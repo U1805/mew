@@ -13,15 +13,12 @@ const io = new Server(httpServer, {
 });
 
 import { authMiddleware } from './gateway/middleware';
+import { registerConnectionHandlers } from './gateway/handlers';
 
 io.use(authMiddleware);
 
 io.on('connection', (socket) => {
-  console.log('Authenticated user connected:', socket.id, 'as', socket.user?.username);
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-  });
+  registerConnectionHandlers(io, socket);
 });
 
 const startServer = async () => {

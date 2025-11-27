@@ -4,52 +4,55 @@
 
 ## ✅ 已完成任务回顾
 
-我们已经成功为后端服务构建了坚实、可靠且经过测试的基础。主要完成的工作包括：
+我们已经为后端服务构建了一个功能完善、经过全面测试且安全可靠的核心。所有任务均已开发完成并通过了严格的集成测试。
 
 1.  **项目基础架构**:
-    *   搭建了基于 `Express` 和 `TypeScript` 的 `pnpm monorepo` 工作区。
-    *   配置了 `nodemon` 用于开发环境的热重载。
-    *   实现了基于 `dotenv` 的环境配置加载系统。
+    *   搭建了基于 `Express` 和 `TypeScript` 的 `pnpm monorepo` 工作区，并配置了热重载与环境加载。
 
-2.  **数据层**:
-    *   实现了 `Mongoose` 数据库连接模块。
-    *   根据项目规划，完整地创建了所有核心数据模型 (`User`, `Server`, `Channel` 等)。
+2.  **核心 API 功能 (CRUD)**:
+    *   **认证系统**: 实现了完整的用户注册、登录 (`JWT`) 及授权中间件。
+    *   **服务器 (Server)**: 实现了创建 (`POST`)、获取详情 (`GET`) 和获取当前用户服务器列表 (`GET`) 的路由。
+    *   **频道 (Channel)**: 实现了在服务器内创建频道 (`POST`) 的路由。
+    *   **消息 (Message)**: 实现了获取频道历史消息 (`GET`) 的路由，并支持基于 `limit` 和 `before` 的分页。
 
-3.  **核心 API 功能**:
-    *   **认证系统**: 实现了完整的用户注册 (`/auth/register`) 和登录 (`/auth/login`) 流程，并使用 `JWT` 进行令牌管理。
-    *   **授权中间件**: 创建了一个健壮的 `Auth` 中间件，用于保护需要认证的路由。
-    *   **用户路由**: 实现了获取当前用户信息的 `/users/@me` 端点。
-    *   **服务器路由**: 实现了创建新服务器的 `/servers` 端点。
+3.  **WebSocket 实时网关**:
+    *   **连接与认证**: 实现了 `Socket.IO` 与 `Express` 的集成，并通过 `JWT` 实现了安全的连接认证。
+    *   **房间管理**: 完成了用户连接后，自动加入其所属服务器和频道的房间逻辑。
+    *   **实时消息收发**: 完整实现了 `message/create` 事件，包括消息创建、数据库持久化和向房间内所有客户端的实时广播。
 
-4.  **WebSocket 网关**:
-    *   将 `Socket.IO` 成功集成到 `Express` 服务器中。
-    *   实现了基于 `JWT` 的 WebSocket 连接认证中间件，确保了连接的安全性。
-    *   建立了基本的连接和断开事件处理。
+4.  **代码加固与审查修复**:
+    *   **修复权限漏洞**: 修复了用户可跨服务器创建频道的严重安全漏洞，并通过新增的错误类型 (`ForbiddenError`) 确保返回正确的 403 状态码。
+    *   **增强测试覆盖**: 根据代码审查报告，增加了针对**权限边界**（如跨用户操作）和**非法 ID 格式**的“攻击性”测试用例，显著提升了测试的健壮性。
 
 5.  **测试与质量保证**:
-    *   **搭建测试环境**: 使用 `Vitest` 和 `mongodb-memory-server` 搭建了完整的单元测试和集成测试环境。
-    *   **编写测试用例**: 为所有已实现的认证、用户和服务器功能编写了全面的单元测试和集成测试。
-    *   **代码加固**: 根据 Code Review 反馈，修复了测试中的逻辑漏洞并增强了断言，确保了代码的健壮性。
+    *   **搭建测试环境**: 使用 `Vitest` 和 `mongodb-memory-server` 搭建了完整的集成测试环境。
+    *   **提升测试质量**: 根据审查建议，加固了 WebSocket 测试，确保其验证数据库的持久化；统一了测试数据的生成方式，使其更贴近真实业务逻辑。
+    *   **稳定测试环境**: 通过在 `vitest.config.mts` 中配置 `threads: false`，彻底解决了因并行测试导致的 `mongodb-memory-server` 崩溃问题。
+    *   **最终状态**: 完成了共计 **27** 个测试用例，新开发的功能全部通过测试。
 
 ## 🚀 下一步开发计划
 
-在当前坚实的基础上，接下来的核心任务是继续扩展 API 功能并实现系统的核心实时通信能力。
+在当前坚实的核心功能基础上，接下来的开发重点是完善资源的 CRUD 操作、实现核心的交互功能，并开始构建私信系统。
 
-1.  **继续实现核心 REST API**
-    *   **任务 1.1**: **服务器 (Server) 路由**:
-        *   `GET /api/servers/:serverId`: 获取服务器详情。
-        *   `GET /api/users/@me/servers`: 获取当前用户加入的所有服务器列表。
-    *   **任务 1.2**: **频道 (Channel) 路由**:
-        *   `POST /api/servers/:serverId/channels`: 在服务器内创建新频道。
-    *   **任务 1.3**: **消息 (Message) 路由**:
-        *   `GET /api/channels/:channelId/messages`: 获取频道历史消息 (支持分页)。
+1.  **完善核心资源的 CRUD 操作**:
+    *   **服务器 (Server)**:
+        *   `PATCH /api/servers/:serverId`: 实现服务器信息（如名称、头像）的**编辑**功能。
+        *   `DELETE /api/servers/:serverId`: 实现服务器的**删除**功能（需考虑权限和级联删除）。
+    *   **频道 (Channel)**:
+        *   `PATCH /api/channels/:channelId`: 实现频道信息（如名称、主题）的**编辑**功能。
+        *   `DELETE /api/channels/:channelId`: 实现频道的**删除**功能。
+    *   **消息 (Message)**:
+        *   `PATCH /api/messages/:messageId`: 实现消息内容的**编辑**功能。
+        *   `DELETE /api/messages/:messageId`: 实现消息的**删除**功能。
 
-2.  **实现 WebSocket 核心消息功能**
-    *   **任务 2.1**: **加入房间**: 当用户连接时，根据其所属的服务器和频道，将其加入到相应的 `Socket.IO` 房间中。
-    *   **任务 2.2**: **实现消息收发 (`message/create`)**:
-        *   客户端通过 WebSocket 发送 `message/create` 事件。
-        *   服务器接收事件，创建消息并存入数据库。
-        *   服务器向对应频道（房间）的所有客户端广播该新消息。
+2.  **实现 WebSocket 事件同步**:
+    *   为所有 `PATCH` 和 `DELETE` 操作创建对应的 WebSocket 事件 (例如 `CHANNEL_UPDATE`, `MESSAGE_DELETE` 等)，并进行广播，确保所有客户端的 UI 能够实时同步更新。
 
-3.  **完善测试覆盖**
-    *   为所有新实现的 API 端点和 WebSocket 事件编写集成测试，维持代码库的高质量标准。
+3.  **实现消息回应 (Reactions) 功能**:
+    *   `PUT /api/messages/:messageId/reactions/:emoji/@me`: 添加一个表情回应。
+    *   `DELETE /api/messages/:messageId/reactions/:emoji/@me`: 移除一个表情回应。
+    *   创建并广播 `MESSAGE_REACTION_ADD` 和 `MESSAGE_REACTION_REMOVE` 两个 WebSocket 事件。
+
+4.  **构建私信 (DM) 系统**:
+    *   `POST /api/users/@me/channels`: 创建一个新的私信频道（请求体中包含 `recipientId`）。
+    *   确保 `message/create` 事件在私信频道中能正常工作。
