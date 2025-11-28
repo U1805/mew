@@ -1,12 +1,19 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, afterEach } from 'vitest';
+import { disconnectAndResetSocket } from '../lib/socket';
 
-// Create a robust mock for the Zustand store that supports both
-// hook usage and direct .getState() calls.
-const state = { token: 'fake-token', user: { username: 'test-user' } };
-const mockUseAuthStore = (selector) => selector ? selector(state) : state;
-mockUseAuthStore.getState = () => state;
+// This mock now correctly handles the hoisting behavior by defining the mock logic
+// inside the factory function, which is executed lazily.
+vi.mock('@/store/authStore', () => {
+  const state = { token: 'fake-token', user: { username: 'test-user' } };
+  const mockUseAuthStore = (selector) => selector ? selector(state) : state;
+  mockUseAuthStore.getState = () => state;
+  return {
+    useAuthStore: mockUseAuthStore,
+  };
+});
 
-vi.mock('@/store/authStore', () => ({
-  useAuthStore: mockUseAuthStore,
-}));
+// After each test, disconnect and reset the global socket instance to prevent test pollution.
+afterEach(() => {
+    disconnectAndResetSocket();
+});

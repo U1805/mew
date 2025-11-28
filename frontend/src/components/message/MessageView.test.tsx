@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import MessageView from './MessageView';
@@ -26,31 +26,37 @@ vi.mock('@/components/providers/SocketProvider', async (importOriginal) => {
     };
 });
 
-const renderWithProviders = (ui: React.ReactElement, { currentUser = { _id: 'default-test-user', username: 'default-test-user' } } = {}) => {
-  vi.mocked(useAuthStore).mockReturnValue({ user: currentUser, token: 'fake-token', getState: () => ({ user: currentUser, token: 'fake-token' }) } as any);
-
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
-  return {
-    ...render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/app/server/1/channel/test-channel']}>
-          <Routes>
-            <Route path="/app/server/:serverId/channel/:channelId" element={ui} />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>
-    ),
-    queryClient,
-  };
-};
-
 describe('MessageView', () => {
     const mockedApiGet = api.get as vi.Mock;
+    let queryClient: QueryClient;
+
+    const renderWithProviders = (ui: React.ReactElement, { currentUser = { _id: 'default-test-user', username: 'default-test-user' } } = {}) => {
+      vi.mocked(useAuthStore).mockReturnValue({ user: currentUser, token: 'fake-token', getState: () => ({ user: currentUser, token: 'fake-token' }) } as any);
+
+      return {
+        ...render(
+          <QueryClientProvider client={queryClient}>
+            <MemoryRouter initialEntries={['/app/server/1/channel/test-channel']}>
+              <Routes>
+                <Route path="/app/server/:serverId/channel/:channelId" element={ui} />
+              </Routes>
+            </MemoryRouter>
+          </QueryClientProvider>
+        ),
+        queryClient,
+      };
+    };
 
     beforeEach(() => {
         vi.clearAllMocks();
         mockSocket.on.mockClear();
         mockSocket.off.mockClear();
+        queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
+    });
+
+    afterEach(() => {
+        cleanup();
+        queryClient.clear();
     });
 
     it('renders initial messages correctly', async () => {
@@ -63,7 +69,7 @@ describe('MessageView', () => {
     it('updates with a new message from socket', async () => {
         const initialMessagesPage = { messages: [] };
         mockedApiGet.mockResolvedValue({ data: initialMessagesPage });
-        const { queryClient } = renderWithProviders(<MessageView setReplyingTo={vi.fn()} />);
+        renderWithProviders(<MessageView setReplyingTo={vi.fn()} />);
         await waitFor(() => expect(queryClient.getQueryData(['channels', 'test-channel', 'messages'])).toBeDefined());
         const newMessage = { _id: '3', channelId: 'test-channel', content: 'A new message', author: { username: 'Charlie' } };
         const messageCallback = mockSocket.on.mock.calls.find(call => call[0] === 'message/create')?.[1];

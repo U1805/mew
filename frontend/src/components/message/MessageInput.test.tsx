@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { vi } from 'vitest';
 import MessageInput from './MessageInput';
@@ -28,6 +28,10 @@ describe('MessageInput', () => {
     // Clear mock history before each test
     vi.clearAllMocks();
     defaultProps.setReplyingTo.mockClear();
+  });
+
+  afterEach(() => {
+    cleanup();
   });
 
   it('should update input value on user typing', async () => {

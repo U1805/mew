@@ -10,6 +10,7 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+    reporters: ['default', 'hanging-process'],
     setupFiles: './src/test/setup.ts',
     deps: {
       inline: ['parse5', 'jsdom', 'react-router-dom', 'axios'],

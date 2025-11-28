@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 
 const URL = import.meta.env.VITE_API_BASE_URL.replace('/api', '');
 
-let socket: Socket;
+let socket: Socket | undefined;
 
 export const getSocket = () => {
   if (!socket) {
@@ -21,4 +21,11 @@ export const getSocket = () => {
   }
 
   return socket;
+};
+
+export const disconnectAndResetSocket = () => {
+    if (socket) {
+        socket.disconnect();
+        socket = undefined;
+    }
 };
