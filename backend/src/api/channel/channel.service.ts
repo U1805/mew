@@ -1,13 +1,14 @@
-import Channel, { IChannel } from '../../models/Channel';
-import Server from '../../models/Server';
-import Message from '../../models/Message';
-import { NotFoundError, ForbiddenError } from '../../utils/errors';
-import { broadcastEvent } from '../../gateway/events';
+import Channel, { IChannel } from './channel.model.js';
+import Server from '../server/server.model.js';
+import Message from '../message/message.model.js';
+import Category from '../category/category.model.js';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors.js';
+import { broadcastEvent } from '../../gateway/events.js';
 
 export const createChannel = async (data: Partial<IChannel>, userId: string) => {
   const { serverId } = data;
   if (!serverId) {
-    throw new Error('Server ID is required to create a channel');
+    throw new BadRequestError('Server ID is required to create a channel');
   }
 
   const server = await Server.findById(serverId);
@@ -17,6 +18,16 @@ export const createChannel = async (data: Partial<IChannel>, userId: string) => 
 
   if (server.ownerId.toString() !== userId) {
     throw new ForbiddenError('You do not have permission to create a channel in this server');
+  }
+
+  if (data.categoryId) {
+    const category = await Category.findById(data.categoryId);
+    if (!category) {
+      throw new NotFoundError('Category not found');
+    }
+    if (category.serverId.toString() !== server.id) {
+      throw new ForbiddenError('Category does not belong to this server');
+    }
   }
 
   const channel = new Channel(data);
@@ -49,6 +60,16 @@ export const updateChannel = async (
     throw new ForbiddenError('You do not have permission to edit this channel');
   }
 
+  if (data.categoryId) {
+    const category = await Category.findById(data.categoryId);
+    if (!category) {
+      throw new NotFoundError('Category not found');
+    }
+    if (category.serverId.toString() !== server.id) {
+      throw new ForbiddenError('Category does not belong to this server');
+    }
+  }
+
   Object.assign(channel, data);
   await channel.save();
 
@@ -76,7 +97,7 @@ export const deleteChannel = async (channelId: string, userId: string) => {
 
 export const createDmChannel = async (userId: string, recipientId: string) => {
   if (userId === recipientId) {
-    throw new Error('You cannot create a DM with yourself');
+    throw new BadRequestError('You cannot create a DM with yourself');
   }
 
   // Check if a DM channel already exists between the two users

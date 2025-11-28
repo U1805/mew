@@ -6,8 +6,8 @@ import {
   getMessagesHandler,
   removeReactionHandler,
   updateMessageHandler,
-} from './message.controller';
-import { protect } from '../../middleware/auth';
+} from './message.controller.js';
+import { protect } from '../../middleware/auth.js';
 
 const router = Router({ mergeParams: true });
 

@@ -1,81 +1,43 @@
 import { Request, Response } from 'express';
 import * as channelService from './channel.service';
-import { NotFoundError, ForbiddenError } from '../../utils/errors';
+import { UnauthorizedError } from '../../utils/errors';
+import asyncHandler from '../../utils/asyncHandler';
 
-export const createChannelHandler = async (req: Request, res: Response) => {
-  try {
-    const data = {
-      ...req.body,
-      serverId: req.params.serverId,
-    };
+export const createChannelHandler = asyncHandler(async (req: Request, res: Response) => {
+  const data = {
+    ...req.body,
+    serverId: req.params.serverId,
+  };
 
-    if (!req.user) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
-
-    const channel = await channelService.createChannel(data, req.user.id);
-    res.status(201).json(channel);
-  } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return res.status(403).json({ message: error.message });
-    }
-    if (error instanceof NotFoundError) {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error instanceof Error) {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: 'An unknown error occurred' });
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
   }
-};
 
-export const updateChannelHandler = async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
+  const channel = await channelService.createChannel(data, req.user.id);
+  res.status(201).json(channel);
+});
 
-    const channel = await channelService.updateChannel(
-      req.params.channelId,
-      req.user.id,
-      req.body
-    );
-    res.status(200).json(channel);
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error instanceof ForbiddenError) {
-      return res.status(403).json({ message: error.message });
-    }
-    if (error instanceof Error) {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: 'An unknown error occurred' });
+export const updateChannelHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
   }
-};
 
-export const deleteChannelHandler = async (req: Request, res: Response) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({ message: 'Not authenticated' });
-    }
+  const channel = await channelService.updateChannel(
+    req.params.channelId,
+    req.user.id,
+    req.body
+  );
+  res.status(200).json(channel);
+});
 
-    const result = await channelService.deleteChannel(
-      req.params.channelId,
-      req.user.id
-    );
-    res.status(200).json(result);
-  } catch (error) {
-    if (error instanceof NotFoundError) {
-      return res.status(404).json({ message: error.message });
-    }
-    if (error instanceof ForbiddenError) {
-      return res.status(403).json({ message: error.message });
-    }
-    if (error instanceof Error) {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: 'An unknown error occurred' });
+export const deleteChannelHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
   }
-};
+
+  const result = await channelService.deleteChannel(
+    req.params.channelId,
+    req.user.id
+  );
+  res.status(200).json(result);
+});

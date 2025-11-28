@@ -3,11 +3,11 @@ import {
   createChannelHandler,
   deleteChannelHandler,
   updateChannelHandler,
-} from './channel.controller';
-import messageRoutes from '../message/message.routes';
-import { protect } from '../../middleware/auth';
-import validate from '../../middleware/validate';
-import { createChannelSchema, updateChannelSchema } from './channel.validation';
+} from './channel.controller.js';
+import messageRoutes from '../message/message.routes.js';
+import { protect } from '../../middleware/auth.js';
+import validate from '../../middleware/validate.js';
+import { createChannelSchema, updateChannelSchema } from './channel.validation.js';
 
 const router = Router({ mergeParams: true });
 

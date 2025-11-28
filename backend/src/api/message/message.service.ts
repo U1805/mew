@@ -1,6 +1,6 @@
-import Message, { IMessage } from '../../models/Message';
-import { ForbiddenError, NotFoundError } from '../../utils/errors';
-import { broadcastEvent } from '../../gateway/events';
+import Message, { IMessage } from './message.model.js';
+import { ForbiddenError, NotFoundError } from '../../utils/errors.js';
+import { broadcastEvent } from '../../gateway/events.js';
 
 interface GetMessagesOptions {
   channelId: string;
@@ -81,21 +81,30 @@ export const addReaction = async (
   userId: string,
   emoji: string
 ) => {
-  const message = await getMessageById(messageId);
-  const reaction = message.reactions?.find((r) => r.emoji === emoji);
+  // First, try to add the user to an existing reaction array.
+  const updatedMessageWithExistingReaction = await Message.findOneAndUpdate(
+    { _id: messageId, 'reactions.emoji': emoji },
+    { $addToSet: { 'reactions.$.userIds': userId } },
+    { new: true }
+  ).populate('authorId', 'username avatarUrl');
 
-  if (reaction) {
-    if (!reaction.userIds.includes(userId as any)) {
-      reaction.userIds.push(userId as any);
-    }
-  } else {
-    message.reactions?.push({ emoji, userIds: [userId as any] });
+  let finalMessage = updatedMessageWithExistingReaction;
+
+  // If no document was updated, it means the reaction emoji doesn't exist yet.
+  if (!updatedMessageWithExistingReaction) {
+    finalMessage = await Message.findOneAndUpdate(
+      { _id: messageId },
+      { $push: { reactions: { emoji, userIds: [userId] } } },
+      { new: true }
+    ).populate('authorId', 'username avatarUrl');
   }
 
-  await message.save();
-  const populatedMessage = await message.populate('authorId', 'username avatarUrl');
-  broadcastEvent(message.channelId.toString(), 'MESSAGE_REACTION_ADD', populatedMessage);
-  return populatedMessage;
+  if (!finalMessage) {
+    throw new NotFoundError('Message not found');
+  }
+
+  broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_ADD', finalMessage);
+  return finalMessage;
 };
 
 export const removeReaction = async (
@@ -103,27 +112,30 @@ export const removeReaction = async (
   userId: string,
   emoji: string
 ) => {
-  const message = await getMessageById(messageId);
-  const reactionIndex = message.reactions?.findIndex((r) => r.emoji === emoji);
+  // Pull the user's ID from the specified reaction's userIds array.
+  const updatedMessage = await Message.findOneAndUpdate(
+    { _id: messageId, 'reactions.emoji': emoji },
+    { $pull: { 'reactions.$.userIds': userId } },
+    { new: true }
+  );
 
-  if (reactionIndex === undefined || reactionIndex === -1) {
-    throw new NotFoundError('Reaction not found');
+  if (!updatedMessage) {
+    throw new NotFoundError('Message or reaction not found');
   }
 
-  const reaction = message.reactions?.[reactionIndex];
-  if (reaction) {
-    const userIndex = reaction.userIds.indexOf(userId as any);
-    if (userIndex > -1) {
-      reaction.userIds.splice(userIndex, 1);
-    }
+  // Clean up any reactions that now have an empty userIds array.
+  const finalMessage = await Message.findOneAndUpdate(
+    { _id: messageId },
+    { $pull: { reactions: { userIds: { $size: 0 } } } },
+    { new: true }
+  ).populate('authorId', 'username avatarUrl');
 
-    if (reaction.userIds.length === 0) {
-      message.reactions?.splice(reactionIndex, 1);
-    }
+  if (!finalMessage) {
+    // This case should ideally not be hit if the first update succeeded,
+    // but it's here for safety.
+    throw new NotFoundError('Message not found after reaction cleanup');
   }
 
-  await message.save();
-  const populatedMessage = await message.populate('authorId', 'username avatarUrl');
-  broadcastEvent(message.channelId.toString(), 'MESSAGE_REACTION_REMOVE', populatedMessage);
-  return populatedMessage;
+  broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_REMOVE', finalMessage);
+  return finalMessage;
 };

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import app from '../../app';
-import { ChannelType } from '../../models/Channel';
+import app from '../../app.js';
+import { ChannelType } from './channel.model.js';
+import Message from '../message/message.model.js';
 
 describe('Channel Routes', () => {
   const userData = {
@@ -112,25 +113,39 @@ describe('Channel Routes', () => {
       channelId = res.body._id;
     });
 
-    it('should delete the channel successfully', async () => {
-      // Create a message in the channel first to test cascade delete
-      await request(app)
-        .post(`/api/channels/${channelId}/messages`)
+    it('should delete the channel successfully but not its messages', async () => {
+      // 1. Create a message in the channel first
+      const createMessageRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ content: 'This message should be deleted' });
+        .send({ content: 'A message to test persistence' });
+      expect(createMessageRes.statusCode).toBe(201);
+      const messageId = createMessageRes.body._id;
 
-      const res = await request(app)
+      // 2. Verify the message is there before we delete the channel
+      const getMessagesRes = await request(app)
+        .get(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(getMessagesRes.statusCode).toBe(200);
+      expect(getMessagesRes.body).toBeInstanceOf(Array);
+      expect(getMessagesRes.body.length).toBe(1);
+
+      // 3. Delete the channel
+      const deleteChannelRes = await request(app)
         .delete(`/api/servers/${serverId}/channels/${channelId}`)
         .set('Authorization', `Bearer ${token}`);
+      expect(deleteChannelRes.statusCode).toBe(200);
+      expect(deleteChannelRes.body.message).toBe('Channel deleted successfully');
 
-      expect(res.statusCode).toBe(200);
-      expect(res.body.message).toBe('Channel deleted successfully');
-
-      // Verify messages are also deleted
-      const messagesRes = await request(app)
-        .get(`/api/channels/${channelId}/messages`)
+      // 4. Verify getting the channel via API now fails (using the proper nested route)
+      const getDeletedChannelRes = await request(app)
+        .get(`/api/servers/${serverId}/channels/${channelId}`)
         .set('Authorization', `Bearer ${token}`);
-      expect(messagesRes.statusCode).toBe(404); // Assuming a getChannelById check
+      expect(getDeletedChannelRes.statusCode).toBe(404);
+
+      // 5. Verify the message object has been deleted from the database
+      const message = await Message.findById(messageId);
+      expect(message).toBeNull();
     });
 
     it('should return 403 if a non-owner tries to delete', async () => {

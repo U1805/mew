@@ -3,11 +3,11 @@ import { io as Client, Socket as ClientSocket } from 'socket.io-client';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import request from 'supertest';
-import app from '../app';
-import { initSocket } from '../gateway/events';
-import { ChannelType } from '../models/Channel';
-import Message from '../models/Message';
-import { authMiddleware } from './middleware';
+import app from '../app.js';
+import { initSocket } from '../gateway/events.js';
+import { ChannelType } from '../api/channel/channel.model.js';
+import Message from '../api/message/message.model.js';
+import { authMiddleware } from './middleware.js';
 
 const createTestClient = (port: number, token: string): ClientSocket => {
   return Client(`http://localhost:${port}`, {

@@ -1,27 +1,28 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User, { IUser } from '../../models/User';
-import config from '../../config';
+import User, { IUser } from '../user/user.model.js';
+import config from '../../config/index.js';
+import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/errors.js';
 
 export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const { email, password } = loginData;
 
   if (!password) {
-    throw new Error('Password is required');
+    throw new BadRequestError('Password is required');
   }
 
   const user = await User.findOne({ email }).select('+password');
   if (!user) {
-    throw new Error('Invalid credentials');
+    throw new UnauthorizedError('Invalid credentials');
   }
 
   const isMatch = await bcrypt.compare(password, user.password || '');
   if (!isMatch) {
-    throw new Error('Invalid credentials');
+    throw new UnauthorizedError('Invalid credentials');
   }
 
   const payload = { id: user.id, username: user.username };
-  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: '1d' });
+  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _, ...userWithoutPassword } = user.toObject();
@@ -33,21 +34,31 @@ export const register = async (userData: Partial<IUser>) => {
   const { email, username, password } = userData;
 
   if (!password) {
-    throw new Error('Password is required');
+    throw new BadRequestError('Password is required');
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  const newUser = new User({
-    email,
-    username,
-    password: hashedPassword,
-  });
+    const newUser = new User({
+      email,
+      username,
+      password: hashedPassword,
+    });
 
-  await newUser.save();
+    await newUser.save();
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { password: _, ...userWithoutPassword } = newUser.toObject();
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = newUser.toObject();
 
-  return userWithoutPassword;
+    return userWithoutPassword;
+  } catch (error: any) {
+    if (error.name === 'MongoServerError' && error.code === 11000) {
+        // Determine which field caused the duplicate key error
+        const field = Object.keys(error.keyPattern)[0];
+        throw new ConflictError(`${field.charAt(0).toUpperCase() + field.slice(1)} already exists.`);
+    }
+    // Re-throw other errors to be handled by the global error handler
+    throw error;
+  }
 };

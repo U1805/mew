@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import * as authService from './auth.service';
-import User from '../../models/User';
+import * as authService from './auth.service.js';
+import User from '../user/user.model.js';
 
 const userData = {
   email: 'test@example.com',
