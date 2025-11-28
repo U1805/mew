@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getMeHandler } from './user.controller';
+import { createDmChannelHandler, getMeHandler } from './user.controller';
 import { getUserServersHandler } from '../server/server.controller';
 import { protect } from '../../middleware/auth';
 
@@ -10,5 +10,6 @@ router.use(protect);
 
 router.get('/@me', getMeHandler);
 router.get('/@me/servers', getUserServersHandler);
+router.post('/@me/channels', createDmChannelHandler);
 
 export default router;

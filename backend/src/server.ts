@@ -14,7 +14,9 @@ const io = new Server(httpServer, {
 
 import { authMiddleware } from './gateway/middleware';
 import { registerConnectionHandlers } from './gateway/handlers';
+import { initSocket } from './gateway/events';
 
+initSocket(io);
 io.use(authMiddleware);
 
 io.on('connection', (socket) => {

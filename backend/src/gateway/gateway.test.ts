@@ -1,72 +1,127 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
 import { io as Client, Socket as ClientSocket } from 'socket.io-client';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import app from '../app';
 import request from 'supertest';
+import app from '../app';
+import { initSocket } from '../gateway/events';
 import { ChannelType } from '../models/Channel';
 import Message from '../models/Message';
 import { authMiddleware } from './middleware';
-import { registerConnectionHandlers } from './handlers';
+
+const createTestClient = (port: number, token: string): ClientSocket => {
+  return Client(`http://localhost:${port}`, {
+    auth: { token },
+    transports: ['websocket'],
+    forceNew: true, // Ensures a new connection for each client
+  });
+};
 
 describe('WebSocket Gateway', () => {
   let httpServer: ReturnType<typeof createServer>;
-  let clientSocket: ClientSocket;
-  let token: string;
-  let channelId: string;
+  let io: Server;
+  let port: number;
+  let client1: ClientSocket, client2: ClientSocket;
+  let token1: string, token2: string;
+  let serverId: string;
+  let channel1Id: string, channel2Id: string;
 
   beforeAll(async () => {
     httpServer = createServer(app);
-    const io = new Server(httpServer);
-    
-    await new Promise<void>(resolve => httpServer.listen(resolve));
+    io = new Server(httpServer);
+    initSocket(io); // Initialize the event broadcaster with our test server
 
-    const port = (httpServer.address() as any).port;
-
-     const userData = { email: 'socket-test@example.com', username: 'sockettest', password: 'password123' };
-    await request(app).post('/api/auth/register').send(userData);
-    const loginRes = await request(app).post('/api/auth/login').send({ email: userData.email, password: userData.password });
-    token = loginRes.body.token;
-
-    const serverRes = await request(app).post('/api/servers').set('Authorization', `Bearer ${token}`).send({ name: 'Socket Test' });
-    const channelRes = await request(app).post(`/api/servers/${serverRes.body._id}/channels`).set('Authorization', `Bearer ${token}`).send({ name: 'socket-channel', type: ChannelType.GUILD_TEXT });
-    channelId = channelRes.body._id;
-
-    // Apply middlewares and handlers to the test Io Server
     io.use(authMiddleware);
     io.on('connection', (socket) => {
-      registerConnectionHandlers(io, socket);
+      socket.on('join', (room) => socket.join(room));
     });
 
-    clientSocket = Client(`http://localhost:${port}`, { auth: { token } });
+    await new Promise<void>((resolve) => httpServer.listen(resolve));
+    port = (httpServer.address() as any).port;
+
+    const user1Data = { email: 'socket-user1@example.com', username: 'socketuser1', password: 'password123' };
+    const user2Data = { email: 'socket-user2@example.com', username: 'socketuser2', password: 'password123' };
+
+    await request(app).post('/api/auth/register').send(user1Data);
+    const loginRes1 = await request(app).post('/api/auth/login').send({ email: user1Data.email, password: user1Data.password });
+    token1 = loginRes1.body.token;
+
+    await request(app).post('/api/auth/register').send(user2Data);
+    const loginRes2 = await request(app).post('/api/auth/login').send({ email: user2Data.email, password: user2Data.password });
+    token2 = loginRes2.body.token;
+
+    const serverRes = await request(app).post('/api/servers').set('Authorization', `Bearer ${token1}`).send({ name: 'Socket Test' });
+    serverId = serverRes.body._id;
+
+    const ch1Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel One', type: ChannelType.GUILD_TEXT });
+    channel1Id = ch1Res.body._id;
+
+    const ch2Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel Two', type: ChannelType.GUILD_TEXT });
+    channel2Id = ch2Res.body._id;
   });
 
   afterAll(() => {
-    clientSocket.close();
+    io.close();
     httpServer.close();
   });
 
-  it('should create a message, persist it, and broadcast to room', (done) => {
-    const messageData = { channelId, content: 'Hello WebSocket' };
+  afterEach(() => {
+    client1?.disconnect();
+    client2?.disconnect();
+  });
 
-    clientSocket.on('message/create', async (message) => {
-      try {
-        // 1. Verify broadcast content
-        expect(message.content).toBe(messageData.content);
-        expect(message.channelId).toBe(channelId);
-        expect(message.authorId.username).toBe('sockettest'); // Check that author is populated
+  it('should reject connection for invalid token', async () => {
+    const promise = new Promise<void>((resolve, reject) => {
+      const badClient = Client(`http://localhost:${port}`, { auth: { token: 'bad-token' } });
+      badClient.on('connect_error', (err) => {
+        expect(err.message).toBe('Authentication error: Invalid token');
+        badClient.close();
+        resolve();
+      });
+      setTimeout(() => reject(new Error('Test timed out waiting for connect_error')), 2000);
+    });
+    await promise;
+  });
 
-        // 2. Verify database persistence
-        const savedMsg = await Message.findById(message._id);
-        expect(savedMsg).toBeTruthy();
-        expect(savedMsg?.content).toBe(messageData.content);
+  it('should broadcast a message only to clients in the correct room', async () => {
+    client1 = createTestClient(port, token1);
+    client2 = createTestClient(port, token2);
 
-        done();
-      } catch (error) {
-        done(error);
-      }
+    const client1ReceivesMessage = new Promise<void>((resolve, reject) => {
+      client1.on('MESSAGE_CREATE', (message) => {
+        try {
+          expect(message.content).toBe('Hello from channel one');
+          expect(message.channelId).toBe(channel1Id);
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
     });
 
-    clientSocket.emit('message/create', messageData);
+    const client2DoesNotReceiveMessage = new Promise<void>((resolve) => {
+      client2.on('MESSAGE_CREATE', () => { throw new Error('Client 2 should not have received this message'); });
+      setTimeout(resolve, 500); // Wait 500ms and assume no message is received
+    });
+
+    // Wait for sockets to connect
+    await new Promise<void>(resolve => client1.on('connect', () => resolve()));
+    await new Promise<void>(resolve => client2.on('connect', () => resolve()));
+
+    // Join rooms
+    client1.emit('join', channel1Id);
+    client2.emit('join', channel2Id);
+
+    // API call to create a message, which triggers the broadcast
+    await request(app)
+      .post(`/api/servers/${serverId}/channels/${channel1Id}/messages`)
+      .set('Authorization', `Bearer ${token1}`)
+      .send({ content: 'Hello from channel one' });
+
+    // Await all test promises
+    await Promise.all([client1ReceivesMessage, client2DoesNotReceiveMessage]);
+
+    const savedMsg = await Message.findOne({ channelId: channel1Id, content: 'Hello from channel one' });
+    expect(savedMsg).toBeTruthy();
   });
 });

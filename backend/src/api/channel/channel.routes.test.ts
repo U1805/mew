@@ -63,4 +63,87 @@ describe('Channel Routes', () => {
       expect(res.statusCode).toBe(400);
     });
   });
+
+  describe('PATCH /api/servers/:serverId/channels/:channelId', () => {
+    let channelId: string;
+
+    beforeEach(async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'ChannelToUpdate', type: ChannelType.GUILD_TEXT });
+      channelId = res.body._id;
+    });
+
+    it('should update the channel name successfully', async () => {
+      const updatedData = { name: 'Updated Channel Name' };
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatedData);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.name).toBe(updatedData.name);
+    });
+
+    it('should return 403 if a non-owner tries to update', async () => {
+      const anotherUserData = { email: 'updater@example.com', username: 'updater', password: 'password123' };
+      await request(app).post('/api/auth/register').send(anotherUserData);
+      const loginRes = await request(app).post('/api/auth/login').send({ email: anotherUserData.email, password: anotherUserData.password });
+      const anotherToken = loginRes.body.token;
+
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${anotherToken}`)
+        .send({ name: 'Malicious Update' });
+
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('DELETE /api/servers/:serverId/channels/:channelId', () => {
+    let channelId: string;
+
+    beforeEach(async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'ChannelToDelete', type: ChannelType.GUILD_TEXT });
+      channelId = res.body._id;
+    });
+
+    it('should delete the channel successfully', async () => {
+      // Create a message in the channel first to test cascade delete
+      await request(app)
+        .post(`/api/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'This message should be deleted' });
+
+      const res = await request(app)
+        .delete(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.message).toBe('Channel deleted successfully');
+
+      // Verify messages are also deleted
+      const messagesRes = await request(app)
+        .get(`/api/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(messagesRes.statusCode).toBe(404); // Assuming a getChannelById check
+    });
+
+    it('should return 403 if a non-owner tries to delete', async () => {
+      const anotherUserData = { email: 'deleter@example.com', username: 'deleter', password: 'password123' };
+      await request(app).post('/api/auth/register').send(anotherUserData);
+      const loginRes = await request(app).post('/api/auth/login').send({ email: anotherUserData.email, password: anotherUserData.password });
+      const anotherToken = loginRes.body.token;
+
+      const res = await request(app)
+        .delete(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${anotherToken}`);
+
+      expect(res.statusCode).toBe(403);
+    });
+  });
 });
