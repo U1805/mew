@@ -1,192 +1,293 @@
-# Mew - 即时通讯平台实现规划
+# Mew - 即时通讯平台实现规划 (v2 - 同步代码)
 
-本文档详细描述了 Mew 即时通讯（IM）平台核心功能的实现方案，旨在作为后续开发工作的技术蓝图。方案严格遵循 `PROJECT.md` 中定义的愿景，专注于构建一个稳定、可靠且高度可扩展的 IM 核心。
+**最后更新时间: 2025-11-28**
+
+本文档详细描述了 Mew 即时通讯（IM）平台核心功能的**当前实现**，旨在作为前端开发的权威技术蓝图。本文档已与后端代码库同步。
 
 ## 一、 数据模型设计 (MongoDB Schema)
 
-采用 Mongoose 设计，以下是核心实体的 Schema 定义。
+所有模型都自动包含 `createdAt` 和 `updatedAt` 时间戳字段。
 
 ### 1. User (用户)
+
+存储用户信息和认证凭据。
 
 ```typescript
 {
   _id: ObjectId,
+  email: { type: String, required: true, unique: true },
   username: { type: String, required: true, unique: true },
+  password: { type: String, required: true, select: false }, // 不会在查询中默认返回
   avatarUrl: String,
   isBot: { type: Boolean, default: false },
-  token: { type: String, required: true }, // Encrypted
   createdAt: Date,
   updatedAt: Date
 }
 ```
+**注意**: 认证 `token` 是在登录时动态生成的，不会存储在数据库中。
 
 ### 2. Server (服务器)
+
+代表一个服务器实例。
 
 ```typescript
 {
   _id: ObjectId,
   name: { type: String, required: true },
   avatarUrl: String, // 服务器头像 URL
-  ownerId: { type: ObjectId, ref: 'User' },
-  createdAt: Date
+  ownerId: { type: ObjectId, ref: 'User', required: true },
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
 ### 3. Category (分组)
 
+服务器内的频道分组。
+
 ```typescript
 {
   _id: ObjectId,
   name: { type: String, required: true },
-  serverId: { type: ObjectId, ref: 'Server' },
-  position: Number,
-  createdAt: Date
+  serverId: { type: ObjectId, ref: 'Server', required: true },
+  position: Number, // 可选，用于排序
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
 ### 4. Channel (频道)
 
+消息发生的场所，分为服务器频道和私聊。
+
 ```typescript
+export enum ChannelType {
+  GUILD_TEXT = 'GUILD_TEXT',
+  DM = 'DM',
+}
+
 {
   _id: ObjectId,
-  name: String, // Nullable for DM
+  name: String, // 私聊时可为空
   type: { type: String, enum: ['GUILD_TEXT', 'DM'], required: true },
-  serverId: { type: ObjectId, ref: 'Server' }, // Nullable for DM
-  categoryId: { type: ObjectId, ref: 'Category' },
-  recipients: [{ type: ObjectId, ref: 'User' }], // For DM
-  position: Number,
-  createdAt: Date
+  serverId: { type: ObjectId, ref: 'Server' }, // 私聊时为空
+  categoryId: { type: ObjectId, ref: 'Category' }, // 可选
+  recipients: [{ type: ObjectId, ref: 'User' }], // 仅用于私聊
+  position: Number, // 可选，用于排序
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
 ### 5. Message (消息)
 
+核心消息数据结构。
+
 ```typescript
+// 内嵌 Schema 定义
+const AttachmentSchema = {
+  filename: string,
+  contentType: string,
+  url: string,
+  size: number
+};
+
+const ReactionSchema = {
+  emoji: string,
+  userIds: [ObjectId] // 点了这个 reaction 的所有用户 ID
+};
+
 {
   _id: ObjectId,
   channelId: { type: ObjectId, ref: 'Channel', required: true },
   authorId: { type: ObjectId, ref: 'User', required: true },
   type: { type: String, default: 'message/default' },
-  content: { type: String, required: true }, // Fallback text
-  payload: Object, // Structured data for custom rendering
+  content: { type: String, required: true }, // 降级纯文本
+  payload: Object, // 用于自定义渲染的结构化数据
   attachments: [AttachmentSchema],
   mentions: [{ type: ObjectId, ref: 'User' }],
-  referencedMessageId: { type: ObjectId, ref: 'Message' },
+  referencedMessageId: { type: ObjectId, ref: 'Message' }, // 引用的消息
   reactions: [ReactionSchema],
+  editedAt: Date, // 消息编辑时间
   createdAt: Date,
-  editedAt: Date
+  updatedAt: Date
 }
 ```
-
-**内嵌 Schemas:**
-
-*   **Attachment**: `{ filename, contentType, url, size }`
-*   **Reaction**: `{ emoji, userIds: [ObjectId] }`
 
 ---
 
 ## 二、 RESTful API 设计
 
-除特殊说明外，所有 API 均需通过 `Authorization: Bearer <TOKEN>` 进行认证。
+**基础URL**: `/api`
+**认证**: 除特殊说明外，所有 API 均需在请求头中提供 `Authorization: Bearer <TOKEN>`。
 
-- **认证 (公开访问)**
-  - `POST /auth/login`: 用户登录以获取认证 Token。此接口本身不需要认证。
+### 认证 (`/auth`)
 
-- **用户 (`/users`)**
-  - `GET /@me`
-  - `GET /:userId`
+- `POST /auth/register` (公开)
+  - **描述**: 注册新用户。
+  - **请求体**: `{"username": "string", "email": "string", "password": "string"}`
 
-- **服务器 (`/servers`)**
-  - `GET /`
-  - `POST /` (请求体现在可以包含 `avatarUrl`)
-  - `GET /:serverId`
-  - `PATCH /:serverId` (请求体现在可以包含 `avatarUrl`)
-  - `DELETE /:serverId`
+- `POST /auth/login` (公开)
+  - **描述**: 用户登录，获取 JWT。
+  - **请求体**: `{"email": "string", "password": "string"}`
+  - **响应**: `{"token": "string"}`
 
-- **频道 (`/channels`, `/servers/:serverId/channels`)**
-  - `GET /servers/:serverId/channels`
-  - `POST /channels` (创建服务器频道或 DM)
-  - `GET /:channelId`
-  - `PATCH /:channelId`
-  - `DELETE /:channelId`
+### 用户 (`/users`)
 
-- **消息 (`/channels/:channelId/messages`)**
-  - `GET /` (支持 `limit`, `before` 分页)
-  - `GET /:messageId`
-  - `POST /`
-  - `PATCH /:messageId`
-  - `DELETE /:messageId`
+- `GET /users/@me`
+  - **描述**: 获取当前认证用户的信息。
 
-- **消息交互 (`.../messages/:messageId/reactions`)**
-  - `PUT /:emoji/@me`
-  - `DELETE /:emoji/@me`
+- `GET /users/@me/servers`
+  - **描述**: 获取当前用户拥有的所有服务器列表。
+
+- `POST /users/@me/channels`
+  - **描述**: 创建或获取一个与其他用户的私聊(DM)频道。
+  - **请求体**: `{"recipientId": "string"}`
+
+### 服务器 (`/servers`)
+
+- `POST /servers`
+  - **描述**: 创建一个新服务器。
+  - **请求体**: `{"name": "string", "avatarUrl": "string" (optional)}`
+
+- `GET /servers/:serverId`
+  - **描述**: 获取指定服务器的详细信息。
+
+- `PATCH /servers/:serverId`
+  - **描述**: 更新服务器信息。
+  - **请求体**: `{"name": "string" (optional), "avatarUrl": "string" (optional)}`
+
+- `DELETE /servers/:serverId`
+  - **描述**: 删除一个服务器。
+
+### 分组 (`/servers/:serverId/categories` 和 `/categories/:categoryId`)
+
+- `POST /servers/:serverId/categories`
+  - **描述**: 在指定服务器下创建新分组。
+  - **请求体**: `{"name": "string"}`
+
+- `PATCH /categories/:categoryId`
+  - **描述**: 更新分组信息。
+  - **请求体**: `{"name": "string" (optional)}`
+
+- `DELETE /categories/:categoryId`
+  - **描述**: 删除一个分组。
+
+### 频道 (`/servers/:serverId/channels`)
+
+- `POST /servers/:serverId/channels`
+  - **描述**: 在指定服务器下创建新频道。
+  - **请求体**: `{"name": "string", "type": "GUILD_TEXT", "categoryId": "string" (optional)}`
+
+- `PATCH /servers/:serverId/channels/:channelId`
+  - **描述**: 更新频道信息。
+  - **请求体**: `{"name": "string" (optional), "categoryId": "string" (optional)}`
+
+- `DELETE /servers/:serverId/channels/:channelId`
+  - **描述**: 删除一个频道。
+
+### 消息 (`/servers/:serverId/channels/:channelId/messages`)
+
+- `GET /`
+  - **描述**: 获取频道的消息列表，支持分页。
+  - **查询参数**:
+    - `limit` (number, 1-100, default: 50)
+    - `before` (string, 消息ID, 用于获取此ID之前的消息)
+
+- `POST /`
+  - **描述**: 发送一条新消息。
+  - **请求体**: `{"content": "string", ...}` (其他字段如 `payload` 待定)
+
+- `PATCH /:messageId`
+  - **描述**: 编辑一条已发送的消息。
+  - **请求体**: `{"content": "string"}`
+
+- `DELETE /:messageId`
+  - **描述**: 删除一条消息。
+
+### 消息交互 (`.../messages/:messageId/reactions`)
+
+- `PUT /:messageId/reactions/:emoji/@me`
+  - **描述**: 为消息添加一个 Reaction。
+  - **`:emoji`** 参数需要进行 URL 编码。
+
+- `DELETE /:messageId/reactions/:emoji/@me`
+  - **描述**: 移除一个 Reaction。
+  - **`:emoji`** 参数需要进行 URL 编码。
 
 ---
 
 ## 三、 WebSocket Gateway 设计
 
-实时通信的核心协议。
+WebSocket 通信基于标准的 Socket.io 事件模型，取代了原计划中复杂的 op-code 协议。
 
-### 1. 数据包结构
+### 1. 连接与认证
 
-```json
-{
-  "op": Number,    // Opcode
-  "d": Object,     // Data
-  "t": String      // Event Name (for op: 0)
-}
-```
+- 客户端在建立连接后，必须通过 `auth` 选项传递有效的 JWT。
+  ```javascript
+  const socket = io("http://localhost:3000", {
+    auth: {
+      token: "YOUR_JWT_TOKEN"
+    }
+  });
+  ```
+- 服务器认证成功后，会自动将该用户加入其所属的所有**服务器房间**和**频道房间**，以便接收相关事件。
 
-### 2. 操作码 (Opcodes)
+### 2. 事件命名
 
-| Code | Name          | Direction        | Description          |
-| :--- | :------------ | :--------------- | :------------------- |
-| 0    | Dispatch      | Server -> Client | 接收一个事件         |
-| 1    | Heartbeat     | Client -> Server | 客户端维持连接       |
-| 2    | Identify      | Client -> Server | 客户端认证           |
-| 10   | Hello         | Server -> Client | 包含心跳间隔         |
-| 11   | Heartbeat ACK | Server -> Client | 确认收到心跳         |
+采用 `feature/action` 的格式，如 `message/create`。
 
-### 3. 核心事件 (Events for `op: 0`)
+### 3. 核心事件
 
-*   `READY`: 认证成功，下发初始状态。
-*   `MESSAGE_CREATE`: 新消息。
-*   `MESSAGE_UPDATE`: 消息编辑。
-*   `MESSAGE_DELETE`: 消息删除。
-*   `CHANNEL_CREATE`, `CHANNEL_UPDATE`, `CHANNEL_DELETE`
-*   `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`
+#### 客户端 -> 服务器
+
+- `message/create`
+  - **描述**: 客户端请求创建一条新消息。
+  - **数据包**: `{"channelId": "string", "content": "string", ...}`
+
+#### 服务器 -> 客户端
+
+- `message/create`
+  - **描述**: 通知客户端有新消息创建。
+  - **数据包**: 完整的消息对象 (IMessage)。
+
+- `message/update`
+  - **描述**: 通知客户端消息被编辑。
+  - **数据包**: 部分更新的消息对象，至少包含 `_id`, `channelId`,和被修改的字段。
+
+- `message/delete`
+  - **描述**: 通知客户端消息被删除。
+  - **数据包**: `{"messageId": "string", "channelId": "string"}`
+
+- `channel/create`, `channel/update`, `channel/delete`
+- `server/update`, `server/delete`
+- `reaction/add`, `reaction/remove`
+
+**注意**: 这是一个简化的实现，后续会根据需求添加更多事件。
 
 ---
 
-## 四、 项目结构规划
+## 四、 项目结构
 
-项目采用 Monorepo 结构进行管理，以提高代码复用性并简化依赖管理。根目录包含 `frontend`, `backend`, 和 `bots` 三个主要的工作区。
+项目采用 Monorepo 结构，后端使用**功能切片 (Feature-Sliced)**架构。
 
 ```
 mew/
 ├── frontend/               # React 前端应用
-│   ├── ...
-│   └── package.json
-│
-├── backend/                # Express 后端应用 (IM 核心)
+├── backend/
 │   ├── src/
-│   │   ├── api/              # RESTful API (Routes, Controllers, Middlewares, Validators)
-│   │   ├── gateway/          # WebSocket Gateway (Manager, Handlers, Events)
-│   │   ├── models/           # Mongoose 数据模型
-│   │   ├── services/         # 业务逻辑层
-│   │   ├── config/           # 配置管理
-│   │   ├── utils/            # 通用工具函数
-│   │   ├── app.ts            # Express 应用主入口
+│   │   ├── api/              # API 核心，按功能模块划分
+│   │   │   ├── auth/
+│   │   │   ├── user/
+│   │   │   ├── server/
+│   │   │   ├── category/
+│   │   │   ├── channel/
+│   │   │   └── message/
+│   │   ├── gateway/          # WebSocket Gateway 逻辑
+│   │   ├── middleware/       # Express 中间件 (auth, validate)
+│   │   ├── utils/            # 通用工具 (errorHandler, db)
+│   │   ├── app.ts            # Express 应用主入口和路由注册
 │   │   └── server.ts         # 服务器启动脚本
-│   ├── .env.example
 │   └── package.json
-│
-├── bots/                   # Bot 服务 (未来实现)
-│   ├── ...
-│   └── package.json
-│
-├── package.json              # Monorepo 根 package.json (使用 pnpm workspaces)
-├── pnpm-workspace.yaml
-├── tsconfig.base.json
-└── README.md
+└── package.json              # Monorepo 根
 ```
