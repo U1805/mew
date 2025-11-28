@@ -113,7 +113,7 @@ describe('Channel Routes', () => {
       channelId = res.body._id;
     });
 
-    it('should delete the channel successfully but not its messages', async () => {
+        it('should delete the channel and its associated messages successfully', async () => {
       // 1. Create a message in the channel first
       const createMessageRes = await request(app)
         .post(`/api/servers/${serverId}/channels/${channelId}/messages`)

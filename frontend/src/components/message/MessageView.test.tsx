@@ -110,7 +110,7 @@ describe('MessageView', () => {
 
         const messageContainer = await screen.findByText('Editable');
         const parentGroup = messageContainer.closest('.group');
-        fireEvent.mouseEnter(parentGroup!);
+        await userEvent.hover(parentGroup!);
 
         const editButton = await screen.findByRole('button', { name: /edit/i });
         await userEvent.click(editButton);
@@ -137,7 +137,7 @@ describe('MessageView', () => {
 
         const messageContainer = await screen.findByText('Deletable');
         const parentGroup = messageContainer.closest('.group');
-        fireEvent.mouseEnter(parentGroup!);
+        await userEvent.hover(parentGroup!);
 
         const deleteButton = await screen.findByRole('button', { name: /delete/i });
         window.confirm = vi.fn(() => true);
@@ -196,7 +196,38 @@ describe('MessageView', () => {
 
         await waitFor(() => {
             expect(screen.getByText('🎉')).toBeInTheDocument();
-            expect(screen.getByText('1')).toBeInTheDocument();
+                    expect(screen.getByText('1')).toBeInTheDocument();
+        });
+    });
+
+    it('updates a message via socket event', async () => {
+        const initialMessagesPage = { messages: [{ _id: '1', content: 'Original content', author: { username: 'Alice' } }] };
+        mockedApiGet.mockResolvedValue({ data: initialMessagesPage });
+        renderWithProviders(<MessageView setReplyingTo={vi.fn()} />);
+
+        expect(await screen.findByText('Original content')).toBeInTheDocument();
+
+        const updateCallback = mockSocket.on.mock.calls.find(call => call[0] === 'message/update')?.[1];
+        updateCallback({ _id: '1', content: 'Updated content' });
+
+        await waitFor(() => {
+            expect(screen.queryByText('Original content')).not.toBeInTheDocument();
+            expect(screen.getByText('Updated content')).toBeInTheDocument();
+        });
+    });
+
+    it('deletes a message via socket event', async () => {
+        const initialMessagesPage = { messages: [{ _id: '1', content: 'To be deleted', author: { username: 'Alice' } }] };
+        mockedApiGet.mockResolvedValue({ data: initialMessagesPage });
+        renderWithProviders(<MessageView setReplyingTo={vi.fn()} />);
+
+        expect(await screen.findByText('To be deleted')).toBeInTheDocument();
+
+        const deleteCallback = mockSocket.on.mock.calls.find(call => call[0] === 'message/delete')?.[1];
+        deleteCallback({ messageId: '1', channelId: 'test-channel' });
+
+        await waitFor(() => {
+            expect(screen.queryByText('To be deleted')).not.toBeInTheDocument();
         });
     });
 });
