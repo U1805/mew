@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore';
 import LoginPage from '@/pages/LoginPage';
 import RegisterPage from '@/pages/RegisterPage';
 import AppLayout from '@/components/layout/AppLayout';
+import ChannelPage from '@/pages/ChannelPage';
 
 const WelcomePage = () => (
   <div className="p-4">
@@ -32,7 +33,11 @@ export const router = createBrowserRouter([
           },
           {
             path: 'app',
-            element: <WelcomePage />
+            element: <WelcomePage />,
+          },
+          {
+            path: 'app/server/:serverId/channel/:channelId',
+            element: <ChannelPage />,
           }
           // Other app routes like /app/server/:serverId will go here
         ]

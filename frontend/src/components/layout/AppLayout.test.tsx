@@ -2,6 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import AppLayout from './AppLayout';
 
+// Mocks for dependencies are now in the global setup file: src/test/setup.ts
+
 // Mock child components to isolate the AppLayout test
 vi.mock('@/components/server/ServerList', () => ({
   default: () => <div data-testid="server-list">ServerList</div>,
@@ -27,12 +29,9 @@ describe('AppLayout', () => {
       </MemoryRouter>
     );
 
-    // Check for the mocked child components
     expect(screen.getByTestId('server-list')).toBeInTheDocument();
     expect(screen.getByTestId('channel-list')).toBeInTheDocument();
     expect(screen.getByTestId('user-panel')).toBeInTheDocument();
-
-    // Check for the Outlet content
     expect(screen.getByText('Outlet Content')).toBeInTheDocument();
   });
 });

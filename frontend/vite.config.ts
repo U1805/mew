@@ -8,10 +8,11 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom',
+    include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
     setupFiles: './src/test/setup.ts',
     deps: {
-      inline: ['parse5', 'jsdom'],
+      inline: ['parse5', 'jsdom', 'react-router-dom', 'axios'],
     },
   },
 });
