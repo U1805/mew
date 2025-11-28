@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import app from '../../app.js';
-import { ChannelType } from './channel.model.js';
-import Message from '../message/message.model.js';
+import app from '../../app';
+import { ChannelType } from './channel.model';
+import Message from '../message/message.model';
 
 describe('Channel Routes', () => {
   const userData = {

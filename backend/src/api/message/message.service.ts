@@ -1,6 +1,6 @@
-import Message, { IMessage } from './message.model.js';
-import { ForbiddenError, NotFoundError } from '../../utils/errors.js';
-import { broadcastEvent } from '../../gateway/events.js';
+import Message, { IMessage } from './message.model';
+import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { broadcastEvent } from '../../gateway/events';
 
 interface GetMessagesOptions {
   channelId: string;

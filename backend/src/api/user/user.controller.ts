@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import * as userService from './user.service.js';
-import * as channelService from '../channel/channel.service.js';
-import { UnauthorizedError } from '../../utils/errors.js';
-import asyncHandler from '../../utils/asyncHandler.js';
+import * as userService from './user.service';
+import * as channelService from '../channel/channel.service';
+import { UnauthorizedError } from '../../utils/errors';
+import asyncHandler from '../../utils/asyncHandler';
 
 export const getMeHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {

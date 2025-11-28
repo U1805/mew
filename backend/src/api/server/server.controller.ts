@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import * as serverService from './server.service.js';
-import asyncHandler from '../../utils/asyncHandler.js';
+import * as serverService from './server.service';
+import asyncHandler from '../../utils/asyncHandler';
 
 export const createServerHandler = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const data = {

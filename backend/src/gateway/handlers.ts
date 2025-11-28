@@ -1,6 +1,6 @@
-import { Server, Socket } from 'socket.io';
-import Channel from '../models/Channel';
-import Server from '../models/Server';
+import { Server as SocketIOServer, Socket } from 'socket.io';
+import Channel from '../api/channel/channel.model';
+import Server from '../api/server/server.model';
 import { createMessage } from '../api/message/message.service';
 
 const joinUserRooms = async (socket: Socket) => {
@@ -11,7 +11,7 @@ const joinUserRooms = async (socket: Socket) => {
 
     // 1. Join all DM channels where the user is a recipient
     const dmChannels = await Channel.find({ recipients: userId });
-    dmChannels.forEach(channel => socket.join(channel.id.toString()));
+    dmChannels.forEach(channel => socket.join(channel._id.toString()));
 
     // 2. Find all servers owned by the user
     const ownedServers = await Server.find({ ownerId: userId });
@@ -19,7 +19,7 @@ const joinUserRooms = async (socket: Socket) => {
 
     // 3. Join all channels in those servers
     const channelsInUserServers = await Channel.find({ serverId: { $in: ownedServerIds } });
-    channelsInUserServers.forEach(channel => socket.join(channel.id.toString()));
+    channelsInUserServers.forEach(channel => socket.join(channel._id.toString()));
 
     // (Optional) Join the server rooms themselves for server-level notifications
     ownedServerIds.forEach(serverId => socket.join(serverId.toString()));
@@ -32,7 +32,7 @@ const joinUserRooms = async (socket: Socket) => {
 };
 
 
-const registerMessageHandlers = (io: Server, socket: Socket) => {
+const registerMessageHandlers = (io: SocketIOServer, socket: Socket) => {
   socket.on('message/create', async (data) => {
     try {
       if (!socket.user) return;
@@ -51,7 +51,7 @@ const registerMessageHandlers = (io: Server, socket: Socket) => {
   });
 };
 
-export const registerConnectionHandlers = (io: Server, socket: Socket) => {
+export const registerConnectionHandlers = (io: SocketIOServer, socket: Socket) => {
   console.log('Authenticated user connected:', socket.id, 'as', socket.user?.username);
 
   joinUserRooms(socket);

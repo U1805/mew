@@ -1,9 +1,9 @@
-import Channel, { IChannel } from './channel.model.js';
-import Server from '../server/server.model.js';
-import Message from '../message/message.model.js';
-import Category from '../category/category.model.js';
-import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors.js';
-import { broadcastEvent } from '../../gateway/events.js';
+import Channel, { IChannel } from './channel.model';
+import Server from '../server/server.model';
+import Message from '../message/message.model';
+import Category from '../category/category.model';
+import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
+import { broadcastEvent } from '../../gateway/events';
 
 export const createChannel = async (data: Partial<IChannel>, userId: string) => {
   const { serverId } = data;
@@ -25,7 +25,7 @@ export const createChannel = async (data: Partial<IChannel>, userId: string) => 
     if (!category) {
       throw new NotFoundError('Category not found');
     }
-    if (category.serverId.toString() !== server.id) {
+        if (category.serverId.toString() !== server._id.toString()) {
       throw new ForbiddenError('Category does not belong to this server');
     }
   }
@@ -54,6 +54,10 @@ export const updateChannel = async (
   data: UpdateChannelData
 ) => {
   const channel = await getChannelById(channelId);
+    if (!channel.serverId) {
+    throw new BadRequestError('channel does not have a server id');
+  }
+
   const server = await Server.findById(channel.serverId);
 
   if (!server || server.ownerId.toString() !== userId) {
@@ -65,7 +69,7 @@ export const updateChannel = async (
     if (!category) {
       throw new NotFoundError('Category not found');
     }
-    if (category.serverId.toString() !== server.id) {
+        if (category.serverId.toString() !== server._id.toString()) {
       throw new ForbiddenError('Category does not belong to this server');
     }
   }
@@ -73,13 +77,19 @@ export const updateChannel = async (
   Object.assign(channel, data);
   await channel.save();
 
-  broadcastEvent(channel.serverId.toString(), 'CHANNEL_UPDATE', channel);
+  if (channel.serverId) {
+    broadcastEvent(channel.serverId.toString(), 'CHANNEL_UPDATE', channel);
+  }
 
   return channel;
 };
 
 export const deleteChannel = async (channelId: string, userId: string) => {
   const channel = await getChannelById(channelId);
+    if (!channel.serverId) {
+    throw new BadRequestError('channel does not have a server id');
+  }
+
   const server = await Server.findById(channel.serverId);
 
   if (!server || server.ownerId.toString() !== userId) {
@@ -90,7 +100,9 @@ export const deleteChannel = async (channelId: string, userId: string) => {
   await Message.deleteMany({ channelId });
   await channel.deleteOne();
 
-  broadcastEvent(channel.serverId.toString(), 'CHANNEL_DELETE', { channelId });
+  if (channel.serverId) {
+    broadcastEvent(channel.serverId.toString(), 'CHANNEL_DELETE', { channelId });
+  }
 
   return { message: 'Channel deleted successfully' };
 };

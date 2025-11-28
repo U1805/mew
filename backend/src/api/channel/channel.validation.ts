@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ChannelType } from './channel.model.js';
+import { ChannelType } from './channel.model';
 
 export const createChannelSchema = z.object({
   body: z.object({

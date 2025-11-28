@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User, { IUser } from '../user/user.model.js';
-import config from '../../config/index.js';
-import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/errors.js';
+import User, { IUser } from '../user/user.model';
+import config from '../../config';
+import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/errors';
 
 export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const { email, password } = loginData;
@@ -21,8 +21,8 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
     throw new UnauthorizedError('Invalid credentials');
   }
 
-  const payload = { id: user.id, username: user.username };
-  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+  const payload = { id: user._id, username: user.username };
+  const token = jwt.sign(payload, config.jwtSecret);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _, ...userWithoutPassword } = user.toObject();

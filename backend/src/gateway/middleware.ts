@@ -1,6 +1,6 @@
 import { Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import config from '../config/index.js';
+import config from '../config';
 
 // Extend Socket type to include user payload
 declare module 'socket.io' {

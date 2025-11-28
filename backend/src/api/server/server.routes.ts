@@ -4,11 +4,11 @@ import {
   deleteServerHandler,
   getServerHandler,
   updateServerHandler,
-} from './server.controller.js';
-import channelRoutes from '../channel/channel.routes.js';
-import { protect } from '../../middleware/auth.js';
-import validate from '../../middleware/validate.js';
-import { createServerSchema, updateServerSchema } from './server.validation.js';
+} from './server.controller';
+import channelRoutes from '../channel/channel.routes';
+import { protect } from '../../middleware/auth';
+import validate from '../../middleware/validate';
+import { createServerSchema, updateServerSchema } from './server.validation';
 
 const router = Router();
 

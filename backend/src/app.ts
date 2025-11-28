@@ -1,9 +1,9 @@
 import express from 'express';
 
-import authRoutes from './api/auth/auth.routes.js';
-import userRoutes from './api/user/user.routes.js';
-import serverRoutes from './api/server/server.routes.js';
-import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes.js';
+import authRoutes from './api/auth/auth.routes';  // Note: This was already correct, no change needed.
+import userRoutes from './api/user/user.routes'; // Note: This was already correct, no change needed.
+import serverRoutes from './api/server/server.routes'; // Note: This was already correct, no change needed.
+import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes'; // Note: This was already correct, no change needed.
 
 const app = express();
 
@@ -22,7 +22,7 @@ app.get('/', (req, res) => {
 });
 
 // Error Handling Middleware
-import { errorHandler } from './utils/errorHandler.js';
+import { errorHandler } from './utils/errorHandler'; // Note: This was already correct, no change needed.
 app.use(errorHandler);
 
 export default app;

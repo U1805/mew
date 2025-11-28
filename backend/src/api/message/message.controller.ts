@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
 import * as messageService from './message.service';
 import { createMessageSchema, getMessagesSchema, updateMessageSchema } from './message.validation';
 import { UnauthorizedError } from '../../utils/errors';
@@ -12,8 +13,8 @@ export const createMessageHandler = asyncHandler(async (req: Request, res: Respo
   const { content } = createMessageSchema.parse(req).body;
 
   const message = await messageService.createMessage({
-    channelId: req.params.channelId,
-    authorId: req.user.id,
+    channelId: new Types.ObjectId(req.params.channelId),
+    authorId: new Types.ObjectId(req.user.id),
     content,
   });
 

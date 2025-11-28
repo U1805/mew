@@ -1,7 +1,7 @@
 import { Router } from 'express';
-import { createDmChannelHandler, getMeHandler } from './user.controller.js';
-import { getUserServersHandler } from '../server/server.controller.js';
-import { protect } from '../../middleware/auth.js';
+import { createDmChannelHandler, getMeHandler } from './user.controller';
+import { getUserServersHandler } from '../server/server.controller';
+import { protect } from '../../middleware/auth';
 
 const router = Router();
 

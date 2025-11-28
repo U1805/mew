@@ -1,8 +1,8 @@
-import Server from './server.model.js';
-import Channel from '../channel/channel.model.js';
-import Message from '../message/message.model.js';
-import { ForbiddenError, NotFoundError } from '../../utils/errors.js';
-import { broadcastEvent } from '../../gateway/events.js';
+import Server from './server.model';
+import Channel from '../channel/channel.model';
+import Message from '../message/message.model';
+import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { broadcastEvent } from '../../gateway/events';
 
 interface CreateServerData {
   name: string;
