@@ -2,9 +2,13 @@
 
 **最后更新时间: 2025-11-28**
 
+**当前状态**: 第一阶段已完成。我们成功搭建了项目基础并实现了完整的用户认证流程。然而，在为该阶段编写单元测试时，发现并确认了项目工具链存在深层次的兼容性问题，导致测试无法运行。在解决该环境问题前，将暂停编写单元测试。下一步将开始第二阶段的开发。
+
+---
+
 现在，让我们基于这个强大的后端，规划前端的开发蓝图。我们可以将整个过程分为几个大的阶段性任务（Epics）：
 
-**第一阶段：奠定基础与用户认证 (Foundation & Authentication)**
+**第一阶段：奠定基础与用户认证 (Foundation & Authentication)** - ✅ **已完成**
 *   **目标**：搭建好前端项目骨架，实现用户注册和登录功能，并建立起与后端通信的桥梁。用户可以登录并保持登录状态。
 *   **关键产出**：可运行的前端应用、登录/注册页面、受保护的路由、全局状态管理。
 
@@ -26,46 +30,60 @@
 
 ---
 
-### **第一阶段：奠定基础与用户认证（细节规划）**
-
-现在，我们来详细规划第一阶段的具体步骤。这是构建整个应用大厦的地基。
+### **第一阶段：奠定基础与用户认证（细节规划）** - ✅ **已完成**
 
 **任务 1：项目初始化与环境配置**
-*   [ ] **安装依赖**：进入 `frontend` 目录，执行 `pnpm install`。
-*   [ ] **配置环境变量**：创建 `.env.local` 文件，并添加 `VITE_API_BASE_URL=http://localhost:3000/api`。
-*   [ ] **建立目录结构**：在 `src` 目录下，创建以下文件夹：`components/`, `pages/`, `lib/` (或 `services/`), `store/`, `hooks/`, `types/`, `router/`。
+*   [x] **安装依赖**：进入 `frontend` 目录，执行 `pnpm install`。
+*   [x] **配置环境变量**：创建 `.env.local` 文件，并添加 `VITE_API_BASE_URL=http://localhost:3000/api`。
+*   [x] **建立目录结构**：在 `src` 目录下，创建以下文件夹：`components/`, `pages/`, `lib/` (或 `services/`), `store/`, `hooks/`, `types/`, `router/`。
 
 **任务 2：创建 API 客户端**
-*   [ ] **封装 API 实例**：在 `lib/api.ts` 中，使用 `axios` 创建一个 API 客户端实例。
+*   [x] **封装 API 实例**：在 `lib/api.ts` 中，使用 `axios` 创建一个 API 客户端实例。
     *   配置 `baseURL`，使其读取 `VITE_API_BASE_URL`。
     *   **关键**：设置一个请求拦截器（Request Interceptor）。这个拦截器的作用是在每次发送请求前，从状态管理（Zustand store）中读取 token，并将其添加到 `Authorization` 请求头中 (`Bearer ${token}`)。
 
 **任务 3：设置全局状态管理 (Zustand)**
-*   [ ] **创建认证 Store**：在 `store/authStore.ts` 中创建一个 Zustand store。
+*   [x] **创建认证 Store**：在 `store/authStore.ts` 中创建一个 Zustand store。
     *   **State**: `user` (用户信息对象 | null), `token` (string | null)。
     *   **Actions**: `setToken(token)`, `setUser(user)`, `logout()`。
     *   **持久化**: 使用 Zustand 的 `persist` 中间件，将 `user` 和 `token` 存储在 `localStorage` 中。
-    *   `logout` action 会清空 state 和 localStorage，并触发重定向。
 
 **任务 4：配置应用路由 (React Router)**
-*   [ ] **安装 React Router**：`pnpm add react-router-dom`。
-*   [ ] **创建路由配置**：在 `router/index.tsx` 中配置应用的路由 (`/login`, `/register`, `/app`)。
-*   [ ] **实现受保护的路由 (`ProtectedRoute`)**：检查用户是否已登录，否则重定向到 `/login`。
-*   [ ] **整合路由**: 在 `App.tsx` 中，使用 `RouterProvider` 来启动整个路由系统。
+*   [x] **安装 React Router**：`pnpm add react-router-dom`。
+*   [x] **创建路由配置**：在 `router/index.tsx` 中配置应用的路由 (`/login`, `/register`, `/app`)。
+*   [x] **实现受保护的路由 (`ProtectedRoute`)**：检查用户是否已登录，否则重定向到 `/login`。
+*   [x] **整合路由**: 在 `App.tsx` 中，使用 `RouterProvider` 来启动整个路由系统。
 
 **任务 5：构建登录与注册页面**
-*   [ ] **创建表单组件**：在 `components/ui/` 中创建基础的 `Input`, `Button`, `Label` 组件。
-*   [ ] **构建页面 UI**：在 `pages/` 中创建 `LoginPage.tsx` 和 `RegisterPage.tsx`。
-*   [ ] **集成数据请求 (TanStack Query)**：
+*   [x] **创建表单组件**：在 `components/ui/` 中创建基础的 `Input`, `Button`, `Label` 组件。
+*   [x] **构建页面 UI**：在 `pages/` 中创建 `LoginPage.tsx` 和 `RegisterPage.tsx`。
+*   [x] **集成数据请求 (TanStack Query)**：
     *   在 `main.tsx` 中用 `QueryClientProvider` 包裹整个应用。
     *   在登录/注册页面中，使用 `useMutation` hook 来处理 API 调用。
-    *   **关键：修正登录流程 (`onSuccess` 回调)**:
-        1.  **第一步**: 调用后端 `POST /api/auth/login`，从响应中获取 `token`。
-        2.  调用 `authStore` 的 `setToken(token)` action 保存 token。
-        3.  **第二步**: **立即**使用新获取的 token 调用 API 客户端，请求 `GET /api/users/@me` 以获取用户信息。
-        4.  拿到用户信息后，调用 `authStore` 的 `setUser(user)` action 保存用户信息。
-        5.  使用 `react-router-dom` 的 `useNavigate` hook 跳转到 `/app` 页面。
-    *   `onError` 回调中，获取并展示错误信息。
+    *   **关键：修正登录流程 (`onSuccess` 回调)**: 已实现。
+
+---
+
+### **第二阶段：核心布局与数据展示（细节规划）**
+
+现在，我们来详细规划第二阶段的具体步骤。
+
+**任务 1：构建应用核心布局**
+*   [ ] **创建 `AppLayout` 组件**：在 `src/pages/` 或 `src/components/layout` 中，创建一个 `AppLayout.tsx` 组件，它将作为登录后所有页面的容器。
+*   [ ] **实现三栏式结构**：使用 Flexbox 或 Grid 布局，在 `AppLayout` 中划分出三列：服务器列表（左侧）、频道/内容区（中间）、用户信息/成员列表（右侧，此阶段可先占位）。
+*   [ ] **更新路由**: 将 `router/index.tsx` 中的占位符 `AppLayout` 替换为真实的组件引用。
+
+**任务 2：获取并展示服务器列表**
+*   [ ] **创建`ServerList`组件**：在 `components/` 中创建服务器列表组件。
+*   [ ] **编写真实 API 调用**: 使用 TanStack Query 的 `useQuery` hook 调用 `GET /api/users/@me/servers` API 来获取用户拥有的服务器列表。
+*   [ ] **渲染列表**: 在 `ServerList` 组件中，将获取到的数据显示为服务器图标或名称的列表。
+
+**任务 3：创建频道列表和用户面板**
+*   [ ] **创建`ChannelList`组件**：在中间栏的顶部创建频道列表组件。在此阶段，它可以是一个静态的占位符。
+*   [ ] **创建`UserPanel`组件**：在中间栏的底部创建用户面板，用于显示当前登录用户的头像和用户名。可以从 Zustand store (`useAuthStore`) 中获取用户信息。
+
+**任务 4：实现占位符内容区**
+*   [ ] 在三栏布局的最右侧（主内容区），显示一个欢迎信息或占位符，例如 “请选择一个频道”。
 
 ---
 
