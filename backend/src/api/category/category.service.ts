@@ -1,68 +1,38 @@
-import Category, { ICategory } from './category.model';
-import Server from '../server/server.model';
-import Channel from '../channel/channel.model';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
+import Server from '../server/server.model';
+import Category, { ICategory } from './category.model';
 
-interface CreateCategoryData {
-  name: string;
-  serverId: string;
-}
+export const createCategory = async (
+  name: string,
+  serverId: string,
+  userId: string
+): Promise<ICategory> => {
+  const server = await Server.findById(serverId);
 
-export const createCategory = async (data: CreateCategoryData, userId: string): Promise<ICategory> => {
-  const server = await Server.findById(data.serverId);
   if (!server) {
     throw new NotFoundError('Server not found');
   }
 
   if (server.ownerId.toString() !== userId) {
-    throw new ForbiddenError('You do not have permission to create a category in this server');
+    throw new ForbiddenError('You are not the owner of this server');
   }
 
-  const category = new Category(data);
-  await category.save();
-  return category;
+  const newCategory = await Category.create({ name, serverId });
+
+  return newCategory;
 };
 
-interface UpdateCategoryData {
-  name?: string;
-  position?: number;
-}
-
-export const updateCategory = async (
-  categoryId: string,
-  userId: string,
-  data: UpdateCategoryData
-): Promise<ICategory> => {
-  const category = await Category.findById(categoryId);
-  if (!category) {
-    throw new NotFoundError('Category not found');
+export const getCategoriesByServer = async (serverId: string, userId: string): Promise<ICategory[]> => {
+  const server = await Server.findById(serverId);
+  if (!server) {
+    throw new NotFoundError('Server not found');
   }
 
-  const server = await Server.findById(category.serverId);
-  if (!server || server.ownerId.toString() !== userId) {
-    throw new ForbiddenError('You do not have permission to edit categories in this server');
+  // For a private system, checking ownership is good practice.
+  if (server.ownerId.toString() !== userId) {
+    throw new ForbiddenError('You do not have permission to view these categories');
   }
 
-  Object.assign(category, data);
-  await category.save();
-  return category;
-};
-
-export const deleteCategory = async (categoryId: string, userId: string) => {
-  const category = await Category.findById(categoryId);
-  if (!category) {
-    throw new NotFoundError('Category not found');
-  }
-
-  const server = await Server.findById(category.serverId);
-  if (!server || server.ownerId.toString() !== userId) {
-    throw new ForbiddenError('You do not have permission to delete categories in this server');
-  }
-
-  // Optional: Move channels from this category to 'uncategorized' (or null)
-  await Channel.updateMany({ categoryId }, { $unset: { categoryId: '' } });
-
-  await category.deleteOne();
-
-  return { message: 'Category deleted successfully' };
+  const categories = await Category.find({ serverId });
+  return categories;
 };

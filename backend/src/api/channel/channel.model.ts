@@ -5,6 +5,11 @@ export enum ChannelType {
   DM = 'DM',
 }
 
+export interface IChannelUpdate {
+  name?: string;
+  categoryId?: mongoose.Types.ObjectId;
+}
+
 export interface IChannel extends Document {
   name?: string;
   type: ChannelType;

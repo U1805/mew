@@ -1,8 +1,8 @@
 # Mew - 即时通讯平台实现规划 (v2 - 同步代码)
 
-**最后更新时间: 2025-11-28**
+**最后更新时间: 2025-05-20**
 
-本文档详细描述了 Mew 即时通讯（IM）平台核心功能的**当前实现**，旨在作为前端开发的权威技术蓝图。本文档已与后端代码库同步。
+本文档详细描述了 Mew 即时通讯（IM）平台核心功能的**当前实现**，旨在作为前端开发的权威技术蓝图。本文档已与后端代码库 (`backend/src`) 同步。
 
 ## 一、 数据模型设计 (MongoDB Schema)
 
@@ -17,24 +17,23 @@
   _id: ObjectId,
   email: { type: String, required: true, unique: true },
   username: { type: String, required: true, unique: true },
-  password: { type: String, required: true, select: false }, // 不会在查询中默认返回
+  password: { type: String, required: true, select: false }, // API 默认不返回
   avatarUrl: String,
-  isBot: { type: Boolean, default: false },
+  isBot: { type: Boolean, default: false }, // 区分机器人账号
   createdAt: Date,
   updatedAt: Date
 }
 ```
-**注意**: 认证 `token` 是在登录时动态生成的，不会存储在数据库中。
 
 ### 2. Server (服务器)
 
-代表一个服务器实例。
+代表一个服务器实例（类似于 Discord 的 Guild）。
 
 ```typescript
 {
   _id: ObjectId,
   name: { type: String, required: true },
-  avatarUrl: String, // 服务器头像 URL
+  avatarUrl: String,
   ownerId: { type: ObjectId, ref: 'User', required: true },
   createdAt: Date,
   updatedAt: Date
@@ -50,7 +49,7 @@
   _id: ObjectId,
   name: { type: String, required: true },
   serverId: { type: ObjectId, ref: 'Server', required: true },
-  position: Number, // 可选，用于排序
+  position: Number, // 可选，用于UI排序
   createdAt: Date,
   updatedAt: Date
 }
@@ -58,22 +57,23 @@
 
 ### 4. Channel (频道)
 
-消息发生的场所，分为服务器频道和私聊。
+消息发生的场所。
 
 ```typescript
-export enum ChannelType {
-  GUILD_TEXT = 'GUILD_TEXT',
-  DM = 'DM',
+// 类型枚举
+enum ChannelType {
+  GUILD_TEXT = 'GUILD_TEXT', // 服务器文字频道
+  DM = 'DM',                 // 私聊频道
 }
 
 {
   _id: ObjectId,
-  name: String, // 私聊时可为空
+  name: String, // DM 类型时通常为空或自动生成
   type: { type: String, enum: ['GUILD_TEXT', 'DM'], required: true },
-  serverId: { type: ObjectId, ref: 'Server' }, // 私聊时为空
-  categoryId: { type: ObjectId, ref: 'Category' }, // 可选
-  recipients: [{ type: ObjectId, ref: 'User' }], // 仅用于私聊
-  position: Number, // 可选，用于排序
+  serverId: { type: ObjectId, ref: 'Server' }, // 仅 GUILD_TEXT 有
+  categoryId: { type: ObjectId, ref: 'Category' }, // 仅 GUILD_TEXT 有
+  recipients: [{ type: ObjectId, ref: 'User' }], // 仅 DM 有
+  position: Number,
   createdAt: Date,
   updatedAt: Date
 }
@@ -84,31 +84,32 @@ export enum ChannelType {
 核心消息数据结构。
 
 ```typescript
-// 内嵌 Schema 定义
-const AttachmentSchema = {
-  filename: string,
-  contentType: string,
-  url: string,
-  size: number
-};
+// 附件结构
+interface IAttachment {
+  filename: string;
+  contentType: string;
+  url: string;
+  size: number;
+}
 
-const ReactionSchema = {
-  emoji: string,
-  userIds: [ObjectId] // 点了这个 reaction 的所有用户 ID
-};
+// 反应结构 (Reactions)
+interface IReaction {
+  emoji: string;
+  userIds: ObjectId[]; // 包含点击该 emoji 的所有用户 ID
+}
 
 {
   _id: ObjectId,
   channelId: { type: ObjectId, ref: 'Channel', required: true },
-  authorId: { type: ObjectId, ref: 'User', required: true },
+  authorId: { type: ObjectId, ref: 'User', required: true }, // Populate 后包含 username, avatarUrl
   type: { type: String, default: 'message/default' },
-  content: { type: String, required: true }, // 降级纯文本
-  payload: Object, // 用于自定义渲染的结构化数据
+  content: { type: String, required: true }, // 文本内容
+  payload: Object, // 用于插件化渲染的自定义数据
   attachments: [AttachmentSchema],
   mentions: [{ type: ObjectId, ref: 'User' }],
-  referencedMessageId: { type: ObjectId, ref: 'Message' }, // 引用的消息
+  referencedMessageId: { type: ObjectId, ref: 'Message' }, // 回复消息引用
   reactions: [ReactionSchema],
-  editedAt: Date, // 消息编辑时间
+  editedAt: Date, // 编辑时间，未编辑则为空
   createdAt: Date,
   updatedAt: Date
 }
@@ -118,149 +119,134 @@ const ReactionSchema = {
 
 ## 二、 RESTful API 设计
 
-**基础URL**: `/api`
-**认证**: 除特殊说明外，所有 API 均需在请求头中提供 `Authorization: Bearer <TOKEN>`。
+**基础 URL**: `/api`
+**认证**: 所有受保护接口均需在 Header 中携带 `Authorization: Bearer <TOKEN>`。
 
-### 认证 (`/auth`)
+### 1. 认证 (Auth)
+*Path: `/api/auth`*
 
-- `POST /auth/register` (公开)
-  - **描述**: 注册新用户。
-  - **请求体**: `{"username": "string", "email": "string", "password": "string"}`
+- `POST /register`: 注册 (Body: `email`, `username`, `password`)
+- `POST /login`: 登录 (Body: `email`, `password`) -> 返回 `{ user, token }`
 
-- `POST /auth/login` (公开)
-  - **描述**: 用户登录，获取 JWT。
-  - **请求体**: `{"email": "string", "password": "string"}`
-  - **响应**: `{"token": "string"}`
+### 2. 用户 (Users)
+*Path: `/api/users`*
 
-### 用户 (`/users`)
+- `GET /@me`: 获取当前用户信息。
+- `GET /@me/servers`: 获取当前用户拥有的服务器列表。
+- `POST /@me/channels`: 创建或获取私聊(DM)频道。
+    - Body: `{ recipientId: string }`
 
-- `GET /users/@me`
-  - **描述**: 获取当前认证用户的信息。
+### 3. 服务器 (Servers)
+*Path: `/api/servers`*
 
-- `GET /users/@me/servers`
-  - **描述**: 获取当前用户拥有的所有服务器列表。
+- `POST /`: 创建服务器 (Body: `name`, `avatarUrl?`)
+- `GET /:serverId`: 获取服务器详情。
+- `PATCH /:serverId`: 更新服务器信息。
+- `DELETE /:serverId`: 删除服务器（级联删除内含的频道和消息）。
 
-- `POST /users/@me/channels`
-  - **描述**: 创建或获取一个与其他用户的私聊(DM)频道。
-  - **请求体**: `{"recipientId": "string"}`
+### 4. 分组 (Categories)
+*Path 1: `/api/servers/:serverId/categories` (创建)*
+*Path 2: `/api/categories` (操作)*
 
-### 服务器 (`/servers`)
+- `POST /api/servers/:serverId/categories`: 在服务器下创建分组 (Body: `name`)
+- `PATCH /api/categories/:categoryId`: 更新分组。
+- `DELETE /api/categories/:categoryId`: 删除分组。
 
-- `POST /servers`
-  - **描述**: 创建一个新服务器。
-  - **请求体**: `{"name": "string", "avatarUrl": "string" (optional)}`
+### 5. 频道 (Channels)
+*Path 1: `/api/servers/:serverId/channels` (创建)*
+*Path 2: `/api/servers/:serverId/channels/:channelId` (操作)*
+*(注：操作路径中保留 serverId 是为了路由挂载方便，虽然 ID 唯一)*
 
-- `GET /servers/:serverId`
-  - **描述**: 获取指定服务器的详细信息。
+- `POST /`: 创建频道 (Body: `name`, `type`, `categoryId?`)
+- `PATCH /:channelId`: 更新频道。
+- `DELETE /:channelId`: 删除频道。
 
-- `PATCH /servers/:serverId`
-  - **描述**: 更新服务器信息。
-  - **请求体**: `{"name": "string" (optional), "avatarUrl": "string" (optional)}`
+### 6. 消息 (Messages)
+*Path: `/api/servers/:serverId/channels/:channelId/messages`*
+*(注：私聊消息路径逻辑上不含 serverId，但在当前路由挂载下统一处理，后续可能优化)*
 
-- `DELETE /servers/:serverId`
-  - **描述**: 删除一个服务器。
+- `GET /`: 获取消息列表。
+    - Query: `limit` (默认 50), `before` (消息ID，用于分页加载旧消息)
+- `POST /`: 发送消息 (Body: `content`)
+- `PATCH /:messageId`: 编辑消息 (Body: `content`)
+- `DELETE /:messageId`: 删除消息。
 
-### 分组 (`/servers/:serverId/categories` 和 `/categories/:categoryId`)
+### 7. 消息互动 (Reactions)
+*Path: `/api/servers/:serverId/channels/:channelId/messages/:messageId/reactions`*
 
-- `POST /servers/:serverId/categories`
-  - **描述**: 在指定服务器下创建新分组。
-  - **请求体**: `{"name": "string"}`
-
-- `PATCH /categories/:categoryId`
-  - **描述**: 更新分组信息。
-  - **请求体**: `{"name": "string" (optional)}`
-
-- `DELETE /categories/:categoryId`
-  - **描述**: 删除一个分组。
-
-### 频道 (`/servers/:serverId/channels`)
-
-- `POST /servers/:serverId/channels`
-  - **描述**: 在指定服务器下创建新频道。
-  - **请求体**: `{"name": "string", "type": "GUILD_TEXT", "categoryId": "string" (optional)}`
-
-- `PATCH /servers/:serverId/channels/:channelId`
-  - **描述**: 更新频道信息。
-  - **请求体**: `{"name": "string" (optional), "categoryId": "string" (optional)}`
-
-- `DELETE /servers/:serverId/channels/:channelId`
-  - **描述**: 删除一个频道。
-
-### 消息 (`/servers/:serverId/channels/:channelId/messages`)
-
-- `GET /`
-  - **描述**: 获取频道的消息列表，支持分页。
-  - **查询参数**:
-    - `limit` (number, 1-100, default: 50)
-    - `before` (string, 消息ID, 用于获取此ID之前的消息)
-
-- `POST /`
-  - **描述**: 发送一条新消息。
-  - **请求体**: `{"content": "string", ...}` (其他字段如 `payload` 待定)
-
-- `PATCH /:messageId`
-  - **描述**: 编辑一条已发送的消息。
-  - **请求体**: `{"content": "string"}`
-
-- `DELETE /:messageId`
-  - **描述**: 删除一条消息。
-
-### 消息交互 (`.../messages/:messageId/reactions`)
-
-- `PUT /:messageId/reactions/:emoji/@me`
-  - **描述**: 为消息添加一个 Reaction。
-  - **`:emoji`** 参数需要进行 URL 编码。
-
-- `DELETE /:messageId/reactions/:emoji/@me`
-  - **描述**: 移除一个 Reaction。
-  - **`:emoji`** 参数需要进行 URL 编码。
+- `PUT /:emoji/@me`: 添加反应 (Emoji 需 URL 编码)。
+- `DELETE /:emoji/@me`: 移除反应。
 
 ---
 
 ## 三、 WebSocket Gateway 设计
 
-WebSocket 通信基于标准的 Socket.io 事件模型，取代了原计划中复杂的 op-code 协议。
+基于 **Socket.io** 实现。
+URL: `http://domain:port` (与 API 同端口)
 
-### 1. 连接与认证
+### 1. 连接与鉴权
 
-- 客户端在建立连接后，必须通过 `auth` 选项传递有效的 JWT。
-  ```javascript
-  const socket = io("http://localhost:3000", {
-    auth: {
-      token: "YOUR_JWT_TOKEN"
-    }
-  });
-  ```
-- 服务器认证成功后，会自动将该用户加入其所属的所有**服务器房间**和**频道房间**，以便接收相关事件。
+客户端连接时必须在握手阶段传递 JWT Token：
 
-### 2. 事件命名
+```javascript
+import { io } from "socket.io-client";
 
-采用 `feature/action` 的格式，如 `message/create`。
+const socket = io("http://localhost:3000", {
+  auth: {
+    token: "eyJhbGciOi..." // 你的 JWT Token
+  },
+  transports: ['websocket']
+});
+```
 
-### 3. 核心事件
+**自动加入房间 (Auto-Join Rooms):**
+连接成功后，服务端会自动将 Socket 加入以下房间，无需客户端手动 emit join 事件：
+1.  用户作为接收者的所有 **DM Channel ID** 房间。
+2.  用户拥有的所有 **Server ID** 房间（用于接收服务器级更新）。
+3.  用户拥有的服务器下的所有 **Channel ID** 房间。
 
-#### 客户端 -> 服务器
+### 2. 客户端上行事件 (Client -> Server)
 
-- `message/create`
-  - **描述**: 客户端请求创建一条新消息。
-  - **数据包**: `{"channelId": "string", "content": "string", ...}`
+客户端可以通过 Socket 发送消息（也可以通过 REST API 发送，效果相同）。
 
-#### 服务器 -> 客户端
+-   `message/create`
+    -   Payload: `{ channelId: string, content: string, ... }`
+    -   *说明*: 服务端收到后会存储入库，并广播下行事件。
 
-- `message/create`
-  - **描述**: 通知客户端有新消息创建。
-  - **数据包**: 完整的消息对象 (IMessage)。
+### 3. 服务端下行广播事件 (Server -> Client)
 
-- `message/update`
-  - **描述**: 通知客户端消息被编辑。
-  - **数据包**: 部分更新的消息对象，至少包含 `_id`, `channelId`,和被修改的字段。
+所有通过 REST API 或 Socket 产生的状态变更，都会通过以下事件实时广播给相关房间的在线用户。事件命名采用 **SCREAMING_SNAKE_CASE**。
 
-- `message/delete`
-  - **描述**: 通知客户端消息被删除。
-  - **数据包**: `{"messageId": "string", "channelId": "string"}`
+#### 消息相关
+-   `MESSAGE_CREATE`
+    -   Data: `IMessage` (已 Populate authorId)
+    -   *触发*: 发送新消息。
+-   `MESSAGE_UPDATE`
+    -   Data: `IMessage` (已 Populate)
+    -   *触发*: 编辑消息内容。
+-   `MESSAGE_DELETE`
+    -   Data: `{ messageId: string, channelId: string }`
+    -   *触发*: 删除消息。
+-   `MESSAGE_REACTION_ADD`
+    -   Data: `IMessage` (包含更新后的 reactions 数组)
+    -   *触发*: 用户添加反应。
+-   `MESSAGE_REACTION_REMOVE`
+    -   Data: `IMessage` (包含更新后的 reactions 数组)
+    -   *触发*: 用户取消反应。
 
-- `channel/create`, `channel/update`, `channel/delete`
-- `server/update`, `server/delete`
-- `reaction/add`, `reaction/remove`
+#### 频道相关
+-   `CHANNEL_UPDATE`
+    -   Data: `IChannel`
+    -   *触发*: 重命名频道、移动分组等。
+-   `CHANNEL_DELETE`
+    -   Data: `{ channelId: string }`
+    -   *触发*: 删除频道。
 
-**注意**: 这是一个简化的实现，后续会根据需求添加更多事件。
+#### 服务器相关
+-   `SERVER_UPDATE`
+    -   Data: `IServer`
+    -   *触发*: 修改服务器名称/头像。
+-   `SERVER_DELETE`
+    -   Data: `{ serverId: string }`
+    -   *触发*: 解散服务器。
+```

@@ -3,6 +3,7 @@ import {
   createChannelHandler,
   deleteChannelHandler,
   updateChannelHandler,
+  getChannelsHandler, // 引入新的 handler
 } from './channel.controller';
 import messageRoutes from '../message/message.routes';
 import { protect } from '../../middleware/auth';
@@ -14,6 +15,8 @@ const router = Router({ mergeParams: true });
 // All routes in this file are protected
 router.use(protect);
 
+// 添加 GET 路由
+router.get('/', getChannelsHandler);
 router.post('/', validate(createChannelSchema), createChannelHandler);
 
 router.patch(
@@ -25,6 +28,5 @@ router.delete('/:channelId', deleteChannelHandler);
 
 // Mount message routes
 router.use('/:channelId/messages', messageRoutes);
-
 
 export default router;
