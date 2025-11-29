@@ -2,11 +2,16 @@ import { Request, Response } from 'express';
 import * as channelService from './channel.service';
 import { UnauthorizedError } from '../../utils/errors';
 import asyncHandler from '../../utils/asyncHandler';
+// 引入 schema
+import { createChannelSchema } from './channel.validation';
 
 export const createChannelHandler = asyncHandler(async (req: Request, res: Response) => {
+  // 使用 Zod 解析后的安全数据，确保 serverId 存在
+  const { body, params } = createChannelSchema.parse(req);
+
   const data = {
-    ...req.body,
-    serverId: req.params.serverId,
+    ...body,
+    serverId: params.serverId,
   };
 
   if (!req.user) {

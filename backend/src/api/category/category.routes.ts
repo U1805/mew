@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { protect } from '../../middleware/auth';
 import * as categoryController from './category.controller';
 
-const router = Router();
+const router = Router({ mergeParams: true });
 
 // These routes are nested under /api/servers/:serverId/categories
 // But for simplicity in this file, we define specific parts.

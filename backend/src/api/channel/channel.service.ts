@@ -5,7 +5,15 @@ import Category from '../category/category.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 import { broadcastEvent } from '../../gateway/events';
 
-export const createChannel = async (data: Partial<IChannel>, userId: string) => {
+
+export interface CreateChannelData {
+  name: string;
+  type: string;
+  serverId: string;
+  categoryId?: string;
+}
+
+export const createChannel = async (data: CreateChannelData, userId: string) => {
   const { serverId } = data;
   if (!serverId) {
     throw new BadRequestError('Server ID is required to create a channel');
