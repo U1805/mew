@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 
 import authRoutes from './api/auth/auth.routes';  // Note: This was already correct, no change needed.
 import userRoutes from './api/user/user.routes'; // Note: This was already correct, no change needed.
@@ -8,6 +9,7 @@ import { categoryRootRoutes, categoryDetailRoutes } from './api/category/categor
 const app = express();
 
 // Middleware
+app.use(cors({ origin: '*' }));
 app.use(express.json());
 
 // Routes

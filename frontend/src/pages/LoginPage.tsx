@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
@@ -72,6 +72,9 @@ const LoginPage = () => {
             {mutation.isPending ? 'Logging in...' : 'Login'}
           </Button>
         </form>
+        <p class="text-sm text-center text-gray-600">
+          Don't have an account? <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">Register</Link>
+        </p>
       </div>
     </div>
   );
