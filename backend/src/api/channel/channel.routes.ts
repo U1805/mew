@@ -19,14 +19,14 @@ router.use(protect);
 router.get('/', getChannelsHandler);
 router.post('/', validate(createChannelSchema), createChannelHandler);
 
+// Mount message routes
+router.use('/:channelId/messages', messageRoutes);
+
 router.patch(
   '/:channelId',
   validate(updateChannelSchema),
   updateChannelHandler
 );
 router.delete('/:channelId', deleteChannelHandler);
-
-// Mount message routes
-router.use('/:channelId/messages', messageRoutes);
 
 export default router;
