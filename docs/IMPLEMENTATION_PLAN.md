@@ -148,6 +148,7 @@ interface IReaction {
 *Path 1: `/api/servers/:serverId/categories` (创建)*
 *Path 2: `/api/categories` (操作)*
 
+- `GET /api/servers/:serverId/categories`: 获取指定服务器下的所有分组。
 - `POST /api/servers/:serverId/categories`: 在服务器下创建分组 (Body: `name`)
 - `PATCH /api/categories/:categoryId`: 更新分组。
 - `DELETE /api/categories/:categoryId`: 删除分组。
@@ -157,6 +158,7 @@ interface IReaction {
 *Path 2: `/api/servers/:serverId/channels/:channelId` (操作)*
 *(注：操作路径中保留 serverId 是为了路由挂载方便，虽然 ID 唯一)*
 
+- `GET /`: 获取当前服务器下的所有频道。
 - `POST /`: 创建频道 (Body: `name`, `type`, `categoryId?`)
 - `PATCH /:channelId`: 更新频道。
 - `DELETE /:channelId`: 删除频道。
@@ -209,9 +211,11 @@ const socket = io("http://localhost:3000", {
 
 客户端可以通过 Socket 发送消息（也可以通过 REST API 发送，效果相同）。
 
+目前主要通过此事件发送消息。
+
 -   `message/create`
-    -   Payload: `{ channelId: string, content: string, ... }`
-    -   *说明*: 服务端收到后会存储入库，并广播下行事件。
+    -   **Payload**: `{ channelId: string, content: string, referencedMessageId?: string }`
+    -   **说明**: 客户端发送新消息。服务端收到后会创建消息，并向频道房间广播一个同名的下行事件。
 
 ### 3. 服务端下行广播事件 (Server -> Client)
 
@@ -220,7 +224,7 @@ const socket = io("http://localhost:3000", {
 #### 消息相关
 -   `MESSAGE_CREATE`
     -   Data: `IMessage` (已 Populate authorId)
-    -   *触发*: 发送新消息。
+    -   *触发*: 发送新消息（通过 REST API 或 WebSocket）。
 -   `MESSAGE_UPDATE`
     -   Data: `IMessage` (已 Populate)
     -   *触发*: 编辑消息内容。
