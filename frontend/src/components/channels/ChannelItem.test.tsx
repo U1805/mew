@@ -1,15 +1,13 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
+import { vi, describe, it, expect } from 'vitest';
 import React from 'react';
 import { ChannelItem } from './ChannelItem';
-import { Channel, ChannelType } from '@/types';
+import { Channel, ChannelType } from '../../types';
 
 const mockChannel: Channel = {
   _id: '1',
   name: 'general',
   type: ChannelType.GUILD_TEXT,
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
 };
 
 describe('ChannelItem', () => {

@@ -1,6 +1,7 @@
+
 import { useQuery } from '@tanstack/react-query';
-import { messageApi } from '@/services/api';
-import { Message } from '@/types';
+import { messageApi } from '../services/api';
+import { Message } from '../types';
 
 export const useMessages = (serverId: string | null, channelId: string | null) => {
   return useQuery({

@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '@/store';
-import { serverApi, channelApi, categoryApi } from '@/services/api';
+import { useModalStore, useUIStore } from '../../store';
+import { serverApi, channelApi, categoryApi, messageApi } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { format } from 'date-fns';
 
 const Modal: React.FC = () => {
   const { activeModal, closeModal, modalData } = useModalStore();
@@ -35,7 +36,8 @@ const Modal: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() && activeModal !== 'deleteChannel') return;
+    // Allow submit if it's a delete action (name not required)
+    if (!name.trim() && activeModal !== 'deleteChannel' && activeModal !== 'deleteMessage') return;
 
     setIsLoading(true);
     try {
@@ -57,6 +59,13 @@ const Modal: React.FC = () => {
          // await channelApi.delete(currentServerId, modalData.channel._id);
          console.log("Deleting channel", modalData.channel._id);
          queryClient.setQueryData(['channels', currentServerId], (old: any[]) => old.filter(c => c._id !== modalData.channel._id));
+      } else if (activeModal === 'deleteMessage' && currentServerId && modalData?.message) {
+          await messageApi.delete(currentServerId, modalData.message.channelId, modalData.message._id);
+          // Optimistic update
+          queryClient.setQueryData(['messages', modalData.message.channelId], (old: any[]) => {
+              if (!old) return old;
+              return old.filter(m => m._id !== modalData.message._id);
+          });
       }
       
       closeModal();
@@ -140,6 +149,7 @@ const Modal: React.FC = () => {
           case 'createChannel': return 'Create Channel';
           case 'channelSettings': return 'Overview'; // We'll customize this layout slightly
           case 'deleteChannel': return 'Delete Channel';
+          case 'deleteMessage': return 'Delete Message';
           default: return '';
       }
   };
@@ -221,17 +231,39 @@ const Modal: React.FC = () => {
       <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
         
         {/* Header */}
-        <div className="p-6">
-            <h2 className="text-2xl font-bold text-center text-white mb-2">{getTitle()}</h2>
-            <p className="text-center text-mew-textMuted text-sm px-4 leading-5">
+        <div className="p-4 pt-5 pb-3">
+            <h2 className="text-xl font-bold text-white mb-2">{getTitle()}</h2>
+            <p className="text-mew-textMuted text-sm leading-5">
                 {activeModal === 'createServer' ? "Give your new server a personality with a name and an icon. You can always change it later." : ""}
                 {activeModal === 'createChannel' && modalData?.categoryName ? `in ${modalData.categoryName}` : ""}
                 {activeModal === 'deleteChannel' && `Are you sure you want to delete #${modalData?.channel?.name}? This cannot be undone.`}
+                {activeModal === 'deleteMessage' && "Are you sure you want to delete this message?"}
             </p>
         </div>
 
-        {/* Form */}
-        {activeModal !== 'deleteChannel' ? (
+        {/* Form or Message Preview */}
+        {activeModal === 'deleteMessage' && modalData?.message ? (
+             <div className="px-4 mb-2">
+                 <div className="border border-mew-divider/60 shadow-sm rounded bg-[#2B2D31] p-3 overflow-hidden">
+                     <div className="flex items-start">
+                          <div className="w-10 h-10 rounded-full bg-mew-accent flex items-center justify-center text-white font-semibold mr-3 flex-shrink-0 mt-0.5">
+                             {modalData.author?.avatarUrl ? (
+                                 <img src={modalData.author.avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover"/>
+                             ) : (
+                                 modalData.author?.username?.slice(0, 2).toUpperCase() || '?'
+                             )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                              <div className="flex items-center mb-1">
+                                 <span className="font-bold text-white mr-1.5">{modalData.author?.username || 'Unknown'}</span>
+                                 <span className="text-xs text-mew-textMuted">{format(new Date(modalData.message.createdAt), 'MM/dd/yyyy h:mm a')}</span>
+                              </div>
+                              <p className="text-mew-text text-sm whitespace-pre-wrap">{modalData.message.content}</p>
+                          </div>
+                     </div>
+                 </div>
+             </div>
+        ) : activeModal !== 'deleteChannel' ? (
              <form onSubmit={handleSubmit} className="px-4">
                 <div className="mb-4">
                     <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{getLabel()}</label>
@@ -246,8 +278,8 @@ const Modal: React.FC = () => {
                 </div>
             </form>
         ) : (
-             // Delete Confirmation Warning Visual
-             <div className="px-6 pb-2">
+             // Delete Channel Warning Visual
+             <div className="px-4 pb-2">
                  <div className="bg-[#F0B132] p-3 rounded text-sm text-black font-medium border border-orange-600/20">
                     <span className="font-bold">Warning:</span> By deleting this channel, you will lose all messages and history within it.
                  </div>
@@ -255,7 +287,7 @@ const Modal: React.FC = () => {
         )}
 
         {/* Footer */}
-        <div className="bg-[#2B2D31] p-4 flex justify-between items-center mt-4">
+        <div className="bg-[#2B2D31] p-4 flex justify-end items-center mt-2 space-x-3">
             <button 
                 type="button" 
                 onClick={closeModal}
@@ -265,17 +297,18 @@ const Modal: React.FC = () => {
             </button>
             <button
                 onClick={handleSubmit}
-                disabled={isLoading || (!name.trim() && activeModal !== 'deleteChannel')}
+                disabled={isLoading || (!name.trim() && activeModal !== 'deleteChannel' && activeModal !== 'deleteMessage')}
                 className={clsx(
                     "px-6 py-2 rounded-[3px] font-medium text-sm transition-colors text-white",
-                    activeModal === 'deleteChannel' 
+                    (activeModal === 'deleteChannel' || activeModal === 'deleteMessage') 
                         ? "bg-red-500 hover:bg-red-600" 
                         : "bg-mew-accent hover:bg-mew-accentHover",
-                    (isLoading || (!name.trim() && activeModal !== 'deleteChannel')) && "opacity-50 cursor-not-allowed"
+                    (isLoading || (!name.trim() && activeModal !== 'deleteChannel' && activeModal !== 'deleteMessage')) && "opacity-50 cursor-not-allowed"
                 )}
             >
                 {activeModal === 'createServer' ? 'Create' : 
-                 activeModal === 'deleteChannel' ? 'Delete Channel' : 'Create Channel'}
+                 activeModal === 'deleteChannel' ? 'Delete Channel' : 
+                 activeModal === 'deleteMessage' ? 'Delete' : 'Create Channel'}
             </button>
         </div>
       </div>

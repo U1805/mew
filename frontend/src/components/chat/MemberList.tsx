@@ -1,8 +1,8 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { serverApi } from '@/services/api';
-import { useUIStore } from '@/store';
-import { User } from '@/types';
+import { serverApi } from '../../services/api';
+import { useUIStore } from '../../store';
+import { User } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 

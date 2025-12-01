@@ -1,6 +1,7 @@
 import { useAuthStore } from './store';
 import { act } from '@testing-library/react';
 import { User } from './types';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 const mockUser: User = {
     _id: 'user-1',

@@ -81,23 +81,43 @@ export const addReaction = async (
   userId: string,
   emoji: string
 ) => {
-  // First, try to add the user to an existing reaction array.
-  const updatedMessageWithExistingReaction = await Message.findOneAndUpdate(
+  const message = await getMessageById(messageId);
+  const existingReaction = (message.reactions || []).find(r => r.userIds.map(id => id.toString()).includes(userId));
+
+  if (existingReaction && existingReaction.emoji === emoji) {
+    // User is reacting with the same emoji, do nothing.
+    return message.populate('authorId', 'username avatarUrl');
+  }
+
+  // If the user has reacted with a different emoji, pull them from the old reaction.
+  if (existingReaction) {
+    await Message.updateOne(
+      { _id: messageId, 'reactions.emoji': existingReaction.emoji },
+      { $pull: { 'reactions.$.userIds': userId } }
+    );
+  }
+
+  // Now, add the user to the new reaction, creating it if it doesn't exist.
+  let updatedMessage = await Message.findOneAndUpdate(
     { _id: messageId, 'reactions.emoji': emoji },
     { $addToSet: { 'reactions.$.userIds': userId } },
     { new: true }
-  ).populate('authorId', 'username avatarUrl');
+  );
 
-  let finalMessage = updatedMessageWithExistingReaction;
-
-  // If no document was updated, it means the reaction emoji doesn't exist yet.
-  if (!updatedMessageWithExistingReaction) {
-    finalMessage = await Message.findOneAndUpdate(
+  if (!updatedMessage) {
+    updatedMessage = await Message.findOneAndUpdate(
       { _id: messageId },
       { $push: { reactions: { emoji, userIds: [userId] } } },
       { new: true }
-    ).populate('authorId', 'username avatarUrl');
+    );
   }
+
+  // Finally, clean up any reactions that might now be empty and get the final state.
+  const finalMessage = await Message.findOneAndUpdate(
+    { _id: messageId },
+    { $pull: { reactions: { userIds: { $size: 0 } } } },
+    { new: true }
+  ).populate('authorId', 'username avatarUrl');
 
   if (!finalMessage) {
     throw new NotFoundError('Message not found');
@@ -112,7 +132,6 @@ export const removeReaction = async (
   userId: string,
   emoji: string
 ) => {
-  // Pull the user's ID from the specified reaction's userIds array.
   const updatedMessage = await Message.findOneAndUpdate(
     { _id: messageId, 'reactions.emoji': emoji },
     { $pull: { 'reactions.$.userIds': userId } },
@@ -123,7 +142,6 @@ export const removeReaction = async (
     throw new NotFoundError('Message or reaction not found');
   }
 
-  // Clean up any reactions that now have an empty userIds array.
   const finalMessage = await Message.findOneAndUpdate(
     { _id: messageId },
     { $pull: { reactions: { userIds: { $size: 0 } } } },
@@ -131,8 +149,6 @@ export const removeReaction = async (
   ).populate('authorId', 'username avatarUrl');
 
   if (!finalMessage) {
-    // This case should ideally not be hit if the first update succeeded,
-    // but it's here for safety.
     throw new NotFoundError('Message not found after reaction cleanup');
   }
 

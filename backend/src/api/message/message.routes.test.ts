@@ -233,6 +233,26 @@ describe('Message Routes', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.reactions[0].userIds.length).toBe(1);
     });
+
+    it('should replace the old reaction when adding a second, different one', async () => {
+      const emoji1 = '👍';
+      const emoji2 = '❤️';
+
+      // Add the first reaction
+      await request(app)
+        .put(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji1)}/@me`)
+        .set('Authorization', `Bearer ${token}`);
+
+      // Add the second, different reaction
+      const res = await request(app)
+        .put(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji2)}/@me`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.reactions.length).toBe(1);
+      expect(res.body.reactions[0].emoji).toBe(emoji2);
+      expect(res.body.reactions[0].userIds).toContain(userId);
+    });
   });
 
   describe('DELETE /api/servers/:serverId/channels/:channelId/messages/:messageId/reactions/:emoji/@me', () => {

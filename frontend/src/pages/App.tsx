@@ -1,7 +1,8 @@
+
 import React from 'react';
-import { useAuthStore } from '@/store';
-import Layout from '@/components/layout/Layout';
-import { AuthScreen } from '@/components/auth/Auth';
+import { useAuthStore } from '../store';
+import Layout from '../components/layout/Layout';
+import { AuthScreen } from '../components/auth/Auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Create a client

@@ -1,7 +1,8 @@
+
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getSocket } from '@/services/socket';
-import { Message } from '@/types';
+import { getSocket } from '../services/socket';
+import { Message } from '../types';
 
 export const useSocketMessages = (channelId: string | null) => {
   const queryClient = useQueryClient();
@@ -20,6 +21,7 @@ export const useSocketMessages = (channelId: string | null) => {
       }
     };
 
+    // Both update and reaction events return the full updated message object
     const handleUpdateMessage = (updatedMessage: Message) => {
       if (updatedMessage.channelId === channelId) {
         queryClient.setQueryData(['messages', channelId], (old: Message[] | undefined) => {
@@ -41,11 +43,17 @@ export const useSocketMessages = (channelId: string | null) => {
     socket.on('MESSAGE_CREATE', handleNewMessage);
     socket.on('MESSAGE_UPDATE', handleUpdateMessage);
     socket.on('MESSAGE_DELETE', handleDeleteMessage);
+    
+    // Design doc specifies these events return the full Message object with updated reactions
+    socket.on('MESSAGE_REACTION_ADD', handleUpdateMessage);
+    socket.on('MESSAGE_REACTION_REMOVE', handleUpdateMessage);
 
     return () => {
       socket.off('MESSAGE_CREATE', handleNewMessage);
       socket.off('MESSAGE_UPDATE', handleUpdateMessage);
       socket.off('MESSAGE_DELETE', handleDeleteMessage);
+      socket.off('MESSAGE_REACTION_ADD', handleUpdateMessage);
+      socket.off('MESSAGE_REACTION_REMOVE', handleUpdateMessage);
     };
   }, [channelId, queryClient]);
 };

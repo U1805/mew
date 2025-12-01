@@ -1,9 +1,9 @@
 import React from 'react';
-import ServerList from '@/components/servers/ServerList';
-import ChannelList from '@/components/channels/ChannelList';
-import ChatArea from '@/components/chat/ChatArea';
-import Modal from '@/components/modals/Modals';
-import UserSettings from '@/components/user/UserSettings';
+import ServerList from '../servers/ServerList';
+import ChannelList from '../channels/ChannelList';
+import ChatArea from '../chat/ChatArea';
+import Modal from '../modals/Modals';
+import UserSettings from '../user/UserSettings';
 
 const Layout: React.FC = () => {
   return (

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
-import { Message, Channel } from '@/types';
-import MessageItem from '@/components/chat/MessageItem';
+import { Message, Channel } from '../../types';
+import MessageItem from './MessageItem';
 import { Icon } from '@iconify/react';
 
 interface MessageListProps {

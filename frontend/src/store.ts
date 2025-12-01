@@ -15,9 +15,9 @@ interface UIState {
 }
 
 interface ModalState {
-  activeModal: 'createServer' | 'createChannel' | 'createCategory' | 'serverSettings' | 'channelSettings' | 'deleteChannel' | null;
+  activeModal: 'createServer' | 'createChannel' | 'createCategory' | 'serverSettings' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | null;
   modalData: any;
-  openModal: (modal: 'createServer' | 'createChannel' | 'createCategory' | 'serverSettings' | 'channelSettings' | 'deleteChannel', data?: any) => void;
+  openModal: (modal: 'createServer' | 'createChannel' | 'createCategory' | 'serverSettings' | 'channelSettings' | 'deleteChannel' | 'deleteMessage', data?: any) => void;
   closeModal: () => void;
 }
 

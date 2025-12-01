@@ -67,7 +67,6 @@ Mew is a highly extensible, personal digital hub centered around an Instant Mess
 - **Nested Routes**: Use `mergeParams: true` for nested routers (e.g., `servers/:serverId/channels`).
 
 **Frontend Guidelines**
-- **Imports**: Use path aliases (`@/components/...`) defined in `tsconfig.app.json`.
 - **Components**: Functional components (`React.FC` or inferred types).
 - **UI Components**: Place reusable, atomic components in `src/components/ui/` (Shadcn-like structure).
 - **Optimistic Updates**: Use React Query `onMutate` to update UI immediately before API confirmation.
@@ -97,3 +96,9 @@ Mew is a highly extensible, personal digital hub centered around an Instant Mess
       "payload": { ...JSON data for UI component... }
     }
     ```
+
+# Test Account
+
+- **Username**: claude_test_user
+- **Email**: claude_test_user@anthropic.com
+- **Password**: password123

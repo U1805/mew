@@ -1,12 +1,12 @@
 import { renderHook, waitFor } from '@testing-library/react';
-import { vi } from 'vitest';
+import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { useMessages } from './useMessages';
-import { messageApi } from '@/services/api';
+import { messageApi } from '../services/api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // Mock the messageApi
-vi.mock('@/services/api', () => ({
+vi.mock('../services/api', () => ({
   messageApi: {
     list: vi.fn(),
   },
@@ -43,7 +43,7 @@ describe('useMessages', () => {
       { _id: '1', content: 'Hello', createdAt: new Date('2023-01-01T10:00:00Z').toISOString() },
       { _id: '2', content: 'World', createdAt: new Date('2023-01-01T09:00:00Z').toISOString() }, // Unsorted
     ];
-    (messageApi.list as vi.Mock).mockResolvedValue({ data: mockMessages });
+    (messageApi.list as Mock).mockResolvedValue({ data: mockMessages });
 
     const { result } = renderHook(() => useMessages('server-1', 'channel-1'), { wrapper: createWrapper() });
 
@@ -57,7 +57,7 @@ describe('useMessages', () => {
   });
 
   it('should return an empty array if the API call fails', async () => {
-    (messageApi.list as vi.Mock).mockRejectedValue(new Error('API Error'));
+    (messageApi.list as Mock).mockRejectedValue(new Error('API Error'));
     const { result } = renderHook(() => useMessages('server-1', 'channel-1'), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isError).toBe(true));

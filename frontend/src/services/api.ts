@@ -1,5 +1,6 @@
+
 import axios from 'axios';
-import { useAuthStore } from '@/store';
+import { useAuthStore } from '../store';
 
 const API_URL = 'http://localhost:3000/api';
 
@@ -56,6 +57,17 @@ export const messageApi = {
   delete: (serverId: string | undefined, channelId: string, messageId: string) => {
       const prefix = serverId ? `/servers/${serverId}` : '';
       return api.delete(`${prefix}/channels/${channelId}/messages/${messageId}`);
+  },
+  addReaction: (serverId: string | undefined, channelId: string, messageId: string, emoji: string) => {
+      const prefix = serverId ? `/servers/${serverId}` : '';
+      // Emoji must be URL encoded
+      const encodedEmoji = encodeURIComponent(emoji);
+      return api.put(`${prefix}/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`);
+  },
+  removeReaction: (serverId: string | undefined, channelId: string, messageId: string, emoji: string) => {
+      const prefix = serverId ? `/servers/${serverId}` : '';
+      const encodedEmoji = encodeURIComponent(emoji);
+      return api.delete(`${prefix}/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`);
   }
 };
 
