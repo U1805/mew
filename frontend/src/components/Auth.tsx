@@ -73,8 +73,8 @@ export const AuthScreen: React.FC = () => {
             </div>
           )}
           <div>
-            <label className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Email</label>
-            <input
+            <label htmlFor="email" className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Email</label>
+            <input id="email"
               type="email"
               required
               className="w-full bg-[#1E1F22] border-none rounded p-2.5 text-white focus:outline-none focus:ring-2 focus:ring-mew-accent transition-all"
@@ -83,8 +83,8 @@ export const AuthScreen: React.FC = () => {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Password</label>
-            <input
+            <label htmlFor="password" className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Password</label>
+            <input id="password"
               type="password"
               required
               className="w-full bg-[#1E1F22] border-none rounded p-2.5 text-white focus:outline-none focus:ring-2 focus:ring-mew-accent transition-all"

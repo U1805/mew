@@ -148,6 +148,9 @@ importers:
       happy-dom:
         specifier: ^20.0.11
         version: 20.0.11
+      msw:
+        specifier: ^2.12.3
+        version: 2.12.3(@types/node@22.19.1)(typescript@5.8.3)
       typescript:
         specifier: ~5.8.2
         version: 5.8.3
@@ -3447,8 +3450,7 @@ snapshots:
 
   '@iconify/types@2.0.0': {}
 
-  '@inquirer/ansi@1.0.2':
-    optional: true
+  '@inquirer/ansi@1.0.2': {}
 
   '@inquirer/confirm@5.1.21(@types/node@22.19.1)':
     dependencies:
@@ -3456,7 +3458,6 @@ snapshots:
       '@inquirer/type': 3.0.10(@types/node@22.19.1)
     optionalDependencies:
       '@types/node': 22.19.1
-    optional: true
 
   '@inquirer/confirm@5.1.21(@types/node@24.10.1)':
     dependencies:
@@ -3478,7 +3479,6 @@ snapshots:
       yoctocolors-cjs: 2.1.3
     optionalDependencies:
       '@types/node': 22.19.1
-    optional: true
 
   '@inquirer/core@10.3.2(@types/node@24.10.1)':
     dependencies:
@@ -3494,13 +3494,11 @@ snapshots:
       '@types/node': 24.10.1
     optional: true
 
-  '@inquirer/figures@1.0.15':
-    optional: true
+  '@inquirer/figures@1.0.15': {}
 
   '@inquirer/type@3.0.10(@types/node@22.19.1)':
     optionalDependencies:
       '@types/node': 22.19.1
-    optional: true
 
   '@inquirer/type@3.0.10(@types/node@24.10.1)':
     optionalDependencies:
@@ -3543,21 +3541,17 @@ snapshots:
       is-node-process: 1.2.0
       outvariant: 1.4.3
       strict-event-emitter: 0.5.1
-    optional: true
 
   '@noble/hashes@1.8.0': {}
 
-  '@open-draft/deferred-promise@2.2.0':
-    optional: true
+  '@open-draft/deferred-promise@2.2.0': {}
 
   '@open-draft/logger@0.3.0':
     dependencies:
       is-node-process: 1.2.0
       outvariant: 1.4.3
-    optional: true
 
-  '@open-draft/until@2.1.0':
-    optional: true
+  '@open-draft/until@2.1.0': {}
 
   '@paralleldrive/cuid2@2.3.1':
     dependencies:
@@ -3794,8 +3788,7 @@ snapshots:
       '@types/node': 24.10.1
       '@types/send': 0.17.6
 
-  '@types/statuses@2.0.6':
-    optional: true
+  '@types/statuses@2.0.6': {}
 
   '@types/superagent@8.1.9':
     dependencies:
@@ -4213,8 +4206,7 @@ snapshots:
     optionalDependencies:
       fsevents: 2.3.3
 
-  cli-width@4.1.0:
-    optional: true
+  cli-width@4.1.0: {}
 
   cliui@8.0.1:
     dependencies:
@@ -4259,8 +4251,7 @@ snapshots:
 
   cookie@0.7.2: {}
 
-  cookie@1.1.1:
-    optional: true
+  cookie@1.1.1: {}
 
   cookiejar@2.1.4: {}
 
@@ -4863,8 +4854,7 @@ snapshots:
 
   graphemer@1.4.0: {}
 
-  graphql@16.12.0:
-    optional: true
+  graphql@16.12.0: {}
 
   happy-dom@20.0.11:
     dependencies:
@@ -4896,8 +4886,7 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
-  headers-polyfill@4.0.3:
-    optional: true
+  headers-polyfill@4.0.3: {}
 
   hermes-estree@0.25.1: {}
 
@@ -5035,8 +5024,7 @@ snapshots:
 
   is-negative-zero@2.0.3: {}
 
-  is-node-process@1.2.0:
-    optional: true
+  is-node-process@1.2.0: {}
 
   is-number-object@1.1.1:
     dependencies:
@@ -5436,7 +5424,6 @@ snapshots:
       typescript: 5.8.3
     transitivePeerDependencies:
       - '@types/node'
-    optional: true
 
   msw@2.12.3(@types/node@24.10.1)(typescript@5.9.3):
     dependencies:
@@ -5464,8 +5451,7 @@ snapshots:
       - '@types/node'
     optional: true
 
-  mute-stream@2.0.0:
-    optional: true
+  mute-stream@2.0.0: {}
 
   nanoid@3.3.11: {}
 
@@ -5553,8 +5539,7 @@ snapshots:
       type-check: 0.4.0
       word-wrap: 1.2.5
 
-  outvariant@1.4.3:
-    optional: true
+  outvariant@1.4.3: {}
 
   own-keys@1.0.1:
     dependencies:
@@ -5597,8 +5582,7 @@ snapshots:
 
   path-parse@1.0.7: {}
 
-  path-to-regexp@6.3.0:
-    optional: true
+  path-to-regexp@6.3.0: {}
 
   path-to-regexp@8.3.0: {}
 
@@ -5717,8 +5701,7 @@ snapshots:
       path-parse: 1.0.7
       supports-preserve-symlinks-flag: 1.0.0
 
-  rettime@0.7.0:
-    optional: true
+  rettime@0.7.0: {}
 
   rollup@4.53.3:
     dependencies:
@@ -5885,8 +5868,7 @@ snapshots:
 
   siginfo@2.0.0: {}
 
-  signal-exit@4.1.0:
-    optional: true
+  signal-exit@4.1.0: {}
 
   simple-update-notifier@2.0.0:
     dependencies:
@@ -5959,8 +5941,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  strict-event-emitter@0.5.1:
-    optional: true
+  strict-event-emitter@0.5.1: {}
 
   string-width@4.2.3:
     dependencies:
@@ -6060,8 +6041,7 @@ snapshots:
   symbol-tree@3.2.4:
     optional: true
 
-  tagged-tag@1.0.0:
-    optional: true
+  tagged-tag@1.0.0: {}
 
   tar-stream@3.1.7:
     dependencies:
@@ -6089,13 +6069,11 @@ snapshots:
 
   tinyrainbow@3.0.3: {}
 
-  tldts-core@7.0.19:
-    optional: true
+  tldts-core@7.0.19: {}
 
   tldts@7.0.19:
     dependencies:
       tldts-core: 7.0.19
-    optional: true
 
   to-regex-range@5.0.1:
     dependencies:
@@ -6108,7 +6086,6 @@ snapshots:
   tough-cookie@6.0.0:
     dependencies:
       tldts: 7.0.19
-    optional: true
 
   tr46@5.1.1:
     dependencies:
@@ -6152,7 +6129,6 @@ snapshots:
   type-fest@5.2.0:
     dependencies:
       tagged-tag: 1.0.0
-    optional: true
 
   type-is@2.0.1:
     dependencies:
@@ -6223,8 +6199,7 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  until-async@3.0.2:
-    optional: true
+  until-async@3.0.2: {}
 
   update-browserslist-db@1.1.4(browserslist@4.28.0):
     dependencies:
@@ -6434,7 +6409,6 @@ snapshots:
       ansi-styles: 4.3.0
       string-width: 4.2.3
       strip-ansi: 6.0.1
-    optional: true
 
   wrap-ansi@7.0.0:
     dependencies:
@@ -6482,8 +6456,7 @@ snapshots:
 
   yocto-queue@0.1.0: {}
 
-  yoctocolors-cjs@2.1.3:
-    optional: true
+  yoctocolors-cjs@2.1.3: {}
 
   zod-validation-error@4.0.2(zod@4.1.13):
     dependencies:
