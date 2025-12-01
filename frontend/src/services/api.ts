@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { useAuthStore } from '../store';
 
-const API_URL = 'http://localhost:3000/api';
+export const API_URL = 'http://localhost:3000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -80,6 +80,13 @@ export const messageApi = {
       const encodedEmoji = encodeURIComponent(emoji);
       return api.delete(`${prefix}/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`);
   }
+};
+
+export const webhookApi = {
+  list: (serverId: string, channelId: string) => api.get(`/servers/${serverId}/channels/${channelId}/webhooks`),
+  create: (serverId: string, channelId: string, data: { name: string; avatarUrl?: string }) => api.post(`/servers/${serverId}/channels/${channelId}/webhooks`, data),
+  update: (serverId: string, channelId: string, webhookId: string, data: { name?: string; avatarUrl?: string }) => api.patch(`/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}`, data),
+  delete: (serverId: string, channelId: string, webhookId: string) => api.delete(`/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}`),
 };
 
 export default api;

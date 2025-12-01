@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { Message, Channel } from '../../types';
 import MessageItem from './MessageItem';
@@ -14,20 +15,16 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (messages) {
+    if (messages && messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: 'auto' });
     }
   }, [channelId, messages?.length]);
 
-  const handleSocketMessage = () => {
-    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-  }
-
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
       {!isLoading && messages ? (
-        <div className="flex flex-col justify-end min-h-0">
-          <div className="mt-auto flex flex-col pb-4">
+        <div className="flex flex-col mt-auto">
+          <div className="flex flex-col pb-4">
             <div className="p-4 mt-4 mb-4 border-b border-[#3F4147]">
               <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
                 <Icon icon="mdi:pound" width="40" height="40" className="text-white" />

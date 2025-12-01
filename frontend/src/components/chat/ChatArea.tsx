@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useUIStore } from '../../store';
 import MemberList from './MemberList';
@@ -41,7 +42,7 @@ const ChatArea: React.FC = () => {
     <div className="flex-1 bg-mew-dark flex flex-col min-w-0 h-full">
       <ChatHeader channel={channel || null} isMemberListOpen={isMemberListOpen} toggleMemberList={toggleMemberList} />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex flex-col flex-1 min-w-0">
+        <div className="flex flex-col flex-1 min-w-0 min-h-0">
           <MessageList messages={messages} isLoading={isLoading} channel={channel || null} channelId={currentChannelId} />
           <MessageInput channel={channel || null} serverId={currentServerId} channelId={currentChannelId} />
         </div>

@@ -2,6 +2,24 @@ import Message, { IMessage } from './message.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { broadcastEvent } from '../../gateway/events';
 
+/**
+ * Applies author overrides from a message's payload.
+ * This converts a Mongoose document to a plain object and modifies it.
+ * @param message The Mongoose message document.
+ * @returns A plain JavaScript object representing the message with overrides applied.
+ */
+function applyAuthorOverride(message: IMessage): object {
+  const messageObject = message.toObject();
+
+  if (messageObject.payload && messageObject.payload.overrides && messageObject.authorId && typeof messageObject.authorId === 'object') {
+    const author = messageObject.authorId as any;
+    author.username = messageObject.payload.overrides.username || author.username;
+    author.avatarUrl = messageObject.payload.overrides.avatarUrl || author.avatarUrl;
+  }
+
+  return messageObject;
+}
+
 interface GetMessagesOptions {
   channelId: string;
   limit: number;
@@ -20,138 +38,142 @@ export const getMessagesByChannel = async ({ channelId, limit, before }: GetMess
     .limit(limit)
     .populate('authorId', 'username avatarUrl');
 
-  return messages;
+  // Apply overrides to historical messages before returning.
+  return messages.map(applyAuthorOverride);
 };
 
-export const createMessage = async (data: Partial<IMessage>) => {
+export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> => {
   const message = new Message(data);
   await message.save();
 
   const populatedMessage = await message.populate('authorId', 'username avatarUrl');
-  broadcastEvent(message.channelId.toString(), 'MESSAGE_CREATE', populatedMessage);
 
+  // Apply overrides for the real-time broadcast.
+  const messageWithOverrides = applyAuthorOverride(populatedMessage);
+
+  broadcastEvent(populatedMessage.channelId.toString(), 'MESSAGE_CREATE', messageWithOverrides);
+
+  // Return the original Mongoose document, as the function signature promises.
   return populatedMessage;
 };
 
 export const getMessageById = async (messageId: string) => {
-  const message = await Message.findById(messageId);
-  if (!message) {
-    throw new NotFoundError('Message not found');
-  }
-  return message;
-};
+    const message = await Message.findById(messageId);
+    if (!message) {
+      throw new NotFoundError('Message not found');
+    }
+    return message;
+  };
 
-export const updateMessage = async (
-  messageId: string,
-  userId: string,
-  content: string
-) => {
-  const message = await getMessageById(messageId);
+  export const updateMessage = async (
+    messageId: string,
+    userId: string,
+    content: string
+  ) => {
+    const message = await getMessageById(messageId);
 
-  if (message.authorId.toString() !== userId) {
-    throw new ForbiddenError('You can only edit your own messages');
-  }
+    if (message.authorId.toString() !== userId) {
+      throw new ForbiddenError('You can only edit your own messages');
+    }
 
-  message.content = content;
-  message.editedAt = new Date();
-  await message.save();
+    message.content = content;
+    message.editedAt = new Date();
+    await message.save();
 
-  const populatedMessage = await message.populate('authorId', 'username avatarUrl');
-  broadcastEvent(message.channelId.toString(), 'MESSAGE_UPDATE', populatedMessage);
+    const populatedMessage = await message.populate('authorId', 'username avatarUrl');
+    broadcastEvent(message.channelId.toString(), 'MESSAGE_UPDATE', populatedMessage);
 
-  return populatedMessage;
-};
+    return populatedMessage;
+  };
 
-export const deleteMessage = async (messageId: string, userId: string) => {
-  const message = await getMessageById(messageId);
+  export const deleteMessage = async (messageId: string, userId: string) => {
+    const message = await getMessageById(messageId);
 
-  if (message.authorId.toString() !== userId) {
-    throw new ForbiddenError('You can only delete your own messages');
-  }
+    if (message.authorId.toString() !== userId) {
+      throw new ForbiddenError('You can only delete your own messages');
+    }
 
-  await message.deleteOne();
+    await message.deleteOne();
 
-  broadcastEvent(message.channelId.toString(), 'MESSAGE_DELETE', { messageId: message._id, channelId: message.channelId });
+    broadcastEvent(message.channelId.toString(), 'MESSAGE_DELETE', { messageId: message._id, channelId: message.channelId.toString() });
 
-  return { message: 'Message deleted successfully' };
-};
+    return { message: 'Message deleted successfully' };
+  };
 
-export const addReaction = async (
-  messageId: string,
-  userId: string,
-  emoji: string
-) => {
-  const message = await getMessageById(messageId);
-  const existingReaction = (message.reactions || []).find(r => r.userIds.map(id => id.toString()).includes(userId));
+  export const addReaction = async (
+      messageId: string,
+      userId: string,
+      emoji: string
+    ) => {
+      const message = await getMessageById(messageId);
+      const existingReaction = (message.reactions || []).find(r => r.userIds.map(id => id.toString()).includes(userId));
 
-  if (existingReaction && existingReaction.emoji === emoji) {
-    // User is reacting with the same emoji, do nothing.
-    return message.populate('authorId', 'username avatarUrl');
-  }
+      if (existingReaction && existingReaction.emoji === emoji) {
+        return message.populate('authorId', 'username avatarUrl');
+      }
 
-  // If the user has reacted with a different emoji, pull them from the old reaction.
-  if (existingReaction) {
-    await Message.updateOne(
-      { _id: messageId, 'reactions.emoji': existingReaction.emoji },
-      { $pull: { 'reactions.$.userIds': userId } }
-    );
-  }
+      if (existingReaction) {
+        await Message.updateOne(
+          { _id: messageId, 'reactions.emoji': existingReaction.emoji },
+          { $pull: { 'reactions.$.userIds': userId } }
+        );
+      }
 
-  // Now, add the user to the new reaction, creating it if it doesn't exist.
-  let updatedMessage = await Message.findOneAndUpdate(
-    { _id: messageId, 'reactions.emoji': emoji },
-    { $addToSet: { 'reactions.$.userIds': userId } },
-    { new: true }
-  );
+      let updatedMessage = await Message.findOneAndUpdate(
+        { _id: messageId, 'reactions.emoji': emoji },
+        { $addToSet: { 'reactions.$.userIds': userId } },
+        { new: true }
+      );
 
-  if (!updatedMessage) {
-    updatedMessage = await Message.findOneAndUpdate(
-      { _id: messageId },
-      { $push: { reactions: { emoji, userIds: [userId] } } },
-      { new: true }
-    );
-  }
+      if (!updatedMessage) {
+        updatedMessage = await Message.findOneAndUpdate(
+          { _id: messageId },
+          { $push: { reactions: { emoji, userIds: [userId] } } },
+          { new: true }
+        );
+      }
 
-  // Finally, clean up any reactions that might now be empty and get the final state.
-  const finalMessage = await Message.findOneAndUpdate(
-    { _id: messageId },
-    { $pull: { reactions: { userIds: { $size: 0 } } } },
-    { new: true }
-  ).populate('authorId', 'username avatarUrl');
+      const finalMessage = await Message.findOneAndUpdate(
+        { _id: messageId },
+        { $pull: { reactions: { userIds: { $size: 0 } } } },
+        { new: true }
+      ).populate('authorId', 'username avatarUrl');
 
-  if (!finalMessage) {
-    throw new NotFoundError('Message not found');
-  }
+      if (!finalMessage) {
+          throw new NotFoundError('Message not found');
+      }
 
-  broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_ADD', finalMessage);
-  return finalMessage;
-};
+      const messageWithOverrides = applyAuthorOverride(finalMessage);
+      broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_ADD', messageWithOverrides);
+      return messageWithOverrides;
+    };
 
-export const removeReaction = async (
-  messageId: string,
-  userId: string,
-  emoji: string
-) => {
-  const updatedMessage = await Message.findOneAndUpdate(
-    { _id: messageId, 'reactions.emoji': emoji },
-    { $pull: { 'reactions.$.userIds': userId } },
-    { new: true }
-  );
+    export const removeReaction = async (
+      messageId: string,
+      userId: string,
+      emoji: string
+    ) => {
+      const updatedMessage = await Message.findOneAndUpdate(
+        { _id: messageId, 'reactions.emoji': emoji },
+        { $pull: { 'reactions.$.userIds': userId } },
+        { new: true }
+      );
 
-  if (!updatedMessage) {
-    throw new NotFoundError('Message or reaction not found');
-  }
+      if (!updatedMessage) {
+        throw new NotFoundError('Message or reaction not found');
+      }
 
-  const finalMessage = await Message.findOneAndUpdate(
-    { _id: messageId },
-    { $pull: { reactions: { userIds: { $size: 0 } } } },
-    { new: true }
-  ).populate('authorId', 'username avatarUrl');
+      const finalMessage = await Message.findOneAndUpdate(
+        { _id: messageId },
+        { $pull: { reactions: { userIds: { $size: 0 } } } },
+        { new: true }
+      ).populate('authorId', 'username avatarUrl');
 
-  if (!finalMessage) {
-    throw new NotFoundError('Message not found after reaction cleanup');
-  }
+      if (!finalMessage) {
+          throw new NotFoundError('Message not found after reaction cleanup');
+      }
 
-  broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_REMOVE', finalMessage);
-  return finalMessage;
-};
+      const messageWithOverrides = applyAuthorOverride(finalMessage);
+      broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_REMOVE', messageWithOverrides);
+      return messageWithOverrides;
+    };

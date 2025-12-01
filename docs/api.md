@@ -115,7 +115,26 @@ interface IReaction {
 }
 ```
 
+### 6. Webhook (钩子)
+
+用于存储 Webhook 的配置信息。
+
+```typescript
+{
+  _id: ObjectId,
+  name: { type: String, required: true },
+  avatarUrl: String,
+  channelId: { type: ObjectId, ref: 'Channel', required: true, index: true },
+  serverId: { type: ObjectId, ref: 'Server', required: true, index: true },
+  token: { type: String, required: true }, // 用于验证请求的唯一令牌
+  botUserId: { type: ObjectId, ref: 'User', required: true }, // 关联的机器人用户 ID
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
 ---
+
 
 ## 二、 RESTful API 设计
 
@@ -181,7 +200,26 @@ interface IReaction {
 - `PUT /:emoji/@me`: 添加反应 (Emoji 需 URL 编码)。
 - `DELETE /:emoji/@me`: 移除反应。
 
+### 8. Webhook 管理
+*Path: `/api/servers/:serverId/channels/:channelId/webhooks`*
+
+- `GET /`: 获取频道下的所有 Webhooks。
+- `POST /`: 创建一个新的 Webhook (Body: `name`, `avatarUrl?`) -> 返回完整的 Webhook 对象，包括 `token`。
+- `PATCH /:webhookId`: 更新 Webhook (Body: `name?`, `avatarUrl?`)。
+- `DELETE /:webhookId`: 删除一个 Webhook。
+
+### 9. Webhook 执行 (公开)
+*Path: `/api/webhooks/:webhookId/:token`*
+
+这是一个公开端点，不需要 `Authorization` 头。认证通过 URL 中的 `webhookId` 和 `token` 完成。
+
+- `POST /`: 执行 Webhook 以发送消息。
+    - Body: `{ "content": "...", "username": "..." (可选), "avatar_url": "..." (可选) }`
+    - `username` 和 `avatar_url` 用于临时覆盖 Webhook 的默认名称和头像。
+
 ---
+
+
 
 ## 三、 WebSocket Gateway 设计
 

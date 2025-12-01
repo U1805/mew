@@ -3,9 +3,10 @@ import {
   createChannelHandler,
   deleteChannelHandler,
   updateChannelHandler,
-  getChannelsHandler, // 引入新的 handler
+  getChannelsHandler,
 } from './channel.controller';
 import messageRoutes from '../message/message.routes';
+import webhookRoutes from '../webhook/webhook.routes';
 import { protect } from '../../middleware/auth';
 import validate from '../../middleware/validate';
 import { createChannelSchema, updateChannelSchema } from './channel.validation';
@@ -15,12 +16,14 @@ const router = Router({ mergeParams: true });
 // All routes in this file are protected
 router.use(protect);
 
-// 添加 GET 路由
 router.get('/', getChannelsHandler);
 router.post('/', validate(createChannelSchema), createChannelHandler);
 
 // Mount message routes
 router.use('/:channelId/messages', messageRoutes);
+
+// Mount webhook routes
+router.use('/:channelId/webhooks', webhookRoutes);
 
 router.patch(
   '/:channelId',

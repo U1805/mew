@@ -74,6 +74,16 @@ export interface Message {
   updatedAt: string;
 }
 
+export interface Webhook {
+  _id: string;
+  name: string;
+  avatarUrl?: string;
+  channelId: string;
+  serverId: string;
+  token: string;
+  botUserId: string;
+}
+
 export interface LoginResponse {
   token: string;
 }

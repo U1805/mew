@@ -1,9 +1,16 @@
 import React from 'react';
-import { Channel } from '../types';
+import { Channel } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 
-export const ChannelItem = ({ channel, isActive, onClick, onSettingsClick }: { channel: Channel, isActive: boolean, onClick: () => void, onSettingsClick: (e: React.MouseEvent) => void }) => (
+interface ChannelItemProps {
+    channel: Channel;
+    isActive: boolean;
+    onClick: () => void;
+    onSettingsClick: (e: React.MouseEvent) => void;
+}
+
+export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick }) => (
     <div
         onClick={onClick}
         className={clsx(

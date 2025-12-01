@@ -21,6 +21,10 @@ app.use('/api/channels', channelRoutes);
 app.use('/api/servers/:serverId/categories', categoryRootRoutes);
 app.use('/api/categories', categoryDetailRoutes);
 
+// Public webhook execution route
+import publicWebhookRoutes from './api/webhook/public.routes';
+app.use('/api/webhooks', publicWebhookRoutes);
+
 app.get('/', (req, res) => {
   res.send('API is running...');
 });
