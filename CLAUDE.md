@@ -4,6 +4,7 @@
 
 My terminal environment is powershell in windows.
 Remember: Our development should follow the spirit of Linus.
+Use `npx kill-port` to clean up the port before running the project.
 
 # Project Mew
 

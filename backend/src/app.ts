@@ -1,10 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 
-import authRoutes from './api/auth/auth.routes';  // Note: This was already correct, no change needed.
-import userRoutes from './api/user/user.routes'; // Note: This was already correct, no change needed.
-import serverRoutes from './api/server/server.routes'; // Note: This was already correct, no change needed.
-import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes'; // Note: This was already correct, no change needed.
+import authRoutes from './api/auth/auth.routes';
+import userRoutes from './api/user/user.routes';
+import serverRoutes from './api/server/server.routes';
+import channelRoutes from './api/channel/channel.routes';
+import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/servers', serverRoutes);
+app.use('/api/channels', channelRoutes);
 app.use('/api/servers/:serverId/categories', categoryRootRoutes);
 app.use('/api/categories', categoryDetailRoutes);
 
@@ -24,7 +26,7 @@ app.get('/', (req, res) => {
 });
 
 // Error Handling Middleware
-import { errorHandler } from './utils/errorHandler'; // Note: This was already correct, no change needed.
+import { errorHandler } from './utils/errorHandler';
 app.use(errorHandler);
 
 export default app;
