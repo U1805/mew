@@ -54,7 +54,7 @@ export const AuthScreen: React.FC = () => {
       <div className="bg-[#313338] p-8 rounded shadow-2xl w-full max-w-md animate-fade-in-up">
         <div className="text-center mb-6">
             <h2 className="text-2xl font-bold text-white mb-1">Welcome back!</h2>
-            <p className="text-mew-textMuted">We're so excited to see you again!</p>
+            <p className="text-mew-textMuted">We&rsquo;re so excited to see you again!</p>
         </div>
         
         {error && <div className="bg-red-500/10 border border-red-500 text-red-500 text-sm p-2 rounded mb-4">{error}</div>}

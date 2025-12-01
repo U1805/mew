@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { messageApi, channelApi } from '../services/api';
-import { useUIStore, useAuthStore } from '../store';
+import { messageApi } from '../services/api';
+import { useUIStore } from '../store';
 import { getSocket } from '../services/socket';
 import { Message, Channel } from '../types';
 import MessageItem from './MessageItem';
@@ -11,7 +11,7 @@ import clsx from 'clsx';
 
 const ChatArea: React.FC = () => {
   const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList } = useUIStore();
-  const { user } = useAuthStore();
+  // const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const bottomRef = useRef<HTMLDivElement>(null);
   const [inputValue, setInputValue] = useState('');

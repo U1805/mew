@@ -68,7 +68,7 @@ const ChannelList: React.FC = () => {
           try {
              const res = await channelApi.listDMs(); 
              return (res.data as Channel[]).filter(c => c.type === ChannelType.DM);
-          } catch (e) {
+          } catch {
               return [];
           }
       },

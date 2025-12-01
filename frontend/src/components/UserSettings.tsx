@@ -117,7 +117,7 @@ const UserSettings: React.FC = () => {
                     <div className="flex justify-between items-center">
                         <div>
                             <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Phone Number</div>
-                            <div className="text-mew-textMuted text-sm">You haven't added a phone number yet.</div>
+                            <div className="text-mew-textMuted text-sm">You haven&rsquo;t added a phone number yet.</div>
                         </div>
                         <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
                             Add
@@ -137,7 +137,7 @@ const UserSettings: React.FC = () => {
         </button>
         <div className="text-xs text-mew-textMuted mt-4 mb-8">
             <h4 className="font-bold uppercase mb-2">Two-Factor Authentication</h4>
-            <p className="mb-4">Protect your account with an extra layer of security. Once configured, you'll be required to enter both your password and an authentication code from your mobile phone in order to sign in.</p>
+            <p className="mb-4">Protect your account with an extra layer of security. Once configured, you&rsquo;ll be required to enter both your password and an authentication code from your mobile phone in order to sign in.</p>
             <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-2 rounded text-sm font-medium transition-colors">
                 Enable Two-Factor Auth
             </button>
