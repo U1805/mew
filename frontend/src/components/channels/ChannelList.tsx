@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { channelApi, serverApi, categoryApi } from '../services/api';
-import { useUIStore, useAuthStore, useModalStore } from '../store';
-import { Channel, ChannelType, Server, Category } from '../types';
+import { channelApi, serverApi, categoryApi } from '@/services/api';
+import { useUIStore, useAuthStore, useModalStore } from '@/store';
+import { Channel, ChannelType, Server, Category } from '@/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';

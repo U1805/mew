@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '../store';
-import { serverApi, channelApi, categoryApi } from '../services/api';
+import { useModalStore, useUIStore } from '@/store';
+import { serverApi, channelApi, categoryApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';

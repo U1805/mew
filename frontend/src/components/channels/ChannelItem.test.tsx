@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { vi } from 'vitest';
 import React from 'react';
 import { ChannelItem } from './ChannelItem';
-import { Channel, ChannelType } from '../types';
+import { Channel, ChannelType } from '@/types';
 
 const mockChannel: Channel = {
   _id: '1',

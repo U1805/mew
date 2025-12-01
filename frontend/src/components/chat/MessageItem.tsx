@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Message } from '../types';
+import { Message } from '@/types';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { useAuthStore, useUIStore } from '../store';
-import { messageApi } from '../services/api';
+import { useAuthStore, useUIStore } from '@/store';
+import { messageApi } from '@/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface MessageItemProps {
