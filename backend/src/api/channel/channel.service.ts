@@ -35,6 +35,7 @@ export const updateChannel = async (
   if (!channel.serverId) {
     throw new BadRequestError('This operation cannot be performed on DM channels.');
   }
+  const serverId = channel.serverId; // Store serverId after check
 
   // Validate categoryId if it's being changed
   if (channelData.categoryId !== undefined) {
@@ -43,7 +44,7 @@ export const updateChannel = async (
       if (!category) {
         throw new BadRequestError('Category not found');
       }
-      if (category.serverId.toString() !== channel.serverId.toString()) {
+      if (category.serverId.toString() !== serverId.toString()) {
         throw new BadRequestError('Category does not belong to this server');
       }
     }
@@ -56,9 +57,8 @@ export const updateChannel = async (
 
   const updatedChannel = await channel.save();
 
-  if (updatedChannel && updatedChannel.serverId) {
-    broadcastEvent(updatedChannel.serverId.toString(), 'CHANNEL_UPDATE', updatedChannel);
-  }
+  // The serverId is immutable in this function, so we can safely use the one we stored.
+  broadcastEvent(serverId.toString(), 'CHANNEL_UPDATE', updatedChannel);
 
   return updatedChannel;
 };
@@ -67,11 +67,24 @@ export const updateChannel = async (
 export const deleteChannel = async (
   channelId: string
 ): Promise<IChannel | null> => {
+  const channel = await Channel.findById(channelId);
+  if (!channel) {
+    throw new NotFoundError('Channel not found');
+  }
+
   // First, delete all messages in the channel
   await Message.deleteMany({ channelId });
 
   // Then, delete the channel itself
   const deletedChannel = await Channel.findByIdAndDelete(channelId);
+
+  if (deletedChannel && deletedChannel.serverId) {
+    broadcastEvent(deletedChannel.serverId.toString(), 'CHANNEL_DELETE', {
+      channelId: deletedChannel._id.toString(),
+      serverId: deletedChannel.serverId.toString(),
+    });
+  }
+
   return deletedChannel;
 };
 

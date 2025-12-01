@@ -7,3 +7,11 @@ export const getMe = async (userId: string) => {
   }
   return user;
 };
+
+export const searchUsers = async (query: string, currentUserId: string) => {
+  const users = await User.find({
+    username: { $regex: query, $options: 'i' }, // 'i' 表示不区分大小写
+    _id: { $ne: currentUserId } // 排除当前用户
+  }).limit(10).select('_id username avatarUrl'); // 只选择必要字段
+  return users;
+};

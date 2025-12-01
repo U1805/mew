@@ -25,3 +25,15 @@ export const createDmChannelHandler = asyncHandler(async (req: Request, res: Res
   const channel = await channelService.createDmChannel(req.user.id, recipientId);
   res.status(201).json(channel);
 });
+
+export const searchUsersHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
+  }
+  const query = req.query.q as string;
+  if (!query) {
+    return res.status(200).json([]); // 如果查询为空，返回空数组
+  }
+  const users = await userService.searchUsers(query, req.user.id);
+  res.status(200).json(users);
+});

@@ -135,6 +135,9 @@ interface IReaction {
 - `GET /@me/servers`: 获取当前用户拥有的服务器列表。
 - `POST /@me/channels`: 创建或获取私聊(DM)频道。
     - Body: `{ recipientId: string }`
+- `GET /search`: 模糊搜索用户。
+    - Query: `q` (搜索关键词)
+    - 返回: `[{ _id, username, avatarUrl }]` 用户数组
 
 ### 3. 服务器 (Servers)
 *Path: `/api/servers`*
@@ -242,7 +245,7 @@ const socket = io("http://localhost:3000", {
     -   Data: `IChannel`
     -   *触发*: 重命名频道、移动分组等。
 -   `CHANNEL_DELETE`
-    -   Data: `{ channelId: string }`
+    -   Data: `{ channelId: string, serverId: string }`
     -   *触发*: 删除频道。
 
 #### 服务器相关

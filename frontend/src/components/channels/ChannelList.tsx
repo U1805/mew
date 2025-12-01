@@ -85,7 +85,10 @@ const ChannelList: React.FC = () => {
     return (
       <div className="w-60 bg-mew-darker flex flex-col border-r border-mew-darkest flex-shrink-0">
         <div className="h-12 shadow-sm flex items-center px-2 border-b border-mew-darkest">
-             <button className="w-full text-left px-2 py-1 rounded bg-mew-darkest text-mew-textMuted text-sm hover:bg-[#1E1F22] transition-colors">
+             <button 
+                className="w-full text-left px-2 py-1 rounded bg-mew-darkest text-mew-textMuted text-sm hover:bg-[#1E1F22] transition-colors"
+                onClick={() => openModal('findUser')}
+             >
                  Find or start a conversation
              </button>
         </div>
@@ -97,7 +100,11 @@ const ChannelList: React.FC = () => {
 
             <div className="flex items-center justify-between px-2 mb-2 group">
                 <div className="text-xs font-bold text-mew-textMuted uppercase hover:text-mew-text cursor-pointer">Direct Messages</div>
-                <Icon icon="mdi:plus" className="text-mew-textMuted hover:text-mew-text cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Icon 
+                    icon="mdi:plus" 
+                    className="text-mew-textMuted hover:text-mew-text cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => openModal('findUser')}
+                />
             </div>
             
             {dmChannels?.map(dm => {

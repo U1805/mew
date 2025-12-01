@@ -97,4 +97,72 @@ describe('User Routes', () => {
       expect(res.body.message).toContain('You cannot create a DM with yourself');
     });
   });
+
+  describe('GET /api/users/search', () => {
+
+    beforeEach(async () => {
+      // Create a few more users for searching
+      await request(app).post('/api/auth/register').send({ email: 'search1@example.com', username: 'search-user-1', password: 'password123' });
+      await request(app).post('/api/auth/register').send({ email: 'search2@example.com', username: 'search-user-2', password: 'password123' });
+      await request(app).post('/api/auth/register').send({ email: 'another@example.com', username: 'another-user', password: 'password123' });
+    });
+
+    it('should return 401 if no token is provided', async () => {
+      const res = await request(app).get('/api/users/search?q=test');
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should return users matching the search query', async () => {
+      const res = await request(app)
+        .get('/api/users/search?q=search')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toBeInstanceOf(Array);
+      expect(res.body.length).toBe(2);
+      expect(res.body[0].username).toContain('search-user');
+    });
+
+    it('should not return the current user in search results', async () => {
+        const res = await request(app)
+        .get('/api/users/search?q=usertest') // usertest is the current user
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.length).toBe(0);
+    });
+
+    it('should return only selected fields (username, avatarUrl)', async () => {
+      const res = await request(app)
+        .get('/api/users/search?q=search')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      const user = res.body[0];
+      expect(user).toHaveProperty('_id');
+      expect(user).toHaveProperty('username');
+      // avatarUrl is optional and may not exist if not set, so we don't assert its presence.
+      // Instead, we focus on ensuring no sensitive fields are present.
+      expect(user).not.toHaveProperty('email');
+      expect(user).not.toHaveProperty('password');
+    });
+
+    it('should return an empty array if no users match', async () => {
+      const res = await request(app)
+        .get('/api/users/search?q=nonexistent')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+
+    it('should return an empty array if query is empty', async () => {
+        const res = await request(app)
+        .get('/api/users/search?q=')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual([]);
+    });
+  });
 });

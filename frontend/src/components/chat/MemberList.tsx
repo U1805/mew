@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { serverApi } from '../../services/api';
-import { useUIStore } from '../../store';
+import { useUIStore, useModalStore } from '../../store';
 import { User } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
@@ -51,12 +52,18 @@ const MemberList: React.FC = () => {
 };
 
 const MemberGroup = ({ title, members, isOffline }: { title: string, members: User[], isOffline?: boolean }) => {
+    const { openModal } = useModalStore();
+
     if (members.length === 0) return null;
     return (
         <div className="mb-6">
             <h3 className="text-xs font-bold text-mew-textMuted uppercase mb-2 px-2">{title}</h3>
             {members.map(member => (
-                <div key={member._id} className={clsx("flex items-center px-2 py-1.5 rounded hover:bg-[#35373C] cursor-pointer group", isOffline && "opacity-50 hover:opacity-100")}>
+                <div 
+                    key={member._id} 
+                    className={clsx("flex items-center px-2 py-1.5 rounded hover:bg-[#35373C] cursor-pointer group", isOffline && "opacity-50 hover:opacity-100")}
+                    onClick={() => openModal('userProfile', { user: member })}
+                >
                     <div className="relative mr-3">
                         <div className="w-8 h-8 rounded-full bg-mew-accent flex items-center justify-center overflow-hidden">
                              {member.avatarUrl ? (

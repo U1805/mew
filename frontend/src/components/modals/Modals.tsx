@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { useModalStore, useUIStore } from '../../store';
-import { serverApi, channelApi, categoryApi, messageApi } from '../../services/api';
+import { serverApi, channelApi, categoryApi, messageApi, userApi } from '../../services/api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { Category } from '../../types';
+import { Category, User } from '../../types';
 
 const Modal: React.FC = () => {
   const { activeModal, closeModal, modalData } = useModalStore();
@@ -16,6 +16,10 @@ const Modal: React.FC = () => {
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Find User State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   // Initialize state based on modal type and data
   useEffect(() => {
@@ -23,6 +27,8 @@ const Modal: React.FC = () => {
           setName('');
           setCategoryId('');
           setIsLoading(false);
+          setSearchQuery('');
+          setDebouncedQuery('');
           return;
       }
 
@@ -38,6 +44,12 @@ const Modal: React.FC = () => {
       }
   }, [activeModal, modalData]);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Fetch categories for Channel Settings dropdown
   const { data: categories } = useQuery({
     queryKey: ['categories', currentServerId],
@@ -47,6 +59,17 @@ const Modal: React.FC = () => {
         return res.data as Category[];
     },
     enabled: !!currentServerId && activeModal === 'channelSettings'
+  });
+
+  // Query for Find User
+  const { data: searchResults, isFetching: isSearching } = useQuery({
+    queryKey: ['userSearch', debouncedQuery],
+    queryFn: async () => {
+        if (!debouncedQuery) return [];
+        const res = await userApi.search(debouncedQuery);
+        return res.data as User[];
+    },
+    enabled: activeModal === 'findUser' && !!debouncedQuery
   });
 
   if (!activeModal) return null;
@@ -117,6 +140,23 @@ const Modal: React.FC = () => {
       } finally {
           setIsLoading(false);
       }
+  };
+
+  const handleCreateDM = async (recipientId: string) => {
+    if (!recipientId) return;
+    setIsLoading(true);
+    try {
+        const res = await channelApi.createDM(recipientId);
+        const channel = res.data;
+        useUIStore.getState().setCurrentServer(null);
+        useUIStore.getState().setCurrentChannel(channel._id);
+        queryClient.invalidateQueries({ queryKey: ['dmChannels'] });
+        closeModal();
+    } catch (error) {
+        console.error("Failed to create DM", error);
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   // --- Modal Content Logic ---
@@ -265,7 +305,7 @@ const Modal: React.FC = () => {
      );
   }
   
-  // Special layout for Category Settings (Similar to Channel Settings)
+  // Special layout for Category Settings
   if (activeModal === 'editCategory') {
      return (
         <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
@@ -316,6 +356,126 @@ const Modal: React.FC = () => {
              </div>
         </div>
      );
+  }
+
+  // Find User Modal
+  if (activeModal === 'findUser') {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#313338] w-full max-w-lg rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[600px]">
+                <div className="p-4 pt-5">
+                    <h2 className="text-xl font-bold text-white mb-2">Find or start a conversation</h2>
+                    <p className="text-mew-textMuted text-sm">Search for a user by their username to start a direct message.</p>
+                </div>
+                
+                <div className="px-4 mb-4">
+                     <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-[#1E1F22] text-white p-3 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none font-medium placeholder-mew-textMuted"
+                        placeholder="Where would you like to go?"
+                        autoFocus
+                    />
+                </div>
+
+                <div className="flex-1 overflow-y-auto px-2 pb-2 custom-scrollbar space-y-1">
+                    {isSearching ? (
+                        <div className="flex justify-center p-4 text-mew-textMuted">
+                            <Icon icon="mdi:loading" className="animate-spin" width="24" />
+                        </div>
+                    ) : searchResults?.length === 0 && debouncedQuery ? (
+                        <div className="text-center p-4 text-mew-textMuted">
+                            No users found.
+                        </div>
+                    ) : (
+                        searchResults?.map(user => (
+                            <div key={user._id} className="flex items-center justify-between p-2 rounded hover:bg-[#35373C] group cursor-pointer" onClick={() => handleCreateDM(user._id)}>
+                                <div className="flex items-center">
+                                    <div className="w-8 h-8 rounded-full bg-mew-accent flex items-center justify-center text-white font-bold mr-3 overflow-hidden">
+                                        {user.avatarUrl ? (
+                                            <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                                        ) : (
+                                            user.username.substring(0, 2).toUpperCase()
+                                        )}
+                                    </div>
+                                    <div className="font-medium text-white">{user.username}</div>
+                                </div>
+                                <Icon icon="mdi:message-outline" className="text-mew-textMuted group-hover:text-white" />
+                            </div>
+                        ))
+                    )}
+                    
+                    {!debouncedQuery && !isSearching && (
+                        <div className="text-center p-8 text-mew-textMuted text-sm">
+                             Start typing to search for friends.
+                        </div>
+                    )}
+                </div>
+                
+                <div className="bg-[#2B2D31] p-4 flex justify-end">
+                    <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">Close</button>
+                </div>
+            </div>
+        </div>
+    )
+  }
+
+  // User Profile Modal
+  if (activeModal === 'userProfile' && modalData?.user) {
+      const user = modalData.user as User;
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+             <div className="bg-[#232428] w-[600px] rounded-lg shadow-2xl overflow-hidden animate-scale-in relative">
+                 <div className="h-[120px] bg-mew-accent"></div>
+                 <div className="px-4 pb-4 relative">
+                     <div className="absolute -top-[50px] left-4 p-[6px] bg-[#232428] rounded-full">
+                         <div className="w-[90px] h-[90px] rounded-full bg-[#1E1F22] flex items-center justify-center overflow-hidden">
+                             {user.avatarUrl ? (
+                                 <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                             ) : (
+                                 <span className="text-2xl font-bold text-white">{user.username.substring(0, 2).toUpperCase()}</span>
+                             )}
+                         </div>
+                         <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#232428]"></div>
+                     </div>
+                     
+                     <div className="flex justify-end pt-3 mb-2">
+                          <button 
+                            onClick={() => handleCreateDM(user._id)}
+                            disabled={isLoading}
+                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                          >
+                              Send Message
+                          </button>
+                          <button 
+                             onClick={closeModal} 
+                             className="ml-2 w-8 h-8 rounded-full bg-[#2B2D31] hover:bg-[#404249] flex items-center justify-center text-mew-textMuted hover:text-white transition-colors"
+                          >
+                              <Icon icon="mdi:close" />
+                          </button>
+                     </div>
+
+                     <div className="mt-8 bg-[#111214] rounded-lg p-3">
+                         <h2 className="text-xl font-bold text-white mb-0.5">{user.username}</h2>
+                         <div className="text-sm text-mew-textMuted mb-4">#{user._id.slice(0, 4)}</div>
+                         
+                         <div className="h-[1px] bg-mew-divider mb-3"></div>
+                         
+                         <div className="mb-3">
+                             <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Member Since</div>
+                             <div className="text-sm text-mew-text">{format(new Date(user.createdAt), 'MMM d, yyyy')}</div>
+                         </div>
+                         
+                         <div>
+                             <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Note</div>
+                             <input type="text" placeholder="Click to add a note" className="w-full bg-transparent text-xs text-white placeholder-mew-textMuted focus:outline-none" />
+                         </div>
+                     </div>
+                 </div>
+             </div>
+        </div>
+      )
   }
 
   // Generic Dialog Modal (Create X, Delete X)

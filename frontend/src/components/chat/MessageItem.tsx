@@ -24,7 +24,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   const [editContent, setEditContent] = useState(message.content);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
-  const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '', _id: message.authorId as string, isBot: false };
+  const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
   const isRssCard = message.type === 'app/x-rss-card';
   const isAuthor = user?._id?.toString() === author._id?.toString();
 
@@ -200,7 +200,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
          </>
       ) : (
           <>
-            <div className="pl-4 mt-0.5 mr-4 flex-shrink-0 cursor-pointer">
+            <div 
+                className="pl-4 mt-0.5 mr-4 flex-shrink-0 cursor-pointer"
+                onClick={() => openModal('userProfile', { user: author })}
+            >
                 {author.avatarUrl ? (
                 <img src={author.avatarUrl} alt={author.username} className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity" />
                 ) : (
@@ -211,7 +214,12 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center">
-                    <span className="font-medium text-white mr-2 hover:underline cursor-pointer">{author.username}</span>
+                    <span 
+                        className="font-medium text-white mr-2 hover:underline cursor-pointer"
+                        onClick={() => openModal('userProfile', { user: author })}
+                    >
+                        {author.username}
+                    </span>
                     {author.isBot && (
                         <span className="bg-[#5865F2] text-white text-[10px] px-1.5 rounded-[3px] h-[15px] flex items-center mr-2 uppercase font-bold">Bot</span>
                     )}

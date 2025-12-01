@@ -22,6 +22,10 @@ export const authApi = {
   getMe: () => api.get('/users/@me'),
 };
 
+export const userApi = {
+  search: (query: string) => api.get('/users/search', { params: { q: query } }),
+};
+
 export const serverApi = {
   list: () => api.get('/users/@me/servers'),
   create: (data: { name: string }) => api.post('/servers', data),
