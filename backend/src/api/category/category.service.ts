@@ -1,6 +1,8 @@
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
+import Channel from '../channel/channel.model';
 import Server from '../server/server.model';
 import Category, { ICategory } from './category.model';
+import { broadcastEvent } from '../../gateway/events';
 
 export const createCategory = async (
   name: string,
@@ -35,4 +37,49 @@ export const getCategoriesByServer = async (serverId: string, userId: string): P
 
   const categories = await Category.find({ serverId });
   return categories;
+};
+
+export const updateCategoryById = async (
+  categoryId: string,
+  data: Partial<Pick<ICategory, 'name' | 'position'>>,
+  userId: string
+): Promise<ICategory> => {
+  const category = await Category.findById(categoryId).populate('serverId');
+  if (!category) {
+    throw new NotFoundError('Category not found');
+  }
+
+  const server = category.serverId as any; // Populated field
+  if (server.ownerId.toString() !== userId) {
+    throw new ForbiddenError('You are not the owner of this server');
+  }
+
+  Object.assign(category, data);
+  await category.save();
+
+  broadcastEvent(server._id.toString(), 'CATEGORY_UPDATE', category);
+
+  return category;
+};
+
+export const deleteCategoryById = async (
+  categoryId: string,
+  userId: string
+): Promise<void> => {
+  const category = await Category.findById(categoryId).populate('serverId');
+  if (!category) {
+    throw new NotFoundError('Category not found');
+  }
+
+  const server = category.serverId as any; // Populated field
+  if (server.ownerId.toString() !== userId) {
+    throw new ForbiddenError('You are not the owner of this server');
+  }
+
+  // Un-categorize channels in this category
+  await Channel.updateMany({ categoryId }, { $unset: { categoryId: '' } });
+
+  await category.deleteOne();
+
+  broadcastEvent(server._id.toString(), 'CATEGORY_DELETE', { categoryId });
 };

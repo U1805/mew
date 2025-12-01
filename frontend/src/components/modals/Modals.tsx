@@ -2,10 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { useModalStore, useUIStore } from '../../store';
 import { serverApi, channelApi, categoryApi, messageApi } from '../../services/api';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { Category } from '../../types';
 
 const Modal: React.FC = () => {
   const { activeModal, closeModal, modalData } = useModalStore();
@@ -13,31 +14,48 @@ const Modal: React.FC = () => {
   const queryClient = useQueryClient();
   
   const [name, setName] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   // Initialize state based on modal type and data
   useEffect(() => {
       if (!activeModal) {
           setName('');
+          setCategoryId('');
           setIsLoading(false);
           return;
       }
 
       if (activeModal === 'channelSettings' && modalData?.channel) {
           setName(modalData.channel.name || '');
+          setCategoryId(modalData.channel.categoryId || '');
       } else if (activeModal === 'serverSettings' && modalData?.server) {
           setName(modalData.server.name || '');
+      } else if (activeModal === 'editCategory' && modalData?.category) {
+          setName(modalData.category.name || '');
       } else {
           setName('');
       }
   }, [activeModal, modalData]);
+
+  // Fetch categories for Channel Settings dropdown
+  const { data: categories } = useQuery({
+    queryKey: ['categories', currentServerId],
+    queryFn: async () => {
+        if (!currentServerId) return [];
+        const res = await categoryApi.list(currentServerId);
+        return res.data as Category[];
+    },
+    enabled: !!currentServerId && activeModal === 'channelSettings'
+  });
 
   if (!activeModal) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Allow submit if it's a delete action (name not required)
-    if (!name.trim() && activeModal !== 'deleteChannel' && activeModal !== 'deleteMessage') return;
+    const isDelete = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory';
+    if (!name.trim() && !isDelete) return;
 
     setIsLoading(true);
     try {
@@ -47,6 +65,13 @@ const Modal: React.FC = () => {
       } else if (activeModal === 'createCategory' && currentServerId) {
         await categoryApi.create(currentServerId, { name });
         queryClient.invalidateQueries({ queryKey: ['categories', currentServerId] });
+      } else if (activeModal === 'editCategory' && modalData?.category) {
+        await categoryApi.update(modalData.category._id, { name });
+        queryClient.invalidateQueries({ queryKey: ['categories', currentServerId] });
+      } else if (activeModal === 'deleteCategory' && modalData?.category) {
+        await categoryApi.delete(modalData.category._id);
+        queryClient.invalidateQueries({ queryKey: ['categories', currentServerId] });
+        queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] }); // Channels might become uncategorized
       } else if (activeModal === 'createChannel' && currentServerId) {
         await channelApi.create(currentServerId, { 
             name, 
@@ -55,10 +80,9 @@ const Modal: React.FC = () => {
         });
         queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
       } else if (activeModal === 'deleteChannel' && currentServerId) {
-         // Fake delete for now as API might not be fully implemented or we need ID from modalData
-         // await channelApi.delete(currentServerId, modalData.channel._id);
-         console.log("Deleting channel", modalData.channel._id);
-         queryClient.setQueryData(['channels', currentServerId], (old: any[]) => old.filter(c => c._id !== modalData.channel._id));
+         // Using the correct API call structure if needed, or stick to mock assumption
+         await channelApi.delete(currentServerId, modalData.channel._id);
+         queryClient.setQueryData(['channels', currentServerId], (old: any[]) => old?.filter(c => c._id !== modalData.channel._id) || []);
       } else if (activeModal === 'deleteMessage' && currentServerId && modalData?.message) {
           await messageApi.delete(currentServerId, modalData.message.channelId, modalData.message._id);
           // Optimistic update
@@ -74,6 +98,25 @@ const Modal: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleChannelUpdate = async () => {
+      if (!currentServerId || !modalData?.channel) return;
+      setIsLoading(true);
+      try {
+          // Convert empty string back to null if "No Category" is selected
+          const catId = categoryId === '' ? null : categoryId;
+          await channelApi.update(currentServerId, modalData.channel._id, { 
+              name, 
+              categoryId: catId 
+          });
+          queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
+          closeModal();
+      } catch (error) {
+          console.error(error);
+      } finally {
+          setIsLoading(false);
+      }
   };
 
   // --- Modal Content Logic ---
@@ -140,31 +183,7 @@ const Modal: React.FC = () => {
       )
   }
 
-  // --- Render Standard Modal (Create/Delete) ---
-  
-  const getTitle = () => {
-      switch (activeModal) {
-          case 'createServer': return 'Customize Your Server';
-          case 'createCategory': return 'Create Category';
-          case 'createChannel': return 'Create Channel';
-          case 'channelSettings': return 'Overview'; // We'll customize this layout slightly
-          case 'deleteChannel': return 'Delete Channel';
-          case 'deleteMessage': return 'Delete Message';
-          default: return '';
-      }
-  };
-
-  const getLabel = () => {
-      switch (activeModal) {
-          case 'createServer': return 'Server Name';
-          case 'createCategory': return 'Category Name';
-          case 'createChannel': return 'Channel Name';
-          case 'channelSettings': return 'Channel Name';
-          default: return 'Name';
-      }
-  };
-
-  // Special layout for Channel Settings (simplified version of Server Settings)
+  // Special layout for Channel Settings
   if (activeModal === 'channelSettings') {
      return (
         <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
@@ -175,7 +194,6 @@ const Modal: React.FC = () => {
                     </h2>
                     <div className="px-2.5 py-1.5 rounded-[4px] bg-[#404249] text-white font-medium text-sm cursor-pointer mb-0.5">Overview</div>
                     <div className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text font-medium text-sm cursor-pointer mb-0.5">Permissions</div>
-                    <div className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text font-medium text-sm cursor-pointer mb-0.5">Invites</div>
                     
                     <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50"></div>
                     
@@ -200,6 +218,22 @@ const Modal: React.FC = () => {
                             className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
                         />
                      </div>
+                     
+                     {/* Category Selection */}
+                     <div>
+                        <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Category</label>
+                        <select
+                            value={categoryId}
+                            onChange={(e) => setCategoryId(e.target.value)}
+                            className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium appearance-none"
+                        >
+                            <option value="">No Category</option>
+                            {categories?.map((cat) => (
+                                <option key={cat._id} value={cat._id}>{cat.name}</option>
+                            ))}
+                        </select>
+                     </div>
+
                      <div>
                         <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Channel Topic</label>
                         <textarea
@@ -208,7 +242,13 @@ const Modal: React.FC = () => {
                         />
                      </div>
                      <div className="flex gap-4 pt-4">
-                         <button className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors">Save Changes</button>
+                         <button 
+                            onClick={handleChannelUpdate} 
+                            disabled={isLoading}
+                            className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors"
+                         >
+                            Save Changes
+                         </button>
                          <button onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
                      </div>
                  </div>
@@ -224,8 +264,84 @@ const Modal: React.FC = () => {
         </div>
      );
   }
+  
+  // Special layout for Category Settings (Similar to Channel Settings)
+  if (activeModal === 'editCategory') {
+     return (
+        <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
+             <div className="w-[30%] min-w-[220px] bg-[#2B2D31] flex flex-col items-end pt-[60px] pb-4 px-2">
+                 <div className="w-[192px] px-1.5">
+                    <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 text-ellipsis overflow-hidden whitespace-nowrap">
+                        CATEGORY SETTINGS
+                    </h2>
+                    <div className="px-2.5 py-1.5 rounded-[4px] bg-[#404249] text-white font-medium text-sm cursor-pointer mb-0.5">Overview</div>
+                    
+                    <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50"></div>
+                    
+                    <div 
+                        className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text font-medium text-sm cursor-pointer mb-0.5 flex justify-between group"
+                        onClick={() => useModalStore.getState().openModal('deleteCategory', modalData)}
+                    >
+                        <span className="text-red-400">Delete Category</span>
+                        <Icon icon="mdi:trash-can-outline" className="hidden group-hover:block text-red-400" />
+                    </div>
+                 </div>
+             </div>
+             <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[740px]">
+                 <h2 className="text-xl font-bold text-white mb-6">Overview</h2>
+                 <form onSubmit={handleSubmit} className="space-y-4">
+                     <div>
+                        <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Category Name</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
+                            autoFocus
+                        />
+                     </div>
+                     <div className="flex gap-4 pt-4">
+                         <button type="submit" className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors">Save Changes</button>
+                         <button type="button" onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
+                     </div>
+                 </form>
+             </div>
+             <div className="w-[18%] min-w-[60px] pt-[60px] pl-5">
+                 <div className="flex flex-col items-center cursor-pointer group" onClick={closeModal}>
+                     <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
+                         <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />
+                     </div>
+                     <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
+                 </div>
+             </div>
+        </div>
+     );
+  }
 
   // Generic Dialog Modal (Create X, Delete X)
+  const isDeleteType = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory';
+  
+  const getTitle = () => {
+      switch (activeModal) {
+          case 'createServer': return 'Customize Your Server';
+          case 'createCategory': return 'Create Category';
+          case 'createChannel': return 'Create Channel';
+          case 'deleteChannel': return 'Delete Channel';
+          case 'deleteMessage': return 'Delete Message';
+          case 'deleteCategory': return 'Delete Category';
+          default: return '';
+      }
+  };
+
+  const getLabel = () => {
+      switch (activeModal) {
+          case 'createServer': return 'Server Name';
+          case 'createCategory': return 'Category Name';
+          case 'createChannel': return 'Channel Name';
+          default: return 'Name';
+      }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
@@ -238,6 +354,7 @@ const Modal: React.FC = () => {
                 {activeModal === 'createChannel' && modalData?.categoryName ? `in ${modalData.categoryName}` : ""}
                 {activeModal === 'deleteChannel' && `Are you sure you want to delete #${modalData?.channel?.name}? This cannot be undone.`}
                 {activeModal === 'deleteMessage' && "Are you sure you want to delete this message?"}
+                {activeModal === 'deleteCategory' && `Are you sure you want to delete the category '${modalData?.category?.name}'? Channels inside will become uncategorized.`}
             </p>
         </div>
 
@@ -263,7 +380,7 @@ const Modal: React.FC = () => {
                      </div>
                  </div>
              </div>
-        ) : activeModal !== 'deleteChannel' ? (
+        ) : !isDeleteType ? (
              <form onSubmit={handleSubmit} className="px-4">
                 <div className="mb-4">
                     <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{getLabel()}</label>
@@ -277,14 +394,14 @@ const Modal: React.FC = () => {
                     />
                 </div>
             </form>
-        ) : (
+        ) : activeModal === 'deleteChannel' ? (
              // Delete Channel Warning Visual
              <div className="px-4 pb-2">
                  <div className="bg-[#F0B132] p-3 rounded text-sm text-black font-medium border border-orange-600/20">
                     <span className="font-bold">Warning:</span> By deleting this channel, you will lose all messages and history within it.
                  </div>
              </div>
-        )}
+        ) : null}
 
         {/* Footer */}
         <div className="bg-[#2B2D31] p-4 flex justify-end items-center mt-2 space-x-3">
@@ -297,18 +414,20 @@ const Modal: React.FC = () => {
             </button>
             <button
                 onClick={handleSubmit}
-                disabled={isLoading || (!name.trim() && activeModal !== 'deleteChannel' && activeModal !== 'deleteMessage')}
+                disabled={isLoading || (!name.trim() && !isDeleteType)}
                 className={clsx(
                     "px-6 py-2 rounded-[3px] font-medium text-sm transition-colors text-white",
-                    (activeModal === 'deleteChannel' || activeModal === 'deleteMessage') 
+                    isDeleteType
                         ? "bg-red-500 hover:bg-red-600" 
                         : "bg-mew-accent hover:bg-mew-accentHover",
-                    (isLoading || (!name.trim() && activeModal !== 'deleteChannel' && activeModal !== 'deleteMessage')) && "opacity-50 cursor-not-allowed"
+                    (isLoading || (!name.trim() && !isDeleteType)) && "opacity-50 cursor-not-allowed"
                 )}
             >
                 {activeModal === 'createServer' ? 'Create' : 
                  activeModal === 'deleteChannel' ? 'Delete Channel' : 
-                 activeModal === 'deleteMessage' ? 'Delete' : 'Create Channel'}
+                 activeModal === 'deleteMessage' ? 'Delete' : 
+                 activeModal === 'deleteCategory' ? 'Delete Category' :
+                 'Create'}
             </button>
         </div>
       </div>

@@ -17,7 +17,7 @@ export const createChannelSchema = z.object({
 export const updateChannelSchema = z.object({
   body: z.object({
     name: z.string().min(1, 'Channel name is required').optional(),
-    categoryId: z.string().optional(),
+    categoryId: z.string().nullable().optional(),
   }),
   // update 路由通常只有 channelId，但在 REST 设计中若包含 serverId 也可校验
   params: z.object({

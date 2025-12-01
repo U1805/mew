@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { protect } from '../../middleware/auth';
+import validate from '../../middleware/validate';
 import * as categoryController from './category.controller';
+import { categoryIdParams, updateCategorySchema } from './category.validation';
 
 const categoryRootRoutes = Router({ mergeParams: true });
 
@@ -10,7 +12,18 @@ categoryRootRoutes.post('/', protect, categoryController.createCategoryHandler);
 
 const categoryDetailRoutes = Router({ mergeParams: true });
 
-// Placeholder for routes like /api/categories/:categoryId
-// e.g., categoryDetailRoutes.patch('/:categoryId', protect, ...);
+// Routes for /api/categories/:categoryId
+categoryDetailRoutes.patch(
+  '/:categoryId',
+  protect,
+  validate(updateCategorySchema),
+  categoryController.updateCategoryHandler
+);
+categoryDetailRoutes.delete(
+  '/:categoryId',
+  protect,
+  validate(categoryIdParams),
+  categoryController.deleteCategoryHandler
+);
 
 export { categoryRootRoutes, categoryDetailRoutes };

@@ -39,14 +39,12 @@ describe('Channel Routes', () => {
       expect(res.body.serverId).toBe(serverId);
     });
 
-        it('should return 403 if a user tries to create a channel in a server they do not own', async () => {
-      // Create a second user (the attacker)
+    it('should return 403 if a user tries to create a channel in a server they do not own', async () => {
       const attackerData = { email: 'attacker@example.com', username: 'attacker', password: 'password123' };
       await request(app).post('/api/auth/register').send(attackerData);
       const attackerLoginRes = await request(app).post('/api/auth/login').send({ email: attackerData.email, password: attackerData.password });
       const attackerToken = attackerLoginRes.body.token;
 
-      // Attacker tries to create a channel in the original user's server
       const res = await request(app)
         .post(`/api/servers/${serverId}/channels`)
         .set('Authorization', `Bearer ${attackerToken}`)
@@ -87,6 +85,65 @@ describe('Channel Routes', () => {
       expect(res.body.name).toBe(updatedData.name);
     });
 
+    it("should update the channel's category successfully", async () => {
+      const categoryRes = await request(app)
+        .post(`/api/servers/${serverId}/categories`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Test Category' });
+      const categoryId = categoryRes.body._id;
+
+      const updatedData = { categoryId };
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatedData);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.categoryId).toBe(categoryId);
+    });
+
+    it("should set channel's category to null successfully", async () => {
+      const updatedData = { categoryId: null };
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatedData);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.categoryId).toBe(null);
+    });
+
+    it('should return 400 for a non-existent categoryId', async () => {
+      const updatedData = { categoryId: '60c72b2f9b1d8c001f8e4c9a' }; // Invalid ID
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatedData);
+
+      expect(res.statusCode).toBe(400);
+    });
+
+    it('should return 400 if the category belongs to another server', async () => {
+      const anotherServerRes = await request(app)
+        .post('/api/servers')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Another Server' });
+      const anotherServerId = anotherServerRes.body._id;
+      const anotherCategoryRes = await request(app)
+        .post(`/api/servers/${anotherServerId}/categories`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Another Category' });
+      const anotherCategoryId = anotherCategoryRes.body._id;
+
+      const updatedData = { categoryId: anotherCategoryId };
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatedData);
+
+      expect(res.statusCode).toBe(400);
+    });
+
     it('should return 403 if a non-owner tries to update', async () => {
       const anotherUserData = { email: 'updater@example.com', username: 'updater', password: 'password123' };
       await request(app).post('/api/auth/register').send(anotherUserData);
@@ -113,8 +170,7 @@ describe('Channel Routes', () => {
       channelId = res.body._id;
     });
 
-        it('should delete the channel and its associated messages successfully', async () => {
-      // 1. Create a message in the channel first
+    it('should delete the channel and its associated messages successfully', async () => {
       const createMessageRes = await request(app)
         .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
         .set('Authorization', `Bearer ${token}`)
@@ -122,7 +178,6 @@ describe('Channel Routes', () => {
       expect(createMessageRes.statusCode).toBe(201);
       const messageId = createMessageRes.body._id;
 
-      // 2. Verify the message is there before we delete the channel
       const getMessagesRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages`)
         .set('Authorization', `Bearer ${token}`);
@@ -130,20 +185,17 @@ describe('Channel Routes', () => {
       expect(getMessagesRes.body).toBeInstanceOf(Array);
       expect(getMessagesRes.body.length).toBe(1);
 
-      // 3. Delete the channel
       const deleteChannelRes = await request(app)
         .delete(`/api/servers/${serverId}/channels/${channelId}`)
         .set('Authorization', `Bearer ${token}`);
       expect(deleteChannelRes.statusCode).toBe(200);
       expect(deleteChannelRes.body.message).toBe('Channel deleted successfully');
 
-      // 4. Verify getting the channel via API now fails (using the proper nested route)
       const getDeletedChannelRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}`)
         .set('Authorization', `Bearer ${token}`);
       expect(getDeletedChannelRes.statusCode).toBe(404);
 
-      // 5. Verify the message object has been deleted from the database
       const message = await Message.findById(messageId);
       expect(message).toBeNull();
     });

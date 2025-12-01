@@ -32,13 +32,20 @@ export const serverApi = {
 export const categoryApi = {
   list: (serverId: string) => api.get(`/servers/${serverId}/categories`),
   create: (serverId: string, data: { name: string }) => api.post(`/servers/${serverId}/categories`, data),
+  update: (categoryId: string, data: { name?: string; position?: number }) => api.patch(`/categories/${categoryId}`, data),
+  delete: (categoryId: string) => api.delete(`/categories/${categoryId}`),
 }
 
 export const channelApi = {
   list: (serverId: string) => api.get(`/servers/${serverId}/channels`),
   create: (serverId: string, data: { name: string; type: string; categoryId?: string }) => api.post(`/servers/${serverId}/channels`, data),
+  update: (serverId: string, channelId: string, data: { name?: string; categoryId?: string | null }) => api.patch(`/servers/${serverId}/channels/${channelId}`, data),
   createDM: (recipientId: string) => api.post(`/users/@me/channels`, { recipientId }),
   listDMs: () => api.get(`/users/@me/channels`),
+  delete: (serverId: string | undefined, channelId: string) => {
+      // Adjusted based on typical REST patterns or previous usage
+      return api.delete(`/servers/${serverId}/channels/${channelId}`);
+  }
 };
 
 export const messageApi = {

@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 import Channel, { IChannel, IChannelUpdate } from './channel.model';
 import Server from '../server/server.model';
+import Category from '../category/category.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
+import { broadcastEvent } from '../../gateway/events';
+import Message from '../message/message.model';
 
 
 export const createChannel = async (
@@ -22,15 +25,44 @@ export const updateChannel = async (
   channelId: string,
   channelData: IChannelUpdate
 ): Promise<IChannel | null> => {
-  const updatedChannel = await Channel.findByIdAndUpdate(
-    channelId,
-    channelData,
-    { new: true }
-  );
+
+  const channel = await Channel.findById(channelId);
+  if (!channel) {
+    throw new NotFoundError('Channel not found');
+  }
+
+  // This operation is only applicable to server channels
+  if (!channel.serverId) {
+    throw new BadRequestError('This operation cannot be performed on DM channels.');
+  }
+
+  // Validate categoryId if it's being changed
+  if (channelData.categoryId !== undefined) {
+    if (channelData.categoryId !== null) {
+      const category = await Category.findById(channelData.categoryId);
+      if (!category) {
+        throw new BadRequestError('Category not found');
+      }
+      if (category.serverId.toString() !== channel.serverId.toString()) {
+        throw new BadRequestError('Category does not belong to this server');
+      }
+    }
+    channel.categoryId = channelData.categoryId;
+  }
+
+  if (channelData.name) {
+    channel.name = channelData.name;
+  }
+
+  const updatedChannel = await channel.save();
+
+  if (updatedChannel && updatedChannel.serverId) {
+    broadcastEvent(updatedChannel.serverId.toString(), 'CHANNEL_UPDATE', updatedChannel);
+  }
+
   return updatedChannel;
 };
 
-import Message from '../message/message.model';
 
 export const deleteChannel = async (
   channelId: string

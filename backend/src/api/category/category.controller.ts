@@ -30,3 +30,29 @@ export const getCategoriesHandler = asyncHandler(async (req: Request, res: Respo
   const categories = await categoryService.getCategoriesByServer(serverId, req.user.id);
   res.status(200).json(categories);
 });
+
+export const updateCategoryHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new UnauthorizedError('Not authenticated');
+    }
+    const { categoryId } = req.params;
+    const updatedCategory = await categoryService.updateCategoryById(
+      categoryId,
+      req.body,
+      req.user.id
+    );
+    res.status(200).json(updatedCategory);
+  }
+);
+
+export const deleteCategoryHandler = asyncHandler(
+  async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new UnauthorizedError('Not authenticated');
+    }
+    const { categoryId } = req.params;
+    await categoryService.deleteCategoryById(categoryId, req.user.id);
+    res.status(204).send();
+  }
+);

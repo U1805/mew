@@ -7,6 +7,7 @@ import { Channel, ChannelType, Server, Category } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
+import { useServerEvents } from '../../hooks/useServerEvents';
 
 const ChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel, openSettings } = useUIStore();
@@ -15,6 +16,8 @@ const ChannelList: React.FC = () => {
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useServerEvents(currentServerId);
 
   const toggleCategory = (categoryId: string) => {
     setCollapsedCategories(prev => ({ ...prev, [categoryId]: !prev[categoryId] }));
@@ -137,6 +140,7 @@ const ChannelList: React.FC = () => {
 
   const channelsByCategory: Record<string, Channel[]> = {};
   const noCategoryChannels: Channel[] = [];
+  const isOwner = user?._id === server?.ownerId;
 
   channels?.forEach(channel => {
       if (channel.type !== ChannelType.GUILD_TEXT) return;
@@ -243,15 +247,30 @@ const ChannelList: React.FC = () => {
                         />
                         {category.name}
                     </div>
-                    <div 
-                        className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
-                        title="Create Channel"
-                        onClick={(e) => { 
-                            e.stopPropagation(); 
-                            openModal('createChannel', { categoryId: category._id, categoryName: category.name }); 
-                        }} 
-                    >
-                        <Icon icon="mdi:plus" />
+                    
+                    <div className="flex items-center space-x-1">
+                        <div 
+                            className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
+                            title="Create Channel"
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                openModal('createChannel', { categoryId: category._id, categoryName: category.name }); 
+                            }} 
+                        >
+                            <Icon icon="mdi:plus" width="18" />
+                        </div>
+                        {isOwner && (
+                            <div 
+                                className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
+                                title="Edit Category"
+                                onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    openModal('editCategory', { category }); 
+                                }} 
+                            >
+                                <Icon icon="mdi:cog" width="14" />
+                            </div>
+                        )}
                     </div>
                 </div>
 
