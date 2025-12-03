@@ -1,5 +1,5 @@
 import React from 'react';
-import { useUIStore } from '../../shared/stores/store';
+import { useUIStore } from '../../../shared/stores/store';
 import { ServerChannelList } from './ServerChannelList';
 import { DMChannelList } from './DMChannelList';
 

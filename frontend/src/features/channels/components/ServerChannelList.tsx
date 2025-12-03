@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { channelApi, serverApi, categoryApi } from '../../shared/services/api';
-import { useUIStore, useAuthStore, useModalStore } from '../../shared/stores/store';
-import { Channel, ChannelType, Server, Category, ServerMember } from '../../shared/types';
+import { channelApi, serverApi, categoryApi } from '../../../shared/services/api';
+import { useUIStore, useAuthStore, useModalStore } from '../../../shared/stores/store';
+import { Channel, ChannelType, Server, Category, ServerMember } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
-import { useServerEvents } from '../../shared/hooks/useServerEvents';
-import { UserStatusFooter } from '../../features/users/components/UserStatusFooter';
+import { useServerEvents } from '../../../shared/hooks/useServerEvents';
+import { UserStatusFooter } from '../../../features/users/components/UserStatusFooter';
 
 export const ServerChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel } = useUIStore();

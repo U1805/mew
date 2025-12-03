@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '../../shared/stores/store';
-import { channelApi, categoryApi } from '../../shared/services/api';
+import { useModalStore, useUIStore } from '../../../shared/stores/store';
+import { channelApi, categoryApi } from '../../../shared/services/api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { Category } from '../../shared/types/index';
+import { Category } from '../../../shared/types/index';
 import { WebhookManager } from './WebhookManager';
 
 export const ChannelSettingsModal: React.FC = () => {

@@ -1,7 +1,7 @@
 
 import React from 'react';
 import ServerList from '../../features/servers/components/ServerList';
-import ChannelList from '../channels/ChannelList';
+import ChannelList from '../../features/channels/components/ChannelList';
 import ChatArea from '../chat/ChatArea';
 import ModalManager from '../modals/ModalManager';
 import UserSettings from '../../features/users/components/UserSettings';

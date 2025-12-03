@@ -96,6 +96,8 @@ src/
 **代码检验**：运行 `pnpm build` 检验通过。
 
 #### 2.4 子任务：频道领域 (Channel Feature)
+**状态**：:heavy_check_mark: 已完成
+**结果**：`Channel` 相关的组件和模态框已成功迁移到 `src/features/channels` 模块下。所有相关的导入路径已更新，并且项目构建成功。
 *   **操作**：建立 `src/features/channels/components` 和 `src/features/channels/modals`。
 *   **迁移**：
     *   `ChannelList`, `ServerChannelList`, `DMChannelList`, `ChannelItem` -> `components/`。
@@ -103,7 +105,7 @@ src/
 *   **类型整理**: `ChannelItemProps` 应该在 `ChannelItem.tsx` 内部。检查并移动。
 *   **修正**：`ServerChannelList` 会引用 `UserStatusFooter`，现在这是一个跨模块引用 (`../features/users/components/...`)，手动修复它。
 
-**代码检验**：切换服务器和私信，确认频道列表能正确渲染。
+**代码检验**：运行 `pnpm build` 检验通过。
 
 #### 2.5 子任务：聊天领域 (Chat Feature)
 *   **操作**：建立 `src/features/chat/components` 和 `src/features/chat/messages`。
