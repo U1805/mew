@@ -1,6 +1,6 @@
 
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from '../store';
+import { useAuthStore } from '../stores/store';
 
 let socket: Socket | null = null;
 

@@ -2,12 +2,11 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
-import { Category } from '../types';
-import { useUIStore } from '../store';
+import { Category } from '../types/index';
+import { useUIStore } from '../stores/store';
 
 export const useServerEvents = (serverId: string | null) => {
   const queryClient = useQueryClient();
-  const { setCurrentServerId } = useUIStore.getState();
 
   useEffect(() => {
     const socket = getSocket();

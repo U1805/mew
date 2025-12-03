@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import clsx from 'clsx';
-import { Reaction } from '../../types';
+import { Reaction } from '../../shared/types/index';
 
 interface DisplayReaction extends Reaction {
     isExiting?: boolean;

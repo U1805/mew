@@ -5,6 +5,7 @@ interface PresenceState {
   onlineStatus: Record<string, 'online' | 'offline'>;
   setInitialState: (userIds: string[]) => void;
   updateUserStatus: (userId: string, status: 'online' | 'offline') => void;
+  clearOnlineStatus: () => void;
 }
 
 export const usePresenceStore = create<PresenceState>((set) => ({

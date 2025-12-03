@@ -5,7 +5,7 @@ import ChannelList from '../channels/ChannelList';
 import ChatArea from '../chat/ChatArea';
 import ModalManager from '../modals/ModalManager';
 import UserSettings from '../user/UserSettings';
-import { usePresenceEvents } from '../../hooks/usePresenceEvents';
+import { usePresenceEvents } from '../../shared/hooks/usePresenceEvents';
 
 const Layout: React.FC = () => {
   usePresenceEvents();

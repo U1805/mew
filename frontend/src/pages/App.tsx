@@ -1,7 +1,7 @@
 
 import React, { useEffect } from 'react';
-import { getSocket } from '../services/socket';
-import { useAuthStore, useModalStore, useUIStore } from '../store';
+import { getSocket } from '../shared/services/socket';
+import { useAuthStore, useModalStore, useUIStore } from '../shared/stores/store';
 import Layout from '../components/layout/Layout';
 import { AuthScreen } from '../components/auth/Auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -52,7 +52,7 @@ const App: React.FC = () => {
       // If the user was viewing the kicked server, navigate them away
       // NOTE: We access the store directly as we are outside a component's render cycle
       if (useUIStore.getState().currentServerId === kickedServerId) {
-        useUIStore.getState().setCurrentServerId(null);
+        useUIStore.getState().setCurrentServer(null);
       }
     };
 

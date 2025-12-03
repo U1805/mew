@@ -1,5 +1,5 @@
 import React from 'react';
-import { useModalStore } from '../../store';
+import { useModalStore } from '../../shared/stores/store';
 
 import { CreateInviteModal } from './CreateInviteModal';
 import { JoinServerModal } from './JoinServerModal';

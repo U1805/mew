@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { useModalStore, useUIStore } from '../../store';
-import { usePresenceStore } from '../../presenceStore';
-import { channelApi } from '../../services/api';
+import { useModalStore, useUIStore } from '../../shared/stores/store';
+import { usePresenceStore } from '../../shared/stores/presenceStore';
+import { channelApi } from '../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { User } from '../../types';
+import { User } from '../../shared/types/index';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { channelApi } from '../../services/api';
-import { useUIStore, useAuthStore, useModalStore } from '../../store';
-import { usePresenceStore } from '../../presenceStore';
-import { Channel, ChannelType } from '../../types';
+import { channelApi } from '../../shared/services/api';
+import { useUIStore, useAuthStore, useModalStore } from '../../shared/stores/store';
+import { usePresenceStore } from '../../shared/stores/presenceStore';
+import { Channel, ChannelType } from '../../shared/types/index';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { UserStatusFooter } from './UserStatusFooter';

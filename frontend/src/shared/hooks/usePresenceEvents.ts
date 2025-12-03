@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
 import { getSocket } from '../services/socket';
-import { usePresenceStore } from '../presenceStore';
+import { usePresenceStore } from '../stores/presenceStore';
 
 export const usePresenceEvents = () => {
   const { setInitialState, updateUserStatus } = usePresenceStore();

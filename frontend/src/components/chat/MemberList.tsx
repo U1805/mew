@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { serverApi } from '../../services/api';
-import { useUIStore, useModalStore, useAuthStore } from '../../store';
-import { usePresenceStore } from '../../presenceStore';
-import { ServerMember } from '../../types';
+import { serverApi } from '../../shared/services/api';
+import { useUIStore, useModalStore, useAuthStore } from '../../shared/stores/store';
+import { usePresenceStore } from '../../shared/stores/presenceStore';
+import { ServerMember } from '../../shared/types/index';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import * as ContextMenu from '@radix-ui/react-context-menu';
@@ -100,7 +100,7 @@ const MemberGroup = ({
                 const isOnline = onlineStatus[u._id] === 'online';
 
                 return (
-                    <ContextMenu.Root key={member._id}>
+                    <ContextMenu.Root>
                         <ContextMenu.Trigger>
                             <div 
                                 className="flex items-center px-2 py-1.5 rounded hover:bg-[#35373C] cursor-pointer group"

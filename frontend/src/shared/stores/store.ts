@@ -1,8 +1,8 @@
 
 import { create } from 'zustand';
-import { disconnectSocket } from './services/socket';
+import { disconnectSocket } from '../services/socket';
 import { usePresenceStore } from './presenceStore';
-import { AuthState, User } from './types';
+import { AuthState, User } from '../types/index';
 
 interface UIState {
   currentServerId: string | null;

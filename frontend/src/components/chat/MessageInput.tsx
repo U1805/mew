@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { messageApi } from '../../services/api';
+import { messageApi } from '../../shared/services/api';
 import { Icon } from '@iconify/react';
-import { Channel } from '../../types';
+import { Channel } from '../../shared/types/index';
 
 interface MessageInputProps {
   channel: Channel | null;

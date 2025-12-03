@@ -1,6 +1,6 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
-import { useAuthStore, useUIStore } from '../../store';
+import { useAuthStore, useUIStore } from '../../shared/stores/store';
 
 export const UserStatusFooter: React.FC = () => {
     const { user } = useAuthStore();

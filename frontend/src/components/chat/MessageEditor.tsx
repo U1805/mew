@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Message } from '../../types';
+import { Message } from '../../shared/types/index';
 import { useQueryClient } from '@tanstack/react-query';
-import { messageApi } from '../../services/api';
-import { useUIStore } from '../../store';
+import { messageApi } from '../../shared/services/api';
+import { useUIStore } from '../../shared/stores/store';
 import { format } from 'date-fns';
 
 interface MessageEditorProps {

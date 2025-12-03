@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { channelApi, serverApi, categoryApi } from '../../services/api';
-import { useUIStore, useAuthStore, useModalStore } from '../../store';
-import { Channel, ChannelType, Server, Category, ServerMember } from '../../types';
+import { channelApi, serverApi, categoryApi } from '../../shared/services/api';
+import { useUIStore, useAuthStore, useModalStore } from '../../shared/stores/store';
+import { Channel, ChannelType, Server, Category, ServerMember } from '../../shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
-import { useServerEvents } from '../../hooks/useServerEvents';
+import { useServerEvents } from '../../shared/hooks/useServerEvents';
 import { UserStatusFooter } from './UserStatusFooter';
 
 export const ServerChannelList: React.FC = () => {

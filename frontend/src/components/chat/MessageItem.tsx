@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
-import { Message } from '../../types';
+import { Message } from '../../shared/types/index';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { useAuthStore, useUIStore, useModalStore } from '../../store';
-import { messageApi } from '../../services/api';
+import { useAuthStore, useUIStore, useModalStore } from '../../shared/stores/store';
+import { messageApi } from '../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { EmojiPicker } from './EmojiPicker';
 import ReactionList from './ReactionList';

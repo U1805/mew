@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { webhookApi, API_URL } from '../../services/api';
-import { Webhook, Channel } from '../../types';
+import { webhookApi, API_URL } from '../../shared/services/api';
+import { Webhook, Channel } from '../../shared/types/index';
 import { Icon } from '@iconify/react';
 
 interface WebhookManagerProps {
