@@ -9,7 +9,7 @@ import { EditCategoryModal } from '@/features/channels/modals/EditCategoryModal'
 import { FindUserModal } from '@/features/users/modals/FindUserModal';
 import { UserProfileModal } from '@/features/users/modals/UserProfileModal';
 import { KickUserModal } from '@/features/servers/modals/KickUserModal';
-import { GenericModal } from '@/components/modals/GenericModal';
+import { GenericModal } from './GenericModal';
 
 const ModalManager: React.FC = () => {
   const { activeModal } = useModalStore();

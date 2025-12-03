@@ -131,6 +131,8 @@ src/
 ---
 
 ### 阶段三：模态框管理器重构 (Modal Manager Refactor)
+**状态**：:heavy_check_mark: 已完成
+**结果**：`ModalManager` 已被成功迁移到 `src/layout/modals` 目录，明确了其作为应用布局协调器的角色。所有相关的导入路径已更新为绝对路径别名，并且项目构建成功，解决了共享代码依赖业务模块的架构问题。
 **目标**：解决`ModalManager`的架构定位问题，避免**共享代码依赖业务代码**这种架构上的**原罪**。
 
 *   **3.1** 创建 `src/layout/modals` 目录。
