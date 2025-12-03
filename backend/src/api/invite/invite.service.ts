@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import Invite, { IInvite } from './invite.model';
 import ServerMember from '../member/member.model';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
+import { Types } from 'mongoose';
 
 // This internal function gets and validates an invite, returning a Mongoose document.
 async function _getAndValidateInvite(inviteCode: string): Promise<IInvite & import('mongoose').Document> {
@@ -22,6 +23,23 @@ async function _getAndValidateInvite(inviteCode: string): Promise<IInvite & impo
   return invite;
 }
 
+// Define a specific type for the lean, populated invite object to ensure type safety.
+interface IPopulatedLeanInvite {
+  _id: Types.ObjectId;
+  code: string;
+  uses: number;
+  maxUses?: number;
+  creatorId: Types.ObjectId;
+  expiresAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+  serverId: {
+    _id: Types.ObjectId;
+    name: string;
+    avatarUrl?: string;
+  };
+}
+
 const inviteService = {
   async createInvite(
     serverId: string,
@@ -33,7 +51,7 @@ const inviteService = {
       throw new ForbiddenError('Only the server owner can create invites.');
     }
 
-    const code = nanoid(10); // Generate a 10-character unique code
+    const code = nanoid(10);
 
     return Invite.create({
       code,
@@ -44,18 +62,37 @@ const inviteService = {
     });
   },
 
-  async getInviteDetails(inviteCode: string): Promise<IInvite> {
-    const invite = await _getAndValidateInvite(inviteCode);
+  async getInviteDetails(inviteCode: string): Promise<any> {
+    const inviteDoc = await _getAndValidateInvite(inviteCode);
 
-    const populatedInvite = await invite.populate<{ serverId: { name: string; avatarUrl?: string } }>({ path: 'serverId', select: 'name avatarUrl' });
+    const invite = await Invite.findOne({ code: inviteDoc.code })
+      .populate('serverId', 'name avatarUrl')
+      .lean<IPopulatedLeanInvite>();
 
-    const memberCount = await ServerMember.countDocuments({ serverId: invite.serverId });
+    if (!invite) {
+      throw new NotFoundError('Invite not found.');
+    }
 
-    const result = populatedInvite.toObject();
-    // Cast serverId to any to dynamically add the memberCount property for the response.
-    (result.serverId as any).memberCount = memberCount;
+    const memberCount = await ServerMember.countDocuments({ serverId: invite.serverId._id });
 
-    return result as IInvite;
+    const response = {
+      _id: invite._id,
+      code: invite.code,
+      uses: invite.uses,
+      maxUses: invite.maxUses,
+      createdAt: invite.createdAt,
+      updatedAt: invite.updatedAt,
+      creatorId: invite.creatorId,
+      expiresAt: invite.expiresAt,
+      server: {
+        _id: invite.serverId._id,
+        name: invite.serverId.name,
+        avatarUrl: invite.serverId.avatarUrl,
+        memberCount
+      }
+    };
+
+    return response;
   },
 
   async acceptInvite(inviteCode: string, userId: string): Promise<IInvite> {

@@ -29,6 +29,7 @@ const Modal: React.FC = () => {
 
   // Create Invite State
   const [createdInviteUrl, setCreatedInviteUrl] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
 
   // Channel Settings Tabs
   const [activeTab, setActiveTab] = useState<'overview' | 'integrations'>('overview');
@@ -46,6 +47,7 @@ const Modal: React.FC = () => {
           setInvitePreview(null);
           setJoinError('');
           setCreatedInviteUrl('');
+          setIsCopied(false);
           return;
       }
 
@@ -256,17 +258,19 @@ const Modal: React.FC = () => {
                      />
                      <button 
                         className={clsx(
-                            "absolute right-1 top-1 h-[34px] px-4 rounded text-white text-sm font-medium transition-colors",
-                            createdInviteUrl ? "bg-mew-accent hover:bg-mew-accentHover" : "bg-[#404249] cursor-not-allowed"
+                            "absolute right-1 top-1 h-[34px] px-4 rounded text-white text-sm font-medium transition-colors min-w-[70px]",
+                            !createdInviteUrl ? "bg-[#404249] cursor-not-allowed" :
+                            isCopied ? "bg-green-500 hover:bg-green-600" : "bg-mew-accent hover:bg-mew-accentHover"
                         )}
                         onClick={() => {
                             if (createdInviteUrl) {
                                 navigator.clipboard.writeText(createdInviteUrl);
-                                // Optional toast
+                                setIsCopied(true);
+                                setTimeout(() => setIsCopied(false), 2000);
                             }
                         }}
                      >
-                         Copy
+                         {isCopied ? 'Copied' : 'Copy'}
                      </button>
                  </div>
                  <div className="text-xs text-mew-textMuted mt-2">
@@ -314,7 +318,7 @@ const Modal: React.FC = () => {
                         <div className="text-white font-bold truncate max-w-full">{invitePreview.server?.name}</div>
                         <div className="text-mew-textMuted text-xs flex items-center mt-1">
                             <span className="w-2 h-2 rounded-full bg-mew-textMuted mr-1.5"></span>
-                            {invitePreview.server?.memberCount || '?'} Members
+                            {invitePreview.server?.memberCount ?? '?'} Members
                         </div>
                     </div>
                  )}

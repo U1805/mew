@@ -14,14 +14,11 @@
 
 ```typescript
 {
-  _id: ObjectId,
   email: { type: String, required: true, unique: true },
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true, select: false }, // API 默认不返回
   avatarUrl: String,
-  isBot: { type: Boolean, default: false }, // 区分机器人账号
-  createdAt: Date,
-  updatedAt: Date
+  isBot: { type: Boolean, default: false } // 区分机器人账号
 }
 ```
 
@@ -31,11 +28,8 @@
 
 ```typescript
 {
-  _id: ObjectId,
   name: { type: String, required: true },
-  avatarUrl: String,
-  createdAt: Date,
-  updatedAt: Date
+  avatarUrl: String
 }
 ```
 
@@ -45,13 +39,10 @@
 
 ```typescript
 {
-  _id: ObjectId,
   serverId: { type: ObjectId, ref: 'Server', required: true },
   userId: { type: ObjectId, ref: 'User', required: true },
   role: { type: String, enum: ['OWNER', 'MEMBER'], default: 'MEMBER' },
-  nickname: String,
-  createdAt: Date,
-  updatedAt: Date
+  nickname: String
 }
 // (serverId, userId) 上有复合唯一索引
 ```
@@ -62,15 +53,12 @@
 
 ```typescript
 {
-  _id: ObjectId,
   code: { type: String, required: true, unique: true },
   serverId: { type: ObjectId, ref: 'Server', required: true },
   creatorId: { type: ObjectId, ref: 'User', required: true },
   expiresAt: Date, // 可选，过期时间
   maxUses: { type: Number, default: 0 }, // 可选，0为无限次
-  uses: { type: Number, default: 0 }, // 当前使用次数
-  createdAt: Date,
-  updatedAt: Date
+  uses: { type: Number, default: 0 } // 当前使用次数
 }
 ```
 
@@ -80,12 +68,9 @@
 
 ```typescript
 {
-  _id: ObjectId,
   name: { type: String, required: true },
   serverId: { type: ObjectId, ref: 'Server', required: true },
-  position: Number, // 可选，用于UI排序
-  createdAt: Date,
-  updatedAt: Date
+  position: Number // 可选，用于UI排序
 }
 ```
 
@@ -101,15 +86,12 @@ enum ChannelType {
 }
 
 {
-  _id: ObjectId,
   name: String, // DM 类型时通常为空或自动生成
   type: { type: String, enum: ['GUILD_TEXT', 'DM'], required: true },
   serverId: { type: ObjectId, ref: 'Server' }, // 仅 GUILD_TEXT 有
   categoryId: { type: ObjectId, ref: 'Category' }, // 仅 GUILD_TEXT 有
   recipients: [{ type: ObjectId, ref: 'User' }], // 仅 DM 有
-  position: Number,
-  createdAt: Date,
-  updatedAt: Date
+  position: Number
 }
 ```
 
@@ -133,7 +115,6 @@ interface IReaction {
 }
 
 {
-  _id: ObjectId,
   channelId: { type: ObjectId, ref: 'Channel', required: true },
   authorId: { type: ObjectId, ref: 'User', required: true }, // Populate 后包含 username, avatarUrl
   type: { type: String, default: 'message/default' },
@@ -143,9 +124,7 @@ interface IReaction {
   mentions: [{ type: ObjectId, ref: 'User' }],
   referencedMessageId: { type: ObjectId, ref: 'Message' }, // 回复消息引用
   reactions: [ReactionSchema],
-  editedAt: Date, // 编辑时间，未编辑则为空
-  createdAt: Date,
-  updatedAt: Date
+  editedAt: Date // 编辑时间，未编辑则为空
 }
 ```
 
@@ -155,15 +134,12 @@ interface IReaction {
 
 ```typescript
 {
-  _id: ObjectId,
   name: { type: String, required: true },
   avatarUrl: String,
   channelId: { type: ObjectId, ref: 'Channel', required: true, index: true },
   serverId: { type: ObjectId, ref: 'Server', required: true, index: true },
   token: { type: String, required: true }, // 用于验证请求的唯一令牌
-  botUserId: { type: ObjectId, ref: 'User', required: true }, // 关联的机器人用户 ID
-  createdAt: Date,
-  updatedAt: Date
+  botUserId: { type: ObjectId, ref: 'User', required: true } // 关联的机器人用户 ID
 }
 ```
 
@@ -201,6 +177,7 @@ interface IReaction {
 *Path: `/api/servers/:serverId/members`*
 
 - `GET /`: 获取服务器的完整成员列表 (需为成员)。
+- `DELETE /@me`: 当前用户主动离开服务器。
 - `DELETE /:userId`: 将指定用户从服务器中移除 (需为 `OWNER`)。
 
 ### 5. 邀请 (Invites)
@@ -220,12 +197,12 @@ Path 2: `/api/invites` (接受/查询)*
 - `DELETE /api/categories/:categoryId`: 删除分组 (需为 `OWNER` 或有权限)。
 
 ### 7. 频道 (Channels)
-*Path: `/api/servers/:serverId/channels` and `/api/channels/:channelId`*
+*Path: `/api/servers/:serverId/channels`*
 
-- `GET /api/servers/:serverId/channels`: 获取服务器下的所有频道。
-- `POST /api/servers/:serverId/channels`: 创建频道 (需为 `OWNER` 或有权限)。
-- `PATCH /api/channels/:channelId`: 更新频道 (需为 `OWNER` 或有权限)。
-- `DELETE /api/channels/:channelId`: 删除频道 (需为 `OWNER` 或有权限)。
+- `GET /`: 获取服务器下的所有频道。
+- `POST /`: 创建频道 (需为 `OWNER` 或有权限)。
+- `PATCH /:channelId`: 更新频道 (需为 `OWNER` 或有权限)。
+- `DELETE /:channelId`: 删除频道 (需为 `OWNER` 或有权限)。
 
 ### 8. 消息 (Messages)
 *Path: `/api/servers/:serverId/channels/:channelId/messages`*
@@ -241,7 +218,7 @@ Path 2: `/api/invites` (接受/查询)*
 - `PUT /:emoji/@me`: 添加反应。
 - `DELETE /:emoji/@me`: 移除反应。
 
-### 8. Webhook 管理
+### 10. Webhook 管理
 *Path: `/api/servers/:serverId/channels/:channelId/webhooks`*
 
 - `GET /`: 获取频道下的所有 Webhooks。
@@ -249,7 +226,7 @@ Path 2: `/api/invites` (接受/查询)*
 - `PATCH /:webhookId`: 更新 Webhook (Body: `name?`, `avatarUrl?`)。
 - `DELETE /:webhookId`: 删除一个 Webhook。
 
-### 9. Webhook 执行 (公开)
+### 11. Webhook 执行 (公开)
 *Path: `/api/webhooks/:webhookId/:token`*
 
 这是一个公开端点，不需要 `Authorization` 头。认证通过 URL 中的 `webhookId` 和 `token` 完成。
@@ -289,7 +266,6 @@ const socket = io("http://localhost:3000", {
 
 - **消息**: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`
 - **反应**: `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`
-- **频道**: `CHANNEL_CREATE`, `CHANNEL_UPDATE`, `CHANNEL_DELETE`
+- **频道**: `CHANNEL_UPDATE`, `CHANNEL_DELETE`
 - **服务器**: `SERVER_UPDATE`, `SERVER_DELETE`
-- **分组**: `CATEGORY_CREATE`, `CATEGORY_UPDATE`, `CATEGORY_DELETE`
-- **成员**: `MEMBER_JOIN`, `MEMBER_UPDATE`, `MEMBER_LEAVE`
+- **分组**: `CATEGORY_UPDATE`, `CATEGORY_DELETE`
