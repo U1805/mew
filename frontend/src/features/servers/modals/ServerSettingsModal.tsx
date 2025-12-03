@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore } from '../../shared/stores/store';
+import { useModalStore } from '../../../shared/stores/store';
 import { Icon } from '@iconify/react';
 
 export const ServerSettingsModal: React.FC = () => {

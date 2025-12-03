@@ -85,13 +85,15 @@ src/
 **代码检验**：确认用户状态栏和用户设置页依然能从 `shared/stores` 获取数据。
 
 #### 2.3 子任务：服务器领域 (Server Feature)
+**状态**：:heavy_check_mark: 已完成
+**结果**：`Server` 相关的组件和模态框已成功迁移到 `src/features/servers` 模块下。所有相关的导入路径已更新，并且项目构建成功。
 *   **操作**：建立 `src/features/servers/components` 和 `src/features/servers/modals`。
 *   **迁移**：
     *   `ServerList.tsx` -> `src/features/servers/components/ServerList.tsx`
     *   `JoinServerModal`, `CreateInviteModal`, `ServerSettingsModal`, `KickUserModal` -> `src/features/servers/modals/`。
-*   **修正**：更新 `Layout.tsx` 中的引用。
+*   **修正**：更新 `Layout.tsx` 及 `ModalManager.tsx` 中的引用，并通过 `pnpm -F frontend build` 检验。
 
-**代码检验**：点击服务器列表，确认功能正常。
+**代码检验**：运行 `pnpm build` 检验通过。
 
 #### 2.4 子任务：频道领域 (Channel Feature)
 *   **操作**：建立 `src/features/channels/components` 和 `src/features/channels/modals`。

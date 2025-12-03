@@ -1,14 +1,14 @@
 import React from 'react';
 import { useModalStore } from '../../shared/stores/store';
 
-import { CreateInviteModal } from './CreateInviteModal';
-import { JoinServerModal } from './JoinServerModal';
-import { ServerSettingsModal } from './ServerSettingsModal';
+import { CreateInviteModal } from '../../features/servers/modals/CreateInviteModal';
+import { JoinServerModal } from '../../features/servers/modals/JoinServerModal';
+import { ServerSettingsModal } from '../../features/servers/modals/ServerSettingsModal';
 import { ChannelSettingsModal } from './ChannelSettingsModal';
 import { EditCategoryModal } from './EditCategoryModal';
 import { FindUserModal } from '../../features/users/modals/FindUserModal';
 import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
-import { KickUserModal } from './KickUserModal';
+import { KickUserModal } from '../../features/servers/modals/KickUserModal';
 import { GenericModal } from './GenericModal';
 
 const ModalManager: React.FC = () => {
