@@ -1,14 +1,14 @@
 
 import React from 'react';
-import { useUIStore } from '../../shared/stores/store';
+import { useUIStore } from '../../../shared/stores/store';
 import MemberList from './MemberList';
 import ChatHeader from './ChatHeader';
-import MessageList from './MessageList';
-import MessageInput from './MessageInput';
-import { useMessages } from '../../shared/hooks/useMessages';
-import { useSocketMessages } from '../../shared/hooks/useSocketMessages';
+import MessageList from '../messages/MessageList';
+import MessageInput from '../messages/MessageInput';
+import { useMessages } from '../../../shared/hooks/useMessages';
+import { useSocketMessages } from '../../../shared/hooks/useSocketMessages';
 import { useQuery } from '@tanstack/react-query';
-import { Channel } from '../../shared/types/index';
+import { Channel } from '../../../shared/types/index';
 import { Icon } from '@iconify/react';
 
 const ChatArea: React.FC = () => {

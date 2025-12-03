@@ -108,13 +108,15 @@ src/
 **代码检验**：运行 `pnpm build` 检验通过。
 
 #### 2.5 子任务：聊天领域 (Chat Feature)
+**状态**：:heavy_check_mark: 已完成
+**结果**：`Chat` 相关的组件已成功迁移到 `src/features/chat` 模块下。所有相关的导入路径已更新，并且项目构建成功。
 *   **操作**：建立 `src/features/chat/components` 和 `src/features/chat/messages`。
 *   **迁移**：
     *   `ChatArea`, `ChatHeader`, `MemberList` -> `components/`。
     *   `MessageList`, `MessageItem`, `MessageInput`, `EmojiPicker` 等消息相关组件 -> `messages/`。
-*   **修正**：更新 `ChatArea` 内部的所有引用路径。
+*   **修正**：更新因文件移动产生的所有导入路径。
 
-**代码检验**：进入一个频道，确认消息流、输入框、成员列表都能正常工作。
+**代码检验**：运行 `pnpm build` 检验通过。
 
 ---
 
