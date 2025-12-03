@@ -7,7 +7,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
 import { useServerEvents } from '../../shared/hooks/useServerEvents';
-import { UserStatusFooter } from './UserStatusFooter';
+import { UserStatusFooter } from '../../features/users/components/UserStatusFooter';
 
 export const ServerChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel } = useUIStore();

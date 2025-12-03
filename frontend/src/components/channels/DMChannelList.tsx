@@ -6,7 +6,7 @@ import { usePresenceStore } from '../../shared/stores/presenceStore';
 import { Channel, ChannelType } from '../../shared/types/index';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { UserStatusFooter } from './UserStatusFooter';
+import { UserStatusFooter } from '../../features/users/components/UserStatusFooter';
 
 export const DMChannelList: React.FC = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();

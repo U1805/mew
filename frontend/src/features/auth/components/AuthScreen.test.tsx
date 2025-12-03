@@ -1,8 +1,8 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import React from 'react';
-import { AuthScreen } from './Auth';
-import { useAuthStore } from '../../shared/stores/store';
+import { AuthScreen } from './AuthScreen';
+import { useAuthStore } from '../../../shared/stores/store';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock the auth store

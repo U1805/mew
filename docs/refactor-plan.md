@@ -41,6 +41,10 @@ src/
 ## 2. 执行阶段 (Execution Phases)
 
 ### 阶段一：基础设施迁移 (Infrastructure Relocation)
+
+**状态**：:heavy_check_mark: 已完成 (Commit: `21b2577`)
+
+**结果**：所有核心基础设施（服务、状态、钩子、类型）已成功迁移到 `src/shared` 目录。所有导入路径已修复，并且项目构建成功。为后续的功能模块拆分奠定了坚实的基础。
 **目标**：迁移底层服务和状态，并手动修正由此产生的地狱般 `../..` 相对路径。
 
 *   **1.1** 创建 `src/shared/services`, `src/shared/stores`, `src/shared/hooks`, `src/shared/types` 目录。
@@ -59,13 +63,17 @@ src/
 我们将按照依赖关系，逐一建立功能模块。
 
 #### 2.1 子任务：认证 (Auth Feature)
+**状态**：:heavy_check_mark: 已完成 (Commit: `b87b324`)
+**结果**：`Auth` 组件及其测试文件已成功迁移到 `src/features/auth` 模块下。所有相关的导入路径已更新，并且项目构建成功。
 *   **操作**：建立 `src/features/auth/components`。
 *   **迁移**：`src/components/auth/Auth.tsx` -> `src/features/auth/components/AuthScreen.tsx`。
 *   **修正**：更新 `App.tsx` 中的引用。
 
-**代码检验**：确认登录页可以正常渲染。
+**代码检验**：确认登录页可以正常渲染并通过了 `pnpm build`。
 
 #### 2.2 子任务：用户领域 (User Feature)
+**状态**：:heavy_check_mark: 已完成
+**结果**：`User` 相关的组件和模态框已成功迁移到 `src/features/users` 模块下。所有相关的导入路径已更新，并且项目构建成功。
 *   **操作**：建立 `src/features/users/components` 和 `src/features/users/modals`。
 *   **迁移**：
     *   `UserSettings.tsx` -> `src/features/users/components/UserSettings.tsx`

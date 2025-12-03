@@ -3,7 +3,7 @@ import React, { useEffect } from 'react';
 import { getSocket } from '../shared/services/socket';
 import { useAuthStore, useModalStore, useUIStore } from '../shared/stores/store';
 import Layout from '../components/layout/Layout';
-import { AuthScreen } from '../components/auth/Auth';
+import { AuthScreen } from '../features/auth/components/AuthScreen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Create a client

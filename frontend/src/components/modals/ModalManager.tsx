@@ -6,8 +6,8 @@ import { JoinServerModal } from './JoinServerModal';
 import { ServerSettingsModal } from './ServerSettingsModal';
 import { ChannelSettingsModal } from './ChannelSettingsModal';
 import { EditCategoryModal } from './EditCategoryModal';
-import { FindUserModal } from './FindUserModal';
-import { UserProfileModal } from './UserProfileModal';
+import { FindUserModal } from '../../features/users/modals/FindUserModal';
+import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
 import { KickUserModal } from './KickUserModal';
 import { GenericModal } from './GenericModal';
 
