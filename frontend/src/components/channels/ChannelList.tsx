@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { channelApi, serverApi, categoryApi } from '../../services/api';
 import { useUIStore, useAuthStore, useModalStore } from '../../store';
-import { Channel, ChannelType, Server, Category } from '../../types';
+import { Channel, ChannelType, Server, Category, ServerMember } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
@@ -43,6 +43,16 @@ const ChannelList: React.FC = () => {
         return res.data as Server;
     },
     enabled: !!currentServerId
+  });
+
+  const { data: members } = useQuery({
+      queryKey: ['members', currentServerId],
+      queryFn: async () => {
+          if (!currentServerId) return [];
+          const res = await serverApi.getMembers(currentServerId);
+          return res.data as ServerMember[];
+      },
+      enabled: !!currentServerId
   });
 
   const { data: categories } = useQuery({
@@ -147,7 +157,8 @@ const ChannelList: React.FC = () => {
 
   const channelsByCategory: Record<string, Channel[]> = {};
   const noCategoryChannels: Channel[] = [];
-  const isOwner = user?._id === server?.ownerId;
+  const myMember = members?.find(m => m.userId?._id === user?._id);
+  const isOwner = myMember?.role === 'OWNER';
 
   channels?.forEach(channel => {
       if (channel.type !== ChannelType.GUILD_TEXT) return;
@@ -179,13 +190,13 @@ const ChannelList: React.FC = () => {
         {isDropdownOpen && (
             <div className="absolute top-[52px] left-2.5 w-[220px] bg-[#111214] p-1.5 rounded-[4px] shadow-2xl z-50 animate-fade-in-up origin-top-left">
                 <div 
-                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group mb-1"
-                    onClick={() => console.log('Server Boost')}
+                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-mew-accent hover:text-white group mb-1"
+                    onClick={() => openModal('createInvite')}
                 >
-                    <span className="text-sm font-medium">Server Boost</span>
-                    <Icon icon="mdi:star-four-points" className="text-[#F47FFF] group-hover:text-white" />
+                    <span className="text-sm font-medium">Invite People</span>
+                    <Icon icon="mdi:account-plus" />
                 </div>
-                
+
                 <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
 
                 <div 
@@ -217,6 +228,7 @@ const ChannelList: React.FC = () => {
 
                  <div 
                     className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
+                    onClick={() => openModal('leaveServer', { serverId: currentServerId })}
                 >
                     <span className="text-sm font-medium">Leave Server</span>
                     <Icon icon="mdi:exit-to-app" />

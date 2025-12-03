@@ -1,6 +1,6 @@
-# Mew - 即时通讯平台实现规划
+# Mew - API 技术规格文档
 
-**最后更新时间: 2025-12-02**
+**最后更新时间: 2025-12-03**
 
 本文档详细描述了 Mew 即时通讯（IM）平台核心功能的**当前实现**，旨在作为前端开发的权威技术蓝图。本文档已与后端代码库 (`backend/src`) 同步。
 
@@ -27,20 +27,54 @@
 
 ### 2. Server (服务器)
 
-代表一个服务器实例（类似于 Discord 的 Guild）。
+代表一个服务器实例。服务器的所有者由 `ServerMember` 模型中 `role: 'OWNER'` 的记录确定。
 
 ```typescript
 {
   _id: ObjectId,
   name: { type: String, required: true },
   avatarUrl: String,
-  ownerId: { type: ObjectId, ref: 'User', required: true },
   createdAt: Date,
   updatedAt: Date
 }
 ```
 
-### 3. Category (分组)
+### 3. ServerMember (服务器成员)
+
+将用户与服务器关联起来，定义其角色。
+
+```typescript
+{
+  _id: ObjectId,
+  serverId: { type: ObjectId, ref: 'Server', required: true },
+  userId: { type: ObjectId, ref: 'User', required: true },
+  role: { type: String, enum: ['OWNER', 'MEMBER'], default: 'MEMBER' },
+  nickname: String,
+  createdAt: Date,
+  updatedAt: Date
+}
+// (serverId, userId) 上有复合唯一索引
+```
+
+### 4. Invite (邀请)
+
+用于邀请用户加入服务器。
+
+```typescript
+{
+  _id: ObjectId,
+  code: { type: String, required: true, unique: true },
+  serverId: { type: ObjectId, ref: 'Server', required: true },
+  creatorId: { type: ObjectId, ref: 'User', required: true },
+  expiresAt: Date, // 可选，过期时间
+  maxUses: { type: Number, default: 0 }, // 可选，0为无限次
+  uses: { type: Number, default: 0 }, // 当前使用次数
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### 5. Category (分组)
 
 服务器内的频道分组。
 
@@ -55,7 +89,7 @@
 }
 ```
 
-### 4. Channel (频道)
+### 6. Channel (频道)
 
 消息发生的场所。
 
@@ -79,7 +113,7 @@ enum ChannelType {
 }
 ```
 
-### 5. Message (消息)
+### 7. Message (消息)
 
 核心消息数据结构。
 
@@ -115,7 +149,7 @@ interface IReaction {
 }
 ```
 
-### 6. Webhook (钩子)
+### 8. Webhook (钩子)
 
 用于存储 Webhook 的配置信息。
 
@@ -151,53 +185,60 @@ interface IReaction {
 *Path: `/api/users`*
 
 - `GET /@me`: 获取当前用户信息。
-- `GET /@me/servers`: 获取当前用户拥有的服务器列表。
-- `POST /@me/channels`: 创建或获取私聊(DM)频道。
-    - Body: `{ recipientId: string }`
-- `GET /search`: 模糊搜索用户。
-    - Query: `q` (搜索关键词)
-    - 返回: `[{ _id, username, avatarUrl }]` 用户数组
+- `GET /@me/servers`: 获取当前用户**作为成员**的所有服务器列表。
+- `POST /@me/channels`: 创建或获取私聊(DM)频道 (Body: `{ recipientId: string }`)
+- `GET /search`: 模糊搜索用户 (Query: `q`) -> 返回 `[{ _id, username, avatarUrl }]`
 
 ### 3. 服务器 (Servers)
 *Path: `/api/servers`*
 
-- `POST /`: 创建服务器 (Body: `name`, `avatarUrl?`)
-- `GET /:serverId`: 获取服务器详情。
-- `PATCH /:serverId`: 更新服务器信息。
-- `DELETE /:serverId`: 删除服务器（级联删除内含的频道和消息）。
+- `POST /`: 创建服务器 (Body: `name`, `avatarUrl?`) -> 成功后，调用者自动成为 `OWNER`。
+- `GET /:serverId`: 获取服务器详情 (需为成员)。
+- `PATCH /:serverId`: 更新服务器信息 (需为 `OWNER`)。
+- `DELETE /:serverId`: 删除服务器 (需为 `OWNER`)。
 
-### 4. 分组 (Categories)
-*Path: `/api/servers/:serverId/categories` and `/api/categories/:categoryId`*
+### 4. 成员管理 (Server Members)
+*Path: `/api/servers/:serverId/members`*
 
-- `GET /api/servers/:serverId/categories`: 获取指定服务器下的所有分组。
-- `POST /api/servers/:serverId/categories`: 在服务器下创建分组 (Body: `name`).
-- `PATCH /api/categories/:categoryId`: 更新分组 (Body: `name?`, `position?`).
-- `DELETE /api/categories/:categoryId`: 删除分组。
+- `GET /`: 获取服务器的完整成员列表 (需为成员)。
+- `DELETE /:userId`: 将指定用户从服务器中移除 (需为 `OWNER`)。
 
-### 5. 频道 (Channels)
-*Path 1: `/api/servers/:serverId/channels` (创建)*
-*Path 2: `/api/servers/:serverId/channels/:channelId` (操作)*
-*(注：操作路径中保留 serverId 是为了路由挂载方便，虽然 ID 唯一)*
+### 5. 邀请 (Invites)
+*Path 1: `/api/servers/:serverId/invites` (创建)
+Path 2: `/api/invites` (接受/查询)*
 
-- `GET /`: 获取当前服务器下的所有频道。
-- `POST /`: 创建频道 (Body: `name`, `type`, `categoryId?`)
-- `PATCH /:channelId`: 更新频道 (Body: `name?`, `categoryId?`).
-- `DELETE /:channelId`: 删除频道。
+- `POST /api/servers/:serverId/invites`: 创建邀请链接 (需为 `OWNER` 或有权限)。
+- `GET /api/invites/:inviteCode`: 获取邀请链接详情（公开，但需认证）。
+- `POST /api/invites/:inviteCode`: 接受邀请并加入服务器（需认证）。
 
-### 6. 消息 (Messages)
+### 6. 分组 (Categories)
+*Path: `/api/servers/:serverId/categories` 和 `/api/categories/:categoryId`*
+
+- `GET /api/servers/:serverId/categories`: 获取服务器下的所有分组。
+- `POST /api/servers/:serverId/categories`: 创建分组 (需为 `OWNER` 或有权限)。
+- `PATCH /api/categories/:categoryId`: 更新分组 (需为 `OWNER` 或有权限)。
+- `DELETE /api/categories/:categoryId`: 删除分组 (需为 `OWNER` 或有权限)。
+
+### 7. 频道 (Channels)
+*Path: `/api/servers/:serverId/channels` and `/api/channels/:channelId`*
+
+- `GET /api/servers/:serverId/channels`: 获取服务器下的所有频道。
+- `POST /api/servers/:serverId/channels`: 创建频道 (需为 `OWNER` 或有权限)。
+- `PATCH /api/channels/:channelId`: 更新频道 (需为 `OWNER` 或有权限)。
+- `DELETE /api/channels/:channelId`: 删除频道 (需为 `OWNER` 或有权限)。
+
+### 8. 消息 (Messages)
 *Path: `/api/servers/:serverId/channels/:channelId/messages`*
-*(注：私聊消息路径逻辑上不含 serverId，但在当前路由挂载下统一处理，后续可能优化)*
 
-- `GET /`: 获取消息列表。
-    - Query: `limit` (默认 50), `before` (消息ID，用于分页加载旧消息)
+- `GET /`: 获取消息列表 (Query: `limit`, `before`)
 - `POST /`: 发送消息 (Body: `content`)
 - `PATCH /:messageId`: 编辑消息 (Body: `content`)
 - `DELETE /:messageId`: 删除消息。
 
-### 7. 消息互动 (Reactions)
+### 9. 消息互动 (Reactions)
 *Path: `/api/servers/:serverId/channels/:channelId/messages/:messageId/reactions`*
 
-- `PUT /:emoji/@me`: 添加反应 (Emoji 需 URL 编码)。
+- `PUT /:emoji/@me`: 添加反应。
 - `DELETE /:emoji/@me`: 移除反应。
 
 ### 8. Webhook 管理
@@ -223,82 +264,32 @@ interface IReaction {
 
 ## 三、 WebSocket Gateway 设计
 
-基于 **Socket.io** 实现。
-URL: `http://domain:port` (与 API 同端口)
+基于 **Socket.io** 实现，与 API 同端口。
 
 ### 1. 连接与鉴权
 
-客户端连接时必须在握手阶段传递 JWT Token：
+客户端连接时需在 `auth` 对象中传递 JWT Token。
 
 ```javascript
-import { io } from "socket.io-client";
-
 const socket = io("http://localhost:3000", {
-  auth: {
-    token: "eyJhbGciOi..." // 你的 JWT Token
-  },
-  transports: ['websocket']
+  auth: { token: "..." }
 });
 ```
 
 **自动加入房间 (Auto-Join Rooms):**
-连接成功后，服务端会自动将 Socket 加入以下房间，无需客户端手动 emit join 事件：
-1.  用户作为接收者的所有 **DM Channel ID** 房间。
-2.  用户拥有的所有 **Server ID** 房间（用于接收服务器级更新）。
-3.  用户拥有的服务器下的所有 **Channel ID** 房间。
+连接成功后，服务端会自动将用户 Socket 加入其有权访问的所有频道房间 (`channel._id`) 和服务器房间 (`server._id`)。
 
 ### 2. 客户端上行事件 (Client -> Server)
 
-客户端可以通过 Socket 发送消息（也可以通过 REST API 发送，效果相同）。
-
-目前主要通过此事件发送消息。
-
--   `message/create`
-    -   **Payload**: `{ channelId: string, content: string, referencedMessageId?: string }`
-    -   **说明**: 客户端发送新消息。服务端收到后会创建消息，并向频道房间广播一个同名的下行事件。
+-   `message/create`: 发送新消息 (Payload: `{ channelId, content, ... }`)
 
 ### 3. 服务端下行广播事件 (Server -> Client)
 
-所有通过 REST API 或 Socket 产生的状态变更，都会通过以下事件实时广播给相关房间的在线用户。事件命名采用 **SCREAMING_SNAKE_CASE**。
+所有状态变更都会通过以下事件实时广播给相关房间的在线用户。
 
-#### 消息相关
--   `MESSAGE_CREATE`
-    -   Data: `IMessage` (已 Populate authorId)
-    -   *触发*: 发送新消息（通过 REST API 或 WebSocket）。
--   `MESSAGE_UPDATE`
-    -   Data: `IMessage` (已 Populate)
-    -   *触发*: 编辑消息内容。
--   `MESSAGE_DELETE`
-    -   Data: `{ messageId: string, channelId: string }`
-    -   *触发*: 删除消息。
--   `MESSAGE_REACTION_ADD`
-    -   Data: `IMessage` (包含更新后的 reactions 数组)
-    -   *触发*: 用户添加反应。
--   `MESSAGE_REACTION_REMOVE`
-    -   Data: `IMessage` (包含更新后的 reactions 数组)
-    -   *触发*: 用户取消反应。
-
-#### 频道相关
--   `CHANNEL_UPDATE`
-    -   Data: `IChannel`
-    -   *触发*: 重命名频道、移动分组等。
--   `CHANNEL_DELETE`
-    -   Data: `{ channelId: string, serverId: string }`
-    -   *触发*: 删除频道。
-
-#### 服务器相关
--   `SERVER_UPDATE`
-    -   Data: `IServer`
-    -   *触发*: 修改服务器名称/头像。
--   `SERVER_DELETE`
-    -   Data: `{ serverId: string }`
-    -   *触发*: 解散服务器。
-
-#### 分组相关
--   `CATEGORY_UPDATE`
-    -   Data: `ICategory`
-    -   *触发*: 重命名分组、移动分组位置。
--   `CATEGORY_DELETE`
-    -   Data: `{ categoryId: string }`
-    -   *触发*: 删除分组。
-```
+- **消息**: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`
+- **反应**: `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`
+- **频道**: `CHANNEL_CREATE`, `CHANNEL_UPDATE`, `CHANNEL_DELETE`
+- **服务器**: `SERVER_UPDATE`, `SERVER_DELETE`
+- **分组**: `CATEGORY_CREATE`, `CATEGORY_UPDATE`, `CATEGORY_DELETE`
+- **成员**: `MEMBER_JOIN`, `MEMBER_UPDATE`, `MEMBER_LEAVE`

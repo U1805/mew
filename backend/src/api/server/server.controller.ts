@@ -24,7 +24,6 @@ export const getUserServersHandler = asyncHandler(async (req: Request, res: Resp
 export const updateServerHandler = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const server = await serverService.updateServer(
     req.params.serverId,
-    req.user!.id,
     req.body
   );
   res.status(200).json(server);
@@ -32,8 +31,7 @@ export const updateServerHandler = asyncHandler(async (req: Request, res: Respon
 
 export const deleteServerHandler = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const result = await serverService.deleteServer(
-    req.params.serverId,
-    req.user!.id
+    req.params.serverId
   );
   res.status(200).json(result);
 });

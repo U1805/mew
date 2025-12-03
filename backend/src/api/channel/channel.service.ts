@@ -3,7 +3,7 @@ import Channel, { IChannel, IChannelUpdate } from './channel.model';
 import Server from '../server/server.model';
 import Category from '../category/category.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
-import { broadcastEvent } from '../../gateway/events';
+import { socketManager } from '../../gateway/events';
 import Message from '../message/message.model';
 
 
@@ -58,7 +58,7 @@ export const updateChannel = async (
   const updatedChannel = await channel.save();
 
   // The serverId is immutable in this function, so we can safely use the one we stored.
-  broadcastEvent(serverId.toString(), 'CHANNEL_UPDATE', updatedChannel);
+  socketManager.broadcast('CHANNEL_UPDATE', serverId.toString(), updatedChannel);
 
   return updatedChannel;
 };
@@ -79,7 +79,7 @@ export const deleteChannel = async (
   const deletedChannel = await Channel.findByIdAndDelete(channelId);
 
   if (deletedChannel && deletedChannel.serverId) {
-    broadcastEvent(deletedChannel.serverId.toString(), 'CHANNEL_DELETE', {
+    socketManager.broadcast('CHANNEL_DELETE', deletedChannel.serverId.toString(), {
       channelId: deletedChannel._id.toString(),
       serverId: deletedChannel.serverId.toString(),
     });
@@ -88,14 +88,14 @@ export const deleteChannel = async (
   return deletedChannel;
 };
 
-export const getChannelsByServer = async (serverId: string, userId: string): Promise<IChannel[]> => {
-  const server = await Server.findById(serverId);
-  if (!server) {
-    throw new NotFoundError('Server not found');
-  }
+import ServerMember from '../member/member.model';
 
-  if (server.ownerId.toString() !== userId) {
-    throw new ForbiddenError('You do not have permission to view these channels');
+// ... (other functions)
+
+export const getChannelsByServer = async (serverId: string, userId: string): Promise<IChannel[]> => {
+  const member = await ServerMember.findOne({ serverId, userId });
+  if (!member) {
+    throw new ForbiddenError('You are not a member of this server.');
   }
 
   const channels = await Channel.find({ serverId });

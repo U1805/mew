@@ -14,8 +14,7 @@ export const createCategoryHandler = asyncHandler(
 
     const newCategory = await categoryService.createCategory(
       name,
-      serverId,
-      req.user.id
+      serverId
     );
 
     res.status(201).json(newCategory);
@@ -27,7 +26,7 @@ export const getCategoriesHandler = asyncHandler(async (req: Request, res: Respo
     throw new UnauthorizedError('Not authenticated');
   }
   const { serverId } = req.params;
-  const categories = await categoryService.getCategoriesByServer(serverId, req.user.id);
+  const categories = await categoryService.getCategoriesByServer(serverId);
   res.status(200).json(categories);
 });
 

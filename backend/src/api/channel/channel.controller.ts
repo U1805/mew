@@ -8,6 +8,7 @@ import {
 } from '../../utils/errors';
 import * as channelService from './channel.service';
 import * as serverService from '../server/server.service';
+import ServerMember from '../member/member.model';
 
 export const createChannelHandler = asyncHandler(
   async (req: Request, res: Response) => {
@@ -18,10 +19,12 @@ export const createChannelHandler = asyncHandler(
 
     if (!server) throw new NotFoundError('Server not found');
 
-    if (server.ownerId.toString() !== req.user.id)
+    const member = await ServerMember.findOne({ serverId, userId: req.user.id });
+    if (!member || member.role !== 'OWNER') {
       throw new ForbiddenError(
         'User is not the owner of the server to create a channel'
       );
+    }
 
     const newChannel = await channelService.createChannel({
       ...req.body,
@@ -59,8 +62,8 @@ export const updateChannelHandler = asyncHandler(
       throw new BadRequestError('This operation is not applicable to DM channels.');
     }
 
-    const server = await serverService.getServerById(channel.serverId.toString());
-    if (!server || server.ownerId.toString() !== req.user.id) {
+    const member = await ServerMember.findOne({ serverId: channel.serverId, userId: req.user.id });
+    if (!member || member.role !== 'OWNER') {
       throw new ForbiddenError('User is not the owner of the server');
     }
 
@@ -85,8 +88,8 @@ export const deleteChannelHandler = asyncHandler(
       throw new BadRequestError('This operation is not applicable to DM channels.');
     }
 
-    const server = await serverService.getServerById(channel.serverId.toString());
-    if (!server || server.ownerId.toString() !== req.user.id) {
+    const member = await ServerMember.findOne({ serverId: channel.serverId, userId: req.user.id });
+    if (!member || member.role !== 'OWNER') {
       throw new ForbiddenError('User is not the owner of the server');
     }
 

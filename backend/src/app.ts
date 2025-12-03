@@ -6,6 +6,8 @@ import userRoutes from './api/user/user.routes';
 import serverRoutes from './api/server/server.routes';
 import channelRoutes from './api/channel/channel.routes';
 import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes';
+import invitePublicRoutes from './api/invite/public.routes';
+
 
 const app = express();
 
@@ -20,6 +22,8 @@ app.use('/api/servers', serverRoutes);
 app.use('/api/channels', channelRoutes);
 app.use('/api/servers/:serverId/categories', categoryRootRoutes);
 app.use('/api/categories', categoryDetailRoutes);
+app.use('/api/invites', invitePublicRoutes);
+
 
 // Public webhook execution route
 import publicWebhookRoutes from './api/webhook/public.routes';

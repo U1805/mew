@@ -4,9 +4,24 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import request from 'supertest';
 import app from '../app';
-import { initSocket } from '../gateway/events';
+import { SocketManager, socketManager as appSocketManager } from '../gateway/events';
+import { registerConnectionHandlers } from './handlers';
+
+// Mock the application's socketManager to intercept broadcasts
+vi.mock('../gateway/events', async (importOriginal) => {
+  const original = await importOriginal() as any;
+  return {
+    SocketManager: original.SocketManager, // Explicitly pass through the class
+    socketManager: { // Mock the singleton instance
+      init: vi.fn(),
+      getIO: vi.fn(),
+      broadcast: vi.fn(),
+    },
+  };
+});
 import { ChannelType } from '../api/channel/channel.model';
 import Message from '../api/message/message.model';
+import ServerMemberModel from '../api/member/member.model';
 import { authMiddleware } from './middleware';
 
 const createTestClient = (port: number, token: string): ClientSocket => {
@@ -22,18 +37,28 @@ describe('WebSocket Gateway', () => {
   let io: Server;
   let port: number;
   let client1: ClientSocket, client2: ClientSocket;
-  let token1: string, token2: string;
+  let token1: string, token2: string, userId2: string;
   let serverId: string;
   let channel1Id: string, channel2Id: string;
 
-  beforeAll(async () => {
+  beforeEach(async () => {
     httpServer = createServer(app);
-    io = new Server(httpServer);
-    initSocket(io); // Initialize the event broadcaster with our test server
 
+    // Create a real SocketManager for the test environment
+    const testSocketManager = new SocketManager();
+    io = testSocketManager.init(httpServer);
+
+    // Make the mocked broadcast function call the real test instance's broadcast
+    (appSocketManager.broadcast as ReturnType<typeof vi.fn>).mockImplementation(
+      (event: string, roomId: string, payload: any) => {
+        testSocketManager.broadcast(event, roomId, payload);
+      }
+    );
+
+    // Use the real auth middleware and connection handlers
     io.use(authMiddleware);
     io.on('connection', (socket) => {
-      socket.on('join', (room) => socket.join(room));
+        registerConnectionHandlers(io, socket)
     });
 
     await new Promise<void>((resolve) => httpServer.listen(resolve));
@@ -49,26 +74,28 @@ describe('WebSocket Gateway', () => {
     await request(app).post('/api/auth/register').send(user2Data);
     const loginRes2 = await request(app).post('/api/auth/login').send({ email: user2Data.email, password: user2Data.password });
     token2 = loginRes2.body.token;
+    userId2 = loginRes2.body.user._id;
 
-    const serverRes = await request(app).post('/api/servers').set('Authorization', `Bearer ${token1}`).send({ name: 'Socket Test' });
-    serverId = serverRes.body._id;
+    // Server 1 for user1
+    const server1Res = await request(app).post('/api/servers').set('Authorization', `Bearer ${token1}`).send({ name: 'Socket Test Server 1' });
+    serverId = server1Res.body._id; // This is the server under test
 
-    const ch1Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel One', type: ChannelType.GUILD_TEXT });
-    channel1Id = ch1Res.body._id;
+    const channel1Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel One', type: ChannelType.GUILD_TEXT });
+    channel1Id = channel1Res.body._id;
 
-    const ch2Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel Two', type: ChannelType.GUILD_TEXT });
-    channel2Id = ch2Res.body._id;
-  });
-
-  afterAll(() => {
-    io.close();
-    httpServer.close();
+    // Server 2 for user2, to ensure they are in a different room
+    const server2Res = await request(app).post('/api/servers').set('Authorization', `Bearer ${token2}`).send({ name: 'Socket Test Server 2' });
+    const server2Id = server2Res.body._id;
+    await request(app).post(`/api/servers/${server2Id}/channels`).set('Authorization', `Bearer ${token2}`).send({ name: 'Channel Two', type: ChannelType.GUILD_TEXT });
   });
 
   afterEach(() => {
     client1?.disconnect();
     client2?.disconnect();
+    io?.close();
+    httpServer?.close();
   });
+
 
   it('should reject connection for invalid token', async () => {
     const promise = new Promise<void>((resolve, reject) => {
@@ -99,18 +126,19 @@ describe('WebSocket Gateway', () => {
       });
     });
 
-    const client2DoesNotReceiveMessage = new Promise<void>((resolve) => {
-      client2.on('MESSAGE_CREATE', () => { throw new Error('Client 2 should not have received this message'); });
-      setTimeout(resolve, 500); // Wait 500ms and assume no message is received
+    const client2DoesNotReceiveMessage = new Promise<void>((resolve, reject) => {
+      client2.on('MESSAGE_CREATE', () => {
+        reject(new Error('Client 2 should not have received this message'));
+      });
+      // If the message is not received after a short delay, resolve the promise.
+      setTimeout(resolve, 500);
     });
 
     // Wait for sockets to connect
     await new Promise<void>(resolve => client1.on('connect', () => resolve()));
     await new Promise<void>(resolve => client2.on('connect', () => resolve()));
 
-    // Join rooms
-    client1.emit('join', channel1Id);
-    client2.emit('join', channel2Id);
+    // client now automatically joins rooms on connection via `joinUserRooms`
 
     // API call to create a message, which triggers the broadcast
     await request(app)

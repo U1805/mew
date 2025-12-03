@@ -2,7 +2,9 @@ import Server from './server.model';
 import Channel from '../channel/channel.model';
 import Message from '../message/message.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
-import { broadcastEvent } from '../../gateway/events';
+import { socketManager } from '../../gateway/events';
+
+import ServerMember from '../member/member.model';
 
 interface CreateServerData {
   name: string;
@@ -11,8 +13,17 @@ interface CreateServerData {
 }
 
 export const createServer = async (data: CreateServerData) => {
-  const server = new Server(data);
+  const { ownerId, ...serverData } = data;
+  const server = new Server(serverData);
   await server.save();
+
+  // Create the owner as the first member
+  await ServerMember.create({
+    serverId: server._id,
+    userId: ownerId,
+    role: 'OWNER',
+  });
+
   return server;
 };
 
@@ -25,7 +36,8 @@ export const getServerById = async (serverId: string) => {
 };
 
 export const getServersForUser = async (userId: string) => {
-  const servers = await Server.find({ ownerId: userId });
+  const memberships = await ServerMember.find({ userId }).populate('serverId');
+  const servers = memberships.map((m) => m.serverId);
   return servers;
 };
 
@@ -36,29 +48,25 @@ interface UpdateServerData {
 
 export const updateServer = async (
   serverId: string,
-  userId: string,
   data: UpdateServerData
 ) => {
   const server = await getServerById(serverId);
 
-  if (server.ownerId.toString() !== userId) {
-    throw new ForbiddenError('You are not the owner of this server');
-  }
+  // Permission is handled by middleware
 
   Object.assign(server, data);
   await server.save();
 
-  broadcastEvent(serverId, 'SERVER_UPDATE', server);
+  socketManager.broadcast('SERVER_UPDATE', serverId, server);
 
   return server;
 };
 
-export const deleteServer = async (serverId: string, userId: string) => {
-  const server = await getServerById(serverId);
+export const deleteServer = async (serverId: string) => {
+  // Permission is handled by middleware
 
-  if (server.ownerId.toString() !== userId) {
-    throw new ForbiddenError('You are not the owner of this server');
-  }
+  // First, ensure server exists before we attempt to delete related data
+  await getServerById(serverId);
 
   // Cascade delete channels and messages
   const channels = await Channel.find({ serverId });
@@ -66,9 +74,13 @@ export const deleteServer = async (serverId: string, userId: string) => {
 
   await Message.deleteMany({ channelId: { $in: channelIds } });
   await Channel.deleteMany({ serverId });
-  await server.deleteOne();
+  // Cascade delete server members
+  await ServerMember.deleteMany({ serverId });
 
-  broadcastEvent(serverId, 'SERVER_DELETE', { serverId });
+  // Finally, delete the server itself
+  await Server.deleteOne({ _id: serverId });
+
+  socketManager.broadcast('SERVER_DELETE', serverId, { serverId });
 
   return { message: 'Server deleted successfully' };
 };

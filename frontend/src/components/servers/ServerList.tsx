@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { serverApi } from '../../services/api';
@@ -79,6 +80,15 @@ const ServerList: React.FC = () => {
         className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-green-500 hover:bg-green-600 hover:text-white transition-all duration-200 hover:rounded-[16px]"
       >
         <Icon icon="mdi:plus" width="24" height="24" className="transition-transform group-hover:rotate-90" />
+      </button>
+
+      {/* Join Server Button */}
+      <button 
+        onClick={() => openModal('joinServer')}
+        className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-mew-text hover:bg-[#35373C] hover:text-white transition-all duration-200 hover:rounded-[16px]"
+        title="Join a Server"
+      >
+        <Icon icon="mdi:compass-outline" width="24" height="24" />
       </button>
     </div>
   );

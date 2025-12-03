@@ -12,7 +12,31 @@ export interface Server {
   _id: string;
   name: string;
   avatarUrl?: string;
-  ownerId: string;
+  // ownerId removed, determined by ServerMember role
+}
+
+export interface ServerMember {
+  _id: string;
+  serverId: string;
+  userId: User; // Populated user object
+  role: 'OWNER' | 'MEMBER';
+  nickname?: string;
+  createdAt: string;
+}
+
+export interface Invite {
+  code: string;
+  serverId: string;
+  server?: { // Populated or partial server info for preview
+      _id: string;
+      name: string;
+      avatarUrl?: string;
+      memberCount?: number;
+  }; 
+  creatorId: string;
+  uses: number;
+  maxUses: number;
+  expiresAt?: string;
 }
 
 export interface Category {

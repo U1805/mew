@@ -1,6 +1,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import Channel from '../api/channel/channel.model';
-import Server from '../api/server/server.model';
+import ServerMember from '../api/member/member.model';
+
 import { createMessage } from '../api/message/message.service';
 
 const joinUserRooms = async (socket: Socket) => {
@@ -13,18 +14,18 @@ const joinUserRooms = async (socket: Socket) => {
     const dmChannels = await Channel.find({ recipients: userId });
     dmChannels.forEach(channel => socket.join(channel._id.toString()));
 
-    // 2. Find all servers owned by the user
-    const ownedServers = await Server.find({ ownerId: userId });
-    const ownedServerIds = ownedServers.map(s => s._id);
+    // 2. Find all servers the user is a member of
+    const memberships = await ServerMember.find({ userId });
+    const memberServerIds = memberships.map(m => m.serverId);
 
     // 3. Join all channels in those servers
-    const channelsInUserServers = await Channel.find({ serverId: { $in: ownedServerIds } });
+    const channelsInUserServers = await Channel.find({ serverId: { $in: memberServerIds } });
     channelsInUserServers.forEach(channel => socket.join(channel._id.toString()));
 
     // (Optional) Join the server rooms themselves for server-level notifications
-    ownedServerIds.forEach(serverId => socket.join(serverId.toString()));
+    memberServerIds.forEach(serverId => socket.join(serverId.toString()));
 
-    console.log(`User ${socket.user.username} joined rooms for ${dmChannels.length} DMs and ${ownedServers.length} servers.`);
+    console.log(`User ${socket.user.username} joined rooms for ${dmChannels.length} DMs and ${memberServerIds.length} servers.`);
 
   } catch (error) {
     console.error('Error joining user to rooms:', error);

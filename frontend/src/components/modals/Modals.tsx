@@ -1,16 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '../../store';
-import { serverApi, channelApi, categoryApi, messageApi, userApi } from '../../services/api';
+import { useModalStore, useUIStore, useAuthStore } from '../../store';
+import { serverApi, channelApi, categoryApi, messageApi, userApi, inviteApi } from '../../services/api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { Category, User } from '../../types';
+import { Category, User, Invite } from '../../types';
 import { WebhookManager } from './WebhookManager';
 
 const Modal: React.FC = () => {
-  const { activeModal, closeModal, modalData } = useModalStore();
+  const { activeModal, closeModal, modalData, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
   
@@ -21,6 +21,14 @@ const Modal: React.FC = () => {
   // Find User State
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  // Join Server State
+  const [inviteCode, setInviteCode] = useState('');
+  const [invitePreview, setInvitePreview] = useState<Invite | null>(null);
+  const [joinError, setJoinError] = useState('');
+
+  // Create Invite State
+  const [createdInviteUrl, setCreatedInviteUrl] = useState('');
 
   // Channel Settings Tabs
   const [activeTab, setActiveTab] = useState<'overview' | 'integrations'>('overview');
@@ -34,6 +42,10 @@ const Modal: React.FC = () => {
           setSearchQuery('');
           setDebouncedQuery('');
           setActiveTab('overview');
+          setInviteCode('');
+          setInvitePreview(null);
+          setJoinError('');
+          setCreatedInviteUrl('');
           return;
       }
 
@@ -44,6 +56,14 @@ const Modal: React.FC = () => {
           setName(modalData.server.name || '');
       } else if (activeModal === 'editCategory' && modalData?.category) {
           setName(modalData.category.name || '');
+      } else if (activeModal === 'joinServer' && modalData?.code) {
+          // If modal opened with code (from URL), fetch preview immediately
+          const code = modalData.code;
+          setInviteCode(code);
+          handleFetchInvite(code);
+      } else if (activeModal === 'createInvite' && currentServerId) {
+          // Generate invite immediately
+          handleCreateInvite();
       } else {
           setName('');
       }
@@ -79,10 +99,50 @@ const Modal: React.FC = () => {
 
   if (!activeModal) return null;
 
+  const handleCreateInvite = async () => {
+      if (!currentServerId) return;
+      try {
+          const res = await inviteApi.create(currentServerId, {});
+          const invite = res.data as Invite;
+          setCreatedInviteUrl(`${window.location.origin}/invite/${invite.code}`);
+      } catch (e) {
+          console.error("Failed to create invite", e);
+      }
+  };
+
+  const handleFetchInvite = async (code: string) => {
+      setIsLoading(true);
+      setJoinError('');
+      try {
+          const res = await inviteApi.get(code);
+          setInvitePreview(res.data);
+      } catch (e) {
+          setJoinError("Invalid or expired invite code.");
+          setInvitePreview(null);
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const handleJoinServer = async () => {
+      if (!invitePreview || !inviteCode) return;
+      setIsLoading(true);
+      try {
+          await inviteApi.accept(inviteCode);
+          await queryClient.invalidateQueries({ queryKey: ['servers'] });
+          useUIStore.getState().setCurrentServer(invitePreview.serverId);
+          closeModal();
+      } catch (e) {
+          setJoinError("Failed to join server.");
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Allow submit if it's a delete action (name not required)
-    const isDelete = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory';
+    const isDelete = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory' || activeModal === 'deleteServer' || activeModal === 'leaveServer';
     if (!name.trim() && !isDelete) return;
 
     setIsLoading(true);
@@ -108,7 +168,6 @@ const Modal: React.FC = () => {
         });
         queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
       } else if (activeModal === 'deleteChannel' && currentServerId) {
-         // Using the correct API call structure if needed, or stick to mock assumption
          await channelApi.delete(currentServerId, modalData.channel._id);
          queryClient.setQueryData(['channels', currentServerId], (old: any[]) => old?.filter(c => c._id !== modalData.channel._id) || []);
       } else if (activeModal === 'deleteMessage' && currentServerId && modalData?.message) {
@@ -118,6 +177,18 @@ const Modal: React.FC = () => {
               if (!old) return old;
               return old.filter(m => m._id !== modalData.message._id);
           });
+      } else if (activeModal === 'deleteServer' && modalData?.server) {
+          await serverApi.delete(modalData.server._id);
+          useUIStore.getState().setCurrentServer(null);
+          queryClient.invalidateQueries({ queryKey: ['servers'] });
+      } else if (activeModal === 'leaveServer' && modalData?.serverId) {
+          await serverApi.leaveServer(modalData.serverId);
+          // Optimistically remove the server from the list before invalidating
+          queryClient.setQueryData(['servers'], (oldData: any[] | undefined) =>
+              oldData ? oldData.filter(server => server._id !== modalData.serverId) : []
+          );
+          useUIStore.getState().setCurrentServer(null);
+          queryClient.invalidateQueries({ queryKey: ['servers'] });
       }
       
       closeModal();
@@ -165,6 +236,106 @@ const Modal: React.FC = () => {
   };
 
   // --- Modal Content Logic ---
+
+  if (activeModal === 'createInvite') {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+             <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in p-4">
+                 <div className="flex justify-between items-center mb-2">
+                     <h2 className="text-sm font-bold text-white uppercase">Invite Friends</h2>
+                     <Icon icon="mdi:close" className="text-mew-textMuted cursor-pointer hover:text-white" onClick={closeModal} />
+                 </div>
+                 <div className="text-mew-text text-sm mb-4">
+                     Share this link with others to grant them access to this server.
+                 </div>
+                 <div className="relative">
+                     <input 
+                        readOnly 
+                        value={createdInviteUrl || 'Generating...'} 
+                        className="w-full bg-[#1E1F22] text-white p-2.5 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none text-sm font-medium" 
+                     />
+                     <button 
+                        className={clsx(
+                            "absolute right-1 top-1 h-[34px] px-4 rounded text-white text-sm font-medium transition-colors",
+                            createdInviteUrl ? "bg-mew-accent hover:bg-mew-accentHover" : "bg-[#404249] cursor-not-allowed"
+                        )}
+                        onClick={() => {
+                            if (createdInviteUrl) {
+                                navigator.clipboard.writeText(createdInviteUrl);
+                                // Optional toast
+                            }
+                        }}
+                     >
+                         Copy
+                     </button>
+                 </div>
+                 <div className="text-xs text-mew-textMuted mt-2">
+                     Your invite link expires in 7 days. <span className="text-mew-accent hover:underline cursor-pointer">Edit link</span>
+                 </div>
+             </div>
+        </div>
+      );
+  }
+
+  if (activeModal === 'joinServer') {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+             <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in p-6 text-center">
+                 <h2 className="text-2xl font-bold text-white mb-2">Join a Server</h2>
+                 <p className="text-mew-textMuted text-sm mb-6">Enter an invite below to join an existing server.</p>
+                 
+                 {!invitePreview ? (
+                    <div className="text-left">
+                        <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Invite Link</label>
+                        <input
+                            type="text"
+                            value={inviteCode}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                // Extract code if full URL pasted
+                                const code = val.split('/').pop() || val;
+                                setInviteCode(code);
+                                if (code.length > 5) handleFetchInvite(code);
+                            }}
+                            className="w-full bg-[#1E1F22] text-white p-2.5 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none text-sm font-medium mb-2"
+                            placeholder="https://mew.com/invite/..."
+                        />
+                         {joinError && <div className="text-red-400 text-xs mb-2">{joinError}</div>}
+                    </div>
+                 ) : (
+                    <div className="bg-[#2B2D31] p-4 rounded mb-6 flex flex-col items-center animate-fade-in-up">
+                        <div className="w-16 h-16 rounded-[20px] bg-mew-accent flex items-center justify-center text-white text-2xl font-bold mb-3 overflow-hidden">
+                             {invitePreview.server?.avatarUrl ? (
+                                <img src={invitePreview.server.avatarUrl} className="w-full h-full object-cover" />
+                             ) : (
+                                invitePreview.server?.name?.substring(0, 2).toUpperCase()
+                             )}
+                        </div>
+                        <div className="text-white font-bold truncate max-w-full">{invitePreview.server?.name}</div>
+                        <div className="text-mew-textMuted text-xs flex items-center mt-1">
+                            <span className="w-2 h-2 rounded-full bg-mew-textMuted mr-1.5"></span>
+                            {invitePreview.server?.memberCount || '?'} Members
+                        </div>
+                    </div>
+                 )}
+
+                 <div className="flex justify-between items-center mt-2">
+                     <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">Back</button>
+                     <button 
+                        onClick={invitePreview ? handleJoinServer : () => handleFetchInvite(inviteCode)}
+                        disabled={isLoading || !inviteCode}
+                        className={clsx(
+                            "bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2.5 rounded-[3px] font-medium text-sm transition-colors",
+                            (isLoading || !inviteCode) && "opacity-50 cursor-not-allowed"
+                        )}
+                     >
+                         {invitePreview ? 'Join Server' : 'Find Server'}
+                     </button>
+                 </div>
+             </div>
+        </div>
+      )
+  }
   
   if (activeModal === 'serverSettings') {
       return (
@@ -179,7 +350,10 @@ const Modal: React.FC = () => {
                     
                     <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50"></div>
                     
-                    <div className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text font-medium text-sm cursor-pointer mb-0.5 flex justify-between group">
+                    <div 
+                        className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text font-medium text-sm cursor-pointer mb-0.5 flex justify-between group"
+                        onClick={() => useModalStore.getState().openModal('deleteServer', modalData)}
+                    >
                         <span className="group-hover:text-red-400">Delete Server</span>
                         <Icon icon="mdi:trash-can-outline" className="hidden group-hover:block text-red-400" />
                     </div>
@@ -506,7 +680,7 @@ const Modal: React.FC = () => {
   }
 
   // Generic Dialog Modal (Create X, Delete X)
-  const isDeleteType = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory';
+  const isDeleteType = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory' || activeModal === 'deleteServer' || activeModal === 'leaveServer';
   
   const getTitle = () => {
       switch (activeModal) {
@@ -516,6 +690,8 @@ const Modal: React.FC = () => {
           case 'deleteChannel': return 'Delete Channel';
           case 'deleteMessage': return 'Delete Message';
           case 'deleteCategory': return 'Delete Category';
+          case 'deleteServer': return 'Delete Server';
+          case 'leaveServer': return 'Leave Server';
           default: return '';
       }
   };
@@ -542,6 +718,8 @@ const Modal: React.FC = () => {
                 {activeModal === 'deleteChannel' && `Are you sure you want to delete #${modalData?.channel?.name}? This cannot be undone.`}
                 {activeModal === 'deleteMessage' && "Are you sure you want to delete this message?"}
                 {activeModal === 'deleteCategory' && `Are you sure you want to delete the category '${modalData?.category?.name}'? Channels inside will become uncategorized.`}
+                {activeModal === 'deleteServer' && `Are you sure you want to delete ${modalData?.server?.name}? This action cannot be undone.`}
+                {activeModal === 'leaveServer' && "Are you sure you want to leave this server?"}
             </p>
         </div>
 
@@ -580,12 +758,23 @@ const Modal: React.FC = () => {
                         autoFocus
                     />
                 </div>
+                {activeModal === 'createServer' && (
+                    <div className="mb-2 text-center">
+                        <button 
+                            type="button" 
+                            className="text-mew-textMuted hover:text-white text-xs font-medium bg-[#2B2D31] px-4 py-2 rounded border border-[#1E1F22] hover:border-mew-textMuted transition-all w-full"
+                            onClick={() => { closeModal(); openModal('joinServer'); }}
+                        >
+                            Have an invite already? Join a Server
+                        </button>
+                    </div>
+                )}
             </form>
-        ) : activeModal === 'deleteChannel' ? (
-             // Delete Channel Warning Visual
+        ) : (activeModal === 'deleteChannel' || activeModal === 'deleteServer') ? (
+             // Delete Warning Visual
              <div className="px-4 pb-2">
                  <div className="bg-[#F0B132] p-3 rounded text-sm text-black font-medium border border-orange-600/20">
-                    <span className="font-bold">Warning:</span> By deleting this channel, you will lose all messages and history within it.
+                    <span className="font-bold">Warning:</span> {activeModal === 'deleteServer' ? 'This server will be permanently deleted.' : 'By deleting this channel, you will lose all messages and history within it.'}
                  </div>
              </div>
         ) : null}
@@ -614,6 +803,8 @@ const Modal: React.FC = () => {
                  activeModal === 'deleteChannel' ? 'Delete Channel' : 
                  activeModal === 'deleteMessage' ? 'Delete' : 
                  activeModal === 'deleteCategory' ? 'Delete Category' :
+                 activeModal === 'deleteServer' ? 'Delete Server' :
+                 activeModal === 'leaveServer' ? 'Leave Server' :
                  'Create'}
             </button>
         </div>

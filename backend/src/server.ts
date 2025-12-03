@@ -5,19 +5,13 @@ import connectDB from './utils/db';
 import config from './config';
 
 const httpServer = http.createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: '*', // Be more specific in production
-    methods: ['GET', 'POST'],
-  },
-});
 
 import { authMiddleware } from './gateway/middleware';
 import { registerConnectionHandlers } from './gateway/handlers';
-import { initSocket } from './gateway/events';
+import { socketManager } from './gateway/events';
 
-initSocket(io);
-io.use(authMiddleware);
+const io = socketManager.init(httpServer);
+socketManager.getIO().use(authMiddleware);
 
 io.on('connection', (socket) => {
   registerConnectionHandlers(io, socket);

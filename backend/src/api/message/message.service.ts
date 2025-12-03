@@ -1,6 +1,6 @@
 import Message, { IMessage } from './message.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
-import { broadcastEvent } from '../../gateway/events';
+import { socketManager } from '../../gateway/events';
 
 /**
  * Applies author overrides from a message's payload.
@@ -51,7 +51,7 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
   // Apply overrides for the real-time broadcast.
   const messageWithOverrides = applyAuthorOverride(populatedMessage);
 
-  broadcastEvent(populatedMessage.channelId.toString(), 'MESSAGE_CREATE', messageWithOverrides);
+  socketManager.broadcast('MESSAGE_CREATE', populatedMessage.channelId.toString(), messageWithOverrides);
 
   // Return the original Mongoose document, as the function signature promises.
   return populatedMessage;
@@ -81,7 +81,7 @@ export const getMessageById = async (messageId: string) => {
     await message.save();
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl');
-    broadcastEvent(message.channelId.toString(), 'MESSAGE_UPDATE', populatedMessage);
+    socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), populatedMessage);
 
     return populatedMessage;
   };
@@ -95,7 +95,7 @@ export const getMessageById = async (messageId: string) => {
 
     await message.deleteOne();
 
-    broadcastEvent(message.channelId.toString(), 'MESSAGE_DELETE', { messageId: message._id, channelId: message.channelId.toString() });
+    socketManager.broadcast('MESSAGE_DELETE', message.channelId.toString(), { messageId: message._id, channelId: message.channelId.toString() });
 
     return { message: 'Message deleted successfully' };
   };
@@ -144,7 +144,7 @@ export const getMessageById = async (messageId: string) => {
       }
 
       const messageWithOverrides = applyAuthorOverride(finalMessage);
-      broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_ADD', messageWithOverrides);
+      socketManager.broadcast('MESSAGE_REACTION_ADD', finalMessage.channelId.toString(), messageWithOverrides);
       return messageWithOverrides;
     };
 
@@ -174,6 +174,6 @@ export const getMessageById = async (messageId: string) => {
       }
 
       const messageWithOverrides = applyAuthorOverride(finalMessage);
-      broadcastEvent(finalMessage.channelId.toString(), 'MESSAGE_REACTION_REMOVE', messageWithOverrides);
+      socketManager.broadcast('MESSAGE_REACTION_REMOVE', finalMessage.channelId.toString(), messageWithOverrides);
       return messageWithOverrides;
     };

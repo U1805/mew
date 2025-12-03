@@ -30,7 +30,17 @@ export const serverApi = {
   list: () => api.get('/users/@me/servers'),
   create: (data: { name: string }) => api.post('/servers', data),
   get: (id: string) => api.get(`/servers/${id}`),
-  getMembers: (id: string) => api.get(`/servers/${id}/members`), // Assuming endpoint exists or we fetch from server details
+  update: (id: string, data: { name?: string; avatarUrl?: string }) => api.patch(`/servers/${id}`, data),
+  delete: (id: string) => api.delete(`/servers/${id}`),
+  getMembers: (id: string) => api.get(`/servers/${id}/members`),
+  kickMember: (serverId: string, userId: string) => api.delete(`/servers/${serverId}/members/${userId}`),
+  leaveServer: (serverId: string) => api.delete(`/servers/${serverId}/members/@me`),
+};
+
+export const inviteApi = {
+  create: (serverId: string, data: { maxUses?: number; expiresAt?: string } = {}) => api.post(`/servers/${serverId}/invites`, data),
+  get: (code: string) => api.get(`/invites/${code}`),
+  accept: (code: string) => api.post(`/invites/${code}`, {}),
 };
 
 export const categoryApi = {

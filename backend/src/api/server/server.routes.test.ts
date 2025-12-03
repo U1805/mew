@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
+import ServerMemberModel from '../member/member.model';
 
 describe('Server Routes', () => {
   const userData = {
@@ -85,7 +86,7 @@ describe('Server Routes', () => {
       expect(res.statusCode).toBe(401);
     });
 
-    it('should create a new server successfully with a valid token', async () => {
+    it('should create a new server and a corresponding owner member entry', async () => {
       const res = await request(app)
         .post('/api/servers')
         .set('Authorization', `Bearer ${token}`)
@@ -93,7 +94,13 @@ describe('Server Routes', () => {
 
       expect(res.statusCode).toBe(201);
       expect(res.body.name).toBe(serverData.name);
-      expect(res.body.ownerId).toBe(userId);
+      expect(res.body).not.toHaveProperty('ownerId');
+
+      const serverId = res.body._id;
+      const member = await ServerMemberModel.findOne({ serverId, userId });
+
+      expect(member).not.toBeNull();
+      expect(member?.role).toBe('OWNER');
     });
 
     it('should return 400 for invalid server data', async () => {
