@@ -1,6 +1,7 @@
 
 import React, { useEffect } from 'react';
-import { useAuthStore, useModalStore } from '../store';
+import { getSocket } from '../services/socket';
+import { useAuthStore, useModalStore, useUIStore } from '../store';
 import Layout from '../components/layout/Layout';
 import { AuthScreen } from '../components/auth/Auth';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -37,6 +38,30 @@ const App: React.FC = () => {
         }
     }
   }, [token, openModal]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleServerKick = ({ serverId: kickedServerId }: { serverId: string }) => {
+      // Invalidate servers query to refetch the list
+      queryClient.invalidateQueries({ queryKey: ['servers'] });
+
+      // If the user was viewing the kicked server, navigate them away
+      // NOTE: We access the store directly as we are outside a component's render cycle
+      if (useUIStore.getState().currentServerId === kickedServerId) {
+        useUIStore.getState().setCurrentServerId(null);
+      }
+    };
+
+    socket.on('SERVER_KICK', handleServerKick);
+
+    return () => {
+      socket.off('SERVER_KICK', handleServerKick);
+    };
+  }, [token, queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

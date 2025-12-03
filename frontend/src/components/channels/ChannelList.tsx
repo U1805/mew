@@ -197,42 +197,48 @@ const ChannelList: React.FC = () => {
                     <Icon icon="mdi:account-plus" />
                 </div>
 
-                <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
+                {isOwner && (
+                    <>
+                        <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
+                        <div
+                            className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
+                            onClick={() => openModal('createCategory')}
+                        >
+                            <span className="text-sm font-medium">Create Category</span>
+                            <Icon icon="mdi:folder-plus-outline" />
+                        </div>
+                        <div
+                            className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
+                            onClick={() => openModal('createChannel')}
+                        >
+                            <span className="text-sm font-medium">Create Channel</span>
+                            <Icon icon="mdi:plus-circle-outline" />
+                        </div>
 
-                <div 
-                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
-                    onClick={() => openModal('createCategory')}
-                >
-                    <span className="text-sm font-medium">Create Category</span>
-                    <Icon icon="mdi:folder-plus-outline" />
-                </div>
-                <div 
-                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
-                    onClick={() => openModal('createChannel')}
-                >
-                    <span className="text-sm font-medium">Create Channel</span>
-                    <Icon icon="mdi:plus-circle-outline" />
-                </div>
-                
-                 <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
+                         <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
 
-                 <div 
-                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
-                    onClick={() => openModal('serverSettings', { server })}
-                >
-                    <span className="text-sm font-medium">Server Settings</span>
-                    <Icon icon="mdi:cog-outline" />
-                </div>
+                         <div
+                            className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
+                            onClick={() => openModal('serverSettings', { server })}
+                        >
+                            <span className="text-sm font-medium">Server Settings</span>
+                            <Icon icon="mdi:cog-outline" />
+                        </div>
+                    </>
+                )}
 
-                <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
-
-                 <div 
-                    className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
-                    onClick={() => openModal('leaveServer', { serverId: currentServerId })}
-                >
-                    <span className="text-sm font-medium">Leave Server</span>
-                    <Icon icon="mdi:exit-to-app" />
-                </div>
+                {!isOwner && (
+                    <>
+                        <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
+                        <div
+                            className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
+                            onClick={() => openModal('leaveServer', { serverId: currentServerId })}
+                        >
+                            <span className="text-sm font-medium">Leave Server</span>
+                            <Icon icon="mdi:exit-to-app" />
+                        </div>
+                    </>
+                )}
             </div>
         )}
       </div>
@@ -267,28 +273,30 @@ const ChannelList: React.FC = () => {
                         {category.name}
                     </div>
                     
-                    <div className="flex items-center space-x-1">
-                        <div 
-                            className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
-                            title="Create Channel"
-                            onClick={(e) => { 
-                                e.stopPropagation(); 
-                                openModal('createChannel', { categoryId: category._id, categoryName: category.name }); 
-                            }} 
-                        >
-                            <Icon icon="mdi:plus" width="18" />
-                        </div>
+                     <div className="flex items-center space-x-1">
                         {isOwner && (
-                            <div 
-                                className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity" 
-                                title="Edit Category"
-                                onClick={(e) => { 
-                                    e.stopPropagation(); 
-                                    openModal('editCategory', { category }); 
-                                }} 
-                            >
-                                <Icon icon="mdi:cog" width="14" />
-                            </div>
+                            <>
+                                <div
+                                    className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity"
+                                    title="Create Channel"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openModal('createChannel', { categoryId: category._id, categoryName: category.name });
+                                    }}
+                                >
+                                    <Icon icon="mdi:plus" width="18" />
+                                </div>
+                                <div
+                                    className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity"
+                                    title="Edit Category"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openModal('editCategory', { category });
+                                    }}
+                                >
+                                    <Icon icon="mdi:cog" width="14" />
+                                </div>
+                            </>
                         )}
                     </div>
                 </div>
@@ -307,16 +315,18 @@ const ChannelList: React.FC = () => {
 
         {(!channels || channels.length === 0) && (
             <div className="flex flex-col items-center justify-center h-40 text-center opacity-75">
-                 <div className="border border-dashed border-mew-textMuted rounded-full p-3 mb-2">
+                <div className="border border-dashed border-mew-textMuted rounded-full p-3 mb-2">
                     <Icon icon="mdi:chat-plus-outline" className="text-mew-textMuted" width="24" />
-                 </div>
+                </div>
                 <p className="text-mew-textMuted text-xs px-4">Nothing here yet.</p>
-                <button 
-                    className="mt-2 text-mew-accent hover:underline text-xs font-medium"
-                    onClick={() => openModal('createChannel')}
-                >
-                    Create a channel
-                </button>
+                {isOwner && (
+                    <button
+                        className="mt-2 text-mew-accent hover:underline text-xs font-medium"
+                        onClick={() => openModal('createChannel')}
+                    >
+                        Create a channel
+                    </button>
+                )}
             </div>
         )}
       </div>

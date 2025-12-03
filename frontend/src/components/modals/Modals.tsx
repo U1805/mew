@@ -144,7 +144,7 @@ const Modal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // Allow submit if it's a delete action (name not required)
-    const isDelete = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory' || activeModal === 'deleteServer' || activeModal === 'leaveServer';
+    const isDelete = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory' || activeModal === 'deleteServer' || activeModal === 'leaveServer' || activeModal === 'kickUser';
     if (!name.trim() && !isDelete) return;
 
     setIsLoading(true);
@@ -191,6 +191,9 @@ const Modal: React.FC = () => {
           );
           useUIStore.getState().setCurrentServer(null);
           queryClient.invalidateQueries({ queryKey: ['servers'] });
+      } else if (activeModal === 'kickUser' && modalData?.user && modalData?.serverId) {
+          await serverApi.kickMember(modalData.serverId, modalData.user._id);
+          queryClient.invalidateQueries({ queryKey: ['members', modalData.serverId] });
       }
       
       closeModal();
@@ -683,8 +686,41 @@ const Modal: React.FC = () => {
       )
   }
 
+  // Kick User Modal - NEW
+  if (activeModal === 'kickUser' && modalData?.user) {
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+             <div className="bg-[#313338] w-full max-w-[440px] rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
+                 <div className="p-4 pt-5">
+                     <h2 className="text-xl font-bold text-white mb-4">Kick '{modalData.user.username}'</h2>
+                     <p className="text-mew-textMuted text-sm leading-5">
+                        Are you sure you want to kick <span className="font-semibold text-white">@{modalData.user.username}</span> from the server? They will be able to rejoin again with a new invite.
+                     </p>
+                 </div>
+                 
+                 <div className="bg-[#2B2D31] p-4 flex justify-end items-center space-x-3">
+                     <button 
+                        type="button" 
+                        onClick={closeModal}
+                        className="text-white hover:underline text-sm font-medium px-4"
+                     >
+                         Cancel
+                     </button>
+                     <button
+                        onClick={handleSubmit}
+                        disabled={isLoading}
+                        className="bg-red-500 hover:bg-red-600 text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors"
+                     >
+                         Kick
+                     </button>
+                 </div>
+             </div>
+        </div>
+      )
+  }
+
   // Generic Dialog Modal (Create X, Delete X)
-  const isDeleteType = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory' || activeModal === 'deleteServer' || activeModal === 'leaveServer';
+  const isDeleteType = activeModal === 'deleteChannel' || activeModal === 'deleteMessage' || activeModal === 'deleteCategory' || activeModal === 'deleteServer' || activeModal === 'leaveServer' || activeModal === 'kickUser';
   
   const getTitle = () => {
       switch (activeModal) {
@@ -696,6 +732,7 @@ const Modal: React.FC = () => {
           case 'deleteCategory': return 'Delete Category';
           case 'deleteServer': return 'Delete Server';
           case 'leaveServer': return 'Leave Server';
+          // kickUser handled above
           default: return '';
       }
   };
@@ -809,6 +846,7 @@ const Modal: React.FC = () => {
                  activeModal === 'deleteCategory' ? 'Delete Category' :
                  activeModal === 'deleteServer' ? 'Delete Server' :
                  activeModal === 'leaveServer' ? 'Leave Server' :
+                 // kickUser handled separately above
                  'Create'}
             </button>
         </div>

@@ -63,33 +63,25 @@ const inviteService = {
   },
 
   async getInviteDetails(inviteCode: string): Promise<any> {
-    const inviteDoc = await _getAndValidateInvite(inviteCode);
-
-    const invite = await Invite.findOne({ code: inviteDoc.code })
-      .populate('serverId', 'name avatarUrl')
-      .lean<IPopulatedLeanInvite>();
-
-    if (!invite) {
-      throw new NotFoundError('Invite not found.');
-    }
+    const invite = await _getAndValidateInvite(inviteCode);
+    await invite.populate('serverId', 'name avatarUrl');
 
     const memberCount = await ServerMember.countDocuments({ serverId: invite.serverId._id });
 
+    // we have to cast serverId to any because the mongoose type is not perfect
+    const server = invite.serverId as any;
+
     const response = {
-      _id: invite._id,
       code: invite.code,
       uses: invite.uses,
       maxUses: invite.maxUses,
-      createdAt: invite.createdAt,
-      updatedAt: invite.updatedAt,
-      creatorId: invite.creatorId,
       expiresAt: invite.expiresAt,
       server: {
-        _id: invite.serverId._id,
-        name: invite.serverId.name,
-        avatarUrl: invite.serverId.avatarUrl,
-        memberCount
-      }
+        _id: server._id,
+        name: server.name,
+        avatarUrl: server.avatarUrl,
+        memberCount,
+      },
     };
 
     return response;

@@ -3,9 +3,11 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Category } from '../types';
+import { useUIStore } from '../store';
 
 export const useServerEvents = (serverId: string | null) => {
   const queryClient = useQueryClient();
+  const { setCurrentServerId } = useUIStore.getState();
 
   useEffect(() => {
     const socket = getSocket();
@@ -28,6 +30,7 @@ export const useServerEvents = (serverId: string | null) => {
         queryClient.invalidateQueries({ queryKey: ['channels', serverId] });
     };
     
+
     socket.on('CATEGORY_UPDATE', handleCategoryUpdate);
     socket.on('CATEGORY_DELETE', handleCategoryDelete);
     

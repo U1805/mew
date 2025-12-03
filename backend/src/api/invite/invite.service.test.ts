@@ -71,7 +71,7 @@ describe('Invite Service', () => {
       const inviteDetails = await inviteService.getInviteDetails(validInvite.code);
       expect(inviteDetails).toBeDefined();
       expect(inviteDetails.code).toBe(validInvite.code);
-      expect(inviteDetails.serverId).toHaveProperty('name');
+      expect(inviteDetails.server).toHaveProperty('name');
     });
 
     it('should throw NotFoundError for an invalid code', async () => {

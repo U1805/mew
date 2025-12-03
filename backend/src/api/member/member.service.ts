@@ -1,5 +1,6 @@
 import ServerMember, { IServerMember } from './member.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { socketManager } from '../../gateway/events';
 
 const memberService = {
   async getMembersByServer(serverId: string, requesterId: string): Promise<IServerMember[]> {
@@ -29,6 +30,11 @@ const memberService = {
     if (result.deletedCount === 0) {
       throw new NotFoundError('Member not found in this server.');
     }
+
+    // Notify the kicked user directly via their personal room
+    socketManager.broadcast('SERVER_KICK', userIdToRemove, { serverId });
+    // Notify other members in the server about the member leaving
+    socketManager.broadcast('MEMBER_LEAVE', serverId, { serverId, userId: userIdToRemove });
   },
 
   async leaveServer(serverId: string, requesterId: string): Promise<void> {

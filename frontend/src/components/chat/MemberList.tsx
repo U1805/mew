@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { serverApi } from '../../services/api';
 import { useUIStore, useModalStore, useAuthStore } from '../../store';
 import { ServerMember } from '../../types';
@@ -11,7 +11,6 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 const MemberList: React.FC = () => {
   const { currentServerId } = useUIStore();
   const { user } = useAuthStore();
-  const queryClient = useQueryClient();
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['members', currentServerId],
@@ -21,13 +20,6 @@ const MemberList: React.FC = () => {
       return res.data as ServerMember[];
     },
     enabled: !!currentServerId
-  });
-  
-  const kickMutation = useMutation({
-      mutationFn: (userId: string) => serverApi.kickMember(currentServerId!, userId),
-      onSuccess: () => {
-          queryClient.invalidateQueries({ queryKey: ['members', currentServerId] });
-      }
   });
 
   if (!currentServerId) return null;
@@ -60,14 +52,14 @@ const MemberList: React.FC = () => {
                 members={admins} 
                 currentUser={user}
                 isOwner={isOwner}
-                onKick={(id) => kickMutation.mutate(id)}
+                serverId={currentServerId}
             />
             <MemberGroup 
                 title={`Members — ${others.length}`} 
                 members={others} 
                 currentUser={user}
                 isOwner={isOwner}
-                onKick={(id) => kickMutation.mutate(id)}
+                serverId={currentServerId}
             />
           </>
       )}
@@ -80,13 +72,13 @@ const MemberGroup = ({
     members, 
     currentUser,
     isOwner,
-    onKick 
+    serverId
 }: { 
     title: string, 
     members: ServerMember[], 
     currentUser: any,
     isOwner: boolean,
-    onKick: (id: string) => void
+    serverId: string
 }) => {
     const { openModal } = useModalStore();
 
@@ -132,11 +124,7 @@ const MemberGroup = ({
                             <ContextMenu.Content className="min-w-[180px] bg-[#111214] rounded p-1.5 shadow-xl z-50 animate-fade-in border border-[#1E1F22]">
                                 <ContextMenu.Item 
                                     className="flex items-center px-2 py-1.5 hover:bg-red-500 hover:text-white text-red-400 rounded cursor-pointer text-sm font-medium outline-none"
-                                    onSelect={() => {
-                                        if (confirm(`Are you sure you want to kick ${u.username}?`)) {
-                                            onKick(u._id);
-                                        }
-                                    }}
+                                    onSelect={() => openModal('kickUser', { user: u, serverId })}
                                 >
                                     Kick {u.username}
                                 </ContextMenu.Item>

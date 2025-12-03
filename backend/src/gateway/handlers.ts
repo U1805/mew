@@ -22,10 +22,13 @@ const joinUserRooms = async (socket: Socket) => {
     const channelsInUserServers = await Channel.find({ serverId: { $in: memberServerIds } });
     channelsInUserServers.forEach(channel => socket.join(channel._id.toString()));
 
-    // (Optional) Join the server rooms themselves for server-level notifications
+    // Join the server rooms themselves for server-level notifications
     memberServerIds.forEach(serverId => socket.join(serverId.toString()));
 
-    console.log(`User ${socket.user.username} joined rooms for ${dmChannels.length} DMs and ${memberServerIds.length} servers.`);
+    // Join a personal room named by userId for user-specific notifications (e.g., kicks)
+    socket.join(userId.toString());
+
+    console.log(`User ${socket.user.username} joined rooms for ${dmChannels.length} DMs, ${memberServerIds.length} servers, and personal room.`);
 
   } catch (error) {
     console.error('Error joining user to rooms:', error);

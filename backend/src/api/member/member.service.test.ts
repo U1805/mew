@@ -1,10 +1,20 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+
+vi.mock('../../gateway/events', () => ({
+  socketManager: {
+    broadcast: vi.fn(),
+    init: vi.fn(),
+    getIO: vi.fn(),
+  },
+}));
+
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import memberService from './member.service';
 import ServerMember from './member.model';
 import '../../api/user/user.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { socketManager } from '../../gateway/events';
 
 describe('Member Service', () => {
 
@@ -40,10 +50,47 @@ describe('Member Service', () => {
   });
 
   describe('removeMember', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
     it('should allow owner to remove a member', async () => {
       await memberService.removeMember(serverId, member1Id, ownerId);
       const member = await ServerMember.findOne({ serverId, userId: member1Id });
       expect(member).toBeNull();
+    });
+
+    it('should broadcast SERVER_KICK event to the kicked user', async () => {
+      await memberService.removeMember(serverId, member1Id, ownerId);
+
+      expect(socketManager.broadcast).toHaveBeenCalledWith(
+        'SERVER_KICK',
+        member1Id,
+        { serverId }
+      );
+    });
+
+    it('should broadcast MEMBER_LEAVE event to the server room', async () => {
+      await memberService.removeMember(serverId, member1Id, ownerId);
+
+      expect(socketManager.broadcast).toHaveBeenCalledWith(
+        'MEMBER_LEAVE',
+        serverId,
+        { serverId, userId: member1Id }
+      );
+    });
+
+    it('should broadcast both events in correct order', async () => {
+      await memberService.removeMember(serverId, member1Id, ownerId);
+
+      const calls = (socketManager.broadcast as ReturnType<typeof vi.fn>).mock.calls;
+      expect(calls.length).toBe(2);
+
+      // First call: SERVER_KICK to kicked user
+      expect(calls[0]).toEqual(['SERVER_KICK', member1Id, { serverId }]);
+
+      // Second call: MEMBER_LEAVE to server room
+      expect(calls[1]).toEqual(['MEMBER_LEAVE', serverId, { serverId, userId: member1Id }]);
     });
 
     it('should prevent owner from removing themselves', async () => {
@@ -63,6 +110,18 @@ describe('Member Service', () => {
       await expect(memberService.removeMember(serverId, nonExistentUserId, ownerId)).rejects.toThrow(
         NotFoundError
       );
+    });
+
+    it('should not broadcast events if removal fails', async () => {
+      const nonExistentUserId = new mongoose.Types.ObjectId().toHexString();
+
+      try {
+        await memberService.removeMember(serverId, nonExistentUserId, ownerId);
+      } catch (error) {
+        // Expected to throw
+      }
+
+      expect(socketManager.broadcast).not.toHaveBeenCalled();
     });
   });
 

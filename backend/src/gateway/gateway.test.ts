@@ -37,8 +37,9 @@ describe('WebSocket Gateway', () => {
   let io: Server;
   let port: number;
   let client1: ClientSocket, client2: ClientSocket;
-  let token1: string, token2: string, userId2: string;
+  let token1: string, token2: string, userId1: string, userId2: string;
   let serverId: string;
+  let inviteCode: string;
   let channel1Id: string, channel2Id: string;
 
   beforeEach(async () => {
@@ -70,6 +71,7 @@ describe('WebSocket Gateway', () => {
     await request(app).post('/api/auth/register').send(user1Data);
     const loginRes1 = await request(app).post('/api/auth/login').send({ email: user1Data.email, password: user1Data.password });
     token1 = loginRes1.body.token;
+    userId1 = loginRes1.body.user._id;
 
     await request(app).post('/api/auth/register').send(user2Data);
     const loginRes2 = await request(app).post('/api/auth/login').send({ email: user2Data.email, password: user2Data.password });
@@ -79,6 +81,9 @@ describe('WebSocket Gateway', () => {
     // Server 1 for user1
     const server1Res = await request(app).post('/api/servers').set('Authorization', `Bearer ${token1}`).send({ name: 'Socket Test Server 1' });
     serverId = server1Res.body._id; // This is the server under test
+
+    const inviteRes = await request(app).post(`/api/servers/${serverId}/invites`).set('Authorization', `Bearer ${token1}`).send({});
+    inviteCode = inviteRes.body.code;
 
     const channel1Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel One', type: ChannelType.GUILD_TEXT });
     channel1Id = channel1Res.body._id;
@@ -151,5 +156,25 @@ describe('WebSocket Gateway', () => {
 
     const savedMsg = await Message.findOne({ channelId: channel1Id, content: 'Hello from channel one' });
     expect(savedMsg).toBeTruthy();
+  });
+
+  it('should make user join their own user ID room upon connection', async () => {
+    // Grant user2 membership to server1 temporarily for the test
+    await request(app)
+      .post(`/api/invites/${inviteCode}`)
+      .set('Authorization', `Bearer ${token2}`)
+
+    client2 = createTestClient(port, token2);
+
+    const client2Connects = new Promise<void>(resolve => client2.on('connect', () => resolve()));
+    await client2Connects;
+
+    // Add a small delay to allow server-side room joining to propagate
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Check server side if the socket is in the room
+    const sockets = await io.in(userId2).fetchSockets();
+    expect(sockets.length).toBe(1);
+    expect(sockets[0].user.id).toBe(userId2);
   });
 });

@@ -15,9 +15,9 @@ interface UIState {
 }
 
 interface ModalState {
-  activeModal: 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer' | null;
+  activeModal: 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer' | 'kickUser' | null;
   modalData: any;
-  openModal: (modal: 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer', data?: any) => void;
+  openModal: (modal: 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer' | 'kickUser', data?: any) => void;
   closeModal: () => void;
 }
 

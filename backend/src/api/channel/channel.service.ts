@@ -128,3 +128,12 @@ export const createDmChannel = async (userId: string, recipientId: string): Prom
 
   return newDmChannel;
 };
+
+export const getDmChannelsByUser = async (userId: string): Promise<IChannel[]> => {
+  const channels = await Channel.find({
+    type: 'DM',
+    recipients: userId,
+  }).populate('recipients', 'username avatar');
+
+  return channels;
+};

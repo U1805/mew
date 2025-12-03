@@ -88,7 +88,7 @@ importers:
         specifier: ^6.0.2
         version: 6.0.2(react@19.2.0)
       '@radix-ui/react-context-menu':
-        specifier: ^2.2.16
+        specifier: ^2.2.1
         version: 2.2.16(@types/react@19.2.7)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@tanstack/react-query':
         specifier: ^5.90.11

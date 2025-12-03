@@ -12,6 +12,15 @@ export const getMeHandler = asyncHandler(async (req: Request, res: Response) => 
   res.status(200).json(user);
 });
 
+export const getDmChannelsHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
+  }
+
+  const channels = await channelService.getDmChannelsByUser(req.user.id);
+  res.status(200).json(channels);
+});
+
 export const createDmChannelHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new UnauthorizedError('Not authenticated');
