@@ -1,6 +1,6 @@
-import { useAuthStore } from './shared/stores/store';
+import { useAuthStore } from './store';
 import { act } from '@testing-library/react';
-import { User } from './shared/types/index';
+import { User } from '@/shared/types/index';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 const mockUser: User = {

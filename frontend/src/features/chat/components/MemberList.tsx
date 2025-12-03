@@ -6,7 +6,6 @@ import { useUIStore, useModalStore, useAuthStore } from '@/shared/stores/store';
 import { usePresenceStore } from '@/shared/stores/presenceStore';
 import { ServerMember } from '@/shared/types';
 import { Icon } from '@iconify/react';
-import clsx from 'clsx';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 
 const MemberList: React.FC = () => {
@@ -100,6 +99,7 @@ const MemberGroup = ({
                 const isOnline = onlineStatus[u._id] === 'online';
 
                 return (
+                    // eslint-disable-next-line react/jsx-key
                     <ContextMenu.Root>
                         <ContextMenu.Trigger>
                             <div 

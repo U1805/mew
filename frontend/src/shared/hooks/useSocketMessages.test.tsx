@@ -1,7 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { useSocketMessages } from './useSocketMessages';
-import { getSocket } from '@/shared/services/socket';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import { Message } from '@/shared/types';

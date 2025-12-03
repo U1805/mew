@@ -1,8 +1,15 @@
 
 import { create } from 'zustand';
+
+export interface AuthState {
+  token: string | null;
+  user: User | null;
+  setAuth: (token: string, user: User | null, remember?: boolean) => void;
+  logout: () => void;
+}
 import { disconnectSocket } from '@/shared/services/socket';
 import { usePresenceStore } from './presenceStore';
-import { AuthState, User } from '@/shared/types';
+import { User } from '@/shared/types';
 
 interface UIState {
   currentServerId: string | null;

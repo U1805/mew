@@ -30,7 +30,7 @@ export const KickUserModal: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
             <div className="bg-[#313338] w-full max-w-[440px] rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
                 <div className="p-4 pt-5">
-                    <h2 className="text-xl font-bold text-white mb-4">Kick '{user.username}'</h2>
+                    <h2 className="text-xl font-bold text-white mb-4">Kick &apos;{user.username}&apos;</h2>
                     <p className="text-mew-textMuted text-sm leading-5">
                         Are you sure you want to kick <span className="font-semibold text-white">@{user.username}</span> from the server? They will be able to rejoin again with a new invite.
                     </p>

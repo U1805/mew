@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '@/shared/services/socket';
 import { Category } from '@/shared/types';
-import { useUIStore } from '@/shared/stores/store';
 
 export const useServerEvents = (serverId: string | null) => {
   const queryClient = useQueryClient();

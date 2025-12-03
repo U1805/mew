@@ -8,9 +8,9 @@ import { useAuthStore, useUIStore, useModalStore } from '@/shared/stores/store';
 import { messageApi } from '@/shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { EmojiPicker } from './EmojiPicker';
-import ReactionList from '@/components/chat/ReactionList';
-import MessageContent from '@/components/chat/MessageContent';
-import MessageEditor from '@/components/chat/MessageEditor';
+import ReactionList from './ReactionList';
+import MessageContent from './MessageContent';
+import MessageEditor from './MessageEditor';
 
 interface MessageItemProps {
   message: Message;
@@ -49,7 +49,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
                   return old.map(m => {
                       if (m._id !== message._id) return m;
 
-                      let newReactions = m.reactions ? [...m.reactions] : [];
+                      const newReactions = m.reactions ? [...m.reactions] : [];
                       const targetIndex = newReactions.findIndex(r => r.emoji === emoji);
 
                       if (targetIndex > -1) {

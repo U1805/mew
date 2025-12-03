@@ -32,7 +32,7 @@ export interface Invite {
       name: string;
       avatarUrl?: string;
       memberCount?: number;
-  }; 
+  };
   creatorId: string;
   uses: number;
   maxUses: number;
@@ -106,15 +106,4 @@ export interface Webhook {
   serverId: string;
   token: string;
   botUserId: string;
-}
-
-export interface LoginResponse {
-  token: string;
-}
-
-export interface AuthState {
-  token: string | null;
-  user: User | null;
-  setAuth: (token: string, user: User | null, remember?: boolean) => void;
-  logout: () => void;
 }

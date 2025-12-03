@@ -11,7 +11,7 @@ export const FindUserModal: React.FC = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
@@ -28,11 +28,12 @@ export const FindUserModal: React.FC = () => {
     enabled: !!debouncedQuery
   });
 
-  const handleCreateDM = async (recipientId: string) => {
-    if (!recipientId) return;
-    setIsLoading(true);
+  const handleCreateDM = async (user: User) => {
+    if (loadingUserId) return;
+    setLoadingUserId(user._id);
+
     try {
-        const res = await channelApi.createDM(recipientId);
+        const res = await channelApi.createDM(user._id);
         const channel = res.data;
         useUIStore.getState().setCurrentServer(null);
         useUIStore.getState().setCurrentChannel(channel._id);
@@ -41,7 +42,7 @@ export const FindUserModal: React.FC = () => {
     } catch (error) {
         console.error("Failed to create DM", error);
     } finally {
-        setIsLoading(false);
+        setLoadingUserId(null);
     }
   };
 
@@ -75,7 +76,11 @@ export const FindUserModal: React.FC = () => {
                     </div>
                 ) : (
                     searchResults?.map(user => (
-                        <div key={user._id} className="flex items-center justify-between p-2 rounded hover:bg-[#35373C] group cursor-pointer" onClick={() => handleCreateDM(user._id)}>
+                        <div
+                            key={user._id}
+                            className={`flex items-center justify-between p-2 rounded hover:bg-[#35373C] group cursor-pointer ${loadingUserId === user._id ? 'opacity-50' : ''}`}
+                            onClick={() => handleCreateDM(user)}
+                        >
                             <div className="flex items-center">
                                 <div className="w-8 h-8 rounded-full bg-mew-accent flex items-center justify-center text-white font-bold mr-3 overflow-hidden">
                                     {user.avatarUrl ? (

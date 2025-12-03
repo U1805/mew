@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useModalStore, useUIStore } from '@/shared/stores/store';
 import { inviteApi } from '@/shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
-import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Invite } from '@/shared/types';
 
@@ -21,7 +20,7 @@ export const JoinServerModal: React.FC = () => {
       try {
           const res = await inviteApi.get(code);
           setInvitePreview(res.data);
-      } catch (e) {
+      } catch {
           setJoinError("Invalid or expired invite code.");
           setInvitePreview(null);
       } finally {
@@ -37,7 +36,7 @@ export const JoinServerModal: React.FC = () => {
           await queryClient.invalidateQueries({ queryKey: ['servers'] });
           useUIStore.getState().setCurrentServer(invitePreview.serverId);
           closeModal();
-      } catch (e) {
+      } catch {
           setJoinError("Failed to join server.");
       } finally {
           setIsLoading(false);
