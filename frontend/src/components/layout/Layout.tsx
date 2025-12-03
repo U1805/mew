@@ -3,7 +3,7 @@ import React from 'react';
 import ServerList from '../servers/ServerList';
 import ChannelList from '../channels/ChannelList';
 import ChatArea from '../chat/ChatArea';
-import Modal from '../modals/Modals';
+import ModalManager from '../modals/ModalManager';
 import UserSettings from '../user/UserSettings';
 import { usePresenceEvents } from '../../hooks/usePresenceEvents';
 
@@ -15,7 +15,7 @@ const Layout: React.FC = () => {
       <ServerList />
       <ChannelList />
       <ChatArea />
-      <Modal />
+      <ModalManager />
       <UserSettings />
     </div>
   );
