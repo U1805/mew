@@ -1,5 +1,7 @@
 
 import { create } from 'zustand';
+import { disconnectSocket } from './services/socket';
+import { usePresenceStore } from './presenceStore';
 import { AuthState, User } from './types';
 
 interface UIState {
@@ -51,6 +53,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     sessionStorage.removeItem('mew_token');
     sessionStorage.removeItem('mew_user');
     set({ token: null, user: null });
+    disconnectSocket();
+    usePresenceStore.getState().clearOnlineStatus();
   },
 }));
 

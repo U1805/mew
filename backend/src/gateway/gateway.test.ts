@@ -177,4 +177,66 @@ describe('WebSocket Gateway', () => {
     expect(sockets.length).toBe(1);
     expect(sockets[0].user.id).toBe(userId2);
   });
+
+  it('should handle and broadcast presence updates correctly', async () => {
+    // Promise to resolve when client2 gets the initial state with just itself
+    const client1InitialStatePromise = new Promise<void>((resolve, reject) => {
+      client1 = createTestClient(port, token1);
+      client1.on('PRESENCE_INITIAL_STATE', (onlineUserIds) => {
+        try {
+          expect(onlineUserIds).toEqual([userId1]);
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    await client1InitialStatePromise;
+
+    const client2OnlinePromise = new Promise<void>((resolve, reject) => {
+      // Client1 listens for client2's online presence update
+      client1.on('PRESENCE_UPDATE', (data) => {
+        try {
+          expect(data).toEqual({ userId: userId2, status: 'online' });
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    // Promise to resolve when client2 gets the initial state with both users
+    const client2InitialStatePromise = new Promise<void>((resolve, reject) => {
+      client2 = createTestClient(port, token2);
+      client2.on('PRESENCE_INITIAL_STATE', (onlineUserIds) => {
+        try {
+          // Order isn't guaranteed, so sort for comparison
+          expect(onlineUserIds.sort()).toEqual([userId1, userId2].sort());
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    // Wait for client2 to connect and both clients to get their updates
+    await Promise.all([client2OnlinePromise, client2InitialStatePromise]);
+
+    // Promise for when client2 receives the offline notification for client1
+    const client1OfflinePromise = new Promise<void>((resolve, reject) => {
+      client2.on('PRESENCE_UPDATE', (data) => {
+        try {
+          expect(data).toEqual({ userId: userId1, status: 'offline' });
+          resolve();
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    // Disconnect client1 and wait for the offline message to be received by client2
+    client1.disconnect();
+    await client1OfflinePromise;
+  });
 });

@@ -163,6 +163,7 @@ interface IReaction {
 - `GET /@me`: 获取当前用户信息。
 - `GET /@me/servers`: 获取当前用户**作为成员**的所有服务器列表。
 - `POST /@me/channels`: 创建或获取私聊(DM)频道 (Body: `{ recipientId: string }`)
+- `GET /@me/channels`: 获取当前用户的私聊(DM)频道列表。
 - `GET /search`: 模糊搜索用户 (Query: `q`) -> 返回 `[{ _id, username, avatarUrl }]`
 
 ### 3. 服务器 (Servers)
@@ -269,3 +270,6 @@ const socket = io("http://localhost:3000", {
 - **频道**: `CHANNEL_UPDATE`, `CHANNEL_DELETE`
 - **服务器**: `SERVER_UPDATE`, `SERVER_DELETE`
 - **分组**: `CATEGORY_UPDATE`, `CATEGORY_DELETE`
+- **在线状态**:
+    - `PRESENCE_INITIAL_STATE`: 客户端首次连接时，服务端单独发送给该客户端的事件，包含当前所有在线用户的ID数组。 (Payload: `string[]`)
+    - `PRESENCE_UPDATE`: 当任何用户上线或下线时，向所有相关客户端广播的事件。 (Payload: `{ userId: string, status: 'online' | 'offline' }`)

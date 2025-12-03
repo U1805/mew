@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useModalStore, useUIStore, useAuthStore } from '../../store';
+import { usePresenceStore } from '../../presenceStore';
 import { serverApi, channelApi, categoryApi, messageApi, userApi, inviteApi } from '../../services/api';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
@@ -12,6 +13,7 @@ import { WebhookManager } from './WebhookManager';
 const Modal: React.FC = () => {
   const { activeModal, closeModal, modalData, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
+  const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const queryClient = useQueryClient();
   
   const [name, setName] = useState('');
@@ -632,6 +634,8 @@ const Modal: React.FC = () => {
   // User Profile Modal
   if (activeModal === 'userProfile' && modalData?.user) {
       const user = modalData.user as User;
+      const isOnline = onlineStatus[user._id] === 'online';
+      
       return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
              <div className="bg-[#232428] w-[600px] rounded-lg shadow-2xl overflow-hidden animate-scale-in relative">
@@ -645,7 +649,10 @@ const Modal: React.FC = () => {
                                  <span className="text-2xl font-bold text-white">{user.username.substring(0, 2).toUpperCase()}</span>
                              )}
                          </div>
-                         <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#232428]"></div>
+                         <div className={clsx(
+                             "absolute bottom-1 right-1 w-6 h-6 rounded-full border-[4px] border-[#232428]",
+                             isOnline ? "bg-green-500" : "bg-gray-500"
+                         )}></div>
                      </div>
                      
                      <div className="flex justify-end pt-3 mb-2">

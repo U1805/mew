@@ -3,6 +3,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { serverApi } from '../../services/api';
 import { useUIStore, useModalStore, useAuthStore } from '../../store';
+import { usePresenceStore } from '../../presenceStore';
 import { ServerMember } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
@@ -11,6 +12,7 @@ import * as ContextMenu from '@radix-ui/react-context-menu';
 const MemberList: React.FC = () => {
   const { currentServerId } = useUIStore();
   const { user } = useAuthStore();
+  const onlineStatus = usePresenceStore(state => state.onlineStatus);
 
   const { data: members, isLoading } = useQuery({
     queryKey: ['members', currentServerId],
@@ -53,6 +55,7 @@ const MemberList: React.FC = () => {
                 currentUser={user}
                 isOwner={isOwner}
                 serverId={currentServerId}
+                onlineStatus={onlineStatus}
             />
             <MemberGroup 
                 title={`Members — ${others.length}`} 
@@ -60,6 +63,7 @@ const MemberList: React.FC = () => {
                 currentUser={user}
                 isOwner={isOwner}
                 serverId={currentServerId}
+                onlineStatus={onlineStatus}
             />
           </>
       )}
@@ -72,13 +76,15 @@ const MemberGroup = ({
     members, 
     currentUser,
     isOwner,
-    serverId
+    serverId,
+    onlineStatus
 }: { 
     title: string, 
     members: ServerMember[], 
     currentUser: any,
     isOwner: boolean,
-    serverId: string
+    serverId: string,
+    onlineStatus: Record<string, 'online' | 'offline'>
 }) => {
     const { openModal } = useModalStore();
 
@@ -91,6 +97,7 @@ const MemberGroup = ({
                 if (!u) return null; 
                 
                 const canKick = isOwner && u._id !== currentUser._id;
+                const isOnline = onlineStatus[u._id] === 'online';
 
                 return (
                     <ContextMenu.Root key={member._id}>
@@ -107,7 +114,9 @@ const MemberGroup = ({
                                             <span className="text-white text-xs font-bold">{u.username.substring(0, 2).toUpperCase()}</span>
                                         )}
                                     </div>
-                                    <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-[3px] border-[#2B2D31] rounded-full bg-green-500"></div>
+                                    {isOnline && (
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-[3px] border-[#2B2D31] rounded-full bg-green-500"></div>
+                                    )}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="font-medium text-sm truncate text-white">

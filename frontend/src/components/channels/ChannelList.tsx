@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { channelApi, serverApi, categoryApi } from '../../services/api';
 import { useUIStore, useAuthStore, useModalStore } from '../../store';
+import { usePresenceStore } from '../../presenceStore';
 import { Channel, ChannelType, Server, Category, ServerMember } from '../../types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
@@ -13,6 +14,7 @@ const ChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel, openSettings } = useUIStore();
   const { openModal } = useModalStore();
   const { user } = useAuthStore();
+  const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -120,7 +122,8 @@ const ChannelList: React.FC = () => {
             {dmChannels?.map(dm => {
                  const otherUser = dm.recipients?.find(r => typeof r === 'object' && r._id !== user?._id) as any;
                  const name = otherUser?.username || dm.name || 'Unknown User';
-                 
+                 const isOnline = otherUser?._id && onlineStatus[otherUser._id] === 'online';
+
                  return (
                     <div 
                         key={dm._id}
@@ -136,8 +139,10 @@ const ChannelList: React.FC = () => {
                             ) : (
                                 <Icon icon="mdi:account" className="text-white" />
                             )}
-                            {/* Fake online status for demo */}
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-[2.5px] border-[#2B2D31]"></div>
+                            <div className={clsx(
+                                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-[2.5px] border-[#2B2D31]",
+                                isOnline ? "bg-green-500" : "bg-gray-500"
+                            )}></div>
                         </div>
                         <span className="font-medium truncate flex-1">{name}</span>
                         <div className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white" title="Remove DM">

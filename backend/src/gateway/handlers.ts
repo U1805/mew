@@ -3,6 +3,7 @@ import Channel from '../api/channel/channel.model';
 import ServerMember from '../api/member/member.model';
 
 import { createMessage } from '../api/message/message.service';
+import { addUserOnline, getOnlineUserIds, removeUserOnline } from './presence.service';
 
 const joinUserRooms = async (socket: Socket) => {
   if (!socket.user) return;
@@ -57,12 +58,23 @@ const registerMessageHandlers = (io: SocketIOServer, socket: Socket) => {
 
 export const registerConnectionHandlers = (io: SocketIOServer, socket: Socket) => {
   console.log('Authenticated user connected:', socket.id, 'as', socket.user?.username);
+  if (!socket.user) return;
+  const userId = socket.user.id;
 
   joinUserRooms(socket);
 
-    registerMessageHandlers(io, socket);
+  // Presence: Handle user online status
+  addUserOnline(userId);
+  io.emit('PRESENCE_UPDATE', { userId, status: 'online' });
+  socket.emit('PRESENCE_INITIAL_STATE', getOnlineUserIds());
+
+  registerMessageHandlers(io, socket);
 
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    if (socket.user) {
+      removeUserOnline(socket.user.id);
+      io.emit('PRESENCE_UPDATE', { userId: socket.user.id, status: 'offline' });
+    }
   });
 };
