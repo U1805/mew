@@ -1,12 +1,12 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { useMessages } from './useMessages';
-import { messageApi } from '../services/api';
+import { messageApi } from '@/shared/services/api';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
 // Mock the messageApi
-vi.mock('../services/api', () => ({
+vi.mock('@/shared/services/api', () => ({
   messageApi: {
     list: vi.fn(),
   },

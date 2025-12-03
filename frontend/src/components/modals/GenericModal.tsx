@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '../../shared/stores/store';
-import { serverApi, channelApi, categoryApi, messageApi } from '../../shared/services/api';
+import { useModalStore, useUIStore } from '@/shared/stores/store';
+import { serverApi, channelApi, categoryApi, messageApi } from '@/shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { format } from 'date-fns';

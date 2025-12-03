@@ -1,9 +1,9 @@
 
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getSocket } from '../services/socket';
-import { Category } from '../types/index';
-import { useUIStore } from '../stores/store';
+import { getSocket } from '@/shared/services/socket';
+import { Category } from '@/shared/types';
+import { useUIStore } from '@/shared/stores/store';
 
 export const useServerEvents = (serverId: string | null) => {
   const queryClient = useQueryClient();

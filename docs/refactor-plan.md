@@ -103,7 +103,7 @@ src/
     *   `ChannelList`, `ServerChannelList`, `DMChannelList`, `ChannelItem` -> `components/`。
     *   `ChannelSettingsModal`, `EditCategoryModal`, `WebhookManager` -> `modals/`。
 *   **类型整理**: `ChannelItemProps` 应该在 `ChannelItem.tsx` 内部。检查并移动。
-*   **修正**：`ServerChannelList` 会引用 `UserStatusFooter`，现在这是一个跨模块引用 (`../features/users/components/...`)，手动修复它。
+*   **修正**：`ServerChannelList` 会引用 `UserStatusFooter`，这是一个跨模块引用。使用路径别名修复此导入，例如：`import { UserStatusFooter } from '@/features/users/components/UserStatusFooter'`。
 
 **代码检验**：运行 `pnpm build` 检验通过。
 
@@ -120,12 +120,22 @@ src/
 
 ---
 
+### 阶段 2.6：路径别名配置 (Path Alias Setup)
+**状态**：:heavy_check_mark: 已完成
+**目标**：为解决重构过程中出现的 `../..` 相对路径问题，配置 Vite 和 TypeScript 的路径别名。
+**结果**：已在 `vite.config.ts` 中添加了路径别名配置，使其与 `tsconfig.json` 保持一致。现在 `@/*` 可以正确解析为 `src/*`。这为后续清理相对路径和提高代码可读性奠定了基础。
+*   **操作**：
+    *   在 `vite.config.ts` 中添加 `resolve.alias` 配置，将 `@` 别名指向 `src` 目录。
+    *   确认 `tsconfig.json` 中已存在相应的 `paths` 配置。
+
+---
+
 ### 阶段三：模态框管理器重构 (Modal Manager Refactor)
 **目标**：解决`ModalManager`的架构定位问题，避免**共享代码依赖业务代码**这种架构上的**原罪**。
 
 *   **3.1** 创建 `src/layout/modals` 目录。
 *   **3.2** 移动 `ModalManager.tsx` 和 `GenericModal.tsx` 到 `src/layout/modals/`。`ModalManager` 是应用布局的一部分，它负责协调（manage）各个功能的弹窗，而不是一个可被复用的“共享”（shared）组件。
-*   **3.3** **大规模路径更新**：`ModalManager` 现在需要从各个 `features/*/modals` 目录导入具体的 Modal 组件。例如 `import { UserProfileModal } from '../../features/users/modals/UserProfileModal'`。
+*   **3.3** **大规模路径更新**：`ModalManager` 现在需要从各个 `features/*/modals` 目录导入具体的 Modal 组件。现在可以使用路径别名，例如 `import { UserProfileModal } from '@/features/users/modals/UserProfileModal'`。
 
 **代码检验 (Checkpoint 3)**：
 *   打开所有类型的模态框（创建服务器、用户资料、频道设置等），确保 `ModalManager` 能在新的位置正确加载它们。
@@ -136,7 +146,8 @@ src/
 
 *   **4.1** 删除所有空的旧目录，尤其是 `src/components`。
 *   **4.2** **最终类型审查**: 最后一次检查 `src/shared/types/index.ts`，把所有不该是全局的类型（比如组件的 Props）全部移到它们应该在的地方（Co-location）。
-*   **4.3** 全局搜索 `..`，确保没有因为手误写错的相对路径。
+*   **4.3** **全局路径清理**：全局搜索 `../` 并用 `@/` 路径别名进行替换，以提高代码库的可维护性。
+*   **4.4** **最终路径审查**: 完成替换后，再次检查项目中是否还存在不必要的长相对路径。
 
 **最终代码检验**：
 *   运行 `npm run lint`：修复所有路径和未使用的导入错误。

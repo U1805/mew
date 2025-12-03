@@ -1,7 +1,7 @@
 
 import { useEffect } from 'react';
-import { getSocket } from '../services/socket';
-import { usePresenceStore } from '../stores/presenceStore';
+import { getSocket } from '@/shared/services/socket';
+import { usePresenceStore } from '@/shared/stores/presenceStore';
 
 export const usePresenceEvents = () => {
   const { setInitialState, updateUserStatus } = usePresenceStore();

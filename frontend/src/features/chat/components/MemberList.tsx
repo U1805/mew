@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { serverApi } from '../../../shared/services/api';
-import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores/store';
-import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { ServerMember } from '../../../shared/types/index';
+import { serverApi } from '@/shared/services/api';
+import { useUIStore, useModalStore, useAuthStore } from '@/shared/stores/store';
+import { usePresenceStore } from '@/shared/stores/presenceStore';
+import { ServerMember } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import * as ContextMenu from '@radix-ui/react-context-menu';

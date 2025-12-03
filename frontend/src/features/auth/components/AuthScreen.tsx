@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { authApi } from '../../../shared/services/api';
-import { useAuthStore } from '../../../shared/stores/store';
+import { authApi } from '@/shared/services/api';
+import { useAuthStore } from '@/shared/stores/store';
 import clsx from 'clsx';
 import { Icon } from '@iconify/react';
 

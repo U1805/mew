@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
-import { Message, Channel } from '../../../shared/types/index';
+import { Message, Channel } from '@/shared/types';
 import MessageItem from './MessageItem';
 import { Icon } from '@iconify/react';
 

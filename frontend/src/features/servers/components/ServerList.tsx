@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { serverApi } from '../../../shared/services/api';
-import { useUIStore, useModalStore } from '../../../shared/stores/store';
-import { Server } from '../../../shared/types/index';
+import { serverApi } from '@/shared/services/api';
+import { useUIStore, useModalStore } from '@/shared/stores/store';
+import { Server } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { Channel } from '../../../shared/types';
+import { Channel } from '@/shared/types';
 
 interface ChatHeaderProps {
   channel: Channel | null;

@@ -1,12 +1,12 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { channelApi } from '../../../shared/services/api';
-import { useUIStore, useAuthStore, useModalStore } from '../../../shared/stores/store';
-import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { Channel, ChannelType } from '../../../shared/types/index';
+import { channelApi } from '@/shared/services/api';
+import { useUIStore, useAuthStore, useModalStore } from '@/shared/stores/store';
+import { usePresenceStore } from '@/shared/stores/presenceStore';
+import { Channel, ChannelType } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { UserStatusFooter } from '../../../features/users/components/UserStatusFooter';
+import { UserStatusFooter } from '@/features/users/components/UserStatusFooter';
 
 export const DMChannelList: React.FC = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();
