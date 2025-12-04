@@ -171,7 +171,7 @@ export const ServerChannelList: React.FC = () => {
                 channel={channel}
                 isActive={currentChannelId === channel._id}
                 onClick={() => setCurrentChannel(channel._id)}
-                onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
+                onSettingsClick={isOwner ? (e) => { e.stopPropagation(); openModal('channelSettings', { channel }); } : undefined}
             />
         ))}
 
@@ -225,7 +225,7 @@ export const ServerChannelList: React.FC = () => {
                         channel={channel}
                         isActive={currentChannelId === channel._id}
                         onClick={() => setCurrentChannel(channel._id)}
-                        onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
+                        onSettingsClick={isOwner ? (e) => { e.stopPropagation(); openModal('channelSettings', { channel }); } : undefined}
                     />
                 ))}
             </div>

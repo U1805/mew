@@ -31,14 +31,11 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
     const newMessage: Message = {
       _id: tempId,
       channelId: channelId,
-      authorId: {
-        _id: user._id,
-        username: user.username,
-        avatarUrl: user.avatarUrl,
-      },
+      authorId: user,
       content: inputValue,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      type: 'DEFAULT',
     };
 
     // Update the cache optimistically

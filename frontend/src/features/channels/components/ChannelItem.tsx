@@ -7,7 +7,7 @@ interface ChannelItemProps {
     channel: Channel;
     isActive: boolean;
     onClick: () => void;
-    onSettingsClick: (e: React.MouseEvent) => void;
+    onSettingsClick?: (e: React.MouseEvent) => void;
 }
 
 export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick }) => (
@@ -24,12 +24,14 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
         </div>
 
         {/* Settings Icon - Shows on hover or if active */}
-        <div
-            className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white ml-2 flex-shrink-0 transition-opacity"
-            title="Edit Channel"
-            onClick={onSettingsClick}
-        >
-            <Icon icon="mdi:cog" width="16" height="16" />
-        </div>
+        {onSettingsClick && (
+            <div
+                className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white ml-2 flex-shrink-0 transition-opacity"
+                title="Edit Channel"
+                onClick={onSettingsClick}
+            >
+                <Icon icon="mdi:cog" width="16" height="16" />
+            </div>
+        )}
     </div>
 );
