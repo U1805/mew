@@ -1,18 +1,21 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { channelApi } from '@/shared/services/api';
-import { useUIStore, useAuthStore, useModalStore } from '@/shared/stores/store';
-import { usePresenceStore } from '@/shared/stores/presenceStore';
-import { Channel, ChannelType } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { UserStatusFooter } from '@/features/users/components/UserStatusFooter';
+import { UserStatusFooter } from '../../users/components/UserStatusFooter';
+import { channelApi } from '../../../shared/services/api';
+import { Channel, ChannelType } from '../../../shared/types';
+import { usePresenceStore } from '../../../shared/stores/presenceStore';
+import { useUIStore, useAuthStore, useModalStore } from '../../../shared/stores/store';
+import { useDmEvents } from '../../../shared/hooks/useDmEvents';
 
 export const DMChannelList: React.FC = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();
   const { openModal } = useModalStore();
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
+
+  useDmEvents();
 
   const { data: dmChannels } = useQuery({
       queryKey: ['dmChannels'],

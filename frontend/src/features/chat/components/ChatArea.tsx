@@ -1,15 +1,15 @@
-
 import React from 'react';
-import { useUIStore } from '@/shared/stores/store';
+import { useQuery } from '@tanstack/react-query';
+import { Icon } from '@iconify/react';
 import MemberList from './MemberList';
 import ChatHeader from './ChatHeader';
-import MessageList from '@/features/chat/messages/MessageList';
-import MessageInput from '@/features/chat/messages/MessageInput';
-import { useMessages } from '@/shared/hooks/useMessages';
-import { useSocketMessages } from '@/shared/hooks/useSocketMessages';
-import { useQuery } from '@tanstack/react-query';
-import { Channel } from '@/shared/types';
-import { Icon } from '@iconify/react';
+import MessageList from '../messages/MessageList';
+import MessageInput from '../messages/MessageInput';
+import { Channel } from '../../../shared/types';
+import { useUIStore } from '../../../shared/stores/store';
+import { useSocketMessages } from '../../../shared/hooks/useSocketMessages';
+import { useMessages } from '../../../shared/hooks/useMessages';
+import { channelApi } from '../../../shared/services/api';
 
 const ChatArea: React.FC = () => {
   const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList } = useUIStore();
@@ -17,9 +17,17 @@ const ChatArea: React.FC = () => {
   const { data: channel } = useQuery({
     queryKey: ['channel', currentChannelId],
     queryFn: async () => {
-      if (!currentChannelId || !currentServerId) return null;
-      // This is a placeholder, in a real app you'd fetch this from an API
-      return { _id: currentChannelId, name: 'general', type: 'GUILD_TEXT' } as Channel;
+      if (!currentChannelId) return null;
+      
+      // Since we don't have a single getChannel endpoint in the API spec, 
+      // we search within the relevant list based on context.
+      if (currentServerId) {
+          const res = await channelApi.list(currentServerId);
+          return (res.data as Channel[]).find(c => c._id === currentChannelId) || null;
+      } else {
+          const res = await channelApi.listDMs();
+          return (res.data as Channel[]).find(c => c._id === currentChannelId) || null;
+      }
     },
     enabled: !!currentChannelId
   });
@@ -27,7 +35,7 @@ const ChatArea: React.FC = () => {
   const { data: messages = [], isLoading } = useMessages(currentServerId, currentChannelId);
   useSocketMessages(currentChannelId);
 
-  if (!currentChannelId || !currentServerId) {
+  if (!currentChannelId) {
     return (
       <div className="flex-1 bg-mew-dark flex items-center justify-center flex-col text-mew-textMuted">
         <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
@@ -46,7 +54,8 @@ const ChatArea: React.FC = () => {
           <MessageList messages={messages} isLoading={isLoading} channel={channel || null} channelId={currentChannelId} />
           <MessageInput channel={channel || null} serverId={currentServerId} channelId={currentChannelId} />
         </div>
-        {isMemberListOpen && <MemberList />}
+        {/* Only show member list for server channels */}
+        {isMemberListOpen && currentServerId && <MemberList />}
       </div>
     </div>
   );

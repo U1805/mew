@@ -268,6 +268,9 @@ const socket = io("http://localhost:3000", {
 - **消息**: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`
 - **反应**: `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`
 - **频道**: `CHANNEL_UPDATE`, `CHANNEL_DELETE`
+- **私聊频道**: `DM_CHANNEL_CREATE`
+    - 当一个用户向另一个用户发起新的私聊时，向接收方用户广播此事件，以便客户端可以动态添加新的私聊会话。
+    - Payload: 完整的、已填充好 `recipients` 信息的频道对象。
 - **服务器**: `SERVER_UPDATE`, `SERVER_DELETE`
 - **分组**: `CATEGORY_UPDATE`, `CATEGORY_DELETE`
 - **在线状态**:

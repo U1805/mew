@@ -1,16 +1,15 @@
-
 import React, { useState } from 'react';
-import { Message } from '@/shared/types';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { useAuthStore, useUIStore, useModalStore } from '@/shared/stores/store';
-import { messageApi } from '@/shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { EmojiPicker } from './EmojiPicker';
 import ReactionList from './ReactionList';
 import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
+import { Message } from '../../../shared/types';
+import { messageApi } from '../../../shared/services/api';
+import { useAuthStore, useUIStore, useModalStore } from '../../../shared/stores/store';
 
 interface MessageItemProps {
   message: Message;

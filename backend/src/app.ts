@@ -4,9 +4,9 @@ import cors from 'cors';
 import authRoutes from './api/auth/auth.routes';
 import userRoutes from './api/user/user.routes';
 import serverRoutes from './api/server/server.routes';
-import channelRoutes from './api/channel/channel.routes';
 import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes';
 import invitePublicRoutes from './api/invite/public.routes';
+import dmChannelRoutes from './api/channel/dm.routes';
 
 
 const app = express();
@@ -19,7 +19,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/servers', serverRoutes);
-app.use('/api/channels', channelRoutes);
+app.use('/api/channels', dmChannelRoutes);
 app.use('/api/servers/:serverId/categories', categoryRootRoutes);
 app.use('/api/categories', categoryDetailRoutes);
 app.use('/api/invites', invitePublicRoutes);

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '@/shared/stores/store';
-import { userApi, channelApi } from '@/shared/services/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
-import { User } from '@/shared/types';
+import { User } from '../../../shared/types';
+import { userApi, channelApi } from '../../../shared/services/api';
+import { useModalStore, useUIStore } from '../../../shared/stores/store';
 
 export const FindUserModal: React.FC = () => {
   const { closeModal } = useModalStore();

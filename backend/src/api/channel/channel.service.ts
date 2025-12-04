@@ -118,13 +118,17 @@ export const createDmChannel = async (userId: string, recipientId: string): Prom
   }
 
   // If not, create a new one.
-  const newDmChannel = await Channel.create({
+  let newDmChannel = await Channel.create({
     type: 'DM',
     recipients: [
       new mongoose.Types.ObjectId(userId),
       new mongoose.Types.ObjectId(recipientId),
     ],
   });
+
+  newDmChannel = await newDmChannel.populate('recipients', 'username avatarUrl');
+
+  socketManager.broadcastToUser(recipientId, 'DM_CHANNEL_CREATE', newDmChannel);
 
   return newDmChannel;
 };

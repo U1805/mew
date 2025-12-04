@@ -1,16 +1,16 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
-import { useSocketMessages } from './useSocketMessages';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
-import { Message } from '@/shared/types';
+import { useSocketMessages } from './useSocketMessages';
+import { Message } from '../types';
 
 // Mock socket.io-client
 const mockSocket = {
   on: vi.fn(),
   off: vi.fn(),
 };
-vi.mock('@/shared/services/socket', () => ({
+vi.mock('../../shared/services/socket', () => ({
   getSocket: () => mockSocket,
 }));
 

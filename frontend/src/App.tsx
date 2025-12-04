@@ -1,10 +1,9 @@
-
 import React, { useEffect } from 'react';
-import { getSocket } from '@/shared/services/socket';
-import { useAuthStore, useModalStore, useUIStore } from '@/shared/stores/store';
-import Layout from '@/layout/Layout';
-import { AuthScreen } from '@/features/auth/components/AuthScreen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthScreen } from './features/auth/components/AuthScreen';
+import Layout from './layout/Layout';
+import { getSocket } from './shared/services/socket';
+import { useAuthStore, useModalStore, useUIStore } from './shared/stores/store';
 
 // Create a client
 const queryClient = new QueryClient();

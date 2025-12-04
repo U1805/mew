@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import request from 'supertest';
+
+// Mock the socketManager to prevent errors in tests that indirectly trigger socket events
+vi.mock('../../gateway/events', () => ({
+  socketManager: {
+    broadcastToUser: vi.fn(),
+    broadcast: vi.fn(),
+  },
+}));
 import app from '../../app';
 
 describe('User Routes', () => {
@@ -58,7 +66,7 @@ describe('User Routes', () => {
 
       expect(res.statusCode).toBe(201);
       expect(res.body.type).toBe('DM');
-      expect(res.body.recipients).toContain(recipientId);
+      expect(res.body.recipients.map((r: any) => r._id)).toContain(recipientId);
     });
 
     it('should return the existing DM channel if one already exists', async () => {

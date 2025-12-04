@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '@/shared/stores/store';
-import { inviteApi } from '@/shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { Invite } from '@/shared/types';
+import { Invite } from '../../../shared/types';
+import { inviteApi } from '../../../shared/services/api';
+import { useModalStore, useUIStore } from '../../../shared/stores/store';
 
 export const JoinServerModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();

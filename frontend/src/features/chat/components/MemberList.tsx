@@ -1,12 +1,11 @@
-
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { serverApi } from '@/shared/services/api';
-import { useUIStore, useModalStore, useAuthStore } from '@/shared/stores/store';
-import { usePresenceStore } from '@/shared/stores/presenceStore';
-import { ServerMember } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { serverApi } from '../../../shared/services/api';
+import { ServerMember } from '../../../shared/types';
+import { usePresenceStore } from '../../../shared/stores/presenceStore';
+import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores/store';
 
 const MemberList: React.FC = () => {
   const { currentServerId } = useUIStore();

@@ -1,7 +1,7 @@
 import React from 'react';
-import { useUIStore, useAuthStore } from '@/shared/stores/store';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { useUIStore, useAuthStore } from '../../../shared/stores/store';
 
 const UserSettings: React.FC = () => {
   const { isSettingsOpen, closeSettings } = useUIStore();

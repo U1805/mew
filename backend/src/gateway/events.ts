@@ -26,6 +26,13 @@ export class SocketManager {
       this.io.to(roomId).emit(event, payload);
     }
   }
+
+  broadcastToUser(userId: string, event: string, payload: any) {
+    if (this.io) {
+      // The user is in a room with their own ID
+      this.io.to(userId).emit(event, payload);
+    }
+  }
 }
 
 export const socketManager = new SocketManager();

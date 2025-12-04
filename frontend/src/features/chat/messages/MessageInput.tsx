@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { messageApi } from '@/shared/services/api';
 import { Icon } from '@iconify/react';
-import { Channel } from '@/shared/types';
+import { messageApi } from '../../../shared/services/api';
+import { Channel, Message } from '../../../shared/types';
+import { useAuthStore } from '../../../shared/stores/store';
 
 interface MessageInputProps {
   channel: Channel | null;
@@ -16,14 +17,49 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !serverId || !channelId) return;
+    if (!inputValue.trim() || !channelId) return;
+
+    // For DM channels, serverId will be null so we pass it as undefined.
+    const currentServerId = serverId ? serverId : undefined;
+
+    // Optimistic update
+    const tempId = new Date().toISOString(); // Temporary unique ID
+    const user = useAuthStore.getState().user;
+
+    if (!user) return; // Should not happen if they can send messages
+
+    const newMessage: Message = {
+      _id: tempId,
+      channelId: channelId,
+      authorId: {
+        _id: user._id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+      },
+      content: inputValue,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Update the cache optimistically
+    queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
+      return oldData ? [...oldData, newMessage] : [newMessage];
+    });
+
+    setInputValue('');
 
     try {
-      await messageApi.send(serverId, channelId, { content: inputValue });
-      setInputValue('');
+      await messageApi.send(currentServerId, channelId, { content: inputValue });
+      // On success, invalidate to refetch and get the real message from the server
       await queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
     } catch (err) {
-      console.error("Failed to send", err);
+      // On error, revert the optimistic update
+      queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
+        return oldData ? oldData.filter(m => m._id !== tempId) : [];
+      });
+      console.error("Failed to send message:", err);
+      // Optionally, restore the input value to allow the user to retry
+      setInputValue(inputValue);
     }
   };
 

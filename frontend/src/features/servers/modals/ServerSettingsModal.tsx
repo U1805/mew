@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore } from '@/shared/stores/store';
 import { Icon } from '@iconify/react';
+import { useModalStore } from '../../../shared/stores/store';
 
 export const ServerSettingsModal: React.FC = () => {
   const { closeModal, modalData, openModal } = useModalStore();

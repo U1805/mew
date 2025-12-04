@@ -1,8 +1,8 @@
-
 import React, { useRef, useEffect } from 'react';
-import { Message, Channel } from '@/shared/types';
-import MessageItem from './MessageItem';
 import { Icon } from '@iconify/react';
+import MessageItem from './MessageItem';
+import { Message, Channel, ChannelType } from '../../../shared/types';
+import { useAuthStore } from '../../../shared/stores/store';
 
 interface MessageListProps {
   messages: Message[];
@@ -13,6 +13,7 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel, channelId }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuthStore();
 
   useEffect(() => {
     if (messages && messages.length > 0) {
@@ -20,17 +21,39 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
     }
   }, [channelId, messages?.length]);
 
+  const isDM = channel?.type === ChannelType.DM;
+  let otherUser: any = null;
+  if (isDM && channel?.recipients) {
+     otherUser = channel.recipients.find((r: any) => r._id !== user?._id);
+  }
+
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
       {!isLoading && messages ? (
         <div className="flex flex-col mt-auto">
           <div className="flex flex-col pb-4">
             <div className="p-4 mt-4 mb-4 border-b border-[#3F4147]">
-              <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
-                <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
-              <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
+              {isDM && otherUser ? (
+                  <>
+                    <div className="w-[80px] h-[80px] rounded-full bg-mew-accent flex items-center justify-center mb-4 overflow-hidden">
+                        {otherUser.avatarUrl ? (
+                             <img src={otherUser.avatarUrl} alt={otherUser.username} className="w-full h-full object-cover" />
+                        ) : (
+                             <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 2).toUpperCase()}</span>
+                        )}
+                    </div>
+                    <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>
+                    <p className="text-mew-textMuted">This is the beginning of your direct message history with <span className="font-semibold text-white">@{otherUser.username}</span>.</p>
+                  </>
+              ) : (
+                  <>
+                    <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
+                        <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
+                    </div>
+                    <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
+                    <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
+                  </>
+              )}
             </div>
             {messages.map((msg, index) => {
               const prevMsg = messages[index - 1];

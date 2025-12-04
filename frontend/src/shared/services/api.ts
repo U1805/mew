@@ -1,10 +1,9 @@
-
 import axios from 'axios';
 
 export interface LoginResponse {
   token: string;
 }
-import { useAuthStore } from '@/shared/stores/store';
+import { useAuthStore } from '../stores/store';
 
 export const API_URL = 'http://localhost:3000/api';
 

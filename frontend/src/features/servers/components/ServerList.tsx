@@ -1,11 +1,11 @@
 
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { serverApi } from '@/shared/services/api';
-import { useUIStore, useModalStore } from '@/shared/stores/store';
-import { Server } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { Server } from '../../../shared/types';
+import { serverApi } from '../../../shared/services/api';
+import { useUIStore, useModalStore } from '../../../shared/stores/store';
 
 const MewLogo = (props: React.SVGProps<SVGSVGElement>) => (
   <svg

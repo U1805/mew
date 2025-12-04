@@ -1,15 +1,14 @@
 import React from 'react';
-import { useModalStore } from '@/shared/stores/store';
-
-import { CreateInviteModal } from '@/features/servers/modals/CreateInviteModal';
-import { JoinServerModal } from '@/features/servers/modals/JoinServerModal';
-import { ServerSettingsModal } from '@/features/servers/modals/ServerSettingsModal';
-import { ChannelSettingsModal } from '@/features/channels/modals/ChannelSettingsModal';
-import { EditCategoryModal } from '@/features/channels/modals/EditCategoryModal';
-import { FindUserModal } from '@/features/users/modals/FindUserModal';
-import { UserProfileModal } from '@/features/users/modals/UserProfileModal';
-import { KickUserModal } from '@/features/servers/modals/KickUserModal';
 import { GenericModal } from './GenericModal';
+import { useModalStore } from '../../shared/stores/store';
+import { CreateInviteModal } from '../../features/servers/modals/CreateInviteModal';
+import { JoinServerModal } from '../../features/servers/modals/JoinServerModal';
+import { ServerSettingsModal } from '../../features/servers/modals/ServerSettingsModal';
+import { ChannelSettingsModal } from '../../features/channels/modals/ChannelSettingsModal';
+import { EditCategoryModal } from '../../features/channels/modals/EditCategoryModal';
+import { FindUserModal } from '../../features/users/modals/FindUserModal';
+import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
+import { KickUserModal } from '../../features/servers/modals/KickUserModal';
 
 const ModalManager: React.FC = () => {
   const { activeModal } = useModalStore();

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useModalStore, useUIStore } from '@/shared/stores/store';
-import { serverApi, channelApi, categoryApi, messageApi } from '@/shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { format } from 'date-fns';
+import { useModalStore, useUIStore } from '../../shared/stores/store';
+import { serverApi, channelApi, categoryApi, messageApi } from '../../shared/services/api';
 
 export const GenericModal: React.FC = () => {
   const { activeModal, closeModal, modalData, openModal } = useModalStore();

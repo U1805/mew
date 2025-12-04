@@ -1,7 +1,7 @@
 import React from 'react';
-import { useUIStore } from '@/shared/stores/store';
-import { ServerChannelList } from './ServerChannelList';
 import { DMChannelList } from './DMChannelList';
+import { ServerChannelList } from './ServerChannelList';
+import { useUIStore } from '../../../shared/stores/store';
 
 const ChannelList: React.FC = () => {
   const { currentServerId } = useUIStore();

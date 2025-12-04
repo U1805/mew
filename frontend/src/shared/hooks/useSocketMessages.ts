@@ -1,8 +1,7 @@
-
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getSocket } from '@/shared/services/socket';
-import { Message } from '@/shared/types';
+import { getSocket } from '../services/socket';
+import { Message } from '../types';
 
 export const useSocketMessages = (channelId: string | null) => {
   const queryClient = useQueryClient();

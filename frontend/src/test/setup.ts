@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
-import { server } from '@/mocks/server';
 import { beforeAll, afterEach, afterAll } from 'vitest';
+import { server } from '../mocks/server';
 
 // 在所有测试开始前启动服务器
 beforeAll(() => server.listen());

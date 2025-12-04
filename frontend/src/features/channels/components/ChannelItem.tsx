@@ -1,7 +1,7 @@
 import React from 'react';
-import { Channel } from '@/shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { Channel } from '../../../shared/types';
 
 interface ChannelItemProps {
     channel: Channel;
