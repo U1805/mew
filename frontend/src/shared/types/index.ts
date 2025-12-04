@@ -93,6 +93,7 @@ export interface Message {
   referencedMessageId?: string;
   reactions?: Reaction[];
   editedAt?: string;
+  retractedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

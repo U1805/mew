@@ -23,6 +23,7 @@ export interface IMessage extends Document {
   referencedMessageId?: mongoose.Types.ObjectId;
   reactions?: IReaction[];
   editedAt?: Date;
+  retractedAt?: Date;
 }
 
 const AttachmentSchema: Schema = new Schema({
@@ -49,6 +50,7 @@ const MessageSchema: Schema = new Schema(
     referencedMessageId: { type: Schema.Types.ObjectId, ref: 'Message' },
     reactions: [ReactionSchema],
     editedAt: { type: Date },
+    retractedAt: { type: Date },
   },
   { timestamps: true }
 );

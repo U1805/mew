@@ -10,6 +10,7 @@ import User from '../user/user.model';
 vi.mock('../../gateway/events', () => ({
   socketManager: {
     broadcastToUser: vi.fn(),
+    broadcast: vi.fn(),
   },
 }));
 

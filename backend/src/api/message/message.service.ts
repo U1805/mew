@@ -93,11 +93,22 @@ export const getMessageById = async (messageId: string) => {
       throw new ForbiddenError('You can only delete your own messages');
     }
 
-    await message.deleteOne();
+    // Instead of deleting, we update the message to mark it as retracted.
+    message.content = '此消息已撤回';
+    message.editedAt = new Date();
+    message.retractedAt = new Date();
+    message.attachments = [];
+    message.payload = {};
+    message.mentions = [];
 
-    socketManager.broadcast('MESSAGE_DELETE', message.channelId.toString(), { messageId: message._id, channelId: message.channelId.toString() });
+    await message.save();
 
-    return { message: 'Message deleted successfully' };
+    const populatedMessage = await message.populate('authorId', 'username avatarUrl');
+
+    // Broadcast a MESSAGE_UPDATE event so clients can show the retracted state.
+    socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), populatedMessage);
+
+    return populatedMessage;
   };
 
   export const addReaction = async (

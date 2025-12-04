@@ -128,7 +128,7 @@ export const createDmChannel = async (userId: string, recipientId: string): Prom
 
   newDmChannel = await newDmChannel.populate('recipients', 'username avatarUrl');
 
-  socketManager.broadcast('DM_CHANNEL_CREATE', recipientId, newDmChannel);
+  socketManager.broadcastToUser(recipientId, 'DM_CHANNEL_CREATE', newDmChannel);
 
   return newDmChannel;
 };

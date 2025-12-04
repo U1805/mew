@@ -175,13 +175,26 @@ describe('Message Routes', () => {
       messageId = res.body._id;
     });
 
-    it('should delete a message successfully by the author', async () => {
+    it('should retract a message successfully by the author', async () => {
       const res = await request(app)
         .delete(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}`)
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.statusCode).toBe(200);
-      expect(res.body.message).toBe('Message deleted successfully');
+      expect(res.body.content).toBe('此消息已撤回');
+      expect(res.body.retractedAt).toBeDefined();
+
+      // Verify the message is indeed updated in the database by fetching all messages again
+      const getRes = await request(app)
+        .get(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(getRes.statusCode).toBe(200);
+      expect(Array.isArray(getRes.body)).toBe(true);
+
+      const retractedMessage = getRes.body.find(m => m._id === messageId);
+      expect(retractedMessage).toBeDefined();
+      expect(retractedMessage.content).toBe('此消息已撤回');
     });
 
     it('should return 403 if a non-author tries to delete', async () => {

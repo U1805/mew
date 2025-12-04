@@ -28,6 +28,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
   const isRssCard = message.type === 'app/x-rss-card';
   const isAuthor = user?._id?.toString() === author._id?.toString();
+  const isRetracted = !!message.retractedAt;
 
   const handleDelete = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -91,7 +92,8 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   return (
     <div className={clsx("group flex pr-4 hover:bg-[#2e3035] relative", isSequential ? "py-0.5" : "mt-[17px] py-0.5 mb-1")}>
 
-      {/* Hover Actions */}
+      {/* Hover Actions - Only show if NOT retracted */}
+      {!isRetracted && (
       <div className="absolute right-4 -top-2 bg-[#313338] border border-[#26272D] rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center p-1 z-10">
          <div className="relative">
              <button
@@ -126,6 +128,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
              </>
          )}
       </div>
+      )}
 
       {isSequential ? (
          <>
@@ -133,9 +136,17 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
                 {format(new Date(message.createdAt), 'h:mm a')}
             </div>
             <div className="flex-1 min-w-0 pl-4">
-                 <MessageContent message={message} />
-                 {message.editedAt && <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>}
-                 <ReactionList reactions={message.reactions} currentUserId={user?._id} onReactionClick={handleReactionClick} />
+                 {isRetracted ? (
+                    <div className="text-mew-textMuted italic text-[0.95rem] leading-[1.375rem] select-none">
+                        (message deleted)
+                    </div>
+                 ) : (
+                    <>
+                        <MessageContent message={message} />
+                        {message.editedAt && <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>}
+                        <ReactionList reactions={message.reactions} currentUserId={user?._id} onReactionClick={handleReactionClick} />
+                    </>
+                 )}
             </div>
          </>
       ) : (
@@ -165,11 +176,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
                     )}
                     <span className="text-xs text-mew-textMuted ml-1">{format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a')}</span>
                 </div>
-                <div className={clsx("text-mew-text text-[0.95rem] leading-[1.375rem]", isRssCard ? "mt-1" : "")}>
-                    <MessageContent message={message} />
-                    {message.editedAt && <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>}
-                </div>
-                <ReactionList reactions={message.reactions} currentUserId={user?._id} onReactionClick={handleReactionClick} />
+                
+                {isRetracted ? (
+                    <div className="text-mew-textMuted italic text-[0.95rem] leading-[1.375rem] select-none mt-1">
+                        (message deleted)
+                    </div>
+                ) : (
+                    <>
+                        <div className={clsx("text-mew-text text-[0.95rem] leading-[1.375rem]", isRssCard ? "mt-1" : "")}>
+                            <MessageContent message={message} />
+                            {message.editedAt && <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>}
+                        </div>
+                        <ReactionList reactions={message.reactions} currentUserId={user?._id} onReactionClick={handleReactionClick} />
+                    </>
+                )}
             </div>
           </>
       )}
