@@ -94,7 +94,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   }
 
   return (
-    <div className={clsx("group flex pr-4 hover:bg-[#2e3035] relative", isSequential ? "py-0.5" : "mt-[17px] py-0.5 mb-1")}>
+    <div 
+        id={`message-${message._id}`}
+        className={clsx("group flex pr-4 hover:bg-[#2e3035] relative transition-colors duration-500", isSequential ? "py-0.5" : "mt-[17px] py-0.5 mb-1")}
+    >
 
       {/* Hover Actions - Only show if NOT retracted */}
       {!isRetracted && (

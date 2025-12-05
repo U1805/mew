@@ -42,7 +42,7 @@ const ReactionSchema: Schema = new Schema({
 
 const MessageSchema: Schema = new Schema(
   {
-    channelId: { type: Schema.Types.ObjectId, ref: 'Channel', required: true },
+    channelId: { type: Schema.Types.ObjectId, ref: 'Channel', required: true, index: true },
     authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, default: 'message/default' },
     content: { type: String, required: true },
@@ -56,5 +56,7 @@ const MessageSchema: Schema = new Schema(
   },
   { timestamps: true }
 );
+
+MessageSchema.index({ content: 'text' });
 
 export default mongoose.model<IMessage>('Message', MessageSchema);

@@ -97,6 +97,11 @@ export const messageApi = {
   }
 };
 
+export const searchApi = {
+  searchMessages: (serverId: string, params: { q: string; channelId?: string; limit?: number; page?: number }) =>
+    api.get(`/servers/${serverId}/search`, { params }),
+};
+
 export const webhookApi = {
   list: (serverId: string, channelId: string) => api.get(`/servers/${serverId}/channels/${channelId}/webhooks`),
   create: (serverId: string, channelId: string, data: { name: string; avatarUrl?: string }) => api.post(`/servers/${serverId}/channels/${channelId}/webhooks`, data),

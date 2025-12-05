@@ -16,11 +16,17 @@ interface UIState {
   currentChannelId: string | null;
   isMemberListOpen: boolean;
   isSettingsOpen: boolean;
+  isSearchOpen: boolean;
+  searchQuery: string;
+  targetMessageId: string | null;
   setCurrentServer: (id: string | null) => void;
   setCurrentChannel: (id: string | null) => void;
   toggleMemberList: () => void;
   openSettings: () => void;
   closeSettings: () => void;
+  setSearchOpen: (isOpen: boolean) => void;
+  setSearchQuery: (query: string) => void;
+  setTargetMessageId: (id: string | null) => void;
 }
 
 interface ModalState {
@@ -106,7 +112,7 @@ export const useUnreadServerStore = create<UnreadServerState>((set) => ({
       let serverIdForChannel: string | null = null;
 
       for (const serverId of allServerIds) {
-        const channels = queryClient.getQueryData<Channel[]>(['channels', serverId]);
+        const channels = queryClient.getQueryData(['channels', serverId]) as Channel[] | undefined;
         if (channels?.some(c => c._id === channelId)) {
           serverIdForChannel = serverId;
           break;
@@ -123,7 +129,7 @@ export const useUnreadServerStore = create<UnreadServerState>((set) => ({
         const currentUnreadChannelIds = useUnreadStore.getState().unreadChannelIds;
 
         // Determine if after this action, ANY channel in this server is still unread.
-        const hasOtherUnread = (queryClient.getQueryData<Channel[]>(['channels', finalServerId]) || [])
+        const hasOtherUnread = ((queryClient.getQueryData(['channels', finalServerId]) as Channel[] | undefined) || [])
           .some(c => currentUnreadChannelIds.has(c._id));
 
         if (hasOtherUnread) {
@@ -143,7 +149,10 @@ export const useUIStore = create<UIState>((set) => ({
   currentChannelId: null,
   isMemberListOpen: true,
   isSettingsOpen: false,
-  setCurrentServer: (id) => set({ currentServerId: id, currentChannelId: null }),
+  isSearchOpen: false,
+  searchQuery: '',
+  targetMessageId: null,
+  setCurrentServer: (id) => set({ currentServerId: id, currentChannelId: null, isSearchOpen: false, searchQuery: '' }),
   setCurrentChannel: (id) => {
     if (id) {
       // Only responsible for instant client-side state updates.
@@ -154,6 +163,9 @@ export const useUIStore = create<UIState>((set) => ({
   toggleMemberList: () => set((state) => ({ isMemberListOpen: !state.isMemberListOpen })),
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
+  setSearchOpen: (isOpen) => set({ isSearchOpen: isOpen }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setTargetMessageId: (id) => set({ targetMessageId: id }),
 }));
 
 export const useModalStore = create<ModalState>((set) => ({

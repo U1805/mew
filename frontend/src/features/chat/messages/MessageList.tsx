@@ -17,14 +17,37 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
-  const { currentServerId } = useUIStore();
+  const { currentServerId, targetMessageId, setTargetMessageId } = useUIStore();
 
-  // Scroll to bottom on new messages or channel switch
+  // Effect for Auto-Scroll to Bottom (Standard Chat Behavior)
+  // We only scroll to bottom if we are NOT trying to jump to a specific message history.
   useEffect(() => {
+    // If we have a target message pending, don't auto-scroll to bottom.
+    // We check state directly to ensure fresh value, though dependency array handles updates.
+    if (useUIStore.getState().targetMessageId) return;
+
     if (messages && messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: 'auto' });
     }
-  }, [channelId, messages?.length]);
+  }, [channelId, messages?.length]); // Only run on channel change or new message
+
+  // Effect for Jump to Message (Search Results)
+  useEffect(() => {
+    if (targetMessageId && messages && !isLoading) {
+        const el = document.getElementById(`message-${targetMessageId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Add a temporary highlight flash
+            el.classList.add('bg-mew-accent/20');
+            setTimeout(() => {
+                el.classList.remove('bg-mew-accent/20');
+                // Clear target so future channel switches scroll to bottom again
+                setTargetMessageId(null);
+            }, 2000);
+        }
+    }
+  }, [targetMessageId, messages, isLoading, setTargetMessageId]);
 
   // Acknowledge channel once messages are loaded
   useEffect(() => {

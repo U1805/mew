@@ -8,6 +8,7 @@ import {
 import channelRoutes from '../channel/channel.routes';
 import inviteRoutes from '../invite/invite.routes'; // Import invite routes
 import memberRoutes from '../member/member.routes'; // Import member routes
+import searchRoutes from '../search/search.routes'; // Import search routes
 
 
 import { protect } from '../../middleware/auth';
@@ -43,6 +44,9 @@ router.use('/:serverId/invites', inviteRoutes);
 
 // Mount member routes
 router.use('/:serverId/members', memberRoutes);
+
+// Mount search routes
+router.use('/:serverId/search', checkServerMembership, searchRoutes);
 
 
 

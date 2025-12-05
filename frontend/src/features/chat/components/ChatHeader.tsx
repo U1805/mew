@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
-import { useAuthStore } from '../../../shared/stores/store';
+import { useAuthStore, useUIStore } from '../../../shared/stores/store';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 
 interface ChatHeaderProps {
@@ -14,6 +14,33 @@ interface ChatHeaderProps {
 const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, toggleMemberList }) => {
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
+  const { currentServerId, setSearchOpen, setSearchQuery, isSearchOpen } = useUIStore();
+
+  const [inputValue, setInputValue] = useState('');
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+        setSearchQuery(inputValue);
+        if (inputValue.trim()) {
+            setSearchOpen(true);
+        } else if (isSearchOpen && inputValue === '') {
+            // Optional: Close search if cleared? keeping it open might be better if user just cleared to type something else
+            // but for now let's keep it open or let user close it via other means.
+            // If we want to strictly close on empty:
+            // setSearchOpen(false);
+        }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [inputValue, setSearchQuery, setSearchOpen, isSearchOpen]);
+
+  // Clear input if search is closed externally
+  useEffect(() => {
+      if (!isSearchOpen) {
+          setInputValue('');
+      }
+  }, [isSearchOpen]);
 
   const isDM = channel?.type === ChannelType.DM;
   
@@ -30,7 +57,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
   const isOnline = otherUser && onlineStatus[otherUser._id] === 'online';
 
   return (
-    <div className="h-12 border-b border-mew-darkest flex items-center px-4 shadow-sm flex-shrink-0 bg-mew-dark">
+    <div className="h-12 border-b border-mew-darkest flex items-center px-4 shadow-sm flex-shrink-0 bg-mew-dark z-20">
       <div className="text-mew-textMuted mr-2 flex items-center justify-center">
           {isDM ? (
               <Icon icon="mdi:at" width="24" height="24" />
@@ -70,10 +97,22 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
             />
         )}
         
-        <div className="relative hidden lg:block">
-          <input type="text" placeholder="Search" className="bg-mew-darker text-sm rounded px-2 py-0.5 w-36 transition-all focus:w-60 focus:outline-none text-mew-text" />
-          <Icon icon="mdi:magnify" className="absolute right-1 top-1 text-xs" />
-        </div>
+        {/* Search Bar - only available in Servers for now based on API spec */}
+        {currentServerId && (
+            <div className={clsx("relative hidden lg:block transition-all", isSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
+            <input 
+                type="text" 
+                placeholder="Search" 
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onFocus={() => {
+                    if (inputValue.trim()) setSearchOpen(true);
+                }}
+                className="bg-mew-darker text-sm rounded px-2 py-0.5 w-full transition-all focus:outline-none text-mew-text placeholder-mew-textMuted" 
+            />
+            <Icon icon="mdi:magnify" className="absolute right-1 top-1 text-xs pointer-events-none" />
+            </div>
+        )}
       </div>
     </div>
   );
