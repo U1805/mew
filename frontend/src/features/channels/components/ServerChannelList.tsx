@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
 import { channelApi, serverApi, categoryApi } from '../../../shared/services/api';
-import { useUIStore, useAuthStore, useModalStore } from '../../../shared/stores/store';
+import { useUIStore, useAuthStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
 import { Channel, ChannelType, Server, Category, ServerMember } from '../../../shared/types';
 import { useServerEvents } from '../../../shared/hooks/useServerEvents';
 
@@ -63,7 +63,7 @@ export const ServerChannelList: React.FC = () => {
     enabled: !!currentServerId
   });
 
-  const { data: channels } = useQuery({
+  const { data: channels, isSuccess } = useQuery({
     queryKey: ['channels', currentServerId],
     queryFn: async () => {
       if (!currentServerId) return [];

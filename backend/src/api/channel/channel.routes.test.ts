@@ -213,4 +213,125 @@ describe('Channel Routes', () => {
       expect(res.statusCode).toBe(403);
     });
   });
+
+  describe('POST /:channelId/ack', () => {
+    let channelId: string;
+    let messageId: string;
+
+    beforeEach(async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'ChannelToAck', type: ChannelType.GUILD_TEXT });
+      channelId = res.body._id;
+
+      const messageRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Test message for ack' });
+      messageId = messageRes.body._id;
+    });
+
+    it('should successfully ack a server channel', async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/ack`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lastMessageId: messageId });
+
+      expect(res.statusCode).toBe(204);
+    });
+
+    it('should successfully ack a DM channel', async () => {
+      const recipientData = { email: 'recipient@example.com', username: 'recipient', password: 'password123' };
+      const recipientRegisterRes = await request(app).post('/api/auth/register').send(recipientData);
+      const recipientId = recipientRegisterRes.body.user._id;
+      const dmChannelRes = await request(app)
+        .post('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ recipientId });
+      const dmChannelId = dmChannelRes.body._id;
+
+      const dmMessageRes = await request(app)
+        .post(`/api/channels/${dmChannelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'DM for ack' });
+      const dmMessageId = dmMessageRes.body._id;
+
+      const res = await request(app)
+        .post(`/api/channels/${dmChannelId}/ack`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lastMessageId: dmMessageId });
+
+      expect(res.statusCode).toBe(204);
+    });
+
+    it('should return 403 if user is not a member of the channel', async () => {
+      const attackerData = { email: 'ack-attacker@example.com', username: 'ack_attacker', password: 'password123' };
+      await request(app).post('/api/auth/register').send(attackerData);
+      const attackerLoginRes = await request(app).post('/api/auth/login').send({ email: attackerData.email, password: attackerData.password });
+      const attackerToken = attackerLoginRes.body.token;
+
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/ack`)
+        .set('Authorization', `Bearer ${attackerToken}`)
+        .send({ lastMessageId: messageId });
+
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe('GET /api/servers/:serverId/channels', () => {
+    let channelId: string;
+
+    beforeEach(async () => {
+      const channelRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'channel-for-listing', type: ChannelType.GUILD_TEXT });
+      channelId = channelRes.body._id;
+    });
+
+    it('should return channels with lastMessage and lastReadMessageId properties', async () => {
+      const messageRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'A message in a server channel' });
+      const messageId = messageRes.body._id;
+
+      const res = await request(app)
+        .get(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toBeInstanceOf(Array);
+      const channel = res.body.find((c: any) => c._id === channelId);
+      expect(channel).toBeDefined();
+      expect(channel).toHaveProperty('lastMessage');
+      expect(channel.lastMessage._id).toBe(messageId);
+      expect(channel).toHaveProperty('lastReadMessageId');
+      expect(channel.lastReadMessageId).toBe(null);
+    });
+
+    it('should reflect correct read status after acking', async () => {
+      const messageRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Another message in server' });
+      const messageId = messageRes.body._id;
+
+      await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/ack`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lastMessageId: messageId });
+
+      const res = await request(app)
+        .get(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const channel = res.body.find((c: any) => c._id === channelId);
+      expect(channel).toBeDefined();
+      expect(channel.lastMessage._id).toBe(messageId);
+      expect(channel.lastReadMessageId).toBe(messageId);
+    });
+  });
 });

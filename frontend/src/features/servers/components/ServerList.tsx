@@ -1,11 +1,11 @@
 
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect } from 'react';
+import { useQuery, useQueries } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { Server } from '../../../shared/types';
-import { serverApi } from '../../../shared/services/api';
-import { useUIStore, useModalStore } from '../../../shared/stores/store';
+import { Server, Channel } from '../../../shared/types';
+import { serverApi, channelApi } from '../../../shared/services/api';
+import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
 
 const MewLogo = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -21,7 +21,9 @@ const MewLogo = (props: React.SVGProps<SVGSVGElement>) => (
 const ServerList: React.FC = () => {
   const { currentServerId, setCurrentServer } = useUIStore();
   const { openModal } = useModalStore();
-  
+  const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
+  const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
+
   const { data: servers } = useQuery({
     queryKey: ['servers'],
     queryFn: async () => {
@@ -29,6 +31,37 @@ const ServerList: React.FC = () => {
       return res.data as Server[];
     },
   });
+
+  const serverQueries = useQueries({
+    queries: (servers || []).map(server => ({
+      queryKey: ['channels', server._id],
+      queryFn: async () => {
+        const res = await channelApi.list(server._id);
+        return res.data as Channel[];
+      },
+      staleTime: 5 * 60 * 1000,
+    }))
+  });
+
+  useEffect(() => {
+    serverQueries.forEach(queryResult => {
+      if (queryResult.isSuccess && queryResult.data) {
+        const channels = queryResult.data;
+        channels.forEach(channel => {
+          if (channel.lastMessage && channel.lastMessage._id !== channel.lastReadMessageId) {
+            addUnreadChannel(channel._id);
+          }
+        });
+      }
+    });
+  }, [serverQueries, addUnreadChannel]);
+
+
+  const hasUnread = (serverId: string, index: number) => {
+    const channels = serverQueries[index].data;
+    if (!channels) return false;
+    return channels.some(c => unreadChannelIds.has(c._id));
+  };
 
   return (
     <div className="w-[72px] bg-mew-darkest flex flex-col items-center py-3 space-y-2 overflow-y-auto no-scrollbar flex-shrink-0 z-20">
@@ -51,28 +84,40 @@ const ServerList: React.FC = () => {
       <div className="w-8 h-[2px] bg-mew-darker rounded-full my-2" />
 
       {/* Server List */}
-      {servers?.map((server) => (
-        <div key={server._id} className="relative flex items-center justify-center w-full">
-            {currentServerId === server._id && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[40px] bg-white rounded-r-full" />
-            )}
-            <button
-                onClick={() => setCurrentServer(server._id)}
-                className={clsx(
-                "group relative flex items-center justify-center w-12 h-12 rounded-[24px] hover:rounded-[16px] transition-all duration-200 overflow-hidden",
-                currentServerId === server._id ? "rounded-[16px] ring-2 ring-offset-2 ring-offset-mew-darkest ring-mew-accent" : "bg-mew-dark hover:bg-mew-accent"
+      {servers?.map((server, index) => {
+        const isUnread = hasUnread(server._id, index);
+        const isActive = currentServerId === server._id;
+
+        return (
+            <div key={server._id} className="relative flex items-center justify-center w-full">
+                {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[40px] bg-white rounded-r-full" />
                 )}
-            >
-                {server.avatarUrl ? (
-                <img src={server.avatarUrl} alt={server.name} className="w-full h-full object-cover" />
-                ) : (
-                <span className="text-sm font-medium text-mew-text group-hover:text-white transition-colors">
-                    {server.name.substring(0, 2).toUpperCase()}
-                </span>
-                )}
-            </button>
-        </div>
-      ))}
+                
+                <div className="relative">
+                    <button
+                        onClick={() => setCurrentServer(server._id)}
+                        className={clsx(
+                        "group relative flex items-center justify-center w-12 h-12 rounded-[24px] hover:rounded-[16px] transition-all duration-200 overflow-hidden",
+                        isActive ? "rounded-[16px] ring-2 ring-offset-2 ring-offset-mew-darkest ring-mew-accent" : "bg-mew-dark hover:bg-mew-accent"
+                        )}
+                    >
+                        {server.avatarUrl ? (
+                        <img src={server.avatarUrl} alt={server.name} className="w-full h-full object-cover" />
+                        ) : (
+                        <span className="text-sm font-medium text-mew-text group-hover:text-white transition-colors">
+                            {server.name.substring(0, 2).toUpperCase()}
+                        </span>
+                        )}
+                    </button>
+                    {isUnread && !isActive && (
+                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-[3px] border-mew-darkest pointer-events-none flex items-center justify-center">
+                         </div>
+                    )}
+                </div>
+            </div>
+        )
+      })}
 
       {/* Add Server Button */}
       <button 

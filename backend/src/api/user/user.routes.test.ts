@@ -173,4 +173,71 @@ describe('User Routes', () => {
       expect(res.body).toEqual([]);
     });
   });
+
+  describe('GET /api/users/@me/channels', () => {
+    let recipientId: string;
+    let dmChannelId: string;
+
+    beforeEach(async () => {
+      const recipientData = { email: 'dm-recipient@example.com', username: 'dm_recipient', password: 'password123' };
+      const recipientRes = await request(app).post('/api/auth/register').send(recipientData);
+      recipientId = recipientRes.body.user._id;
+
+      const dmChannelRes = await request(app)
+        .post('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ recipientId });
+      dmChannelId = dmChannelRes.body._id;
+    });
+
+    it('should return DM channels with lastMessage and lastReadMessageId', async () => {
+      const messageRes = await request(app)
+        .post(`/api/channels/${dmChannelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Hello DM' });
+      const messageId = messageRes.body._id;
+
+      const res = await request(app)
+        .get('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toBeInstanceOf(Array);
+      const channel = res.body[0];
+      expect(channel).toHaveProperty('lastMessage');
+      expect(channel.lastMessage._id).toBe(messageId);
+      expect(channel).toHaveProperty('lastReadMessageId');
+      expect(channel.lastReadMessageId).toBe(null);
+    });
+
+    it('should show correct read status after acking', async () => {
+      const messageRes = await request(app)
+        .post(`/api/channels/${dmChannelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Another message' });
+      const messageId = messageRes.body._id;
+
+      await request(app)
+        .post(`/api/channels/${dmChannelId}/ack`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ lastMessageId: messageId });
+
+      const res = await request(app)
+        .get('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`);
+
+      const channel = res.body[0];
+      expect(channel.lastMessage._id).toBe(messageId);
+      expect(channel.lastReadMessageId).toBe(messageId);
+    });
+
+    it('should have null lastMessage if no messages sent', async () => {
+      const res = await request(app)
+        .get('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`);
+
+      const channel = res.body.find((c: any) => c._id === dmChannelId);
+      expect(channel.lastMessage).toBe(null);
+    });
+  });
 });

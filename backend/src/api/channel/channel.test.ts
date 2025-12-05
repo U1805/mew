@@ -1,12 +1,13 @@
-import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
-import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import Message from '../message/message.model';
+import Server from '../server/server.model';
+import ServerMember from '../member/member.model';
+import { ChannelReadState } from './readState.model';
 import * as channelService from './channel.service';
 import { socketManager } from '../../gateway/events';
 import Channel from './channel.model';
 import User from '../user/user.model';
 
-// Mock the socketManager
 vi.mock('../../gateway/events', () => ({
   socketManager: {
     broadcastToUser: vi.fn(),
@@ -16,7 +17,10 @@ vi.mock('../../gateway/events', () => ({
 
 describe('Channel Service', () => {
   afterEach(async () => {
+    await Message.deleteMany({});
+    await ChannelReadState.deleteMany({});
     await Channel.deleteMany({});
+    await Server.deleteMany({});
     await User.deleteMany({});
     vi.clearAllMocks();
   });
@@ -47,15 +51,65 @@ describe('Channel Service', () => {
         const user1 = await User.create({ email: 'user1@test.com', username: 'user1', password: 'password' });
         const user2 = await User.create({ email: 'user2@test.com', username: 'user2', password: 'password' });
 
-        // Create channel for the first time
         await channelService.createDmChannel(user1._id.toString(), user2._id.toString());
-        // Reset mock after first call
         vi.clearAllMocks();
 
-        // Call it again
         await channelService.createDmChannel(user1._id.toString(), user2._id.toString());
 
         expect(socketManager.broadcastToUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getDmChannelsByUser', () => {
+    it('should correctly attach lastMessage and lastReadMessageId', async () => {
+      const user1 = await User.create({ email: 'user1@test.com', username: 'user1', password: 'password' });
+      const user2 = await User.create({ email: 'user2@test.com', username: 'user2', password: 'password' });
+
+      const dmChannel1 = await channelService.createDmChannel(user1._id.toString(), user2._id.toString());
+      const msg1 = await Message.create({ channelId: dmChannel1._id, authorId: user2._id, content: 'Hello' });
+      await new Promise(r => setTimeout(r, 10));
+      const msg2 = await Message.create({ channelId: dmChannel1._id, authorId: user2._id, content: 'World' });
+      await ChannelReadState.create({ userId: user1._id, channelId: dmChannel1._id, lastReadMessageId: msg1._id });
+
+      const user3 = await User.create({ email: 'user3@test.com', username: 'user3', password: 'password' });
+      const dmChannel2 = await channelService.createDmChannel(user1._id.toString(), user3._id.toString());
+      await Message.create({ channelId: dmChannel2._id, authorId: user3._id, content: 'Greetings' });
+
+      await channelService.createDmChannel(user1._id.toString(), (await User.create({ email: 'user4@test.com', username: 'user4', password: 'password' }))._id.toString());
+
+      const channels = await channelService.getDmChannelsByUser(user1._id.toString());
+
+      const ch1Result = channels.find(c => c._id.equals(dmChannel1._id));
+      const ch2Result = channels.find(c => c._id.equals(dmChannel2._id));
+
+      expect(ch1Result).toBeDefined();
+      expect(ch1Result.lastMessage).toBeDefined();
+      expect(ch1Result.lastMessage._id.toString()).toBe(msg2._id.toString());
+      expect(ch1Result.lastReadMessageId.toString()).toBe(msg1._id.toString());
+
+      expect(ch2Result).toBeDefined();
+      expect(ch2Result.lastMessage).toBeDefined();
+      expect(ch2Result.lastReadMessageId).toBeNull();
+    });
+  });
+
+  describe('getChannelsByServer', () => {
+    it('should correctly attach lastMessage for server channels', async () => {
+      const user = await User.create({ email: 'user@test.com', username: 'user', password: 'password' });
+      const server = await Server.create({ name: 'Test Server' });
+      await ServerMember.create({ serverId: server._id, userId: user._id, role: 'MEMBER' });
+
+      const channel = await Channel.create({ serverId: server._id, name: 'general', type: 'GUILD_TEXT' });
+
+      await Message.create({ channelId: channel._id, authorId: user._id, content: 'First' });
+      await new Promise(r => setTimeout(r, 10));
+      const msg2 = await Message.create({ channelId: channel._id, authorId: user._id, content: 'Second' });
+
+      const channels = await channelService.getChannelsByServer(server._id.toString(), user._id.toString());
+
+      expect(channels).toHaveLength(1);
+      expect(channels[0].lastMessage).toBeDefined();
+      expect(channels[0].lastMessage._id.toString()).toBe(msg2._id.toString());
     });
   });
 });

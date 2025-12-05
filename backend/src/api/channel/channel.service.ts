@@ -4,7 +4,8 @@ import Server from '../server/server.model';
 import Category from '../category/category.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
-import Message from '../message/message.model';
+import Message, { IMessage } from '../message/message.model';
+import { ChannelReadState } from './readState.model';
 
 
 export const createChannel = async (
@@ -92,13 +93,76 @@ import ServerMember from '../member/member.model';
 
 // ... (other functions)
 
-export const getChannelsByServer = async (serverId: string, userId: string): Promise<IChannel[]> => {
+export const getChannelsByServer = async (serverId: string, userId: string): Promise<any[]> => {
   const member = await ServerMember.findOne({ serverId, userId });
   if (!member) {
     throw new ForbiddenError('You are not a member of this server.');
   }
 
-  const channels = await Channel.find({ serverId });
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+  const serverObjectId = new mongoose.Types.ObjectId(serverId);
+
+  const channels = await Channel.aggregate([
+    {
+      $match: {
+        serverId: serverObjectId,
+        type: 'GUILD_TEXT',
+      },
+    },
+    {
+      $lookup: {
+        from: 'messages',
+        localField: '_id',
+        foreignField: 'channelId',
+        as: 'lastMessageArr',
+      },
+    },
+    {
+      $lookup: {
+        from: ChannelReadState.collection.name,
+        let: { channelId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$channelId', '$$channelId'] },
+                  { $eq: ['$userId', userObjectId] },
+                ],
+              },
+            },
+          },
+          { $project: { lastReadMessageId: 1, _id: 0 } },
+        ],
+        as: 'readState',
+      },
+    },
+    {
+      $addFields: {
+        lastReadMessageId: { $ifNull: [{ $first: '$readState.lastReadMessageId' }, null] },
+      },
+    },
+    {
+      $project: {
+        readState: 0,
+      },
+    },
+    {
+      $sort: { position: 1 },
+    }
+  ]);
+
+  // Manual sorting and message assignment at the application level
+  channels.forEach(channel => {
+    if (channel.lastMessageArr && channel.lastMessageArr.length > 0) {
+      channel.lastMessageArr.sort((a: IMessage, b: IMessage) => b.createdAt.getTime() - a.createdAt.getTime());
+      channel.lastMessage = channel.lastMessageArr[0];
+    } else {
+      channel.lastMessage = null;
+    }
+    delete channel.lastMessageArr; // Clean up the temporary array
+  });
+
   return channels;
 };
 
@@ -133,11 +197,106 @@ export const createDmChannel = async (userId: string, recipientId: string): Prom
   return newDmChannel;
 };
 
-export const getDmChannelsByUser = async (userId: string): Promise<IChannel[]> => {
-  const channels = await Channel.find({
-    type: 'DM',
-    recipients: userId,
-  }).populate('recipients', 'username avatar');
+export const getDmChannelsByUser = async (userId: string): Promise<any[]> => {
+  const userObjectId = new mongoose.Types.ObjectId(userId);
+
+  const channels = await Channel.aggregate([
+    {
+      $match: {
+        type: 'DM',
+        recipients: userObjectId,
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'recipients',
+        foreignField: '_id',
+        as: 'recipientsInfo',
+      },
+    },
+    {
+      $addFields: {
+        recipients: '$recipientsInfo',
+      },
+    },
+    {
+      $lookup: {
+        from: 'messages',
+        localField: '_id',
+        foreignField: 'channelId',
+        as: 'lastMessageArr',
+      },
+    },
+    {
+      $lookup: {
+        from: ChannelReadState.collection.name,
+        let: { channelId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$channelId', '$$channelId'] },
+                  { $eq: ['$userId', userObjectId] },
+                ],
+              },
+            },
+          },
+          { $project: { lastReadMessageId: 1, _id: 0 } },
+        ],
+        as: 'readState',
+      },
+    },
+    {
+      $addFields: {
+        lastReadMessageId: { $ifNull: [{ $first: '$readState.lastReadMessageId' }, null] },
+      },
+    },
+    {
+      $project: {
+        recipientsInfo: 0,
+        readState: 0,
+      },
+    },
+  ]);
+
+  // Manual sorting and message assignment at the application level
+  channels.forEach(channel => {
+    if (channel.lastMessageArr && channel.lastMessageArr.length > 0) {
+      channel.lastMessageArr.sort((a: IMessage, b: IMessage) => b.createdAt.getTime() - a.createdAt.getTime());
+      channel.lastMessage = channel.lastMessageArr[0];
+    } else {
+      channel.lastMessage = null;
+    }
+    delete channel.lastMessageArr; // Clean up the temporary array
+  });
 
   return channels;
+};
+
+
+export const ackChannel = async (userId: string, channelId: string, lastMessageId: string): Promise<void> => {
+  const channel = await Channel.findById(channelId);
+  if (!channel) {
+    throw new NotFoundError('Channel not found');
+  }
+
+  // Check if user has access to this channel
+  if (channel.type === 'DM') {
+    if (!channel.recipients || !channel.recipients.map(id => id.toString()).includes(userId)) {
+      throw new ForbiddenError('You do not have access to this DM channel.');
+    }
+  } else if (channel.type === 'GUILD_TEXT') {
+    const member = await ServerMember.findOne({ serverId: channel.serverId, userId });
+    if (!member) {
+      throw new ForbiddenError('You are not a member of this server.');
+    }
+  }
+
+  await ChannelReadState.updateOne(
+    { userId, channelId },
+    { $set: { lastReadMessageId: lastMessageId } },
+    { upsert: true }
+  );
 };

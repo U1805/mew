@@ -10,7 +10,14 @@ const router = Router();
 router.use(protect);
 
 // Mount message routes for DMs
+import { ackChannelHandler } from './channel.controller';
+import { ackChannelSchema } from './channel.validation';
+import validate from '../../middleware/validate';
+
 // This will handle routes like /api/channels/:channelId/messages
 router.use('/:channelId/messages', messageRoutes);
+
+router.post('/:channelId/ack', validate(ackChannelSchema), ackChannelHandler);
+
 
 export default router;

@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
 import { channelApi } from '../../../shared/services/api';
-import { Channel, ChannelType } from '../../../shared/types';
+import { Channel } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { useUIStore, useAuthStore, useModalStore } from '../../../shared/stores/store';
+import { useUIStore, useAuthStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
 import { useDmEvents } from '../../../shared/hooks/useDmEvents';
 
 export const DMChannelList: React.FC = () => {
@@ -14,21 +14,33 @@ export const DMChannelList: React.FC = () => {
   const { openModal } = useModalStore();
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
+  const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
+  const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
 
   useDmEvents();
 
-  const { data: dmChannels } = useQuery({
+  const { data: dmChannels, isSuccess } = useQuery({
       queryKey: ['dmChannels'],
       queryFn: async () => {
           try {
              const res = await channelApi.listDMs();
-             return (res.data as Channel[]).filter(c => c.type === ChannelType.DM);
+             return res.data as Channel[];
           } catch {
               return [];
           }
       },
       enabled: true // Always fetch DMs when this component is rendered
   });
+
+  useEffect(() => {
+    if (dmChannels && isSuccess) {
+      dmChannels.forEach((channel) => {
+        if (channel.lastMessage && channel.lastMessage._id !== channel.lastReadMessageId) {
+          addUnreadChannel(channel._id);
+        }
+      });
+    }
+  }, [dmChannels, isSuccess, addUnreadChannel]);
 
   return (
     <div className="w-60 bg-mew-darker flex flex-col border-r border-mew-darkest flex-shrink-0">
@@ -59,14 +71,19 @@ export const DMChannelList: React.FC = () => {
                const otherUser = dm.recipients?.find(r => typeof r === 'object' && r._id !== user?._id) as any;
                const name = otherUser?.username || dm.name || 'Unknown User';
                const isOnline = otherUser?._id && onlineStatus[otherUser._id] === 'online';
+               const hasUnread = unreadChannelIds.has(dm._id);
 
                return (
                   <div
                       key={dm._id}
                       onClick={() => setCurrentChannel(dm._id)}
                       className={clsx(
-                          "flex items-center px-2 py-2 rounded cursor-pointer mb-0.5 transition-colors group",
-                          currentChannelId === dm._id ? "bg-mew-dark text-white" : "text-mew-textMuted hover:bg-mew-dark hover:text-mew-text"
+                          "flex items-center px-2 py-2 rounded cursor-pointer mb-0.5 transition-colors group relative",
+                          currentChannelId === dm._id 
+                            ? "bg-mew-dark text-white" 
+                            : hasUnread
+                                ? "text-white hover:bg-mew-dark"
+                                : "text-mew-textMuted hover:bg-mew-dark hover:text-mew-text"
                       )}
                   >
                       <div className="w-8 h-8 rounded-full bg-mew-accent mr-3 flex items-center justify-center flex-shrink-0 relative">
@@ -80,7 +97,15 @@ export const DMChannelList: React.FC = () => {
                               isOnline ? "bg-green-500" : "bg-gray-500"
                           )}></div>
                       </div>
-                      <span className="font-medium truncate flex-1">{name}</span>
+                      
+                      <div className="flex-1 min-w-0 flex items-center">
+                          <span className={clsx("truncate flex-1", hasUnread ? "font-bold" : "font-medium")}>{name}</span>
+                          {/* Unread Indicator - Right side */}
+                          {hasUnread && currentChannelId !== dm._id && (
+                             <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 ml-2"></div>
+                          )}
+                      </div>
+
                       <div className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white" title="Remove DM">
                          <Icon icon="mdi:close" width="16" />
                       </div>

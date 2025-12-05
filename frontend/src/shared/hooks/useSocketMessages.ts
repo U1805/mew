@@ -2,27 +2,35 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Message } from '../types';
+import { useUIStore, useUnreadStore } from '../stores/store';
 
 export const useSocketMessages = (channelId: string | null) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const socket = getSocket();
-    if (!socket || !channelId) return;
+    if (!socket) return;
 
     const handleNewMessage = (newMessage: Message) => {
-      if (newMessage.channelId === channelId) {
+      // 1. Update cache if we are viewing this channel
+      if (channelId && newMessage.channelId === channelId) {
         queryClient.setQueryData(['messages', channelId], (old: Message[] | undefined) => {
           if (!old) return [newMessage];
           if (old.find(m => m._id === newMessage._id)) return old;
           return [...old, newMessage];
         });
       }
+
+      // 2. Global Unread Logic
+      // Check against the actual current channel in the store to ensure accuracy
+      const currentChannelId = useUIStore.getState().currentChannelId;
+      if (newMessage.channelId !== currentChannelId) {
+          useUnreadStore.getState().addUnreadChannel(newMessage.channelId);
+      }
     };
 
-    // Both update and reaction events return the full updated message object
     const handleUpdateMessage = (updatedMessage: Message) => {
-      if (updatedMessage.channelId === channelId) {
+      if (channelId && updatedMessage.channelId === channelId) {
         queryClient.setQueryData(['messages', channelId], (old: Message[] | undefined) => {
           if (!old) return old;
           return old.map(m => m._id === updatedMessage._id ? updatedMessage : m);
@@ -31,7 +39,7 @@ export const useSocketMessages = (channelId: string | null) => {
     };
 
     const handleDeleteMessage = ({ messageId, channelId: msgChannelId }: { messageId: string, channelId: string }) => {
-      if (msgChannelId === channelId) {
+      if (channelId && msgChannelId === channelId) {
         queryClient.setQueryData(['messages', channelId], (old: Message[] | undefined) => {
           if (!old) return old;
           return old.filter(m => m._id !== messageId);

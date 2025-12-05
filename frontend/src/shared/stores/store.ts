@@ -1,4 +1,8 @@
 import { create } from 'zustand';
+import { usePresenceStore } from './presenceStore';
+import { disconnectSocket } from '../services/socket';
+import { User, Channel } from '../types';
+import { QueryClient } from '@tanstack/react-query';
 
 export interface AuthState {
   token: string | null;
@@ -6,9 +10,6 @@ export interface AuthState {
   setAuth: (token: string, user: User | null, remember?: boolean) => void;
   logout: () => void;
 }
-import { usePresenceStore } from './presenceStore';
-import { disconnectSocket } from '../services/socket';
-import { User } from '../types';
 
 interface UIState {
   currentServerId: string | null;
@@ -29,16 +30,20 @@ interface ModalState {
   closeModal: () => void;
 }
 
+interface UnreadState {
+  unreadChannelIds: Set<string>;
+  addUnreadChannel: (channelId: string) => void;
+  removeUnreadChannel: (channelId: string) => void;
+}
+
 export const useAuthStore = create<AuthState>((set) => ({
-  // Initialize from either storage
   token: localStorage.getItem('mew_token') || sessionStorage.getItem('mew_token'),
   user: JSON.parse(localStorage.getItem('mew_user') || sessionStorage.getItem('mew_user') || 'null'),
-  
+
   setAuth: (token: string, user: User | null, remember: boolean = true) => {
     const storage = remember ? localStorage : sessionStorage;
     const otherStorage = remember ? sessionStorage : localStorage;
 
-    // Save to preferred storage
     storage.setItem('mew_token', token);
     if (user) {
       storage.setItem('mew_user', JSON.stringify(user));
@@ -46,13 +51,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       storage.removeItem('mew_user');
     }
 
-    // Clean other storage to prevent sync issues
     otherStorage.removeItem('mew_token');
     otherStorage.removeItem('mew_user');
 
     set({ token, user });
   },
-  
+
   logout: () => {
     localStorage.removeItem('mew_token');
     localStorage.removeItem('mew_user');
@@ -64,13 +68,89 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 }));
 
+export const useUnreadStore = create<UnreadState>((set, get) => ({
+  unreadChannelIds: new Set(),
+  addUnreadChannel: (channelId) => {
+    if (get().unreadChannelIds.has(channelId)) return;
+    set((state) => {
+      const newSet = new Set(state.unreadChannelIds);
+      newSet.add(channelId);
+      return { unreadChannelIds: newSet };
+    });
+    if (notifyServerStore) notifyServerStore(channelId, 'add');
+  },
+  removeUnreadChannel: (channelId) => {
+    if (!get().unreadChannelIds.has(channelId)) return;
+    set((state) => {
+      const newSet = new Set(state.unreadChannelIds);
+      newSet.delete(channelId);
+      return { unreadChannelIds: newSet };
+    });
+    if (notifyServerStore) notifyServerStore(channelId, 'remove');
+  },
+}));
+
+// Communication bridge between channel unread store and server unread store.
+// This will be initialized in a top-level component (e.g., Layout.tsx).
+export let notifyServerStore: (channelId: string, action: 'add' | 'remove') => void;
+
+export interface UnreadServerState {
+  unreadServerIds: Set<string>;
+  initializeNotifier: (queryClient: QueryClient, allServerIds: string[]) => void;
+}
+
+export const useUnreadServerStore = create<UnreadServerState>((set) => ({
+  unreadServerIds: new Set(),
+  initializeNotifier: (queryClient, allServerIds) => {
+    notifyServerStore = (channelId, action) => {
+      let serverIdForChannel: string | null = null;
+
+      for (const serverId of allServerIds) {
+        const channels = queryClient.getQueryData<Channel[]>(['channels', serverId]);
+        if (channels?.some(c => c._id === channelId)) {
+          serverIdForChannel = serverId;
+          break;
+        }
+      }
+
+      if (!serverIdForChannel) return;
+
+      const finalServerId = serverIdForChannel; // To satisfy TypeScript's non-null assertion
+
+      set(state => {
+        const newUnreadServerIds = new Set(state.unreadServerIds);
+        // Use a fresh lookup of the unread channels set inside the setter for accuracy
+        const currentUnreadChannelIds = useUnreadStore.getState().unreadChannelIds;
+
+        // Determine if after this action, ANY channel in this server is still unread.
+        const hasOtherUnread = (queryClient.getQueryData<Channel[]>(['channels', finalServerId]) || [])
+          .some(c => currentUnreadChannelIds.has(c._id));
+
+        if (hasOtherUnread) {
+          newUnreadServerIds.add(finalServerId);
+        } else {
+          newUnreadServerIds.delete(finalServerId);
+        }
+
+        return { unreadServerIds: newUnreadServerIds };
+      });
+    };
+  },
+}));
+
 export const useUIStore = create<UIState>((set) => ({
   currentServerId: null,
   currentChannelId: null,
-  isMemberListOpen: true, // Default to open on desktop
+  isMemberListOpen: true,
   isSettingsOpen: false,
   setCurrentServer: (id) => set({ currentServerId: id, currentChannelId: null }),
-  setCurrentChannel: (id) => set({ currentChannelId: id }),
+  setCurrentChannel: (id) => {
+    if (id) {
+      // Only responsible for instant client-side state updates.
+      useUnreadStore.getState().removeUnreadChannel(id);
+    }
+    set({ currentChannelId: id });
+  },
   toggleMemberList: () => set((state) => ({ isMemberListOpen: !state.isMemberListOpen })),
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),

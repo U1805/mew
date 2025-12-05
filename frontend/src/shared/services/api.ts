@@ -62,7 +62,8 @@ export const channelApi = {
   delete: (serverId: string | undefined, channelId: string) => {
       // Adjusted based on typical REST patterns or previous usage
       return api.delete(`/servers/${serverId}/channels/${channelId}`);
-  }
+  },
+  ack: (channelId: string, lastMessageId: string) => api.post(`/channels/${channelId}/ack`, { lastMessageId }),
 };
 
 export const messageApi = {

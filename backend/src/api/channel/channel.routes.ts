@@ -36,7 +36,13 @@ router.patch(
   updateChannelHandler
 );
 
+import { ackChannelHandler } from './channel.controller';
+import { ackChannelSchema } from './channel.validation';
+
 router.delete('/:channelId', authorizeRole(['OWNER']), deleteChannelHandler);
+
+router.post('/:channelId/ack', validate(ackChannelSchema), ackChannelHandler);
+
 
 
 export default router;

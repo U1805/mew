@@ -24,3 +24,12 @@ export const updateChannelSchema = z.object({
     channelId: z.string().min(1),
   }),
 });
+
+export const ackChannelSchema = z.object({
+  body: z.object({
+    lastMessageId: z.string().min(1, 'lastMessageId is required'),
+  }),
+  params: z.object({
+    channelId: z.string().min(1, 'channelId is required'),
+  }),
+});

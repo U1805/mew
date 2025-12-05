@@ -24,6 +24,8 @@ export interface IMessage extends Document {
   reactions?: IReaction[];
   editedAt?: Date;
   retractedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const AttachmentSchema: Schema = new Schema({

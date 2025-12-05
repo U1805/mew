@@ -2,7 +2,9 @@ import React, { useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import MessageItem from './MessageItem';
 import { Message, Channel, ChannelType } from '../../../shared/types';
-import { useAuthStore } from '../../../shared/stores/store';
+import { useAuthStore, useUIStore } from '../../../shared/stores/store';
+import { channelApi } from '../../../shared/services/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface MessageListProps {
   messages: Message[];
@@ -14,12 +16,36 @@ interface MessageListProps {
 const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel, channelId }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
+  const { currentServerId } = useUIStore();
 
+  // Scroll to bottom on new messages or channel switch
   useEffect(() => {
     if (messages && messages.length > 0) {
       bottomRef.current?.scrollIntoView({ behavior: 'auto' });
     }
   }, [channelId, messages?.length]);
+
+  // Acknowledge channel once messages are loaded
+  useEffect(() => {
+    if (channel && channelId && messages.length > 0 && !isLoading) {
+      const lastMessage = messages[messages.length - 1];
+
+      if (lastMessage._id !== channel.lastReadMessageId) {
+        channelApi.ack(channelId, lastMessage._id)
+          .then(() => {
+            // Invalidate queries to refetch channel lists with updated read state
+            queryClient.invalidateQueries({ queryKey: ['dmChannels']});
+            if (currentServerId) {
+              queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
+            }
+          })
+          .catch(err => {
+            console.error("Failed to acknowledge channel:", err);
+          });
+      }
+    }
+  }, [messages, channel, channelId, isLoading, queryClient, currentServerId]);
 
   const isDM = channel?.type === ChannelType.DM;
   let otherUser: any = null;

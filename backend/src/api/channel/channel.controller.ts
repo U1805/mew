@@ -107,3 +107,15 @@ export const getChannelsHandler = asyncHandler(async (req: Request, res: Respons
   const channels = await channelService.getChannelsByServer(serverId, req.user.id);
   res.status(200).json(channels);
 });
+
+export const ackChannelHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
+  }
+  const { channelId } = req.params;
+  const { lastMessageId } = req.body;
+
+  await channelService.ackChannel(req.user.id, channelId, lastMessageId);
+
+  res.status(204).send();
+});

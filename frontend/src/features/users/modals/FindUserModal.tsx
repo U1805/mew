@@ -14,7 +14,7 @@ export const FindUserModal: React.FC = () => {
   const [loadingUserId, setLoadingUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 100);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 

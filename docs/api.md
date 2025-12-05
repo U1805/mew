@@ -1,6 +1,6 @@
 # Mew - API 技术规格文档
 
-**最后更新时间: 2025-12-03**
+**最后更新时间: 2025-12-05**
 
 本文档详细描述了 Mew 即时通讯（IM）平台核心功能的**当前实现**，旨在作为前端开发的权威技术蓝图。本文档已与后端代码库 (`backend/src`) 同步。
 
@@ -124,7 +124,8 @@ interface IReaction {
   mentions: [{ type: ObjectId, ref: 'User' }],
   referencedMessageId: { type: ObjectId, ref: 'Message' }, // 回复消息引用
   reactions: [ReactionSchema],
-  editedAt: Date // 编辑时间，未编辑则为空
+  editedAt: Date, // 编辑时间，未编辑则为空
+  retractedAt: Date // 撤回时间，未撤回则为空
 }
 ```
 
@@ -141,6 +142,19 @@ interface IReaction {
   token: { type: String, required: true }, // 用于验证请求的唯一令牌
   botUserId: { type: ObjectId, ref: 'User', required: true } // 关联的机器人用户 ID
 }
+```
+
+### 9. ChannelReadState (频道已读状态)
+
+记录用户在特定频道中最后读取的消息。
+
+```typescript
+{
+  userId: { type: ObjectId, ref: 'User', required: true },
+  channelId: { type: ObjectId, ref: 'Channel', required: true },
+  lastReadMessageId: { type: ObjectId, ref: 'Message', required: true }
+}
+// (userId, channelId) 上有复合唯一索引
 ```
 
 ---
@@ -164,6 +178,7 @@ interface IReaction {
 - `GET /@me/servers`: 获取当前用户**作为成员**的所有服务器列表。
 - `POST /@me/channels`: 创建或获取私聊(DM)频道 (Body: `{ recipientId: string }`)
 - `GET /@me/channels`: 获取当前用户的私聊(DM)频道列表。
+  - **响应更新**: 每个返回的频道对象现在额外包含 `lastMessage: IMessage | null` 和 `lastReadMessageId: ObjectId | null` 字段。
 - `GET /search`: 模糊搜索用户 (Query: `q`) -> 返回 `[{ _id, username, avatarUrl }]`
 
 ### 3. 服务器 (Servers)
@@ -201,25 +216,33 @@ Path 2: `/api/invites` (接受/查询)*
 *Path: `/api/servers/:serverId/channels`*
 
 - `GET /`: 获取服务器下的所有频道。
+  - **响应更新**: 每个返回的频道对象现在额外包含 `lastMessage: IMessage | null` 和 `lastReadMessageId: ObjectId | null` 字段。
 - `POST /`: 创建频道 (需为 `OWNER` 或有权限)。
 - `PATCH /:channelId`: 更新频道 (需为 `OWNER` 或有权限)。
 - `DELETE /:channelId`: 删除频道 (需为 `OWNER` 或有权限)。
 
 ### 8. 消息 (Messages)
-*Path: `/api/servers/:serverId/channels/:channelId/messages`*
+*Path (服务器频道): `/api/servers/:serverId/channels/:channelId/messages`*
+*Path (私聊频道): `/api/channels/:channelId/messages`*
 
 - `GET /`: 获取消息列表 (Query: `limit`, `before`)
 - `POST /`: 发送消息 (Body: `content`)
 - `PATCH /:messageId`: 编辑消息 (Body: `content`)
 - `DELETE /:messageId`: 删除消息。
 
-### 9. 消息互动 (Reactions)
+### 9. 频道已读状态 (Channel Read State)
+*Path (服务器频道): `/api/servers/:serverId/channels/:channelId/ack`*
+*Path (私聊频道): `/api/channels/:channelId/ack`*
+
+- `POST /`: 标记频道为已读 (Body: `{ lastMessageId: string }`)。此端点将用户的已读状态更新到指定的消息 ID。
+
+### 10. 消息互动 (Reactions)
 *Path: `/api/servers/:serverId/channels/:channelId/messages/:messageId/reactions`*
 
 - `PUT /:emoji/@me`: 添加反应。
 - `DELETE /:emoji/@me`: 移除反应。
 
-### 10. Webhook 管理
+### 11. Webhook 管理
 *Path: `/api/servers/:serverId/channels/:channelId/webhooks`*
 
 - `GET /`: 获取频道下的所有 Webhooks。
@@ -227,7 +250,7 @@ Path 2: `/api/invites` (接受/查询)*
 - `PATCH /:webhookId`: 更新 Webhook (Body: `name?`, `avatarUrl?`)。
 - `DELETE /:webhookId`: 删除一个 Webhook。
 
-### 11. Webhook 执行 (公开)
+### 12. Webhook 执行 (公开)
 *Path: `/api/webhooks/:webhookId/:token`*
 
 这是一个公开端点，不需要 `Authorization` 头。认证通过 URL 中的 `webhookId` 和 `token` 完成。
@@ -265,7 +288,7 @@ const socket = io("http://localhost:3000", {
 
 所有状态变更都会通过以下事件实时广播给相关房间的在线用户。
 
-- **消息**: `MESSAGE_CREATE`, `MESSAGE_UPDATE`, `MESSAGE_DELETE`
+- **消息**: `MESSAGE_CREATE`, `MESSAGE_UPDATE` (编辑), `MESSAGE_DELETE` (删除), `MESSAGE_RETRACT` (撤回)
 - **反应**: `MESSAGE_REACTION_ADD`, `MESSAGE_REACTION_REMOVE`
 - **频道**: `CHANNEL_UPDATE`, `CHANNEL_DELETE`
 - **私聊频道**: `DM_CHANNEL_CREATE`
