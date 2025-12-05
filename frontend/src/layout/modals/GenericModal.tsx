@@ -74,9 +74,10 @@ export const GenericModal: React.FC = () => {
           }
           break;
         case 'deleteMessage':
-          if(currentServerId && modalData?.message) {
+                    if(modalData?.message) {
+            const serverId = currentServerId ? currentServerId : undefined;
             // Perform the API call first
-            await messageApi.delete(currentServerId, modalData.message.channelId, modalData.message._id);
+            await messageApi.delete(serverId, modalData.message.channelId, modalData.message._id);
 
             // Then, perform a correct optimistic update by updating the message in the cache
             queryClient.setQueryData(['messages', modalData.message.channelId], (old: any[] | undefined) => {

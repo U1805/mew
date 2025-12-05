@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhookApi, API_URL } from '../../../shared/services/api';
 import { Webhook, Channel } from '../../../shared/types';
 import { Icon } from '@iconify/react';
+import clsx from 'clsx';
 
 interface WebhookManagerProps {
   serverId: string;
@@ -12,6 +13,7 @@ interface WebhookManagerProps {
 export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channel }) => {
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
+  const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
   
   // Form State
   const [name, setName] = useState('');
@@ -83,7 +85,8 @@ export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channe
   const copyUrl = (webhook: Webhook) => {
     const url = `${API_URL}/webhooks/${webhook._id}/${webhook.token}`;
     navigator.clipboard.writeText(url);
-    // Could add toast notification here
+    setCopiedWebhookId(webhook._id);
+    setTimeout(() => setCopiedWebhookId(null), 2000);
   };
 
   if (view === 'list') {
@@ -123,8 +126,16 @@ export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channe
                     </div>
                  </div>
                  <div className="flex items-center space-x-2">
-                    <button onClick={() => copyUrl(wh)} className="bg-[#1E1F22] hover:bg-[#111214] text-white px-3 py-1.5 rounded text-xs font-medium transition-colors">
-                       Copy URL
+                    <button 
+                        onClick={() => copyUrl(wh)} 
+                        className={clsx(
+                            "text-white px-3 py-1.5 rounded text-xs font-medium transition-colors min-w-[80px]",
+                            copiedWebhookId === wh._id 
+                                ? "bg-green-500 hover:bg-green-600" 
+                                : "bg-[#1E1F22] hover:bg-[#111214]"
+                        )}
+                    >
+                       {copiedWebhookId === wh._id ? 'Copied' : 'Copy URL'}
                     </button>
                     <button onClick={() => handleEdit(wh)} className="bg-[#1E1F22] hover:bg-[#111214] text-white p-1.5 rounded transition-colors">
                        <Icon icon="mdi:pencil" width="16" />
@@ -193,9 +204,14 @@ export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channe
                    <button 
                       type="button"
                       onClick={() => copyUrl(selectedWebhook)}
-                      className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 rounded-r font-medium text-sm transition-colors"
+                      className={clsx(
+                          "text-white px-4 rounded-r font-medium text-sm transition-colors min-w-[70px]",
+                          copiedWebhookId === selectedWebhook._id
+                            ? "bg-green-500 hover:bg-green-600"
+                            : "bg-mew-accent hover:bg-mew-accentHover"
+                      )}
                    >
-                     Copy
+                     {copiedWebhookId === selectedWebhook._id ? 'Copied' : 'Copy'}
                    </button>
                 </div>
              </div>

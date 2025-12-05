@@ -13,7 +13,7 @@ UI 样式: Tailwind CSS
 实时通信: Socket.io
 数据校验：Zod
 持久化数据库: MongoDB
-文件对象存储: MinIO
+文件对象存储: Garage
 容器化: Docker
 编排工具: Docker Compose
 CI/CD: GitHub Actions
