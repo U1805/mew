@@ -240,4 +240,51 @@ describe('User Routes', () => {
       expect(channel.lastMessage).toBe(null);
     });
   });
+
+  describe('GET /api/users/:userId', () => {
+    let otherUserId: string;
+    beforeEach(async () => {
+      // Create another user to be fetched
+      const otherUserData = { email: 'otheruser@example.com', username: 'otheruser', password: 'password123' };
+      const res = await request(app).post('/api/auth/register').send(otherUserData);
+      otherUserId = res.body.user._id;
+    });
+
+    it('should return 401 if no token is provided', async () => {
+      const res = await request(app).get(`/api/users/${otherUserId}`);
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('should get a user by their ID', async () => {
+      const res = await request(app)
+        .get(`/api/users/${otherUserId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.username).toBe('otheruser');
+      expect(res.body._id).toBe(otherUserId);
+    });
+
+    it('should only return public fields', async () => {
+      const res = await request(app)
+        .get(`/api/users/${otherUserId}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toHaveProperty('_id');
+      expect(res.body).toHaveProperty('username');
+      expect(res.body).toHaveProperty('isBot');
+      expect(res.body).toHaveProperty('createdAt');
+      expect(res.body).not.toHaveProperty('email');
+      expect(res.body).not.toHaveProperty('password');
+    });
+
+    it('should return 404 if user does not exist', async () => {
+      const nonExistentId = '605c72ef1f633b4e7d427d2b'; // A valid but non-existent ObjectId
+      const res = await request(app)
+        .get(`/api/users/${nonExistentId}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(res.statusCode).toBe(404);
+    });
+  });
 });

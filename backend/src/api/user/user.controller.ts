@@ -46,3 +46,8 @@ export const searchUsersHandler = asyncHandler(async (req: Request, res: Respons
   const users = await userService.searchUsers(query, req.user.id);
   res.status(200).json(users);
 });
+
+export const getUserByIdHandler = asyncHandler(async (req: Request, res: Response) => {
+  const user = await userService.getUserById(req.params.userId);
+  res.status(200).json(user);
+});

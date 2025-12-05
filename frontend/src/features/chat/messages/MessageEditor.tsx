@@ -46,6 +46,10 @@ const MessageEditor: React.FC<MessageEditorProps> = ({ message, onCancel }) => {
         }
     };
 
+    const dateString = message.createdAt && !isNaN(new Date(message.createdAt).getTime()) 
+        ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a') 
+        : '';
+
     return (
         <div className="py-0.5 px-4 bg-[#2e3035]/50 flex pr-4 mt-[17px]">
             <div className="w-10 h-10 rounded-full bg-mew-accent flex items-center justify-center text-white font-semibold mr-4 mt-0.5 opacity-50">
@@ -54,7 +58,7 @@ const MessageEditor: React.FC<MessageEditorProps> = ({ message, onCancel }) => {
             <div className="flex-1 w-full">
                 <div className="flex items-center mb-1">
                     <span className="font-medium text-white mr-2">{author.username}</span>
-                    <span className="text-xs text-mew-textMuted">{format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a')}</span>
+                    <span className="text-xs text-mew-textMuted">{dateString}</span>
                 </div>
                 <div className="bg-[#383A40] rounded p-2">
                     <textarea

@@ -1,23 +1,37 @@
 import React, { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { User } from '../../../shared/types';
-import { channelApi } from '../../../shared/services/api';
-import { useModalStore, useUIStore } from '../../../shared/stores/store';
+import { channelApi, userApi } from '../../../shared/services/api';
+import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores/store';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
+  const { user: currentUser } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
 
-  const user = modalData?.user as User;
+  const initialUser = modalData?.user as User;
+
+  const { data: user } = useQuery({
+    queryKey: ['user', initialUser?._id],
+    queryFn: async () => {
+        if (!initialUser?._id) return null;
+        const res = await userApi.getById(initialUser._id);
+        return res.data as User;
+    },
+    enabled: !!initialUser?._id,
+    initialData: initialUser,
+  });
+
   if (!user) return null;
 
   const isOnline = onlineStatus[user._id] === 'online';
+  const isSelf = currentUser?._id === user._id;
 
   const handleCreateDM = async (recipientId: string) => {
     if (!recipientId) return;
@@ -35,6 +49,10 @@ export const UserProfileModal: React.FC = () => {
         setIsLoading(false);
     }
   };
+
+  const joinedDate = user.createdAt && !isNaN(new Date(user.createdAt).getTime()) 
+    ? format(new Date(user.createdAt), 'MMM d, yyyy') 
+    : 'Unknown';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -56,13 +74,15 @@ export const UserProfileModal: React.FC = () => {
                  </div>
 
                  <div className="flex justify-end pt-3 mb-2">
-                      <button
-                        onClick={() => handleCreateDM(user._id)}
-                        disabled={isLoading}
-                        className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
-                      >
-                          Send Message
-                      </button>
+                      {!isSelf && (
+                        <button
+                          onClick={() => handleCreateDM(user._id)}
+                          disabled={isLoading}
+                          className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                        >
+                            Send Message
+                        </button>
+                      )}
                       <button
                          onClick={closeModal}
                          className="ml-2 w-8 h-8 rounded-full bg-[#2B2D31] hover:bg-[#404249] flex items-center justify-center text-mew-textMuted hover:text-white transition-colors"
@@ -79,7 +99,7 @@ export const UserProfileModal: React.FC = () => {
 
                      <div className="mb-3">
                          <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Member Since</div>
-                         <div className="text-sm text-mew-text">{format(new Date(user.createdAt), 'MMM d, yyyy')}</div>
+                         <div className="text-sm text-mew-text">{joinedDate}</div>
                      </div>
 
                      <div>

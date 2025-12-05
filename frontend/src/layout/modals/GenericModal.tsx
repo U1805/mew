@@ -161,7 +161,11 @@ export const GenericModal: React.FC = () => {
                           <div className="flex-1 min-w-0">
                               <div className="flex items-center mb-1">
                                  <span className="font-bold text-white mr-1.5">{modalData.author?.username || 'Unknown'}</span>
-                                 <span className="text-xs text-mew-textMuted">{format(new Date(modalData.message.createdAt), 'MM/dd/yyyy h:mm a')}</span>
+                                 <span className="text-xs text-mew-textMuted">
+                                    {modalData.message.createdAt && !isNaN(new Date(modalData.message.createdAt).getTime()) 
+                                        ? format(new Date(modalData.message.createdAt), 'MM/dd/yyyy h:mm a') 
+                                        : ''}
+                                 </span>
                               </div>
                               <p className="text-mew-text text-sm whitespace-pre-wrap">{modalData.message.content}</p>
                           </div>

@@ -180,6 +180,7 @@ interface IReaction {
 - `GET /@me/channels`: 获取当前用户的私聊(DM)频道列表。
   - **响应更新**: 每个返回的频道对象现在额外包含 `lastMessage: IMessage | null` 和 `lastReadMessageId: ObjectId | null` 字段。
 - `GET /search`: 模糊搜索用户 (Query: `q`) -> 返回 `[{ _id, username, avatarUrl }]`
+- `GET /:userId`: 获取指定ID用户的公开信息。成功时返回用户对象，包含 `_id`, `username`, `avatarUrl`, `isBot`, `createdAt`。如果用户不存在则返回 404。
 
 ### 3. 服务器 (Servers)
 *Path: `/api/servers`*

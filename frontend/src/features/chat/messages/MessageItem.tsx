@@ -85,6 +85,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
       }
   };
 
+  const isValidDate = message.createdAt && !isNaN(new Date(message.createdAt).getTime());
+  const timeString = isValidDate ? format(new Date(message.createdAt), 'h:mm a') : '';
+  const fullDateString = isValidDate ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a') : '';
+
   if (isEditing) {
       return <MessageEditor message={message} onCancel={() => setIsEditing(false)} />;
   }
@@ -133,7 +137,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
       {isSequential ? (
          <>
             <div className="w-[50px] text-[10px] text-mew-textMuted opacity-0 group-hover:opacity-100 text-right pr-3 select-none mt-1.5 flex-shrink-0">
-                {format(new Date(message.createdAt), 'h:mm a')}
+                {timeString}
             </div>
             <div className="flex-1 min-w-0 pl-4">
                  {isRetracted ? (
@@ -174,7 +178,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
                     {author.isBot && (
                         <span className="bg-[#5865F2] text-white text-[10px] px-1.5 rounded-[3px] h-[15px] flex items-center mr-2 uppercase font-bold">Bot</span>
                     )}
-                    <span className="text-xs text-mew-textMuted ml-1">{format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a')}</span>
+                    <span className="text-xs text-mew-textMuted ml-1">{fullDateString}</span>
                 </div>
                 
                 {isRetracted ? (

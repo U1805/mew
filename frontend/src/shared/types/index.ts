@@ -58,6 +58,8 @@ export interface Channel {
   categoryId?: string;
   recipients?: string[] | User[]; // Can be IDs or populated Users
   position?: number;
+  lastMessage?: Message;
+  lastReadMessageId?: string;
 }
 
 export interface Attachment {
