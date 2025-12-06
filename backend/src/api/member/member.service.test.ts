@@ -9,7 +9,6 @@ vi.mock('../../gateway/events', () => ({
 }));
 
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import memberService from './member.service';
 import ServerMember from './member.model';
 import '../../api/user/user.model';
@@ -23,17 +22,24 @@ describe('Member Service', () => {
   let member1Id: string;
   let nonMemberId: string;
 
-  beforeEach(async () => {
-    await ServerMember.deleteMany({});
+  beforeAll(async () => {
     serverId = new mongoose.Types.ObjectId().toHexString();
     ownerId = new mongoose.Types.ObjectId().toHexString();
     member1Id = new mongoose.Types.ObjectId().toHexString();
     nonMemberId = new mongoose.Types.ObjectId().toHexString();
+  });
 
+  beforeEach(async () => {
+    await ServerMember.deleteMany({});
     await ServerMember.create([
-      { serverId, userId: ownerId, role: 'OWNER' },
-      { serverId, userId: member1Id, role: 'MEMBER' },
+      { serverId, userId: ownerId, isOwner: true, roleIds: [] },
+      { serverId, userId: member1Id, isOwner: false, roleIds: [] },
     ]);
+    vi.clearAllMocks();
+  });
+
+  afterAll(async () => {
+    await ServerMember.deleteMany({});
   });
 
   describe('getMembersByServer', () => {
@@ -101,7 +107,7 @@ describe('Member Service', () => {
 
     it('should prevent non-owner from removing a member', async () => {
       await expect(memberService.removeMember(serverId, ownerId, member1Id)).rejects.toThrow(
-        'Only the server owner can remove members.'
+        'You cannot manage a user with an equal or higher role position than your own.'
       );
     });
 
@@ -146,7 +152,7 @@ describe('Member Service', () => {
 
     it('should allow an owner to leave if there are other owners', async () => {
       const anotherOwnerId = new mongoose.Types.ObjectId().toHexString();
-      await ServerMember.create({ serverId, userId: anotherOwnerId, role: 'OWNER' });
+      await ServerMember.create({ serverId, userId: anotherOwnerId, isOwner: true });
 
       await memberService.leaveServer(serverId, ownerId);
       const member = await ServerMember.findOne({ serverId, userId: ownerId });

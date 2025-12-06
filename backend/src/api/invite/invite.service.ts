@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import Invite, { IInvite } from './invite.model';
 import ServerMember from '../member/member.model';
+import Server from '../server/server.model';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { Types } from 'mongoose';
 
@@ -46,10 +47,6 @@ const inviteService = {
     creatorId: string,
     options: { expiresAt?: string; maxUses?: number }
   ): Promise<IInvite> {
-    const member = await ServerMember.findOne({ serverId, userId: creatorId });
-    if (!member || member.role !== 'OWNER') {
-      throw new ForbiddenError('Only the server owner can create invites.');
-    }
 
     const code = nanoid(10);
 
@@ -95,10 +92,15 @@ const inviteService = {
       return invite; // User is already a member
     }
 
+    const server = await Server.findById(invite.serverId);
+    if (!server) {
+      throw new NotFoundError('Associated server not found.');
+    }
+
     await ServerMember.create({
       serverId: invite.serverId,
       userId,
-      role: 'MEMBER',
+      roleIds: [server.everyoneRoleId],
     });
 
     invite.uses += 1;

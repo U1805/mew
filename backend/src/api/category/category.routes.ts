@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { protect } from '../../middleware/auth';
-import { checkServerMembership, authorizeRole } from '../../middleware/memberAuth';
+import { checkServerMembership, setServerIdFromCategory } from '../../middleware/memberAuth';
 
 import validate from '../../middleware/validate';
 import * as categoryController from './category.controller';
@@ -13,7 +13,9 @@ categoryRootRoutes.use(protect, checkServerMembership);
 
 categoryRootRoutes.get('/', categoryController.getCategoriesHandler);
 
-categoryRootRoutes.post('/', authorizeRole(['OWNER']), categoryController.createCategoryHandler);
+import { authorizeServer } from '../../middleware/checkPermission';
+
+categoryRootRoutes.post('/', authorizeServer('MANAGE_CHANNEL'), categoryController.createCategoryHandler);
 
 
 const categoryDetailRoutes = Router({ mergeParams: true });
@@ -22,8 +24,9 @@ const categoryDetailRoutes = Router({ mergeParams: true });
 categoryDetailRoutes.patch(
   '/:categoryId',
   protect,
-  // Note: For this route, we can't use checkServerMembership directly
-  // as serverId is not in params. The check must be in the controller/service.
+  setServerIdFromCategory,
+  checkServerMembership,
+  authorizeServer('MANAGE_CHANNEL'),
   validate(updateCategorySchema),
   categoryController.updateCategoryHandler
 );
@@ -31,6 +34,9 @@ categoryDetailRoutes.patch(
 categoryDetailRoutes.delete(
   '/:categoryId',
   protect,
+  setServerIdFromCategory,
+  checkServerMembership,
+  authorizeServer('MANAGE_CHANNEL'),
   validate(categoryIdParams),
   categoryController.deleteCategoryHandler
 );

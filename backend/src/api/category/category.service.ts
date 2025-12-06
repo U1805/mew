@@ -1,10 +1,13 @@
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
-import Channel from '../channel/channel.model';
+import { calculateEffectivePermissions } from '../../utils/permission.service';
+import { Permission } from '../../constants/permissions';
+import Role from '../role/role.model';
 import Server from '../server/server.model';
+import Channel from '../channel/channel.model';
 import Category, { ICategory } from './category.model';
 import { socketManager } from '../../gateway/events';
-
 import ServerMember from '../member/member.model';
+
 
 export const createCategory = async (
   name: string,
@@ -28,14 +31,10 @@ export const updateCategoryById = async (
   data: Partial<Pick<ICategory, 'name' | 'position'>>,
   userId: string
 ): Promise<ICategory> => {
+  
   const category = await Category.findById(categoryId);
   if (!category) {
-    throw new NotFoundError('Category not found');
-  }
-
-  const member = await ServerMember.findOne({ serverId: category.serverId, userId });
-  if (!member || member.role !== 'OWNER') {
-    throw new ForbiddenError('You are not the owner of this server');
+    throw new NotFoundError('Category not found'); // Should be caught by check, but for safety
   }
 
   Object.assign(category, data);
@@ -50,14 +49,10 @@ export const deleteCategoryById = async (
   categoryId: string,
   userId: string
 ): Promise<void> => {
+  
   const category = await Category.findById(categoryId);
   if (!category) {
-    throw new NotFoundError('Category not found');
-  }
-
-  const member = await ServerMember.findOne({ serverId: category.serverId, userId });
-  if (!member || member.role !== 'OWNER') {
-    throw new ForbiddenError('You are not the owner of this server');
+    throw new NotFoundError('Category not found'); // Should be caught by check, but for safety
   }
 
   // Un-categorize channels in this category

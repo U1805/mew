@@ -1,12 +1,21 @@
 import { beforeAll, afterAll, afterEach } from 'vitest';
-import { MongoMemoryServer } from 'mongodb-memory-server';
+import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 
-let mongoServer: MongoMemoryServer;
+let replSet: MongoMemoryReplSet;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
+  replSet = await MongoMemoryReplSet.create({
+    binary: {
+      version: '6.0.4',
+      skipMD5: true,
+    },
+    replSet: {
+      count: 1,
+      dbName: 'jest',
+    },
+  });
+  const mongoUri = replSet.getUri();
   await mongoose.connect(mongoUri);
 });
 
@@ -20,5 +29,5 @@ afterEach(async () => {
 
 afterAll(async () => {
   await mongoose.disconnect();
-  await mongoServer.stop();
+  await replSet.stop();
 });

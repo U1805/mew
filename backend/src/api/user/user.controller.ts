@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import * as userService from './user.service';
-import * as channelService from '../channel/channel.service';
+import userService from './user.service';
+import channelService from '../channel/channel.service';
 import { UnauthorizedError } from '../../utils/errors';
 import asyncHandler from '../../utils/asyncHandler';
 

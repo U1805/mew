@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
 import ServerMemberModel from '../member/member.model';
+import RoleModel from '../role/role.model';
 
 describe('Server Routes', () => {
   const userData = {
@@ -100,7 +101,18 @@ describe('Server Routes', () => {
       const member = await ServerMemberModel.findOne({ serverId, userId });
 
       expect(member).not.toBeNull();
-      expect(member?.role).toBe('OWNER');
+      expect(member?.isOwner).toBe(true);
+
+      const everyoneRole = await RoleModel.findOne({ serverId, isDefault: true });
+      expect(everyoneRole).not.toBeNull();
+      expect(everyoneRole?.name).toBe('@everyone');
+
+      // Check if server has the everyoneRoleId
+      const server = await request(app).get(`/api/servers/${serverId}`).set('Authorization', `Bearer ${token}`);
+      expect(server.body.everyoneRoleId).toBe(everyoneRole?._id.toString());
+
+      // Check if owner member has the everyoneRole id
+      expect(member?.roleIds.map(id => id.toString())).toContain(everyoneRole?._id.toString());
     });
 
     it('should return 400 for invalid server data', async () => {
@@ -157,6 +169,48 @@ describe('Server Routes', () => {
         .send({ name: '' });
 
       expect(res.statusCode).toBe(400);
+    });
+
+    it('should allow a member with MANAGE_SERVER permission to update and deny without it', async () => {
+      const memberData = { email: 'server-updater@example.com', username: 'serverupdater', password: 'password123' };
+      await request(app).post('/api/auth/register').send(memberData);
+      const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberData.email, password: memberData.password });
+      const memberToken = memberLoginRes.body.token;
+
+      const inviteRes = await request(app)
+        .post(`/api/servers/${serverId}/invites`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      await request(app)
+        .post(`/api/invites/${inviteRes.body.code}`)
+        .set('Authorization', `Bearer ${memberToken}`);
+
+      const updatedData = { name: 'Permission Update Test' };
+
+      // Deny without permission
+      const resFail = await request(app)
+        .patch(`/api/servers/${serverId}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send(updatedData);
+      expect(resFail.statusCode).toBe(403);
+
+      // Grant permission
+      const serverDetailsRes = await request(app).get(`/api/servers/${serverId}`).set('Authorization', `Bearer ${token}`);
+      const everyoneRoleId = serverDetailsRes.body.everyoneRoleId;
+      const rolesRes = await request(app).get(`/api/servers/${serverId}/roles`).set('Authorization', `Bearer ${token}`);
+      const everyoneRole = rolesRes.body.find((r: any) => r._id === everyoneRoleId);
+      await request(app)
+        .patch(`/api/servers/${serverId}/roles/${everyoneRoleId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ permissions: [...everyoneRole.permissions, 'MANAGE_SERVER'] });
+
+      // Allow with permission
+      const resSuccess = await request(app)
+        .patch(`/api/servers/${serverId}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send(updatedData);
+      expect(resSuccess.statusCode).toBe(200);
+      expect(resSuccess.body.name).toBe(updatedData.name);
     });
   });
 
@@ -226,6 +280,13 @@ describe('Server Routes', () => {
         .get(`/api/channels/${channelId}`)
         .set('Authorization', `Bearer ${token}`);
       expect(getChannelRes.statusCode).toBe(404);
+
+      // 5. Verify members and roles are deleted
+      const memberCount = await ServerMemberModel.countDocuments({ serverId });
+      expect(memberCount).toBe(0);
+
+      const roleCount = await RoleModel.countDocuments({ serverId });
+      expect(roleCount).toBe(0);
     });
   });
 });

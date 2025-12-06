@@ -25,6 +25,23 @@ export const updateChannelSchema = z.object({
   }),
 });
 
+import { ALL_PERMISSIONS } from '../../constants/permissions';
+
+const permissionOverrideSchema = z.object({
+  targetType: z.enum(['role', 'member']),
+  targetId: z.string(),
+  allow: z.array(z.enum(ALL_PERMISSIONS)).default([]),
+  deny: z.array(z.enum(ALL_PERMISSIONS)).default([]),
+});
+
+export const updatePermissionsSchema = z.object({
+  body: z.array(permissionOverrideSchema),
+  params: z.object({
+    channelId: z.string().min(1),
+  }),
+});
+
+
 export const ackChannelSchema = z.object({
   body: z.object({
     lastMessageId: z.string().min(1, 'lastMessageId is required'),

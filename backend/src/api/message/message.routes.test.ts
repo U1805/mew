@@ -3,6 +3,8 @@ import request from 'supertest';
 import app from '../../app';
 import { ChannelType } from '../channel/channel.model';
 import { createMessage } from './message.service';
+import Server from '../server/server.model';
+import Role from '../role/role.model';
 
 describe('Message Routes', () => {
   const userData = {
@@ -113,7 +115,71 @@ describe('Message Routes', () => {
   });
 
   describe('POST /api/servers/:serverId/channels/:channelId/messages', () => {
-    it('should create a new message in a channel', async () => {
+    describe('with permission checks', () => {
+      let everyoneRole: any;
+      let memberToken = '';
+      const memberUserData = {
+        email: 'member-msg-test@example.com',
+        username: 'membermsgtest',
+        password: 'password123',
+      };
+
+      beforeEach(async () => {
+        const server = await Server.findById(serverId).lean();
+        everyoneRole = await Role.findById(server.everyoneRoleId);
+
+        // Create and setup a new member for the server
+        await request(app).post('/api/auth/register').send(memberUserData);
+        const loginRes = await request(app).post('/api/auth/login').send({ email: memberUserData.email, password: memberUserData.password });
+        memberToken = loginRes.body.token;
+
+        // Owner creates an invite
+        const inviteRes = await request(app)
+          .post(`/api/servers/${serverId}/invites`)
+          .set('Authorization', `Bearer ${token}`)
+          .send({});
+        const inviteCode = inviteRes.body.code;
+
+        // New user accepts the invite
+        await request(app)
+          .post(`/api/invites/${inviteCode}`)
+          .set('Authorization', `Bearer ${memberToken}`);
+      });
+
+      it('should return 403 if user does not have SEND_MESSAGES permission', async () => {
+        // By default, @everyone has SEND_MESSAGES. Let's remove it.
+        everyoneRole.permissions = everyoneRole.permissions.filter(p => p !== 'SEND_MESSAGES');
+        await everyoneRole.save();
+
+        const messageData = { content: 'This message should be blocked' };
+        const res = await request(app)
+          .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+          .set('Authorization', `Bearer ${memberToken}`)
+          .send(messageData);
+
+        expect(res.statusCode).toBe(403);
+        expect(res.body.message).toContain('You do not have the required permission: SEND_MESSAGES');
+      });
+
+      it('should return 201 if user has SEND_MESSAGES permission', async () => {
+        // Ensure the permission is present (it is by default, but we're being explicit)
+        if (!everyoneRole.permissions.includes('SEND_MESSAGES')) {
+          everyoneRole.permissions.push('SEND_MESSAGES');
+          await everyoneRole.save();
+        }
+
+        const messageData = { content: 'This message should be allowed' };
+        const res = await request(app)
+          .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+          .set('Authorization', `Bearer ${memberToken}`)
+          .send(messageData);
+
+        expect(res.statusCode).toBe(201);
+        expect(res.body.content).toBe(messageData.content);
+      });
+    });
+
+    it('should create a new message as a server owner (bypassing permissions)', async () => {
       const messageData = { content: 'A new message' };
       const res = await request(app)
         .post(`/api/servers/${serverId}/channels/${channelId}/messages`)

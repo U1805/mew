@@ -12,7 +12,8 @@ import searchRoutes from '../search/search.routes'; // Import search routes
 
 
 import { protect } from '../../middleware/auth';
-import { checkServerMembership, authorizeRole } from '../../middleware/memberAuth';
+import { authorizeServer } from '../../middleware/checkPermission';
+import { checkServerMembership } from '../../middleware/memberAuth';
 
 import validate from '../../middleware/validate';
 import { createServerSchema, updateServerSchema } from './server.validation';
@@ -28,12 +29,12 @@ router.get('/:serverId', checkServerMembership, getServerHandler);
 router.patch(
   '/:serverId',
   checkServerMembership,
-  authorizeRole(['OWNER']),
+  authorizeServer('MANAGE_SERVER'),
   validate(updateServerSchema),
   updateServerHandler
 );
 
-router.delete('/:serverId', checkServerMembership, authorizeRole(['OWNER']), deleteServerHandler);
+router.delete('/:serverId', checkServerMembership, authorizeServer('ADMINISTRATOR'), deleteServerHandler);
 
 
 // Mount channel routes

@@ -4,24 +4,26 @@ import {
   deleteChannelHandler,
   updateChannelHandler,
   getChannelsHandler,
+  ackChannelHandler,
+  getPermissionOverridesHandler,
+  updatePermissionOverridesHandler
 } from './channel.controller';
 import messageRoutes from '../message/message.routes';
 import webhookRoutes from '../webhook/webhook.routes';
+import { authorizeChannel, authorizeServer } from '../../middleware/checkPermission';
 import { protect } from '../../middleware/auth';
-import { checkServerMembership, authorizeRole } from '../../middleware/memberAuth';
+import { checkServerMembership } from '../../middleware/memberAuth';
 
 import validate from '../../middleware/validate';
-import { createChannelSchema, updateChannelSchema } from './channel.validation';
+import { createChannelSchema, updateChannelSchema, ackChannelSchema, updatePermissionsSchema } from './channel.validation';
 
 const router = Router({ mergeParams: true });
 
 // All routes in this file are protected and require server membership
 router.use(protect, checkServerMembership);
 
-
 router.get('/', getChannelsHandler);
-router.post('/', authorizeRole(['OWNER']), validate(createChannelSchema), createChannelHandler);
-
+router.post('/', authorizeServer('MANAGE_CHANNEL'), validate(createChannelSchema), createChannelHandler);
 
 // Mount message routes
 router.use('/:channelId/messages', messageRoutes);
@@ -31,18 +33,17 @@ router.use('/:channelId/webhooks', webhookRoutes);
 
 router.patch(
   '/:channelId',
-  authorizeRole(['OWNER']),
+  authorizeChannel('MANAGE_CHANNEL'),
   validate(updateChannelSchema),
   updateChannelHandler
 );
 
-import { ackChannelHandler } from './channel.controller';
-import { ackChannelSchema } from './channel.validation';
+router.route('/:channelId/permissions')
+  .get(authorizeChannel('MANAGE_CHANNEL'), getPermissionOverridesHandler)
+  .put(authorizeChannel('MANAGE_CHANNEL'), validate(updatePermissionsSchema), updatePermissionOverridesHandler);
 
-router.delete('/:channelId', authorizeRole(['OWNER']), deleteChannelHandler);
+router.delete('/:channelId', authorizeChannel('MANAGE_CHANNEL'), deleteChannelHandler);
 
 router.post('/:channelId/ack', validate(ackChannelSchema), ackChannelHandler);
-
-
 
 export default router;

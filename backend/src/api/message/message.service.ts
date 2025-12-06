@@ -1,6 +1,58 @@
 import Message, { IMessage } from './message.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
+import { calculateEffectivePermissions } from '../../utils/permission.service';
+import Member from '../member/member.model';
+import Role from '../role/role.model';
+import Server from '../server/server.model';
+import Channel from '../channel/channel.model';
+import { Permission } from '../../constants/permissions';
+
+async function checkMessagePermissions(messageId: string, userId: string) {
+  const message = await getMessageById(messageId);
+
+  // If the user is the author, they can always edit/delete.
+  if (message.authorId.toString() === userId) {
+    return;
+  }
+
+  // If not the author, check for MANAGE_MESSAGES permission.
+  const channel = await Channel.findById(message.channelId).lean();
+  if (!channel || channel.type === 'DM' || !channel.serverId) {
+    throw new ForbiddenError('Permission check failed: Invalid channel.');
+  }
+
+  const serverId = channel.serverId.toString();
+
+  const [member, roles, server] = await Promise.all([
+    Member.findOne({ userId, serverId }).lean(),
+    Role.find({ serverId: serverId as any }).lean(),
+    Server.findById(serverId).select('everyoneRoleId').lean(),
+  ]);
+
+  if (!member) {
+    throw new ForbiddenError('You are not a member of this server.');
+  }
+
+  if (member.isOwner) {
+    return; // Owner can do anything
+  }
+
+  if (!server || !server.everyoneRoleId) {
+    throw new Error('Server configuration error.');
+  }
+
+  const everyoneRole = roles.find((r) => r._id.equals(server.everyoneRoleId!));
+  if (!everyoneRole) {
+    throw new Error('Server configuration error: @everyone role not found.');
+  }
+
+  const permissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
+
+  if (!permissions.has('MANAGE_MESSAGES')) {
+    throw new ForbiddenError('You do not have permission to manage this message.');
+  }
+}
 
 /**
  * Applies author overrides from a message's payload.
@@ -70,11 +122,8 @@ export const getMessageById = async (messageId: string) => {
     userId: string,
     content: string
   ) => {
+    await checkMessagePermissions(messageId, userId);
     const message = await getMessageById(messageId);
-
-    if (message.authorId.toString() !== userId) {
-      throw new ForbiddenError('You can only edit your own messages');
-    }
 
     message.content = content;
     message.editedAt = new Date();
@@ -87,11 +136,8 @@ export const getMessageById = async (messageId: string) => {
   };
 
   export const deleteMessage = async (messageId: string, userId: string) => {
+    await checkMessagePermissions(messageId, userId);
     const message = await getMessageById(messageId);
-
-    if (message.authorId.toString() !== userId) {
-      throw new ForbiddenError('You can only delete your own messages');
-    }
 
     // Instead of deleting, we update the message to mark it as retracted.
     message.content = '此消息已撤回';

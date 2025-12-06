@@ -20,6 +20,7 @@ vi.mock('../gateway/events', async (importOriginal) => {
   };
 });
 import { ChannelType } from '../api/channel/channel.model';
+import ServerModel from '../api/server/server.model';
 import Message from '../api/message/message.model';
 import ServerMemberModel from '../api/member/member.model';
 import { authMiddleware } from './middleware';
@@ -56,6 +57,8 @@ describe('WebSocket Gateway', () => {
       }
     );
 
+    (appSocketManager.getIO as ReturnType<typeof vi.fn>).mockImplementation(() => io);
+
     // Use the real auth middleware and connection handlers
     io.use(authMiddleware);
     io.on('connection', (socket) => {
@@ -87,6 +90,9 @@ describe('WebSocket Gateway', () => {
 
     const channel1Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel One', type: ChannelType.GUILD_TEXT });
     channel1Id = channel1Res.body._id;
+
+    const channel2Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel Two', type: ChannelType.GUILD_TEXT });
+    channel2Id = channel2Res.body._id;
 
     // Server 2 for user2, to ensure they are in a different room
     const server2Res = await request(app).post('/api/servers').set('Authorization', `Bearer ${token2}`).send({ name: 'Socket Test Server 2' });
@@ -139,9 +145,9 @@ describe('WebSocket Gateway', () => {
       setTimeout(resolve, 500);
     });
 
-    // Wait for sockets to connect
-    await new Promise<void>(resolve => client1.on('connect', () => resolve()));
-    await new Promise<void>(resolve => client2.on('connect', () => resolve()));
+    // Wait for sockets to be fully ready (after joining rooms)
+    await new Promise<void>(resolve => client1.on('ready', () => resolve()));
+    await new Promise<void>(resolve => client2.on('ready', () => resolve()));
 
     // client now automatically joins rooms on connection via `joinUserRooms`
 
@@ -166,8 +172,8 @@ describe('WebSocket Gateway', () => {
 
     client2 = createTestClient(port, token2);
 
-    const client2Connects = new Promise<void>(resolve => client2.on('connect', () => resolve()));
-    await client2Connects;
+    const client2Ready = new Promise<void>(resolve => client2.on('ready', () => resolve()));
+    await client2Ready;
 
     // Add a small delay to allow server-side room joining to propagate
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -238,5 +244,77 @@ describe('WebSocket Gateway', () => {
     // Disconnect client1 and wait for the offline message to be received by client2
     client1.disconnect();
     await client1OfflinePromise;
+  });
+
+  it('should remove user from channel room upon losing VIEW_CHANNEL permission', async () => {
+    // 1. Setup: user2 joins server1
+    await request(app).post(`/api/invites/${inviteCode}`).set('Authorization', `Bearer ${token2}`);
+
+    client2 = createTestClient(port, token2);
+    await new Promise<void>(resolve => client2.on('ready', () => resolve()));
+
+    // 2. Initial state verification: user2 is in both channel rooms
+    const sockets = await io.in(userId2).fetchSockets();
+    expect(sockets[0].rooms.has(channel1Id)).toBe(true);
+    expect(sockets[0].rooms.has(channel2Id)).toBe(true);
+
+    const permissionUpdatePromise = new Promise<void>((resolve) => {
+        client2.on('PERMISSIONS_UPDATE', (data) => {
+            expect(data.serverId).toBe(serverId);
+            resolve();
+        });
+    });
+
+    // 3. Permission change: user1 (owner) denies VIEW_CHANNEL for @everyone in channel1
+    const serverDoc = await ServerModel.findById(serverId);
+    const everyoneRoleId = serverDoc!.everyoneRoleId;
+
+    await request(app)
+        .put(`/api/servers/${serverId}/channels/${channel1Id}/permissions`)
+        .set('Authorization', `Bearer ${token1}`)
+        .send([{
+            targetType: 'role',
+            targetId: everyoneRoleId,
+            allow: [],
+            deny: ['VIEW_CHANNEL']
+        }]);
+
+    // 4. Real-time event verification
+    await permissionUpdatePromise;
+
+    // Allow some time for server-side async logic to complete
+    await new Promise(resolve => setTimeout(resolve, 200));
+
+    // 5. Room leaving verification
+    const updatedSockets = await io.in(userId2).fetchSockets();
+    expect(updatedSockets[0].rooms.has(channel1Id)).toBe(false);
+    expect(updatedSockets[0].rooms.has(channel2Id)).toBe(true);
+
+    // 6. Message isolation verification
+    const client2ReceivesChannel2Msg = new Promise<void>((resolve) => {
+        client2.on('MESSAGE_CREATE', (msg) => {
+            expect(msg.channelId).toBe(channel2Id);
+            resolve();
+        });
+    });
+
+    const client2ShouldNotReceiveChannel1Msg = new Promise<void>((resolve, reject) => {
+        const listener = (msg: any) => {
+            if (msg.channelId === channel1Id) {
+                reject(new Error('Should not have received message from channel 1'));
+            }
+        };
+        client2.on('MESSAGE_CREATE', listener);
+        setTimeout(() => {
+            client2.off('MESSAGE_CREATE', listener);
+            resolve();
+        }, 500);
+    });
+
+    // User1 sends messages to both channels
+    await request(app).post(`/api/servers/${serverId}/channels/${channel2Id}/messages`).set('Authorization', `Bearer ${token1}`).send({ content: 'hello channel 2' });
+    await request(app).post(`/api/servers/${serverId}/channels/${channel1Id}/messages`).set('Authorization', `Bearer ${token1}`).send({ content: 'hello channel 1' });
+
+    await Promise.all([client2ReceivesChannel2Msg, client2ShouldNotReceiveChannel1Msg]);
   });
 });

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import inviteService from './invite.service';
 import ServerMember from '../member/member.model';
 import Invite from './invite.model';
 import '../server/server.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import Server from '../server/server.model';
+import Role from '../role/role.model';
 
 describe('Invite Service', () => {
 
@@ -24,8 +24,8 @@ describe('Invite Service', () => {
 
     beforeEach(async () => {
       await Server.create({ _id: serverId, name: 'Test Server' });
-      await ServerMember.create({ serverId, userId: ownerId, role: 'OWNER' });
-      await ServerMember.create({ serverId, userId: memberId, role: 'MEMBER' });
+      await ServerMember.create({ serverId, userId: ownerId, isOwner: true });
+      await ServerMember.create({ serverId, userId: memberId, isOwner: false });
     });
 
     it('should allow a server owner to create an invite', async () => {
@@ -46,14 +46,6 @@ describe('Invite Service', () => {
       expect(Math.abs(new Date(invite.expiresAt).getTime() - new Date(expiresAt).getTime())).toBeLessThan(1000);
     });
 
-    it('should prevent a non-owner from creating an invite', async () => {
-      await expect(inviteService.createInvite(serverId, memberId, {})).rejects.toThrow(
-        ForbiddenError
-      );
-      await expect(inviteService.createInvite(serverId, memberId, {})).rejects.toThrow(
-        'Only the server owner can create invites.'
-      );
-    });
   });
 
   describe('getInviteDetails', () => {
@@ -63,7 +55,7 @@ describe('Invite Service', () => {
 
     beforeEach(async () => {
       await Server.create({ _id: serverId, name: 'Test Server' });
-      await ServerMember.create({ serverId, userId: ownerId, role: 'OWNER' });
+      await ServerMember.create({ serverId, userId: ownerId, isOwner: true });
       validInvite = await inviteService.createInvite(serverId, ownerId, {});
     });
 
@@ -110,10 +102,17 @@ describe('Invite Service', () => {
     let validInvite: any;
 
     beforeEach(async () => {
-      await Server.create({ _id: serverId, name: 'Test Server' });
+      const everyoneRole = await Role.create({
+        name: '@everyone',
+        serverId: serverId,
+        position: 0,
+        isDefault: true,
+      });
+
+      await Server.create({ _id: serverId, name: 'Test Server', everyoneRoleId: everyoneRole._id });
       await ServerMember.create([
-        { serverId, userId: ownerId, role: 'OWNER' },
-        { serverId, userId: existingMemberId, role: 'MEMBER' },
+        { serverId, userId: ownerId, isOwner: true, roleIds: [everyoneRole._id] },
+        { serverId, userId: existingMemberId, isOwner: false, roleIds: [everyoneRole._id] },
       ]);
       validInvite = await inviteService.createInvite(serverId, ownerId, {});
     });
@@ -123,7 +122,10 @@ describe('Invite Service', () => {
 
       const memberRecord = await ServerMember.findOne({ serverId, userId: newUserId });
       expect(memberRecord).not.toBeNull();
-      expect(memberRecord?.role).toBe('MEMBER');
+      expect(memberRecord?.isOwner).toBe(false);
+
+      const server = await Server.findById(serverId);
+      expect(memberRecord?.roleIds.map(id => id.toString())).toContain(server?.everyoneRoleId.toString());
 
       const updatedInvite = await Invite.findById(validInvite._id);
       expect(updatedInvite?.uses).toBe(1);

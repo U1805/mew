@@ -3,7 +3,8 @@ import { Document, Schema, model, Types } from 'mongoose';
 export interface IServerMember extends Document {
   serverId: Types.ObjectId;
   userId: Types.ObjectId;
-  role: 'OWNER' | 'MEMBER';
+  roleIds: Types.ObjectId[];
+  isOwner: boolean;
   nickname?: string;
 }
 
@@ -11,7 +12,8 @@ const ServerMemberSchema = new Schema<IServerMember>(
   {
     serverId: { type: Schema.Types.ObjectId, ref: 'Server', required: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    role: { type: String, enum: ['OWNER', 'MEMBER'], default: 'MEMBER' },
+    roleIds: [{ type: Schema.Types.ObjectId, ref: 'Role' }],
+    isOwner: { type: Boolean, default: false, index: true },
     nickname: { type: String },
   },
   { timestamps: true }

@@ -56,12 +56,12 @@ const registerMessageHandlers = (io: SocketIOServer, socket: Socket) => {
   });
 };
 
-export const registerConnectionHandlers = (io: SocketIOServer, socket: Socket) => {
+export const registerConnectionHandlers = async (io: SocketIOServer, socket: Socket) => {
   console.log('Authenticated user connected:', socket.id, 'as', socket.user?.username);
   if (!socket.user) return;
   const userId = socket.user.id;
 
-  joinUserRooms(socket);
+  await joinUserRooms(socket);
 
   // Presence: Handle user online status
   addUserOnline(userId);
@@ -77,4 +77,6 @@ export const registerConnectionHandlers = (io: SocketIOServer, socket: Socket) =
       io.emit('PRESENCE_UPDATE', { userId: socket.user.id, status: 'offline' });
     }
   });
+
+  socket.emit('ready');
 };

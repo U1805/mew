@@ -6,8 +6,8 @@ import {
   UnauthorizedError,
   BadRequestError
 } from '../../utils/errors';
-import * as channelService from './channel.service';
-import * as serverService from '../server/server.service';
+import channelService from './channel.service';
+import serverService from '../server/server.service';
 import ServerMember from '../member/member.model';
 
 export const createChannelHandler = asyncHandler(
@@ -19,12 +19,6 @@ export const createChannelHandler = asyncHandler(
 
     if (!server) throw new NotFoundError('Server not found');
 
-    const member = await ServerMember.findOne({ serverId, userId: req.user.id });
-    if (!member || member.role !== 'OWNER') {
-      throw new ForbiddenError(
-        'User is not the owner of the server to create a channel'
-      );
-    }
 
     const newChannel = await channelService.createChannel({
       ...req.body,
@@ -62,10 +56,6 @@ export const updateChannelHandler = asyncHandler(
       throw new BadRequestError('This operation is not applicable to DM channels.');
     }
 
-    const member = await ServerMember.findOne({ serverId: channel.serverId, userId: req.user.id });
-    if (!member || member.role !== 'OWNER') {
-      throw new ForbiddenError('User is not the owner of the server');
-    }
 
     const updatedChannel = await channelService.updateChannel(
       channelId,
@@ -88,10 +78,6 @@ export const deleteChannelHandler = asyncHandler(
       throw new BadRequestError('This operation is not applicable to DM channels.');
     }
 
-    const member = await ServerMember.findOne({ serverId: channel.serverId, userId: req.user.id });
-    if (!member || member.role !== 'OWNER') {
-      throw new ForbiddenError('User is not the owner of the server');
-    }
 
     await channelService.deleteChannel(channelId);
 
@@ -107,6 +93,22 @@ export const getChannelsHandler = asyncHandler(async (req: Request, res: Respons
   const channels = await channelService.getChannelsByServer(serverId, req.user.id);
   res.status(200).json(channels);
 });
+
+export const getPermissionOverridesHandler = asyncHandler(async (req: Request, res: Response) => {
+  // @ts-ignore
+  const overrides = await channelService.getPermissionOverrides(req.params.channelId);
+  res.status(200).json(overrides);
+});
+
+export const updatePermissionOverridesHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('User not authenticated');
+  }
+  // @ts-ignore
+  const overrides = await channelService.updatePermissionOverrides(req.params.channelId, req.body, req.user.id);
+  res.status(200).json(overrides);
+});
+
 
 export const ackChannelHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {

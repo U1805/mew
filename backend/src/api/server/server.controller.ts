@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import * as serverService from './server.service';
+import serverService from './server.service';
 import asyncHandler from '../../utils/asyncHandler';
 
 export const createServerHandler = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {

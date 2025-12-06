@@ -8,6 +8,8 @@ const router = Router({ mergeParams: true });
 
 import { protect } from '../../middleware/auth';
 
-router.post('/', protect, validate(createInviteSchema), inviteController.createInvite);
+import { authorizeServer } from '../../middleware/checkPermission';
+
+router.post('/', protect, authorizeServer('CREATE_INVITE'), validate(createInviteSchema), inviteController.createInvite);
 
 export default router;

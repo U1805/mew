@@ -10,6 +10,13 @@ export interface IChannelUpdate {
   categoryId?: mongoose.Types.ObjectId;
 }
 
+interface IPermissionOverride {
+  targetType: 'role' | 'member';
+  targetId: mongoose.Types.ObjectId;
+  allow: string[];
+  deny: string[];
+}
+
 export interface IChannel extends Document {
   name?: string;
   type: ChannelType;
@@ -17,7 +24,18 @@ export interface IChannel extends Document {
   categoryId?: mongoose.Types.ObjectId;
   recipients?: mongoose.Types.ObjectId[];
   position?: number;
+  permissionOverrides?: IPermissionOverride[];
 }
+
+const PermissionOverrideSchema = new Schema<IPermissionOverride>(
+  {
+    targetType: { type: String, required: true },
+    targetId: { type: Schema.Types.ObjectId, required: true },
+    allow: { type: [String], default: [] },
+    deny: { type: [String], default: [] },
+  },
+  { _id: false }
+);
 
 const ChannelSchema: Schema = new Schema(
   {
@@ -27,6 +45,7 @@ const ChannelSchema: Schema = new Schema(
     categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },
     recipients: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     position: { type: Number },
+    permissionOverrides: { type: [PermissionOverrideSchema], default: [] },
   },
   { timestamps: true }
 );

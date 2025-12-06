@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import Category from '../api/category/category.model';
 import ServerMember, { IServerMember } from '../api/member/member.model';
 import { ForbiddenError, UnauthorizedError, NotFoundError } from '../utils/errors';
 import Server from '../api/server/server.model';
@@ -18,6 +19,22 @@ declare global {
  * It fetches the membership record and attaches it to `req.member`.
  * Throws a ForbiddenError if the user is not a member.
  */
+export const setServerIdFromCategory = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const categoryId = req.params.categoryId;
+  if (!categoryId) {
+    return res.status(400).send({ message: 'Category ID is required' });
+  }
+
+  const category = await Category.findById(categoryId).lean();
+  if (!category) {
+    return res.status(404).send({ message: 'Category not found' });
+  }
+
+  // Attach serverId to params for subsequent middleware
+  req.params.serverId = category.serverId.toString();
+  next();
+});
+
 export const checkServerMembership = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   if (!req.user) {
     throw new UnauthorizedError('Not authenticated');
@@ -44,22 +61,3 @@ export const checkServerMembership = asyncHandler(async (req: Request, res: Resp
   next();
 });
 
-/**
- * Middleware factory to authorize based on role.
- * Must be used AFTER `checkServerMembership`.
- * @param {Array<'OWNER' | 'MEMBER'>} allowedRoles - The roles allowed to access the route.
- */
-export const authorizeRole = (allowedRoles: Array<'OWNER' | 'MEMBER'>) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.member) {
-      // This should not happen if checkServerMembership is used before this middleware
-      throw new ForbiddenError('Membership details not found. Ensure checkServerMembership middleware is used.');
-    }
-
-    if (!allowedRoles.includes(req.member.role)) {
-      throw new ForbiddenError(`You do not have the required permission. Allowed roles: ${allowedRoles.join(', ')}`);
-    }
-
-    next();
-  };
-};

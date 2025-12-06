@@ -6,6 +6,10 @@ My terminal environment is powershell in windows.
 Remember: Our development should follow the spirit of Linus.
 Use `npx kill-port` to clean up the port before running the project.
 
+Always use context7 when I need code generation, setup or configuration steps, or
+library/API documentation. This means you should automatically use the Context7 MCP
+tools to resolve library id and get library docs without me having to explicitly ask.
+
 # Project Mew
 
 Mew is a highly extensible, personal digital hub centered around an Instant Messaging (IM) platform. It follows a "Private Discord" metaphor, separating the core IM platform (Frontend/Backend) from business logic (Bots).

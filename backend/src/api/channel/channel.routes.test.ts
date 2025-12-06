@@ -61,6 +61,60 @@ describe('Channel Routes', () => {
 
       expect(res.statusCode).toBe(400);
     });
+
+    it('should allow a member with MANAGE_CHANNEL permission to create a channel and deny without it', async () => {
+      // 1. Create a new user (member) and have them join the server
+      const memberData = { email: 'member@example.com', username: 'member', password: 'password123' };
+      await request(app).post('/api/auth/register').send(memberData);
+      const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberData.email, password: memberData.password });
+      const memberToken = memberLoginRes.body.token;
+
+      const inviteRes = await request(app)
+        .post(`/api/servers/${serverId}/invites`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      const inviteCode = inviteRes.body.code;
+
+      await request(app)
+        .post(`/api/invites/${inviteCode}`)
+        .set('Authorization', `Bearer ${memberToken}`);
+
+      // 2. Initially, the member (with default @everyone role) should NOT have permission
+      const channelData = { name: 'permission-test', type: ChannelType.GUILD_TEXT };
+      const resFail = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send(channelData);
+
+      expect(resFail.statusCode).toBe(403);
+
+      // 3. Grant MANAGE_CHANNEL permission to the @everyone role
+      const serverDetailsRes = await request(app)
+        .get(`/api/servers/${serverId}`)
+        .set('Authorization', `Bearer ${token}`);
+      const everyoneRoleId = serverDetailsRes.body.everyoneRoleId;
+
+      const rolesRes = await request(app)
+        .get(`/api/servers/${serverId}/roles`)
+        .set('Authorization', `Bearer ${token}`);
+      const everyoneRole = rolesRes.body.find((r: any) => r._id === everyoneRoleId);
+
+      await request(app)
+        .patch(`/api/servers/${serverId}/roles/${everyoneRoleId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          permissions: [...everyoneRole.permissions, 'MANAGE_CHANNEL'],
+        });
+
+      // 4. Now, the member should have permission
+      const resSuccess = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send({ ...channelData, name: 'permission-success' });
+
+      expect(resSuccess.statusCode).toBe(201);
+      expect(resSuccess.body.name).toBe('permission-success');
+    });
   });
 
   describe('PATCH /api/servers/:serverId/channels/:channelId', () => {
@@ -144,18 +198,46 @@ describe('Channel Routes', () => {
       expect(res.statusCode).toBe(400);
     });
 
-    it('should return 403 if a non-owner tries to update', async () => {
-      const anotherUserData = { email: 'updater@example.com', username: 'updater', password: 'password123' };
-      await request(app).post('/api/auth/register').send(anotherUserData);
-      const loginRes = await request(app).post('/api/auth/login').send({ email: anotherUserData.email, password: anotherUserData.password });
-      const anotherToken = loginRes.body.token;
+    it('should allow a member with MANAGE_CHANNEL permission to update and deny without it', async () => {
+      const memberData = { email: 'updater@example.com', username: 'updater', password: 'password123' };
+      await request(app).post('/api/auth/register').send(memberData);
+      const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberData.email, password: memberData.password });
+      const memberToken = memberLoginRes.body.token;
 
-      const res = await request(app)
+      const inviteRes = await request(app)
+        .post(`/api/servers/${serverId}/invites`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      await request(app)
+        .post(`/api/invites/${inviteRes.body.code}`)
+        .set('Authorization', `Bearer ${memberToken}`);
+
+      const updatedData = { name: 'Permission Update Test' };
+
+      // Deny without permission
+      const resFail = await request(app)
         .patch(`/api/servers/${serverId}/channels/${channelId}`)
-        .set('Authorization', `Bearer ${anotherToken}`)
-        .send({ name: 'Malicious Update' });
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send(updatedData);
+      expect(resFail.statusCode).toBe(403);
 
-      expect(res.statusCode).toBe(403);
+      // Grant permission
+      const serverDetailsRes = await request(app).get(`/api/servers/${serverId}`).set('Authorization', `Bearer ${token}`);
+      const everyoneRoleId = serverDetailsRes.body.everyoneRoleId;
+      const rolesRes = await request(app).get(`/api/servers/${serverId}/roles`).set('Authorization', `Bearer ${token}`);
+      const everyoneRole = rolesRes.body.find((r: any) => r._id === everyoneRoleId);
+      await request(app)
+        .patch(`/api/servers/${serverId}/roles/${everyoneRoleId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ permissions: [...everyoneRole.permissions, 'MANAGE_CHANNEL'] });
+
+      // Allow with permission
+      const resSuccess = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .send(updatedData);
+      expect(resSuccess.statusCode).toBe(200);
+      expect(resSuccess.body.name).toBe(updatedData.name);
     });
   });
 
@@ -200,17 +282,41 @@ describe('Channel Routes', () => {
       expect(message).toBeNull();
     });
 
-    it('should return 403 if a non-owner tries to delete', async () => {
-      const anotherUserData = { email: 'deleter@example.com', username: 'deleter', password: 'password123' };
-      await request(app).post('/api/auth/register').send(anotherUserData);
-      const loginRes = await request(app).post('/api/auth/login').send({ email: anotherUserData.email, password: anotherUserData.password });
-      const anotherToken = loginRes.body.token;
+    it('should allow a member with MANAGE_CHANNEL permission to delete and deny without it', async () => {
+      const memberData = { email: 'deleter@example.com', username: 'deleter', password: 'password123' };
+      await request(app).post('/api/auth/register').send(memberData);
+      const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberData.email, password: memberData.password });
+      const memberToken = memberLoginRes.body.token;
 
-      const res = await request(app)
+      const inviteRes = await request(app)
+        .post(`/api/servers/${serverId}/invites`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+      await request(app)
+        .post(`/api/invites/${inviteRes.body.code}`)
+        .set('Authorization', `Bearer ${memberToken}`);
+
+      // Deny without permission
+      const resFail = await request(app)
         .delete(`/api/servers/${serverId}/channels/${channelId}`)
-        .set('Authorization', `Bearer ${anotherToken}`);
+        .set('Authorization', `Bearer ${memberToken}`);
+      expect(resFail.statusCode).toBe(403);
 
-      expect(res.statusCode).toBe(403);
+      // Grant permission
+      const serverDetailsRes = await request(app).get(`/api/servers/${serverId}`).set('Authorization', `Bearer ${token}`);
+      const everyoneRoleId = serverDetailsRes.body.everyoneRoleId;
+      const rolesRes = await request(app).get(`/api/servers/${serverId}/roles`).set('Authorization', `Bearer ${token}`);
+      const everyoneRole = rolesRes.body.find((r: any) => r._id === everyoneRoleId);
+      await request(app)
+        .patch(`/api/servers/${serverId}/roles/${everyoneRoleId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ permissions: [...everyoneRole.permissions, 'MANAGE_CHANNEL'] });
+
+      // Allow with permission
+      const resSuccess = await request(app)
+        .delete(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${memberToken}`);
+      expect(resSuccess.statusCode).toBe(200);
     });
   });
 
@@ -332,6 +438,140 @@ describe('Channel Routes', () => {
       expect(channel).toBeDefined();
       expect(channel.lastMessage._id).toBe(messageId);
       expect(channel.lastReadMessageId).toBe(messageId);
+    });
+  });
+
+  describe('PUT /api/servers/:serverId/channels/:channelId/permissions', () => {
+    let channelId: string;
+    let roleId: string;
+
+    beforeEach(async () => {
+      const channelRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'perms-test', type: ChannelType.GUILD_TEXT });
+      channelId = channelRes.body._id;
+
+      const roleRes = await request(app)
+        .post(`/api/servers/${serverId}/roles`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Test Role' });
+      roleId = roleRes.body._id;
+    });
+
+    it('should allow server owner to update permission overrides', async () => {
+      const overrides = [
+        {
+          targetType: 'role',
+          targetId: roleId,
+          allow: ['MANAGE_MESSAGES'],
+          deny: ['SEND_MESSAGES'],
+        },
+      ];
+
+      const res = await request(app)
+        .put(`/api/servers/${serverId}/channels/${channelId}/permissions`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(overrides);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            targetType: 'role',
+            targetId: roleId,
+            allow: ['MANAGE_MESSAGES'],
+            deny: ['SEND_MESSAGES'],
+          }),
+        ])
+      );
+    });
+
+    it('should prevent non-owner from updating permissions', async () => {
+      const anotherUserRes = await request(app).post('/api/auth/register').send({ email: 'perm-attacker@test.com', username: 'permattacker', password: 'password123' });
+      const anotherUserLogin = await request(app).post('/api/auth/login').send({ email: 'perm-attacker@test.com', password: 'password123' });
+      const attackerToken = anotherUserLogin.body.token;
+
+      const res = await request(app)
+        .put(`/api/servers/${serverId}/channels/${channelId}/permissions`)
+        .set('Authorization', `Bearer ${attackerToken}`)
+        .send([]);
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should return 400 for invalid permission string', async () => {
+        const overrides = [
+            {
+              targetType: 'role',
+              targetId: roleId,
+              allow: ['INVALID_PERMISSION'],
+            },
+          ];
+
+        const res = await request(app)
+        .put(`/api/servers/${serverId}/channels/${channelId}/permissions`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(overrides);
+
+        expect(res.statusCode).toBe(400);
+    });
+
+    it('should prevent a user from locking themselves out of managing a channel', async () => {
+      // 1. Create a new user (manager) and a new role (Manager) with MANAGE_CHANNEL permission
+      const managerData = { email: 'manager@example.com', username: 'manager', password: 'password123' };
+      await request(app).post('/api/auth/register').send(managerData);
+      const managerLoginRes = await request(app).post('/api/auth/login').send({ email: managerData.email, password: managerData.password });
+      const managerToken = managerLoginRes.body.token;
+      const managerId = managerLoginRes.body.user._id;
+
+      const managerRoleRes = await request(app)
+        .post(`/api/servers/${serverId}/roles`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Manager', permissions: ['MANAGE_CHANNEL', 'VIEW_CHANNEL'] });
+      const managerRoleId = managerRoleRes.body._id;
+
+      // 2. Have the manager join the server and assign them the Manager role
+      const inviteRes = await request(app)
+        .post(`/api/servers/${serverId}/invites`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      await request(app)
+        .post(`/api/invites/${inviteRes.body.code}`)
+        .set('Authorization', `Bearer ${managerToken}`);
+
+      await request(app)
+        .put(`/api/servers/${serverId}/members/${managerId}/roles`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ roleIds: [managerRoleId] });
+
+      // 3. Create a channel for the test
+      const channelRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send({ name: 'self-lockout-test', type: ChannelType.GUILD_TEXT });
+      const testChannelId = channelRes.body._id;
+
+      // 4. As the manager, try to update the channel's permissions to remove their own MANAGE_CHANNEL permission
+      // This is done by setting an override for their own role that denies the permission.
+      const maliciousOverrides = [
+        {
+          targetType: 'role',
+          targetId: managerRoleId,
+          allow: ['VIEW_CHANNEL'], // Still allow viewing
+          deny: ['MANAGE_CHANNEL'], // Explicitly deny management
+        },
+      ];
+
+      const res = await request(app)
+        .put(`/api/servers/${serverId}/channels/${testChannelId}/permissions`)
+        .set('Authorization', `Bearer ${managerToken}`)
+        .send(maliciousOverrides);
+
+      // 5. Assert that the request was forbidden
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain('You cannot submit changes that would remove your own MANAGE_CHANNEL permission.');
     });
   });
 });

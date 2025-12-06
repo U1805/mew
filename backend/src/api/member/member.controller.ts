@@ -23,6 +23,14 @@ const memberController = {
     await memberService.leaveServer(serverId, requesterId);
     res.status(204).send();
   }),
+
+  updateMemberRoles: asyncHandler(async (req: Request, res: Response) => {
+    const { serverId, userId } = req.params;
+    const requesterId = req.user!.id;
+    const { roleIds } = req.body;
+    const member = await memberService.updateMemberRoles(serverId, userId, requesterId, roleIds);
+    res.status(200).json(member);
+  }),
 };
 
 export default memberController;
