@@ -31,9 +31,7 @@ export interface ServerMember {
   _id: string;
   serverId: string;
   userId: User; // Populated user object
-  roles?: Role[]; // Populated roles
-  // role: 'OWNER' | 'MEMBER'; // Deprecated in favor of roles system, but keeping for now if needed
-  role?: string; 
+  roleIds?: string[]; // Corrected: The backend actually returns roleIds
   isOwner?: boolean; // Explicit owner flag
   nickname?: string;
   createdAt: string;

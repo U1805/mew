@@ -199,7 +199,32 @@ export const ServerSettingsModal: React.FC = () => {
                <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10">
                  <h2 className="text-xl font-bold text-white mb-6">Server Overview</h2>
                  <div className="flex gap-8">
-                    ...[omitted for brevity]...
+                     <div className="flex items-center justify-center">
+                         <div className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center relative group cursor-pointer">
+                             <div className="text-white text-3xl font-bold">{modalData?.server?.name?.substring(0,2).toUpperCase()}</div>
+                             <div className="absolute top-0 right-0 bg-white rounded-full p-1 shadow-md">
+                                 <Icon icon="mdi:image-plus" className="text-black" width="16" />
+                             </div>
+                             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-white uppercase">
+                                 Change Icon
+                             </div>
+                         </div>
+                     </div>
+                     <div className="flex-1 space-y-4">
+                         <div>
+                            <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Server Name</label>
+                            <input
+                                type="text"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
+                            />
+                         </div>
+                         <div className="flex gap-4">
+                             <button className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors">Save Changes</button>
+                             <button onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
+                         </div>
+                     </div>
                  </div>
                </div>
              )}

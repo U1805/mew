@@ -7,7 +7,6 @@ import { channelApi } from '../../../shared/services/api';
 import { Channel } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores/store';
-import { useDmEvents } from '../../../shared/hooks/useDmEvents';
 import { useMemo } from 'react';
 
 export const DMChannelList: React.FC = () => {
@@ -19,7 +18,6 @@ export const DMChannelList: React.FC = () => {
   const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
   const { hiddenDmChannelIds, addHiddenChannel } = useHiddenStore();
 
-  useDmEvents();
 
   const { data: dmChannels, isSuccess } = useQuery({
       queryKey: ['dmChannels'],

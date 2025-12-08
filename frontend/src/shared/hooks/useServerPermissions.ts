@@ -1,51 +1,68 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries } from '@tanstack/react-query';
 import { useAuthStore, useUIStore } from '../stores/store';
-import { ServerMember, Role, Server } from '../types';
+import { ServerMember, Role } from '../types';
 import { useMemo } from 'react';
-
-// Placeholder while we figure out the best way to get all data
-const useServerData = () => {
-    const { currentServerId } = useUIStore();
-    const { user } = useAuthStore();
-    const queryClient = useQueryClient();
-
-    const server = queryClient.getQueryData<Server>(['server', currentServerId]);
-    const members = queryClient.getQueryData<ServerMember[]>(['members', currentServerId]);
-    const roles = queryClient.getQueryData<Role[]>(['roles', currentServerId]);
-
-    const myMember = members?.find(m => m.userId?._id === user?._id);
-
-    return { server, myMember, roles };
-}
-
+import { serverApi } from '../services/api';
+import { ALL_PERMISSIONS } from '../constants/permissions';
 
 /**
- * A hook to get the effective permissions of the current user for the current server.
+ * A reactive hook to get the current user's effective permissions on the current server.
+ * It fetches and waits for the necessary data (members and roles) on its own.
  *
- * It calculates permissions based on the @everyone role and all roles assigned to the user.
- *
- * @returns A Set containing the user's effective permission strings for the server.
+ * @returns An object containing a Set of permission strings and a boolean `isOwner` flag.
  */
-export const useServerPermissions = (): Set<string> => {
-    const { server, myMember, roles } = useServerData();
+export const useServerPermissions = (): { permissions: Set<string>; isOwner: boolean } => {
+    const { currentServerId } = useUIStore();
+    const { user } = useAuthStore();
 
-    const permissions = useMemo(() => {
-        if (!server || !myMember || !roles) {
-            return new Set<string>();
+    const results = useQueries({
+        queries: [
+            {
+                queryKey: ['members', currentServerId],
+                // fix: 保持与其他组件一致，在 queryFn 中直接返回 res.data
+                queryFn: () => serverApi.getMembers(currentServerId!).then(res => res.data),
+                enabled: !!currentServerId,
+                // remove: 移除 select，因为数据已经是我们需要的格式了
+            },
+            {
+                queryKey: ['roles', currentServerId],
+                // fix: 保持与其他组件一致，在 queryFn 中直接返回 res.data
+                queryFn: () => serverApi.getRoles(currentServerId!).then(res => res.data),
+                enabled: !!currentServerId,
+                // remove: 移除 select
+            }
+        ],
+    });
+
+    const members = results[0].data as ServerMember[] | undefined;
+    const roles = results[1].data as Role[] | undefined;
+    const isLoading = results.some(r => r.isLoading);
+
+    const serverPermissions = useMemo(() => {
+        const result = { permissions: new Set<string>(), isOwner: false };
+
+        // 增加 Array.isArray 检查以防御潜在的数据格式问题
+        if (isLoading || !members || !Array.isArray(members) || !roles || !Array.isArray(roles) || !user) {
+            return result;
         }
 
-        // Server owner has all permissions implicitly
+        const myMember = members.find(m => m.userId?._id === user._id);
+        if (!myMember) {
+            return result;
+        }
+
+        result.isOwner = myMember.isOwner || false;
+
         if (myMember.isOwner) {
-            // In a real scenario, you might return a special symbol or all known permissions
-            // For now, we'll just grant a set of admin-like perms for UI logic.
-            return new Set<string>(['ADMINISTRATOR']); // Using a single 'ADMINISTRATOR' perm to signify full power
+            result.permissions = new Set<string>(ALL_PERMISSIONS);
+            return result;
         }
 
         const everyoneRole = roles.find(r => r.isDefault);
-        const myRoleIds = myMember.roles?.map(r => r._id) || [];
-        const memberRoles = roles.filter(r => myRoleIds.includes(r._id));
-
         const finalPermissions = new Set<string>(everyoneRole?.permissions || []);
+
+        const myRoleIds = myMember.roleIds || [];
+        const memberRoles = roles.filter(role => myRoleIds.includes(role._id));
 
         memberRoles.forEach(role => {
             role.permissions.forEach(perm => {
@@ -53,9 +70,15 @@ export const useServerPermissions = (): Set<string> => {
             });
         });
 
-        return finalPermissions;
+        if (finalPermissions.has('ADMINISTRATOR')) {
+            result.permissions = new Set<string>(ALL_PERMISSIONS);
+            return result;
+        }
 
-    }, [server, myMember, roles]);
+        result.permissions = finalPermissions;
+        return result;
 
-    return permissions;
+    }, [isLoading, members, roles, user]);
+
+    return serverPermissions;
 };

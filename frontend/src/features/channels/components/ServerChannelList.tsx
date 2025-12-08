@@ -44,15 +44,6 @@ export const ServerChannelList: React.FC = () => {
     enabled: !!currentServerId
   });
 
-  const { data: members } = useQuery({
-      queryKey: ['members', currentServerId],
-      queryFn: async () => {
-          if (!currentServerId) return [];
-          const res = await serverApi.getMembers(currentServerId);
-          return res.data as ServerMember[];
-      },
-      enabled: !!currentServerId
-  });
 
   const { data: categories } = useQuery({
     queryKey: ['categories', currentServerId],
@@ -76,7 +67,7 @@ export const ServerChannelList: React.FC = () => {
 
   const channelsByCategory: Record<string, Channel[]> = {};
   const noCategoryChannels: Channel[] = [];
-  const serverPermissions = useServerPermissions();
+  const { permissions: serverPermissions, isOwner } = useServerPermissions();
 
   const canCreateInvite = serverPermissions.has('CREATE_INSTANT_INVITE') || serverPermissions.has('ADMINISTRATOR');
   const canManageChannels = serverPermissions.has('MANAGE_CHANNEL') || serverPermissions.has('ADMINISTRATOR');
@@ -154,13 +145,15 @@ export const ServerChannelList: React.FC = () => {
 
                 {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
 
-                <div
-                    className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
-                    onClick={() => openModal('leaveServer', { serverId: currentServerId })}
-                >
-                    <span className="text-sm font-medium">Leave Server</span>
-                    <Icon icon="mdi:exit-to-app" />
-                </div>
+                {!isOwner && (
+                    <div
+                        className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
+                        onClick={() => openModal('leaveServer', { serverId: currentServerId })}
+                    >
+                        <span className="text-sm font-medium">Leave Server</span>
+                        <Icon icon="mdi:exit-to-app" />
+                    </div>
+                )}
             </div>
         )}
       </div>

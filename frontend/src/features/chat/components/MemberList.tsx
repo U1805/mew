@@ -13,8 +13,8 @@ import { usePermissions } from '../../../shared/hooks/usePermissions';
 // Get the highest role position for a member
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;
-  if (!member.roles || member.roles.length === 0) return 0;
-  const memberRoleIds = member.roles.map(r => r._id);
+  const memberRoleIds = member.roleIds || [];
+  if (memberRoleIds.length === 0) return 0;
   const memberRoles = roles.filter(r => memberRoleIds.includes(r._id));
   if (memberRoles.length === 0) return 0;
   return Math.max(...memberRoles.map(r => r.position));
@@ -43,7 +43,7 @@ const MemberList: React.FC = () => {
   const isLoading = membersLoading || rolesLoading;
 
   const memberGroups = React.useMemo(() => {
-    if (!members || !roles) return [];
+    if (!Array.isArray(members) || !Array.isArray(roles)) return [];
 
     const sortedMembers = [...members].sort((a, b) => {
       const posA = getHighestRolePos(a, roles);
@@ -54,7 +54,7 @@ const MemberList: React.FC = () => {
 
     const groups: { [key: string]: ServerMember[] } = {};
     sortedMembers.forEach(member => {
-      const memberRoleIds = member.roles?.map(r => r._id) || [];
+      const memberRoleIds = member.roleIds || [];
       const highestRole = roles
         .filter(r => memberRoleIds.includes(r._id) || r.isDefault)
         .sort((a,b) => b.position - a.position)[0];
@@ -68,7 +68,7 @@ const MemberList: React.FC = () => {
 
     const everyoneRole = roles.find(r => r.isDefault);
     const everyoneGroupName = everyoneRole?.name || '@everyone';
-    const everyoneMembers = groups[everyoneGroupName]
+    const everyoneMembers = groups[everyoneGroupName];
 
     return Object.entries(groups)
       .filter(([name]) => name !== everyoneGroupName)
@@ -180,10 +180,10 @@ const MemberContextMenu: React.FC<{ targetMember: ServerMember }> = ({ targetMem
     const { user: currentUser } = useAuthStore();
     const { openModal } = useModalStore();
     const queryClient = useQueryClient();
-    const serverPermissions = useServerPermissions();
+    const { permissions: serverPermissions } = useServerPermissions();
 
-    const { data: roles } = useQuery<Role[]>({ queryKey: ['roles', currentServerId] });
-    const { data: members } = useQuery<ServerMember[]>({ queryKey: ['members', currentServerId] });
+    const roles = queryClient.getQueryData<Role[]>(['roles', currentServerId]);
+    const members = queryClient.getQueryData<ServerMember[]>(['members', currentServerId]);
 
     const requesterMember = members?.find(m => m.userId?._id === currentUser?._id);
     if (!targetMember.userId || !currentUser || !requesterMember || !currentServerId || !roles) return null;
@@ -199,7 +199,7 @@ const MemberContextMenu: React.FC<{ targetMember: ServerMember }> = ({ targetMem
     const canManageRoles = serverPermissions.has('MANAGE_ROLES') && canManageMember && !targetMember.userId.isBot;
 
     const handleToggleRole = async (roleId: string) => {
-        const currentRoleIds = targetMember.roles?.map(r => r._id) || [];
+        const currentRoleIds = targetMember.roleIds || [];
         const newRoleIds = currentRoleIds.includes(roleId)
             ? currentRoleIds.filter(id => id !== roleId)
             : [...currentRoleIds, roleId];
@@ -230,7 +230,7 @@ const MemberContextMenu: React.FC<{ targetMember: ServerMember }> = ({ targetMem
                                 onSelect={(e) => { e.preventDefault(); handleToggleRole(role._id); }}
                             >
                                 <div className="w-4 h-4 border border-[#B5BAC1] rounded mr-2 flex items-center justify-center">
-                                    {targetMember.roles?.some(r => r._id === role._id) && <Icon icon="mdi:check" className="w-3 h-3" />}
+                                    {(targetMember.roleIds || []).includes(role._id) && <Icon icon="mdi:check" className="w-3 h-3" />}
                                 </div>
                                 <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: role.color }}></div>
                                 {role.name}
