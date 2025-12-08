@@ -2,10 +2,18 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import clsx from 'clsx';
 import { serverApi } from '../../../shared/services/api';
 import { ServerMember } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores/store';
+
+// Mock Roles for Member List Context Menu
+const MOCK_ROLES = [
+    { id: '2', name: 'Admin', color: '#E74C3C' },
+    { id: '3', name: 'Moderator', color: '#3498DB' },
+    { id: '4', name: 'Member', color: '#99AAB5' },
+];
 
 const MemberList: React.FC = () => {
   const { currentServerId } = useUIStore();
@@ -94,7 +102,7 @@ const MemberGroup = ({
                 const u = member.userId;
                 if (!u) return null; 
                 
-                const canKick = isOwner && u._id !== currentUser._id;
+                const canManage = isOwner && u._id !== currentUser._id;
                 const isOnline = onlineStatus[u._id] === 'online';
 
                 return (
@@ -128,8 +136,29 @@ const MemberGroup = ({
                             </div>
                         </ContextMenu.Trigger>
                         
-                        {canKick && (
-                            <ContextMenu.Content className="min-w-[180px] bg-[#111214] rounded p-1.5 shadow-xl z-50 animate-fade-in border border-[#1E1F22]">
+                        {canManage && (
+                            <ContextMenu.Content className="min-w-[188px] bg-[#111214] rounded p-1.5 shadow-xl z-50 animate-fade-in border border-[#1E1F22]">
+                                <ContextMenu.Sub>
+                                    <ContextMenu.SubTrigger className="flex items-center justify-between px-2 py-1.5 hover:bg-mew-accent hover:text-white text-mew-textMuted rounded cursor-pointer text-sm font-medium outline-none">
+                                        Roles
+                                        <Icon icon="mdi:chevron-right" width="16" />
+                                    </ContextMenu.SubTrigger>
+                                    <ContextMenu.SubContent className="min-w-[160px] bg-[#111214] rounded p-1.5 shadow-xl z-50 border border-[#1E1F22] ml-1">
+                                        {MOCK_ROLES.map(role => (
+                                            <ContextMenu.Item 
+                                                key={role.id}
+                                                className="flex items-center px-2 py-1.5 hover:bg-[#35373C] text-[#B5BAC1] hover:text-white rounded cursor-pointer text-sm font-medium outline-none"
+                                            >
+                                                <div className="w-4 h-4 border border-[#B5BAC1] rounded mr-2"></div>
+                                                <div className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: role.color }}></div>
+                                                {role.name}
+                                            </ContextMenu.Item>
+                                        ))}
+                                    </ContextMenu.SubContent>
+                                </ContextMenu.Sub>
+
+                                <ContextMenu.Separator className="h-[1px] bg-mew-divider my-1" />
+
                                 <ContextMenu.Item 
                                     className="flex items-center px-2 py-1.5 hover:bg-red-500 hover:text-white text-red-400 rounded cursor-pointer text-sm font-medium outline-none"
                                     onSelect={() => openModal('kickUser', { user: u, serverId })}

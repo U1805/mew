@@ -11,14 +11,28 @@ export interface Server {
   _id: string;
   name: string;
   avatarUrl?: string;
-  // ownerId removed, determined by ServerMember role
+  ownerId?: string; // Kept for compatibility if needed, though mostly derived from members now
+  memberCount?: number;
+}
+
+export interface Role {
+  _id: string;
+  name: string;
+  color: string;
+  position: number;
+  permissions: string[];
+  isDefault: boolean; // For @everyone
+  serverId: string;
 }
 
 export interface ServerMember {
   _id: string;
   serverId: string;
   userId: User; // Populated user object
-  role: 'OWNER' | 'MEMBER';
+  roles?: Role[]; // Populated roles
+  // role: 'OWNER' | 'MEMBER'; // Deprecated in favor of roles system, but keeping for now if needed
+  role?: string; 
+  isOwner?: boolean; // Explicit owner flag
   nickname?: string;
   createdAt: string;
 }
@@ -50,6 +64,13 @@ export enum ChannelType {
   DM = 'DM',
 }
 
+export interface PermissionOverride {
+  targetType: 'ROLE' | 'MEMBER';
+  targetId: string;
+  allow: string[];
+  deny: string[];
+}
+
 export interface Channel {
   _id: string;
   name?: string;
@@ -60,6 +81,7 @@ export interface Channel {
   position?: number;
   lastMessage?: Message;
   lastReadMessageId?: string;
+  permissionOverrides?: PermissionOverride[];
 }
 
 export interface Attachment {
