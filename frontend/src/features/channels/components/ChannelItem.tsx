@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel } from '../../../shared/types';
 import { useUnreadStore } from '../../../shared/stores/store';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 interface ChannelItemProps {
     channel: Channel;
@@ -12,6 +13,8 @@ interface ChannelItemProps {
 }
 
 export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick }) => {
+    const permissions = usePermissions(channel._id);
+    const canManageChannel = permissions.has('MANAGE_CHANNEL');
     const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
     const hasUnread = unreadChannelIds.has(channel._id);
 
@@ -37,7 +40,7 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
             </div>
 
             {/* Settings Icon - Shows on hover or if active */}
-            {onSettingsClick && (
+            {canManageChannel && onSettingsClick && (
                 <div
                     className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white ml-1 flex-shrink-0 transition-opacity"
                     title="Edit Channel"

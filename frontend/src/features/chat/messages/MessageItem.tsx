@@ -10,6 +10,7 @@ import MessageEditor from './MessageEditor';
 import { Message } from '../../../shared/types';
 import { messageApi } from '../../../shared/services/api';
 import { useAuthStore, useUIStore, useModalStore } from '../../../shared/stores/store';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 interface MessageItemProps {
   message: Message;
@@ -24,6 +25,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const permissions = usePermissions(message.channelId);
+
+  const canAddReaction = permissions.has('ADD_REACTIONS');
+  const canManageMessages = permissions.has('MANAGE_MESSAGES');
 
   const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
   const isRssCard = message.type === 'app/x-rss-card';
@@ -102,38 +107,41 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
       {/* Hover Actions - Only show if NOT retracted */}
       {!isRetracted && (
       <div className="absolute right-4 -top-2 bg-[#313338] border border-[#26272D] rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center p-1 z-10">
-         <div className="relative">
-             <button
-                type="button"
-                className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text"
-                title="Add Reaction"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-             >
-                <Icon icon="mdi:emoticon-plus-outline" width="18" height="18" />
-             </button>
-             {showEmojiPicker && (
-                 <EmojiPicker
-                    onSelect={(emoji) => handleReactionClick(emoji)}
-                    onClose={() => setShowEmojiPicker(false)}
-                 />
-             )}
-         </div>
-
-         {isAuthor && (
-             <>
-                <button type="button" onClick={() => setIsEditing(true)} className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text" title="Edit">
-                    <Icon icon="mdi:pencil" width="18" height="18" />
-                </button>
+          {canAddReaction && (
+            <div className="relative">
                 <button
                     type="button"
-                    onClick={handleDelete}
-                    className="p-1 hover:bg-[#404249] rounded text-red-400 hover:text-red-500"
-                    title="Delete"
+                    className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text"
+                    title="Add Reaction"
+                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 >
-                    <Icon icon="mdi:trash-can-outline" width="18" height="18" />
+                    <Icon icon="mdi:emoticon-plus-outline" width="18" height="18" />
                 </button>
-             </>
-         )}
+                {showEmojiPicker && (
+                    <EmojiPicker
+                        onSelect={(emoji) => handleReactionClick(emoji)}
+                        onClose={() => setShowEmojiPicker(false)}
+                    />
+                )}
+            </div>
+        )}
+
+        {isAuthor && (
+            <button type="button" onClick={() => setIsEditing(true)} className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text" title="Edit">
+                <Icon icon="mdi:pencil" width="18" height="18" />
+            </button>
+        )}
+
+        {(isAuthor || canManageMessages) && (
+            <button
+                type="button"
+                onClick={handleDelete}
+                className="p-1 hover:bg-[#404249] rounded text-red-400 hover:text-red-500"
+                title="Delete"
+            >
+                <Icon icon="mdi:trash-can-outline" width="18" height="18" />
+            </button>
+        )}
       </div>
       )}
 

@@ -72,7 +72,9 @@ export const SearchResultsPanel: React.FC = () => {
                          <div className="text-xs font-bold text-mew-textMuted uppercase mb-2">
                             {messages.length} Results
                         </div>
-                        {messages.map(msg => {
+                        {messages
+                            .filter(msg => channels?.some(c => c._id === msg.channelId))
+                            .map(msg => {
                             const channel = channels?.find(c => c._id === msg.channelId);
                             return (
                                 <SearchResultItem 

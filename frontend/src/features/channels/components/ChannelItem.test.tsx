@@ -1,8 +1,14 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
 import React from 'react';
 import { ChannelItem } from './ChannelItem';
 import { Channel, ChannelType } from '../../../shared/types';
+
+// Mock the usePermissions hook
+vi.mock('../../../shared/hooks/usePermissions');
+
+const mockUsePermissions = vi.mocked(usePermissions);
 
 const mockChannel: Channel = {
   _id: '1',
@@ -11,6 +17,9 @@ const mockChannel: Channel = {
 };
 
 describe('ChannelItem', () => {
+  beforeEach(() => {
+    mockUsePermissions.mockClear();
+  });
   it('renders the channel name', () => {
     render(
       <ChannelItem
@@ -84,5 +93,25 @@ describe('ChannelItem', () => {
     );
     expect(container.firstChild).not.toHaveClass('bg-mew-dark');
     expect(container.firstChild).toHaveClass('text-mew-textMuted');
+  });
+
+  it('shows settings icon if user has MANAGE_CHANNEL permission', () => {
+    mockUsePermissions.mockReturnValue(new Set(['MANAGE_CHANNEL']));
+
+    render(
+      <ChannelItem channel={mockChannel} isActive={false} onClick={() => {}} onSettingsClick={() => {}} />
+    );
+
+    expect(screen.getByTitle('Edit Channel')).toBeInTheDocument();
+  });
+
+  it('hides settings icon if user does not have MANAGE_CHANNEL permission', () => {
+    mockUsePermissions.mockReturnValue(new Set(['VIEW_CHANNEL'])); // No manage permission
+
+    render(
+      <ChannelItem channel={mockChannel} isActive={false} onClick={() => {}} onSettingsClick={() => {}} />
+    );
+
+    expect(screen.queryByTitle('Edit Channel')).not.toBeInTheDocument();
   });
 });

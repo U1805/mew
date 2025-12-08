@@ -15,6 +15,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
   const [inputValue, setInputValue] = useState('');
   const queryClient = useQueryClient();
 
+  const canSendMessage = channel?.permissions?.includes('SEND_MESSAGES') ?? false;
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || !channelId) return;
@@ -70,8 +72,9 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder={`Message #${channel?.name || 'channel'}`}
-          className="bg-transparent flex-1 text-mew-text placeholder-mew-textMuted focus:outline-none"
+                  placeholder={canSendMessage ? `Message #${channel?.name || 'channel'}` : 'You do not have permission to send messages in this channel'}
+          className="bg-transparent flex-1 text-mew-text placeholder-mew-textMuted focus:outline-none disabled:cursor-not-allowed"
+          disabled={!canSendMessage}
         />
         <div className="flex items-center space-x-2 mr-2">
           <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:gift" width="24" height="24" /></button>

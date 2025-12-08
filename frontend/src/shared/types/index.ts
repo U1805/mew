@@ -1,3 +1,5 @@
+import { Permission } from '../constants/permissions';
+
 export interface User {
   _id: string;
   username: string;
@@ -20,7 +22,7 @@ export interface Role {
   name: string;
   color: string;
   position: number;
-  permissions: string[];
+  permissions: Permission[];
   isDefault: boolean; // For @everyone
   serverId: string;
 }
@@ -82,6 +84,7 @@ export interface Channel {
   lastMessage?: Message;
   lastReadMessageId?: string;
   permissionOverrides?: PermissionOverride[];
+  permissions?: string[]; // Effective permissions for the current user in this channel
 }
 
 export interface Attachment {
