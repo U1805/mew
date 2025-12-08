@@ -135,7 +135,7 @@ export const ServerSettingsModal: React.FC = () => {
   };
 
   const togglePermission = (permId: string) => {
-    if (!selectedRole || selectedRole.isDefault) return;
+    if (!selectedRole) return;
     const currentPerms = selectedRole.permissions || [];
     const hasPerm = currentPerms.includes(permId);
 
@@ -317,7 +317,7 @@ export const ServerSettingsModal: React.FC = () => {
                                 <div className="space-y-4">
                                   {group.perms.map(perm => {
                                     const isEnabled = selectedRole.permissions?.includes(perm.id);
-                                    const isDisabled = selectedRole.isDefault && perm.id !== 'VIEW_CHANNELS' && perm.id !== 'READ_MESSAGE_HISTORY' && perm.id !== 'CREATE_INSTANT_INVITE';
+                                    const isDisabled = selectedRole.isDefault && (perm.id === 'ADMINISTRATOR' || perm.id === 'KICK_MEMBERS' || perm.id === 'BAN_MEMBERS');
                                     return (
                                       <div key={perm.id} className={clsx("flex items-center justify-between", isDisabled && 'opacity-50')}>
                                         <div className="mr-4">
