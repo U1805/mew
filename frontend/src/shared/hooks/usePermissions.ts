@@ -17,11 +17,15 @@ export const usePermissions = (channelId: string): Set<string> => {
   const { currentServerId } = useUIStore();
 
   const permissions = useMemo(() => {
-    if (!currentServerId) {
-      return new Set<string>();
-    }
+    let channels: Channel[] | undefined;
 
-    const channels: Channel[] | undefined = queryClient.getQueryData(['channels', currentServerId]);
+    // Decide which cache to query based on the context (server or DMs)
+    if (currentServerId) {
+      channels = queryClient.getQueryData(['channels', currentServerId]);
+    } else {
+      // In a DM context, permissions are derived from the 'dmChannels' query
+      channels = queryClient.getQueryData(['dmChannels']);
+    }
 
     if (!channels) {
       return new Set<string>();

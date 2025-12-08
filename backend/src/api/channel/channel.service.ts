@@ -9,6 +9,7 @@ import { socketManager } from '../../gateway/events';
 import Message, { IMessage } from '../message/message.model';
 import { ChannelReadState } from './readState.model';
 import ServerMember from '../member/member.model';
+import { DM_PERMISSIONS } from '../../constants/permissions';
 
 const channelService = {
   async createChannel(channelData: Omit<IChannel, 'createdAt' | 'updatedAt'>): Promise<IChannel> {
@@ -194,6 +195,9 @@ const channelService = {
         channel.lastMessage = null;
       }
       delete channel.lastMessageArr;
+
+      // Attach the fixed permission set for every DM channel
+      channel.permissions = DM_PERMISSIONS;
     });
 
     return channels;

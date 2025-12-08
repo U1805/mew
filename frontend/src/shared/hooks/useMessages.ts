@@ -13,7 +13,7 @@ export const useMessages = (serverId: string | null, channelId: string | null) =
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
     },
-    enabled: !!serverId && !!channelId,
+    enabled: !!channelId,
     refetchOnWindowFocus: false,
   });
 };
