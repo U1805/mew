@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "pnpm -r test",
-    "dev": "concurrently \"pnpm --filter frontend dev\" \"pnpm --filter backend dev\""
+    "dev": "concurrently \"pnpm --filter frontend dev\" \"pnpm --filter backend dev\"",
+    "dev:docs": "pnpm --filter docs start",
+    "build:docs": "pnpm --filter docs build"
   },
   "keywords": [],
   "author": "",
