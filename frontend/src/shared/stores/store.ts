@@ -29,10 +29,12 @@ interface UIState {
   setTargetMessageId: (id: string | null) => void;
 }
 
+type ModalType = 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer' | 'kickUser' | 'addPermissionOverride' | 'confirm';
+
 interface ModalState {
-  activeModal: 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer' | 'kickUser' | null;
+  activeModal: ModalType | null;
   modalData: any;
-  openModal: (modal: 'createServer' | 'createChannel' | 'createCategory' | 'editCategory' | 'deleteCategory' | 'serverSettings' | 'deleteServer' | 'leaveServer' | 'channelSettings' | 'deleteChannel' | 'deleteMessage' | 'findUser' | 'userProfile' | 'createInvite' | 'joinServer' | 'kickUser', data?: any) => void;
+  openModal: (modal: ModalType, data?: any) => void;
   closeModal: () => void;
 }
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useModalStore, useUIStore } from '../../../shared/stores/store';
 import { channelApi, categoryApi, serverApi } from '../../../shared/services/api';
 import { Category, PermissionOverride, Role, ServerMember } from '../../../shared/types';
@@ -7,8 +7,8 @@ import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 
-// Permission groups for channel settings
 const CHANNEL_PERMS = [
     { group: 'General', perms: [
         { id: 'VIEW_CHANNEL', name: 'View Channel' },
@@ -25,13 +25,15 @@ const CHANNEL_PERMS = [
 
 type PermissionState = 'allow' | 'deny' | 'inherit';
 
-interface OverrideMock {
+interface DisplayOverride {
     id: string;
+    targetId: string;
     type: 'role' | 'member';
     name: string;
     color?: string;
     avatarUrl?: string;
-    perms: Record<string, PermissionState>;
+    allow: Set<string>;
+    deny: Set<string>;
 }
 
 export const ChannelSettingsModal: React.FC = () => {
@@ -45,11 +47,7 @@ export const ChannelSettingsModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'permissions' | 'integrations'>('overview');
   const permissions = usePermissions(modalData?.channel?._id);
 
-
-  // =======================================================================================
   // Permissions State
-  // =======================================================================================
-
   const [selectedOverrideId, setSelectedOverrideId] = useState<string | null>(null);
   const [localOverrides, setLocalOverrides] = useState<PermissionOverride[]>([]);
 
@@ -58,12 +56,14 @@ export const ChannelSettingsModal: React.FC = () => {
   const { data: serverRoles } = useQuery<Role[]>({
     queryKey: ['roles', currentServerId],
     queryFn: () => serverApi.getRoles(currentServerId!).then(res => res.data),
-    enabled: !!currentServerId });
+    enabled: !!currentServerId
+  });
 
   const { data: serverMembers } = useQuery<ServerMember[]>({
     queryKey: ['members', currentServerId],
     queryFn: () => serverApi.getMembers(currentServerId!).then(res => res.data),
-    enabled: !!currentServerId });
+    enabled: !!currentServerId
+  });
 
   const { data: initialOverrides, isLoading: isLoadingOverrides } = useQuery<PermissionOverride[]>({
     queryKey: ['permissionOverrides', channelId],
@@ -71,10 +71,21 @@ export const ChannelSettingsModal: React.FC = () => {
     enabled: !!currentServerId && !!channelId
   });
 
+  const updatePermissionsMutation = useMutation({
+      mutationFn: (overrides: PermissionOverride[]) =>
+          channelApi.updatePermissionOverrides(currentServerId!, channelId!, overrides),
+      onSuccess: () => {
+          toast.success('Permissions updated!');
+          queryClient.invalidateQueries({ queryKey: ['permissionOverrides', channelId] });
+      },
+      onError: (err: any) => {
+          toast.error(err.response?.data?.message || 'Failed to update permissions.');
+      }
+  });
+
   useEffect(() => {
     if (initialOverrides) {
       setLocalOverrides(initialOverrides);
-      // Find @everyone role and set it as default selected
       const everyoneRole = serverRoles?.find(r => r.isDefault);
       if (everyoneRole && !selectedOverrideId) {
         const everyoneOverride = initialOverrides.find(o => o.targetType === 'role' && o.targetId === everyoneRole._id);
@@ -84,8 +95,7 @@ export const ChannelSettingsModal: React.FC = () => {
           setSelectedOverrideId(`${first.targetType}-${first.targetId}`);
       }
     }
-  }, [initialOverrides, serverRoles]);
-
+  }, [initialOverrides, serverRoles, selectedOverrideId]);
 
   useEffect(() => {
     if (modalData?.channel) {
@@ -123,25 +133,20 @@ export const ChannelSettingsModal: React.FC = () => {
   };
 
   const handleSelectNewTarget = (target: { targetId: string, targetType: 'role' | 'member' }) => {
-    // This ensures we don't add duplicates, though the selector should prevent this
     if (localOverrides.some(o => o.targetId === target.targetId)) return;
-
     const newOverride: PermissionOverride = {
       targetId: target.targetId,
       targetType: target.targetType,
       allow: [],
       deny: [],
     };
-
     setLocalOverrides(prev => [...prev, newOverride]);
     setSelectedOverrideId(`${target.targetType}-${target.targetId}`);
   };
 
   const handleAddOverride = () => {
       if (!serverRoles || !serverMembers) return;
-
       const existingTargetIds = localOverrides.map(o => o.targetId);
-
       openModal('addPermissionOverride', {
           roles: serverRoles,
           members: serverMembers,
@@ -152,31 +157,21 @@ export const ChannelSettingsModal: React.FC = () => {
 
   const handleUpdatePermission = (permId: string, state: PermissionState) => {
     if (!currentDisplayOverride) return;
-
     const { targetId, type } = currentDisplayOverride;
-
     setLocalOverrides(prev => {
         const newOverrides = [...prev];
         let override = newOverrides.find(o => o.targetId === targetId);
-
         if (!override) {
-            // Create a new override if it doesn't exist for this target
             override = { targetId, targetType: type, allow: [], deny: [] };
             newOverrides.push(override);
         }
-
-        // Always remove from both lists to handle state changes
         override.allow = override.allow.filter(p => p !== permId);
         override.deny = override.deny.filter(p => p !== permId);
-
-        // Add to the correct list if not 'inherit'
         if (state === 'allow') {
             override.allow.push(permId);
         } else if (state === 'deny') {
             override.deny.push(permId);
         }
-
-        // Filter out overrides that have become empty
         return newOverrides.filter(o => o.allow.length > 0 || o.deny.length > 0);
     });
   };
@@ -200,7 +195,6 @@ export const ChannelSettingsModal: React.FC = () => {
 
     const existingOverrideTargetIds = new Set(localOverrides.map(o => o.targetId));
 
-    // Ensure @everyone is always an option in the list
     const everyoneRole = serverRoles.find(r => r.isDefault);
     if (everyoneRole && !existingOverrideTargetIds.has(everyoneRole._id)) {
         existingOverrideTargetIds.add(everyoneRole._id);
@@ -209,9 +203,7 @@ export const ChannelSettingsModal: React.FC = () => {
     const overridesForDisplay = Array.from(existingOverrideTargetIds).map(targetId => {
         const override = localOverrides.find(o => o.targetId === targetId);
         const targetInfo = allPossibleTargets.find(t => t.id === targetId);
-
-        if (!targetInfo) return null; // This can happen if a role/member was deleted but override persists
-
+        if (!targetInfo) return null;
         return {
             id: `${targetInfo.type}-${targetInfo.id}`,
             targetId: targetInfo.id,
@@ -222,9 +214,8 @@ export const ChannelSettingsModal: React.FC = () => {
             allow: new Set(override?.allow || []),
             deny: new Set(override?.deny || []),
         };
-    }).filter(Boolean) as Exclude<ReturnType<typeof Array.prototype.map>, null>[];
+    }).filter(Boolean) as DisplayOverride[];
 
-    // Sort: @everyone first, then other roles, then members
     overridesForDisplay.sort((a, b) => {
         const aIsEveryone = serverRoles.find(r => r._id === a.targetId)?.isDefault;
         const bIsEveryone = serverRoles.find(r => r._id === b.targetId)?.isDefault;
@@ -237,7 +228,7 @@ export const ChannelSettingsModal: React.FC = () => {
 
     const current = overridesForDisplay.find(o => o.id === selectedOverrideId);
 
-    return { displayOverrides: overridesForDisplay, currentDisplayOverride: current };
+    return { displayOverrides: overridesForDisplay, currentDisplayOverride: current || null };
 
   }, [localOverrides, serverRoles, serverMembers, selectedOverrideId]);
 
@@ -272,8 +263,7 @@ export const ChannelSettingsModal: React.FC = () => {
                             "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5",
                             activeTab === 'integrations' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text"
                         )}
-                        onClick={() => setActiveTab('integrations')}
-                    >
+                        onClick={() => setActiveTab('integrations')}>
                         Integrations
                     </div>
                 )}

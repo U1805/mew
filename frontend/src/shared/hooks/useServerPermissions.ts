@@ -41,8 +41,9 @@ export const useServerPermissions = (): Set<string> => {
             return new Set<string>(['ADMINISTRATOR']); // Using a single 'ADMINISTRATOR' perm to signify full power
         }
 
-        const everyoneRole = roles.find(r => r._id === server.everyoneRoleId);
-        const memberRoles = roles.filter(r => myMember.roleIds.includes(r._id));
+        const everyoneRole = roles.find(r => r.isDefault);
+        const myRoleIds = myMember.roles?.map(r => r._id) || [];
+        const memberRoles = roles.filter(r => myRoleIds.includes(r._id));
 
         const finalPermissions = new Set<string>(everyoneRole?.permissions || []);
 

@@ -6,13 +6,16 @@ import { serverApi, memberApi } from '../../../shared/services/api';
 import { ServerMember, Role, User } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores/store';
-import { useServerPermissions, usePermissions } from '../../../shared/hooks/useServerPermissions';
+import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
+import { usePermissions } from '../../../shared/hooks/usePermissions';
+
 
 // Get the highest role position for a member
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;
-  if (!member.roleIds || member.roleIds.length === 0) return 0;
-  const memberRoles = roles.filter(r => member.roleIds.includes(r._id));
+  if (!member.roles || member.roles.length === 0) return 0;
+  const memberRoleIds = member.roles.map(r => r._id);
+  const memberRoles = roles.filter(r => memberRoleIds.includes(r._id));
   if (memberRoles.length === 0) return 0;
   return Math.max(...memberRoles.map(r => r.position));
 };
@@ -51,8 +54,9 @@ const MemberList: React.FC = () => {
 
     const groups: { [key: string]: ServerMember[] } = {};
     sortedMembers.forEach(member => {
+      const memberRoleIds = member.roles?.map(r => r._id) || [];
       const highestRole = roles
-        .filter(r => member.roleIds.includes(r._id) || r.isDefault)
+        .filter(r => memberRoleIds.includes(r._id) || r.isDefault)
         .sort((a,b) => b.position - a.position)[0];
 
       const groupName = highestRole ? highestRole.name : 'Unassigned';
@@ -62,12 +66,10 @@ const MemberList: React.FC = () => {
       groups[groupName].push(member);
     });
 
-    // Get @everyone role and make sure it's last
     const everyoneRole = roles.find(r => r.isDefault);
     const everyoneGroupName = everyoneRole?.name || '@everyone';
     const everyoneMembers = groups[everyoneGroupName]
 
-    // Return sorted groups, with owners first, then by role position, then @everyone last
     return Object.entries(groups)
       .filter(([name]) => name !== everyoneGroupName)
       .sort((a, b) => {
@@ -186,21 +188,18 @@ const MemberContextMenu: React.FC<{ targetMember: ServerMember }> = ({ targetMem
     const requesterMember = members?.find(m => m.userId?._id === currentUser?._id);
     if (!targetMember.userId || !currentUser || !requesterMember || !currentServerId || !roles) return null;
 
-    // The user being actioned on
     const targetUserId = targetMember.userId._id;
 
-    // My highest role vs target's highest role
     const myHighestRolePos = getHighestRolePos(requesterMember, roles);
     const targetHighestRolePos = getHighestRolePos(targetMember, roles);
 
-    // I can manage this member if I'm owner, or my highest role is higher than theirs
     const canManageMember = requesterMember.isOwner || myHighestRolePos > targetHighestRolePos;
 
     const canKick = serverPermissions.has('KICK_MEMBERS') && canManageMember && targetUserId !== currentUser._id;
     const canManageRoles = serverPermissions.has('MANAGE_ROLES') && canManageMember && !targetMember.userId.isBot;
 
     const handleToggleRole = async (roleId: string) => {
-        const currentRoleIds = targetMember.roleIds || [];
+        const currentRoleIds = targetMember.roles?.map(r => r._id) || [];
         const newRoleIds = currentRoleIds.includes(roleId)
             ? currentRoleIds.filter(id => id !== roleId)
             : [...currentRoleIds, roleId];
@@ -231,7 +230,7 @@ const MemberContextMenu: React.FC<{ targetMember: ServerMember }> = ({ targetMem
                                 onSelect={(e) => { e.preventDefault(); handleToggleRole(role._id); }}
                             >
                                 <div className="w-4 h-4 border border-[#B5BAC1] rounded mr-2 flex items-center justify-center">
-                                    {targetMember.roleIds?.includes(role._id) && <Icon icon="mdi:check" className="w-3 h-3" />}
+                                    {targetMember.roles?.some(r => r._id === role._id) && <Icon icon="mdi:check" className="w-3 h-3" />}
                                 </div>
                                 <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: role.color }}></div>
                                 {role.name}

@@ -67,7 +67,7 @@ export enum ChannelType {
 }
 
 export interface PermissionOverride {
-  targetType: 'ROLE' | 'MEMBER';
+  targetType: 'role' | 'member';
   targetId: string;
   allow: string[];
   deny: string[];

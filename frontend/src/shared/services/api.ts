@@ -51,6 +51,11 @@ export const serverApi = {
   get: (id: string) => api.get(`/servers/${id}`),
   update: (id: string, data: { name?: string; avatarUrl?: string }) => api.patch(`/servers/${id}`, data),
   delete: (id: string) => api.delete(`/servers/${id}`),
+  // Compatibility methods for components not yet updated to new API structure
+  getRoles: (serverId: string) => roleApi.list(serverId),
+  getMembers: (serverId: string) => memberApi.list(serverId),
+  leaveServer: (serverId: string) => memberApi.leave(serverId),
+  kickMember: (serverId: string, userId: string) => memberApi.kick(serverId, userId),
 };
 
 export const inviteApi = {

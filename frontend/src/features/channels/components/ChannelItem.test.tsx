@@ -19,6 +19,7 @@ const mockChannel: Channel = {
 describe('ChannelItem', () => {
   beforeEach(() => {
     mockUsePermissions.mockClear();
+    mockUsePermissions.mockReturnValue(new Set(['MANAGE_CHANNEL']));
   });
   it('renders the channel name', () => {
     render(
