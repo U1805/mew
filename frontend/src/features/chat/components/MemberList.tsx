@@ -13,6 +13,8 @@ import { usePermissions } from '../../../shared/hooks/usePermissions';
 // Get the highest role position for a member
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;
+  // 增加防御性检查
+  if (!Array.isArray(roles)) return 0;
   const memberRoleIds = member.roleIds || [];
   if (memberRoleIds.length === 0) return 0;
   const memberRoles = roles.filter(r => memberRoleIds.includes(r._id));

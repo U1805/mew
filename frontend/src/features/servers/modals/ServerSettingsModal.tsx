@@ -48,9 +48,8 @@ export const ServerSettingsModal: React.FC = () => {
   // --- Data Fetching ---
   const { data: serverRoles, isLoading: isLoadingRoles } = useQuery({
     queryKey: ['roles', currentServerId],
-    queryFn: () => roleApi.list(currentServerId!),
+    queryFn: () => roleApi.list(currentServerId!).then(res => res.data), // 统一缓存结构为数组
     enabled: !!currentServerId,
-    select: (res) => res.data as Role[],
   });
 
   // --- Local State for Edits ---
@@ -183,7 +182,7 @@ export const ServerSettingsModal: React.FC = () => {
 
                 <div
                     className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] font-medium text-sm cursor-pointer mb-0.5 flex justify-between group text-red-400"
-                    onClick={() => openModal('confirm', { title: 'Delete Server', description: 'Are you sure you want to delete this server? This action cannot be undone.', onConfirm: () => serverApi.delete(modalData.server!._id).then(() => {closeModal(); queryClient.invalidateQueries({ queryKey:['servers']});}) })}
+                    onClick={() => openModal('deleteServer', { server: modalData.server })}
                 >
                     <span>Delete Server</span>
                     <Icon icon="mdi:trash-can-outline" />
