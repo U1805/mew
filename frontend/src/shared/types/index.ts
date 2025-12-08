@@ -1,3 +1,5 @@
+import { Permission } from '../constants/permissions';
+
 export interface User {
   _id: string;
   username: string;
@@ -11,14 +13,26 @@ export interface Server {
   _id: string;
   name: string;
   avatarUrl?: string;
-  // ownerId removed, determined by ServerMember role
+  ownerId?: string; // Kept for compatibility if needed, though mostly derived from members now
+  memberCount?: number;
+}
+
+export interface Role {
+  _id: string;
+  name: string;
+  color: string;
+  position: number;
+  permissions: Permission[];
+  isDefault: boolean; // For @everyone
+  serverId: string;
 }
 
 export interface ServerMember {
   _id: string;
   serverId: string;
   userId: User; // Populated user object
-  role: 'OWNER' | 'MEMBER';
+  roleIds?: string[]; // Corrected: The backend actually returns roleIds
+  isOwner?: boolean; // Explicit owner flag
   nickname?: string;
   createdAt: string;
 }
@@ -50,6 +64,13 @@ export enum ChannelType {
   DM = 'DM',
 }
 
+export interface PermissionOverride {
+  targetType: 'role' | 'member';
+  targetId: string;
+  allow: string[];
+  deny: string[];
+}
+
 export interface Channel {
   _id: string;
   name?: string;
@@ -60,6 +81,8 @@ export interface Channel {
   position?: number;
   lastMessage?: Message;
   lastReadMessageId?: string;
+  permissionOverrides?: PermissionOverride[];
+  permissions?: string[]; // Effective permissions for the current user in this channel
 }
 
 export interface Attachment {

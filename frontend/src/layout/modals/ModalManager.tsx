@@ -9,6 +9,7 @@ import { EditCategoryModal } from '../../features/channels/modals/EditCategoryMo
 import { FindUserModal } from '../../features/users/modals/FindUserModal';
 import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
 import { KickUserModal } from '../../features/servers/modals/KickUserModal';
+import { AddPermissionOverrideModal } from '../../features/channels/modals/AddPermissionOverrideModal';
 
 const ModalManager: React.FC = () => {
   const { activeModal } = useModalStore();
@@ -41,6 +42,8 @@ const ModalManager: React.FC = () => {
       return <UserProfileModal />;
     case 'kickUser':
       return <KickUserModal />;
+    case 'addPermissionOverride':
+        return <AddPermissionOverrideModal />;
     default:
       return null;
   }

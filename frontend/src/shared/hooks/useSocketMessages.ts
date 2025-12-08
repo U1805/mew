@@ -8,6 +8,8 @@ export const useSocketMessages = (channelId: string | null) => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
+    if (!channelId) return;
+
     const socket = getSocket();
     if (!socket) return;
 

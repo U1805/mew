@@ -30,15 +30,32 @@ export const userApi = {
   getById: (userId: string) => api.get(`/users/${userId}`),
 };
 
+export const roleApi = {
+  list: (serverId: string) => api.get(`/servers/${serverId}/roles`),
+  create: (serverId: string, data: { name: string, permissions: string[], color: string }) => api.post(`/servers/${serverId}/roles`, data),
+  update: (serverId: string, roleId: string, data: Partial<{ name: string; permissions: string[]; color: string }>) => api.patch(`/servers/${serverId}/roles/${roleId}`, data),
+  updatePositions: (serverId: string, positions: { roleId: string, position: number }[]) => api.patch(`/servers/${serverId}/roles/positions`, positions),
+  delete: (serverId: string, roleId: string) => api.delete(`/servers/${serverId}/roles/${roleId}`),
+};
+
+export const memberApi = {
+  list: (serverId: string) => api.get(`/servers/${serverId}/members`),
+  kick: (serverId: string, userId: string) => api.delete(`/servers/${serverId}/members/${userId}`),
+  leave: (serverId: string) => api.delete(`/servers/${serverId}/members/@me`),
+  updateRoles: (serverId: string, userId: string, roleIds: string[]) => api.put(`/servers/${serverId}/members/${userId}/roles`, { roleIds }),
+};
+
 export const serverApi = {
   list: () => api.get('/users/@me/servers'),
   create: (data: { name: string }) => api.post('/servers', data),
   get: (id: string) => api.get(`/servers/${id}`),
   update: (id: string, data: { name?: string; avatarUrl?: string }) => api.patch(`/servers/${id}`, data),
   delete: (id: string) => api.delete(`/servers/${id}`),
-  getMembers: (id: string) => api.get(`/servers/${id}/members`),
-  kickMember: (serverId: string, userId: string) => api.delete(`/servers/${serverId}/members/${userId}`),
-  leaveServer: (serverId: string) => api.delete(`/servers/${serverId}/members/@me`),
+  // Compatibility methods for components not yet updated to new API structure
+  getRoles: (serverId: string) => roleApi.list(serverId),
+  getMembers: (serverId: string) => memberApi.list(serverId),
+  leaveServer: (serverId: string) => memberApi.leave(serverId),
+  kickMember: (serverId: string, userId: string) => memberApi.kick(serverId, userId),
 };
 
 export const inviteApi = {
@@ -65,6 +82,8 @@ export const channelApi = {
       return api.delete(`/servers/${serverId}/channels/${channelId}`);
   },
   ack: (channelId: string, lastMessageId: string) => api.post(`/channels/${channelId}/ack`, { lastMessageId }),
+  getPermissionOverrides: (serverId: string, channelId: string) => api.get(`/servers/${serverId}/channels/${channelId}/permissions`),
+  updatePermissionOverrides: (serverId: string, channelId: string, data: any) => api.put(`/servers/${serverId}/channels/${channelId}/permissions`, data),
 };
 
 export const messageApi = {

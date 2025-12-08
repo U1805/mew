@@ -8,6 +8,7 @@ import { channelApi, serverApi, categoryApi } from '../../../shared/services/api
 import { useUIStore, useAuthStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
 import { Channel, ChannelType, Server, Category, ServerMember } from '../../../shared/types';
 import { useServerEvents } from '../../../shared/hooks/useServerEvents';
+import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
 
 export const ServerChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel } = useUIStore();
@@ -43,15 +44,6 @@ export const ServerChannelList: React.FC = () => {
     enabled: !!currentServerId
   });
 
-  const { data: members } = useQuery({
-      queryKey: ['members', currentServerId],
-      queryFn: async () => {
-          if (!currentServerId) return [];
-          const res = await serverApi.getMembers(currentServerId);
-          return res.data as ServerMember[];
-      },
-      enabled: !!currentServerId
-  });
 
   const { data: categories } = useQuery({
     queryKey: ['categories', currentServerId],
@@ -75,8 +67,11 @@ export const ServerChannelList: React.FC = () => {
 
   const channelsByCategory: Record<string, Channel[]> = {};
   const noCategoryChannels: Channel[] = [];
-  const myMember = members?.find(m => m.userId?._id === user?._id);
-  const isOwner = myMember?.role === 'OWNER';
+  const { permissions: serverPermissions, isOwner } = useServerPermissions();
+
+  const canCreateInvite = serverPermissions.has('CREATE_INSTANT_INVITE') || serverPermissions.has('ADMINISTRATOR');
+  const canManageChannels = serverPermissions.has('MANAGE_CHANNEL') || serverPermissions.has('ADMINISTRATOR');
+  const canManageServer = serverPermissions.has('MANAGE_SERVER') || serverPermissions.has('ADMINISTRATOR');
 
   channels?.forEach(channel => {
       if (channel.type !== ChannelType.GUILD_TEXT) return;
@@ -107,17 +102,20 @@ export const ServerChannelList: React.FC = () => {
         {/* Dropdown Menu */}
         {isDropdownOpen && (
             <div className="absolute top-[52px] left-2.5 w-[220px] bg-[#111214] p-1.5 rounded-[4px] shadow-2xl z-50 animate-fade-in-up origin-top-left">
-                <div
-                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-mew-accent hover:text-white group mb-1"
-                    onClick={() => openModal('createInvite')}
-                >
-                    <span className="text-sm font-medium">Invite People</span>
-                    <Icon icon="mdi:account-plus" />
-                </div>
+                {canCreateInvite && (
+                    <div
+                        className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-mew-accent hover:text-white group mb-1"
+                        onClick={() => openModal('createInvite')}
+                    >
+                        <span className="text-sm font-medium">Invite People</span>
+                        <Icon icon="mdi:account-plus" />
+                    </div>
+                )}
 
-                {isOwner && (
+                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
+
+                {canManageChannels && (
                     <>
-                        <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
                         <div
                             className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
                             onClick={() => openModal('createCategory')}
@@ -132,30 +130,29 @@ export const ServerChannelList: React.FC = () => {
                             <span className="text-sm font-medium">Create Channel</span>
                             <Icon icon="mdi:plus-circle-outline" />
                         </div>
-
-                         <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
-
-                         <div
-                            className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
-                            onClick={() => openModal('serverSettings', { server })}
-                        >
-                            <span className="text-sm font-medium">Server Settings</span>
-                            <Icon icon="mdi:cog-outline" />
-                        </div>
                     </>
                 )}
 
+                {canManageServer && (
+                     <div
+                        className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
+                        onClick={() => openModal('serverSettings', { server })}
+                    >
+                        <span className="text-sm font-medium">Server Settings</span>
+                        <Icon icon="mdi:cog-outline" />
+                    </div>
+                )}
+
+                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
+
                 {!isOwner && (
-                    <>
-                        <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>
-                        <div
-                            className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
-                            onClick={() => openModal('leaveServer', { serverId: currentServerId })}
-                        >
-                            <span className="text-sm font-medium">Leave Server</span>
-                            <Icon icon="mdi:exit-to-app" />
-                        </div>
-                    </>
+                    <div
+                        className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
+                        onClick={() => openModal('leaveServer', { serverId: currentServerId })}
+                    >
+                        <span className="text-sm font-medium">Leave Server</span>
+                        <Icon icon="mdi:exit-to-app" />
+                    </div>
                 )}
             </div>
         )}
@@ -171,7 +168,7 @@ export const ServerChannelList: React.FC = () => {
                 channel={channel}
                 isActive={currentChannelId === channel._id}
                 onClick={() => setCurrentChannel(channel._id)}
-                onSettingsClick={isOwner ? (e) => { e.stopPropagation(); openModal('channelSettings', { channel }); } : undefined}
+                onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
             />
         ))}
 
@@ -192,7 +189,7 @@ export const ServerChannelList: React.FC = () => {
                     </div>
 
                      <div className="flex items-center space-x-1">
-                        {isOwner && (
+                        {canManageChannels && (
                             <>
                                 <div
                                     className="opacity-0 group-hover:opacity-100 cursor-pointer hover:text-white transition-opacity"
@@ -225,7 +222,7 @@ export const ServerChannelList: React.FC = () => {
                         channel={channel}
                         isActive={currentChannelId === channel._id}
                         onClick={() => setCurrentChannel(channel._id)}
-                        onSettingsClick={isOwner ? (e) => { e.stopPropagation(); openModal('channelSettings', { channel }); } : undefined}
+                        onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
                     />
                 ))}
             </div>
@@ -237,7 +234,7 @@ export const ServerChannelList: React.FC = () => {
                     <Icon icon="mdi:chat-plus-outline" className="text-mew-textMuted" width="24" />
                 </div>
                 <p className="text-mew-textMuted text-xs px-4">Nothing here yet.</p>
-                {isOwner && (
+                {canManageChannels && (
                     <button
                         className="mt-2 text-mew-accent hover:underline text-xs font-medium"
                         onClick={() => openModal('createChannel')}

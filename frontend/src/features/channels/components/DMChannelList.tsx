@@ -6,8 +6,8 @@ import { UserStatusFooter } from '../../users/components/UserStatusFooter';
 import { channelApi } from '../../../shared/services/api';
 import { Channel } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { useUIStore, useAuthStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
-import { useDmEvents } from '../../../shared/hooks/useDmEvents';
+import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores/store';
+import { useMemo } from 'react';
 
 export const DMChannelList: React.FC = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();
@@ -16,8 +16,8 @@ export const DMChannelList: React.FC = () => {
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
   const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
+  const { hiddenDmChannelIds, addHiddenChannel } = useHiddenStore();
 
-  useDmEvents();
 
   const { data: dmChannels, isSuccess } = useQuery({
       queryKey: ['dmChannels'],
@@ -32,6 +32,11 @@ export const DMChannelList: React.FC = () => {
       enabled: true // Always fetch DMs when this component is rendered
   });
 
+  const visibleDmChannels = useMemo(() => {
+    if (!dmChannels) return [];
+    return dmChannels.filter(channel => !hiddenDmChannelIds.has(channel._id));
+  }, [dmChannels, hiddenDmChannelIds]);
+
   useEffect(() => {
     if (dmChannels && isSuccess) {
       dmChannels.forEach((channel) => {
@@ -41,6 +46,17 @@ export const DMChannelList: React.FC = () => {
       });
     }
   }, [dmChannels, isSuccess, addUnreadChannel]);
+
+  const handleRemoveDm = (e: React.MouseEvent, channelId: string) => {
+    e.stopPropagation(); // Prevent the parent div's onClick from firing
+
+    // If we are currently viewing the channel we are hiding, switch away from it.
+    if (useUIStore.getState().currentChannelId === channelId) {
+      useUIStore.getState().setCurrentChannel(null);
+    }
+
+    addHiddenChannel(channelId);
+  };
 
   return (
     <div className="w-60 bg-mew-darker flex flex-col border-r border-mew-darkest flex-shrink-0">
@@ -67,7 +83,7 @@ export const DMChannelList: React.FC = () => {
               />
           </div>
 
-          {dmChannels?.map(dm => {
+          {visibleDmChannels?.map(dm => {
                const otherUser = dm.recipients?.find(r => typeof r === 'object' && r._id !== user?._id) as any;
                const name = otherUser?.username || dm.name || 'Unknown User';
                const isOnline = otherUser?._id && onlineStatus[otherUser._id] === 'online';
@@ -106,7 +122,11 @@ export const DMChannelList: React.FC = () => {
                           )}
                       </div>
 
-                      <div className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white" title="Remove DM">
+                      <div
+                         className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white"
+                         title="Remove DM"
+                         onClick={(e) => handleRemoveDm(e, dm._id)}
+                      >
                          <Icon icon="mdi:close" width="16" />
                       </div>
                   </div>
