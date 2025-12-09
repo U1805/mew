@@ -2,4 +2,4 @@ packages:
   - 'frontend'
   - 'backend'
   - 'bots'
-  - 'docs'
+  - 'website'

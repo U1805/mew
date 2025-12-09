@@ -1,0 +1,123 @@
+.features {
+  padding: 5rem 0; /* 增加留白 */
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+.featuresHeader {
+  margin-bottom: 3rem;
+}
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 4rem; /* 增加卡片间距 */
+}
+
+/* 滚动显现动画相关的类 */
+.fadeInSection {
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.8s ease-out, transform 0.8s ease-out;
+  will-change: opacity, transform;
+}
+
+.isVisible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Feature Row 卡片化增强 */
+.featureRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: var(--ifm-background-color);
+  border-radius: 16px; /* 更圆润 */
+  padding: 3rem; /* 内容更宽松 */
+  gap: 4rem;
+
+  /* 初始状态 */
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+  border: 1px solid transparent;
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* Hover 效果：轻微上浮 + 阴影加深 + 边框高亮 */
+.featureRow:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.08);
+  border-color: var(--ifm-color-emphasis-200);
+  z-index: 1;
+}
+
+[data-theme="dark"] .featureRow:hover {
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+  border-color: var(--ifm-color-primary-dark);
+}
+
+.featureRowReverse {
+  flex-direction: row-reverse;
+  /* 移除特定背景色，统一让卡片自己处理背景，或者保持交替风格 */
+  background-color: var(--ifm-background-color);
+}
+
+.featureContent {
+  flex: 1;
+}
+
+.featureImageWrapper {
+  flex: 1.2;
+  display: flex;
+  justify-content: center;
+  perspective: 1000px; /* 3D 效果准备 */
+}
+
+.featureImage {
+  width: 100%;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  transition: transform 0.4s ease;
+}
+
+/* 图片在卡片 Hover 时的微互动：稍微放大或倾斜 */
+.featureRow:hover .featureImage {
+  transform: scale(1.02);
+}
+
+/* 标签样式优化 */
+.tagList {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.2rem;
+  flex-wrap: wrap;
+}
+
+.tag {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.8rem;
+  border-radius: 20px; /* 胶囊形状 */
+  background-color: var(--ifm-color-emphasis-200);
+  color: var(--ifm-color-content-secondary);
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.tagActive {
+  background-color: var(--ifm-color-primary-lightest);
+  color: var(--ifm-color-primary-darkest);
+}
+[data-theme="dark"] .tagActive {
+  background-color: rgba(88, 101, 242, 0.2);
+  color: #fff;
+}
+
+@media screen and (max-width: 996px) {
+  .featureRow {
+    padding: 2rem;
+    gap: 2rem;
+  }
+  .featureRow,
+  .featureRowReverse {
+    flex-direction: column-reverse;
+  }
+}

@@ -6,8 +6,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'Mew',
-  tagline: 'A highly extensible, personal digital hub.',
-  favicon: 'img/favicon.ico',
+  tagline: '一个高扩展性的个人数字中心。',
+  favicon: '/favicon.svg',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -35,11 +35,29 @@ const config: Config = {
     locales: ['zh-Hans'],
   },
 
+  scripts: [
+    {
+      src: 'https://unpkg.com/twemoji@latest/dist/twemoji.min.js',
+      crossorigin: 'anonymous',
+      async: true,
+    },
+  ],
+
+  clientModules: [
+    './src/js/twemoji-client.ts',
+  ],
+
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+
   presets: [
     [
       'classic',
       {
         docs: {
+          path: 'docs', // Look for docs in `website/docs`
           sidebarPath: './sidebars.ts',
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
@@ -78,21 +96,40 @@ const config: Config = {
       title: 'Mew',
       logo: {
         alt: 'Mew Logo',
-        src: 'img/logo.svg',
+        src: '/favicon.svg',
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
+          type: 'doc',
+          docId: 'guide/introduction',
           position: 'left',
-          label: 'Documentation',
+          label: '指南',
         },
-        // {to: '/blog', label: 'Blog', position: 'left'},
-        // {
-        //   href: 'https://github.com/facebook/docusaurus',
-        //   label: 'GitHub',
-        //   position: 'right',
-        // },
+        {
+          type: 'dropdown',
+          label: 'SDK',
+          position: 'left',
+          items: [
+            {
+              label: '核心 API',
+              to: '/docs/core-api',
+            },
+            {
+              label: 'Bot 开发',
+              to: '/docs/bot-sdk',
+            },
+          ],
+        },
+        {to: '/blog', label: '博客', position: 'left'},
+        {
+          type: 'localeDropdown',
+          position: 'right',
+        },
+        {
+          href: 'https://github.com/your-username/mew',
+          label: 'GitHub',
+          position: 'right',
+        },
       ],
     },
     footer: {
@@ -103,17 +140,13 @@ const config: Config = {
           items: [
             {
               label: 'Documentation',
-              to: '/docs/intro',
+              to: '/docs/guide/introduction',
             },
           ],
         },
         {
           title: 'Community',
           items: [
-            {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-            },
             {
               label: 'Discord',
               href: 'https://discordapp.com/invite/docusaurus',

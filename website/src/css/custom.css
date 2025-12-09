@@ -1,0 +1,108 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #5865f2;
+  --ifm-color-primary-dark: #4752c4;
+  --ifm-color-primary-darker: #414abf;
+  --ifm-color-primary-darkest: #353d9d;
+  --ifm-color-primary-light: #6978f4;
+  --ifm-color-primary-lighter: #7584f5;
+  --ifm-color-primary-lightest: #939ff7;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+  /* 新增动画变量 */
+  --transition-fast: 0.2s ease;
+  --transition-smooth: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 10px 30px rgba(88, 101, 242, 0.15); /* 带品牌色的阴影 */
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme="dark"] {
+  /* Discord Colors */
+  --ifm-color-primary: #5865f2; /* Blurple for links and active elements */
+  --ifm-color-primary-dark: #4752c4;
+  --ifm-color-primary-darker: #414abf;
+  --ifm-color-primary-darkest: #353d9d;
+  --ifm-color-primary-light: #6978f4;
+  --ifm-color-primary-lighter: #7584f5;
+  --ifm-color-primary-lightest: #939ff7;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .button.button--primary {
+  color: #ffffff !important;
+}
+
+img.emoji {
+  height: 1em;
+  width: 1em;
+  margin: 0 0.05em 0 0.1em;
+  vertical-align: -0.1em;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* 定义全局通用的 Keyframes */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes gradientMove {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+/* 优化按钮质感 */
+.button {
+  transition: all var(--transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.button:active {
+  transform: scale(0.96);
+}
+
+.button--primary {
+  box-shadow: 0 4px 14px 0 rgba(88, 101, 242, 0.39);
+}
+
+.button--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(88, 101, 242, 0.23);
+}
