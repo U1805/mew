@@ -10,6 +10,7 @@ import Message, { IMessage } from '../message/message.model';
 import { ChannelReadState } from './readState.model';
 import ServerMember from '../member/member.model';
 import { DM_PERMISSIONS } from '../../constants/permissions';
+import { Webhook } from '../webhook/webhook.model';
 
 const channelService = {
   async createChannel(channelData: Omit<IChannel, 'createdAt' | 'updatedAt'>): Promise<IChannel> {
@@ -62,6 +63,7 @@ const channelService = {
     }
 
     await Message.deleteMany({ channelId });
+    await Webhook.deleteMany({ channelId });
     const deletedChannel = await Channel.findByIdAndDelete(channelId);
 
     if (deletedChannel && deletedChannel.serverId) {

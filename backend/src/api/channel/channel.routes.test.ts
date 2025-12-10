@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../../app';
 import { ChannelType } from './channel.model';
 import Message from '../message/message.model';
+import { Webhook } from '../webhook/webhook.model';
 
 describe('Channel Routes', () => {
   const userData = {
@@ -280,6 +281,26 @@ describe('Channel Routes', () => {
 
       const message = await Message.findById(messageId);
       expect(message).toBeNull();
+    });
+
+    it('should cascade delete all webhooks within the channel', async () => {
+      // 1. Create a webhook in the channel
+      const webhookRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Channel-Scoped Webhook' });
+      const webhookId = webhookRes.body._id;
+      expect(webhookRes.statusCode).toBe(201);
+
+      // 2. Delete the channel
+      const deleteRes = await request(app)
+        .delete(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(deleteRes.statusCode).toBe(200);
+
+      // 3. Verify the webhook is deleted
+      const webhook = await Webhook.findById(webhookId);
+      expect(webhook).toBeNull();
     });
 
     it('should allow a member with MANAGE_CHANNEL permission to delete and deny without it', async () => {

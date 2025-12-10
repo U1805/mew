@@ -3,6 +3,7 @@ import request from 'supertest';
 import app from '../../app';
 import ServerMemberModel from '../member/member.model';
 import RoleModel from '../role/role.model';
+import { Webhook } from '../webhook/webhook.model';
 
 describe('Server Routes', () => {
   const userData = {
@@ -287,6 +288,33 @@ describe('Server Routes', () => {
 
       const roleCount = await RoleModel.countDocuments({ serverId });
       expect(roleCount).toBe(0);
+    });
+
+    it('should cascade delete all webhooks within the server', async () => {
+      // 1. Create a channel
+      const channelRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'webhook-test-channel', type: 'GUILD_TEXT' });
+      const channelId = channelRes.body._id;
+
+      // 2. Create a webhook in the channel
+      const webhookRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Test Webhook' });
+      const webhookId = webhookRes.body._id;
+      expect(webhookRes.statusCode).toBe(201);
+
+      // 3. Delete the server
+      const deleteRes = await request(app)
+        .delete(`/api/servers/${serverId}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(deleteRes.statusCode).toBe(200);
+
+      // 4. Verify the webhook is deleted directly from the database
+      const webhook = await Webhook.findById(webhookId);
+      expect(webhook).toBeNull();
     });
   });
 });

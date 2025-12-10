@@ -6,6 +6,7 @@ import { NotFoundError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
 import ServerMember from '../member/member.model';
 import Role from '../role/role.model';
+import { Webhook } from '../webhook/webhook.model';
 
 interface CreateServerData {
   name: string;
@@ -98,6 +99,7 @@ const serverService = {
 
     await Channel.deleteMany({ serverId: serverId as any });
     await ServerMember.deleteMany({ serverId: serverId as any });
+    await Webhook.deleteMany({ serverId: serverId as any });
     await Role.deleteMany({ serverId: serverId as any });
     await Server.deleteOne({ _id: serverId as any });
 
