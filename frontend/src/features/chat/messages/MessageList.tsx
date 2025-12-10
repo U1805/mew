@@ -1,6 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import MessageItem from './MessageItem';
+import TimestampDivider from './TimestampDivider';
+import { formatDividerTimestamp } from '../../../shared/utils/date';
+import { isSameDay } from 'date-fns';
 import { Message, Channel, ChannelType } from '../../../shared/types';
 import { useAuthStore, useUIStore } from '../../../shared/stores/store';
 import { channelApi } from '../../../shared/services/api';
@@ -106,10 +109,29 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
             </div>
             {messages.map((msg, index) => {
               const prevMsg = messages[index - 1];
+
+              const currentTimestamp = new Date(msg.createdAt);
+              const prevTimestamp = prevMsg ? new Date(prevMsg.createdAt) : null;
+
+              let showDivider = false;
+              if (prevTimestamp) {
+                // Show if it's not the same day or if the time gap is larger than 1 minute
+                if (!isSameDay(currentTimestamp, prevTimestamp) || (currentTimestamp.getTime() - prevTimestamp.getTime() > 5 * 60 * 1000)) {
+                    showDivider = true;
+                }
+              }
+
               const isSequential = prevMsg &&
+                !showDivider && // Don't group if there's a time divider between them
                 prevMsg.authorId === msg.authorId &&
-                (new Date(msg.createdAt).getTime() - new Date(prevMsg.createdAt).getTime() < 5 * 60 * 1000);
-              return <MessageItem key={msg._id} message={msg} isSequential={!!isSequential} />;
+                (currentTimestamp.getTime() - prevTimestamp.getTime() < 5 * 60 * 1000);
+
+              return (
+                <React.Fragment key={msg._id}>
+                  {showDivider && <TimestampDivider timestamp={formatDividerTimestamp(currentTimestamp)} />}
+                  <MessageItem message={msg} isSequential={!!isSequential} />
+                </React.Fragment>
+              );
             })}
           </div>
           <div ref={bottomRef} />
