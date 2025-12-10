@@ -9,7 +9,6 @@ export const ALL_PERMISSIONS = [
   'MANAGE_WEBHOOKS',
 
   // Channel-Level Permissions
-  'VIEW_CHANNEL',
   'MANAGE_CHANNEL',
   'SEND_MESSAGES',
   'MANAGE_MESSAGES',
@@ -30,7 +29,6 @@ export const SERVER_PERMISSIONS: Permission[] = [
 ];
 
 export const CHANNEL_PERMISSIONS: Permission[] = [
-  'VIEW_CHANNEL',
   'MANAGE_CHANNEL',
   'SEND_MESSAGES',
   'MANAGE_MESSAGES',
@@ -40,7 +38,6 @@ export const CHANNEL_PERMISSIONS: Permission[] = [
 ];
 
 export const DM_PERMISSIONS: Permission[] = [
-    'VIEW_CHANNEL',
     'SEND_MESSAGES',
     'ADD_REACTIONS',
     'ATTACH_FILES',

@@ -10,7 +10,6 @@ import { roleApi, serverApi } from '../../../shared/services/api';
 
 const PERMISSION_GROUPS = [
   { group: 'General Server Permissions', perms: [
-    { id: 'VIEW_CHANNELS', name: 'View Channels', desc: 'Allows members to view channels by default (excluding private channels).' },
     { id: 'MANAGE_CHANNELS', name: 'Manage Channels', desc: 'Allows members to create, edit, or delete channels.' },
     { id: 'MANAGE_ROLES', name: 'Manage Roles', desc: 'Allows members to create new roles and edit/delete roles lower than their highest role.' },
     { id: 'MANAGE_SERVER', name: 'Manage Server', desc: "Allows members to change this server's name or move its region." },

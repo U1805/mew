@@ -528,7 +528,7 @@ describe('Channel Routes', () => {
       const managerRoleRes = await request(app)
         .post(`/api/servers/${serverId}/roles`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'Manager', permissions: ['MANAGE_CHANNEL', 'VIEW_CHANNEL'] });
+        .send({ name: 'Manager', permissions: ['MANAGE_CHANNEL'] });
       const managerRoleId = managerRoleRes.body._id;
 
       // 2. Have the manager join the server and assign them the Manager role
@@ -559,7 +559,7 @@ describe('Channel Routes', () => {
         {
           targetType: 'role',
           targetId: managerRoleId,
-          allow: ['VIEW_CHANNEL'], // Still allow viewing
+          allow: [],
           deny: ['MANAGE_CHANNEL'], // Explicitly deny management
         },
       ];

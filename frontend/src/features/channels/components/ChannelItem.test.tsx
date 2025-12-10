@@ -107,7 +107,7 @@ describe('ChannelItem', () => {
   });
 
   it('hides settings icon if user does not have MANAGE_CHANNEL permission', () => {
-    mockUsePermissions.mockReturnValue(new Set(['VIEW_CHANNEL'])); // No manage permission
+    mockUsePermissions.mockReturnValue(new Set(['SEND_MESSAGES'])); // No manage permission
 
     render(
       <ChannelItem channel={mockChannel} isActive={false} onClick={() => {}} onSettingsClick={() => {}} />

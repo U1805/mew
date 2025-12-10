@@ -117,12 +117,6 @@ export function calculateEffectivePermissions(
     );
   }
 
-  // If user doesn't have VIEW_CHANNEL, they implicitly have no permissions in it.
-  // This is a convention from Discord.
-  if (!effectivePermissions.has('VIEW_CHANNEL')) {
-      return new Set();
-  }
-
   // 5. Return the final calculated permissions.
   return effectivePermissions;
 }
@@ -158,14 +152,4 @@ export async function syncUserChannelPermissions(
   if (!everyoneRole) return;
 
   const newPermissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
-
-  if (!newPermissions.has('VIEW_CHANNEL')) {
-    const io = socketManager.getIO();
-    const sockets = await io.in(userId).fetchSockets();
-
-    for (const socket of sockets) {
-      socket.leave(channelId);
-      console.log(`Socket ${socket.id} for user ${userId} left room ${channelId} due to permission change.`);
-    }
-  }
 }

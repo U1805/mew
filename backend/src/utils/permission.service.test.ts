@@ -74,11 +74,11 @@ describe('Permission Service - calculateEffectivePermissions', () => {
       createMockRole(everyoneRoleId, [], 0, true),
       channel
     );
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES', 'ADD_REACTIONS', 'ATTACH_FILES']));
+    expect(permissions).toEqual(new Set(['SEND_MESSAGES', 'ADD_REACTIONS', 'ATTACH_FILES']));
   });
 
   it('should combine base permissions from @everyone and other roles', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const memberRole = createMockRole(role1Id, ['SEND_MESSAGES'], 1);
     const member = createMockMember(user1Id, [everyoneRoleId, role1Id]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT);
@@ -90,12 +90,12 @@ describe('Permission Service - calculateEffectivePermissions', () => {
       channel
     );
 
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES']));
+    expect(permissions).toEqual(new Set(['SEND_MESSAGES']));
   });
 
   it('should grant all permissions if a role has ADMINISTRATOR', () => {
     const adminRole = createMockRole(role1Id, ['ADMINISTRATOR'], 2);
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const member = createMockMember(user1Id, [everyoneRoleId, role1Id]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT);
 
@@ -110,7 +110,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
   });
 
  it('should apply a DENY override from @everyone', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL', 'SEND_MESSAGES'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, ['SEND_MESSAGES'], 0, true);
     const member = createMockMember(user1Id, [everyoneRoleId]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT, [
       {
@@ -123,11 +123,11 @@ describe('Permission Service - calculateEffectivePermissions', () => {
 
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
 
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL']));
+    expect(permissions).toEqual(new Set());
   });
 
   it('should apply an ALLOW override from a specific role', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const specificRole = createMockRole(role1Id, [], 1);
     const member = createMockMember(user1Id, [everyoneRoleId, role1Id]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT, [
@@ -146,12 +146,12 @@ describe('Permission Service - calculateEffectivePermissions', () => {
       channel
     );
 
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES']));
+    expect(permissions).toEqual(new Set(['SEND_MESSAGES']));
   });
 
 
   it('should prioritize member-specific overrides over role overrides', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const specificRole = createMockRole(role1Id, [], 1);
     const member = createMockMember(user1Id, [everyoneRoleId, role1Id]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT, [
@@ -166,20 +166,8 @@ describe('Permission Service - calculateEffectivePermissions', () => {
     expect(permissions).toContain('SEND_MESSAGES');
   });
 
-  it('should return an empty set if VIEW_CHANNEL is denied', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL', 'SEND_MESSAGES'], 0, true);
-    const member = createMockMember(user1Id, [everyoneRoleId]);
-    const channel = createMockChannel(ChannelType.GUILD_TEXT, [
-        { targetType: 'role', targetId: everyoneRoleId, allow:[], deny: ['VIEW_CHANNEL'] }
-    ]);
-
-    const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
-
-    expect(permissions).toEqual(new Set());
-  });
-
   it('should correctly apply overrides based on role position hierarchy', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const lowerRole = createMockRole(role1Id, [], 1); // position 1
     const higherRole = createMockRole(role2Id, [], 2); // position 2
     const member = createMockMember(user1Id, [everyoneRoleId, role1Id, role2Id]);
@@ -205,7 +193,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
   it('should handle complex interactions between allow and deny across levels', () => {
     const everyoneRole = createMockRole(
       everyoneRoleId,
-      ['VIEW_CHANNEL', 'ADD_REACTIONS'],
+      ['ADD_REACTIONS'],
       0,
       true
     );
@@ -226,11 +214,11 @@ describe('Permission Service - calculateEffectivePermissions', () => {
 
     const permissions = calculateEffectivePermissions(member, [modRole, vipRole], everyoneRole, channel);
 
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'ADD_REACTIONS', 'SEND_MESSAGES', 'ATTACH_FILES']));
+    expect(permissions).toEqual(new Set(['ADD_REACTIONS', 'SEND_MESSAGES', 'ATTACH_FILES']));
   });
 
   it('should handle users with only the @everyone role', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const member = createMockMember(user1Id, [everyoneRoleId]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT, [
       { targetType: 'role', targetId: everyoneRoleId, allow: ['ADD_REACTIONS'], deny: [] }
@@ -238,11 +226,11 @@ describe('Permission Service - calculateEffectivePermissions', () => {
 
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
 
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'ADD_REACTIONS']));
+    expect(permissions).toEqual(new Set(['ADD_REACTIONS']));
   });
 
   it('should ignore invalid permission strings in data', () => {
-    const everyoneRole = createMockRole(everyoneRoleId, ['VIEW_CHANNEL', 'INVALID_PERM'], 0, true);
+    const everyoneRole = createMockRole(everyoneRoleId, ['INVALID_PERM'], 0, true);
     const member = createMockMember(user1Id, [everyoneRoleId]);
     const channel = createMockChannel(ChannelType.GUILD_TEXT, [
       { targetType: 'role', targetId: everyoneRoleId, allow: ['SEND_MESSAGES'], deny: ['ANOTHER_INVALID'] }
@@ -251,6 +239,6 @@ describe('Permission Service - calculateEffectivePermissions', () => {
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
 
     // Invalid permissions should be filtered out
-    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES']));
+    expect(permissions).toEqual(new Set(['SEND_MESSAGES']));
   });
 });

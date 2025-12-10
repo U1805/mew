@@ -147,13 +147,10 @@ const channelService = {
       delete channel.lastMessageArr;
     });
 
-    const processedChannels = baseChannels.reduce((acc: any[], channel: IChannel) => {
+    const processedChannels = baseChannels.map(channel => {
       const permissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
-      if (permissions.has('VIEW_CHANNEL')) {
-        acc.push({ ...channel, permissions: Array.from(permissions) });
-      }
-      return acc;
-    }, []);
+      return { ...channel, permissions: Array.from(permissions) };
+    });
 
     return processedChannels;
   },

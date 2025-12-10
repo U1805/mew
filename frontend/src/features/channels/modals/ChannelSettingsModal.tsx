@@ -11,7 +11,6 @@ import toast from 'react-hot-toast';
 
 const CHANNEL_PERMS = [
     { group: 'General', perms: [
-        { id: 'VIEW_CHANNEL', name: 'View Channel' },
         { id: 'MANAGE_CHANNEL', name: 'Manage Channel' },
     ]},
     { group: 'Text', perms: [

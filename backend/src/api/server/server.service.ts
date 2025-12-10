@@ -26,7 +26,6 @@ const serverService = {
       isDefault: true,
       permissions: [
         'CREATE_INVITE',
-        'VIEW_CHANNEL',
         'SEND_MESSAGES',
         'ADD_REACTIONS',
         'ATTACH_FILES',

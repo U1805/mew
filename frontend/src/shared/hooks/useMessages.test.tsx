@@ -32,10 +32,12 @@ describe('useMessages', () => {
     vi.clearAllMocks();
   });
 
-  it('should not fetch messages if serverId or channelId are null', () => {
+  it('should not fetch messages if serverId is null', () => {
     renderHook(() => useMessages(null, 'channel-1'), { wrapper: createWrapper() });
     expect(messageApi.list).not.toHaveBeenCalled();
+  });
 
+  it('should not fetch messages if channelId is null', () => {
     renderHook(() => useMessages('server-1', null), { wrapper: createWrapper() });
     expect(messageApi.list).not.toHaveBeenCalled();
   });

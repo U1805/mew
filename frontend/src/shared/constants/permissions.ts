@@ -8,7 +8,6 @@ export const ALL_PERMISSIONS = [
   'MANAGE_WEBHOOKS',
 
   // Channel-Level Permissions
-  'VIEW_CHANNEL',
   'MANAGE_CHANNEL',
   'SEND_MESSAGES',
   'MANAGE_MESSAGES',

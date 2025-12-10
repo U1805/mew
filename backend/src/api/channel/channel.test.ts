@@ -100,7 +100,7 @@ describe('Channel Service', () => {
     it('should correctly attach lastMessage for server channels', async () => {
       const user = await User.create({ email: 'user@test.com', username: 'user', password: 'password' });
       const server = await Server.create({ name: 'Test Server' });
-      const everyoneRole = await Role.create({ name: '@everyone', permissions: ['VIEW_CHANNEL'], serverId: server._id, position: 0 });
+      const everyoneRole = await Role.create({ name: '@everyone', permissions: [], serverId: server._id, position: 0 });
       server.everyoneRoleId = everyoneRole._id;
       await server.save();
 
@@ -119,30 +119,24 @@ describe('Channel Service', () => {
       expect(channels[0].lastMessage._id.toString()).toBe(msg2._id.toString());
     });
 
-    it('should only return channels the user has VIEW_CHANNEL permission for and attach permissions', async () => {
+    it('should return all channels with calculated permissions', async () => {
       const owner = await User.create({ email: 'owner@test.com', username: 'owner', password: 'password' });
       const member = await User.create({ email: 'member@test.com', username: 'member', password: 'password' });
       const server = await Server.create({ name: 'Test Server' });
-      const everyoneRole = await Role.create({ name: '@everyone', serverId: server._id, permissions: [], position: 0 });
+      const everyoneRole = await Role.create({ name: '@everyone', serverId: server._id, permissions: ['SEND_MESSAGES'], position: 0 });
       server.everyoneRoleId = everyoneRole._id;
       await server.save();
 
       await ServerMember.create({ serverId: server._id, userId: owner._id, isOwner: true, roleIds: [everyoneRole._id] });
       await ServerMember.create({ serverId: server._id, userId: member._id, roleIds: [everyoneRole._id] });
 
-      const publicChannel = await Channel.create({ serverId: server._id, name: 'public', type: 'GUILD_TEXT', permissionOverrides: [
-        { targetType: 'role', targetId: everyoneRole._id, allow: ['VIEW_CHANNEL', 'SEND_MESSAGES'], deny: [] }
-      ]});
-      const privateChannel = await Channel.create({ serverId: server._id, name: 'private', type: 'GUILD_TEXT', permissionOverrides: [
-        { targetType: 'role', targetId: everyoneRole._id, allow: [], deny: ['VIEW_CHANNEL'] }
-      ]});
+      await Channel.create({ serverId: server._id, name: 'general', type: 'GUILD_TEXT' });
+      await Channel.create({ serverId: server._id, name: 'random', type: 'GUILD_TEXT' });
 
       const memberChannels = await channelService.getChannelsByServer(server._id.toString(), member._id.toString());
 
-      expect(memberChannels).toHaveLength(1);
-      expect(memberChannels[0].name).toBe('public');
-      expect(memberChannels[0].permissions).toBeDefined();
-      expect(memberChannels[0].permissions).toEqual(expect.arrayContaining(['VIEW_CHANNEL', 'SEND_MESSAGES']));
+      expect(memberChannels).toHaveLength(2);
+      expect(memberChannels[0].permissions).toEqual(expect.arrayContaining(['SEND_MESSAGES']));
 
       const ownerChannels = await channelService.getChannelsByServer(server._id.toString(), owner._id.toString());
 

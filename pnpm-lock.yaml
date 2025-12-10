@@ -82,43 +82,6 @@ importers:
         specifier: ^4.0.14
         version: 4.0.14(@opentelemetry/api@1.9.0)(@types/node@24.10.1)(happy-dom@20.0.11)(jiti@2.6.1)(jsdom@27.2.0)(lightningcss@1.30.2)(msw@2.12.3(@types/node@24.10.1)(typescript@5.9.3))(terser@5.44.1)
 
-  docs:
-    dependencies:
-      '@docusaurus/core':
-        specifier: 3.9.2
-        version: 3.9.2(@mdx-js/react@3.1.1(@types/react@19.2.7)(react@19.2.1))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(typescript@5.6.3)
-      '@docusaurus/preset-classic':
-        specifier: 3.9.2
-        version: 3.9.2(@algolia/client-search@5.46.0)(@mdx-js/react@3.1.1(@types/react@19.2.7)(react@19.2.1))(@types/react@19.2.7)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)(search-insights@2.17.3)(typescript@5.6.3)
-      '@mdx-js/react':
-        specifier: ^3.0.0
-        version: 3.1.1(@types/react@19.2.7)(react@19.2.1)
-      clsx:
-        specifier: ^2.0.0
-        version: 2.1.1
-      prism-react-renderer:
-        specifier: ^2.3.0
-        version: 2.4.1(react@19.2.1)
-      react:
-        specifier: 19.2.1
-        version: 19.2.1
-      react-dom:
-        specifier: 19.2.1
-        version: 19.2.1(react@19.2.1)
-    devDependencies:
-      '@docusaurus/module-type-aliases':
-        specifier: 3.9.2
-        version: 3.9.2(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-      '@docusaurus/tsconfig':
-        specifier: 3.9.2
-        version: 3.9.2
-      '@docusaurus/types':
-        specifier: 3.9.2
-        version: 3.9.2(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
-      typescript:
-        specifier: ~5.6.2
-        version: 5.6.3
-
   frontend:
     dependencies:
       '@iconify/react':
