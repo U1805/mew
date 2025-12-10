@@ -6,6 +6,7 @@ import UserSettings from '../features/users/components/UserSettings';
 import ModalManager from '../layout/modals/ModalManager';
 import { usePresenceEvents } from '../shared/hooks/usePresenceEvents';
 import { useGlobalSocketEvents } from '../shared/hooks/useGlobalSocketEvents';
+import useTabNotifier from '../shared/hooks/useTabNotifier';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { serverApi } from '../shared/services/api';
 import { useUnreadServerStore } from '../shared/stores/store';
@@ -13,6 +14,7 @@ import { useUnreadServerStore } from '../shared/stores/store';
 const Layout: React.FC = () => {
   usePresenceEvents();
   useGlobalSocketEvents();
+  useTabNotifier();
   const queryClient = useQueryClient();
   const initializeNotifier = useUnreadServerStore(state => state.initializeNotifier);
 
