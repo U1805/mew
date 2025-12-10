@@ -5,15 +5,52 @@ import { checkMemberHierarchy } from '../../utils/hierarchy.utils';
 import { socketManager } from '../../gateway/events';
 import mongoose from 'mongoose';
 import { syncUserChannelPermissions } from '../../utils/permission.service';
+import { Webhook } from '../webhook/webhook.model';
+import Server from '../server/server.model';
 
 const memberService = {
-  async getMembersByServer(serverId: string, requesterId: string): Promise<IServerMember[]> {
+  async getMembersByServer(serverId: string, requesterId: string): Promise<any[]> {
     const requester = await ServerMember.findOne({ serverId, userId: requesterId });
     if (!requester) {
       throw new ForbiddenError('You are not a member of this server.');
     }
-    const members = await ServerMember.find({ serverId }).populate('userId', 'username avatarUrl');
-    return members;
+
+    // Step 1: Get real members and convert to plain objects
+    const members = await ServerMember.find({ serverId })
+      .populate('userId', 'username avatarUrl isBot')
+      .lean();
+
+    // Step 2: Get the server's webhooks
+    const webhooks = await Webhook.find({ serverId }).lean();
+
+    // Step 3: Get the @everyone role ID from the server
+    const server = await Server.findById(serverId).select('everyoneRoleId').lean();
+    if (!server) {
+      throw new NotFoundError('Server not found.');
+    }
+    const everyoneRoleId = server.everyoneRoleId;
+
+    // Step 4: Build virtual member objects for each webhook
+    const webhookMembers = webhooks.map(webhook => ({
+      _id: webhook._id, // Use webhook's ID for a unique key
+      serverId: webhook.serverId,
+      userId: {
+        _id: webhook.botUserId,
+        username: webhook.name,
+        avatarUrl: webhook.avatarUrl,
+        isBot: true,
+      },
+      roleIds: [everyoneRoleId],
+      isOwner: false,
+      nickname: null,
+      createdAt: webhook.createdAt,
+      updatedAt: webhook.updatedAt,
+    }));
+
+    // Step 5: Merge real members and virtual webhook members
+    const allMembers = [...members, ...webhookMembers];
+
+    return allMembers;
   },
 
   async removeMember(serverId: string, userIdToRemove: string, requesterId: string): Promise<void> {

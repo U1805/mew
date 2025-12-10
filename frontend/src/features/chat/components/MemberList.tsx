@@ -143,34 +143,42 @@ const MemberItem: React.FC<MemberItemProps> = ({ member, isOnline, onClick }) =>
     const u = member.userId;
     if (!u) return null;
 
+    const content = (
+      <div
+        className="flex items-center px-2 py-1.5 rounded hover:bg-[#35373C] cursor-pointer group"
+        onClick={onClick}
+      >
+        <div className="relative mr-3">
+          <div className="w-8 h-8 rounded-full bg-mew-accent flex items-center justify-center overflow-hidden">
+            {u.avatarUrl ? (
+              <img src={u.avatarUrl} alt={u.username} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white text-xs font-bold">{u.username.substring(0, 2).toUpperCase()}</span>
+            )}
+          </div>
+          {isOnline && !u.isBot && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-[3px] border-[#2B2D31] rounded-full bg-green-500"></div>
+          )}
+        </div>
+        <div className="flex items-center flex-1 min-w-0">
+          <div className="font-medium text-sm truncate text-white">
+            {u.username}
+          </div>
+          {u.isBot && (
+            <div className="ml-1.5 text-[10px] font-bold text-white bg-[#5865F2] inline-block px-1 rounded-[3px] leading-3 shrink-0">BOT</div>
+          )}
+        </div>
+      </div>
+    );
+
+    if (u.isBot) {
+      return content;
+    }
+
     return (
         <ContextMenu.Root>
             <ContextMenu.Trigger>
-                <div
-                    className="flex items-center px-2 py-1.5 rounded hover:bg-[#35373C] cursor-pointer group"
-                    onClick={onClick}
-                >
-                    <div className="relative mr-3">
-                        <div className="w-8 h-8 rounded-full bg-mew-accent flex items-center justify-center overflow-hidden">
-                            {u.avatarUrl ? (
-                                <img src={u.avatarUrl} alt={u.username} className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="text-white text-xs font-bold">{u.username.substring(0, 2).toUpperCase()}</span>
-                            )}
-                        </div>
-                        {isOnline && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-[3px] border-[#2B2D31] rounded-full bg-green-500"></div>
-                        )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate text-white">
-                            {u.username}
-                        </div>
-                        {u.isBot && (
-                            <div className="text-[10px] font-bold text-white bg-[#5865F2] inline-block px-1 rounded-[3px] leading-3 mt-0.5">BOT</div>
-                        )}
-                    </div>
-                </div>
+               {content}
             </ContextMenu.Trigger>
             <MemberContextMenu targetMember={member} />
         </ContextMenu.Root>

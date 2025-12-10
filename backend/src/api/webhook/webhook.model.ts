@@ -7,6 +7,8 @@ export interface IWebhook extends Document {
   serverId: mongoose.Types.ObjectId;
   token: string;
   botUserId: mongoose.Types.ObjectId;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const webhookSchema = new Schema<IWebhook>(

@@ -11,7 +11,9 @@ vi.mock('../../gateway/events', () => ({
 import mongoose from 'mongoose';
 import memberService from './member.service';
 import ServerMember from './member.model';
-import '../../api/user/user.model';
+import User from '../user/user.model';
+import { Webhook } from '../webhook/webhook.model';
+import Server from '../server/server.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
 
@@ -27,6 +29,17 @@ describe('Member Service', () => {
     ownerId = new mongoose.Types.ObjectId().toHexString();
     member1Id = new mongoose.Types.ObjectId().toHexString();
     nonMemberId = new mongoose.Types.ObjectId().toHexString();
+
+    await User.create([
+      { _id: ownerId, email: 'owner@test.com', username: 'owner', password: 'password123' },
+      { _id: member1Id, email: 'member1@test.com', username: 'member1', password: 'password123' },
+      {
+        _id: nonMemberId,
+        email: 'nonmember@test.com',
+        username: 'nonmember',
+        password: 'password123',
+      },
+    ]);
   });
 
   beforeEach(async () => {
@@ -40,12 +53,45 @@ describe('Member Service', () => {
 
   afterAll(async () => {
     await ServerMember.deleteMany({});
+    await User.deleteMany({});
   });
 
   describe('getMembersByServer', () => {
+    let everyoneRoleId: string;
+
+    beforeEach(async () => {
+      await Webhook.deleteMany({});
+      await Server.deleteMany({});
+
+      everyoneRoleId = new mongoose.Types.ObjectId().toHexString();
+      await Server.create({ _id: serverId, name: 'Test Server', everyoneRoleId });
+
+      await Webhook.create({
+        _id: new mongoose.Types.ObjectId(),
+        name: 'Test Webhook',
+        avatarUrl: 'http://example.com/webhook.png',
+        serverId,
+        channelId: new mongoose.Types.ObjectId().toHexString(),
+        botUserId: new mongoose.Types.ObjectId().toHexString(),
+        token: 'test-token',
+      });
+    });
+
     it('should return member list for a server member', async () => {
       const members = await memberService.getMembersByServer(serverId, ownerId);
-      expect(members.length).toBe(2);
+      // 2 real members + 1 webhook
+      expect(members.length).toBe(3);
+    });
+
+    it('should include virtual members for webhooks', async () => {
+      const members = await memberService.getMembersByServer(serverId, ownerId);
+      const webhookMember = members.find(m => m.userId && m.userId.isBot);
+
+      expect(webhookMember).toBeDefined();
+      expect(webhookMember.userId.username).toBe('Test Webhook');
+      expect(webhookMember.userId.avatarUrl).toBe('http://example.com/webhook.png');
+      expect(webhookMember.userId.isBot).toBe(true);
+      expect(webhookMember.roleIds.map(String)).toContain(everyoneRoleId);
     });
 
     it('should throw ForbiddenError for a non-member', async () => {
