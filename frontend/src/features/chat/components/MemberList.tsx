@@ -23,7 +23,7 @@ const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
 };
 
 const MemberList: React.FC = () => {
-  const { currentServerId } = useUIStore();
+  const { currentServerId, currentChannelId } = useUIStore();
   const onlineStatus = usePresenceStore(state => state.onlineStatus);
 
   // Fetch server members
@@ -45,44 +45,67 @@ const MemberList: React.FC = () => {
   const isLoading = membersLoading || rolesLoading;
 
   const memberGroups = React.useMemo(() => {
-    if (!Array.isArray(members) || !Array.isArray(roles)) return [];
+    if (!members || !roles) return [];
 
-    const sortedMembers = [...members].sort((a, b) => {
-      const posA = getHighestRolePos(a, roles);
-      const posB = getHighestRolePos(b, roles);
-      if (posA !== posB) return posB - posA; // Sort by highest role position descending
-      return (a.userId?.username || '').localeCompare(b.userId?.username || '');
-    });
-
-    const groups: { [key: string]: ServerMember[] } = {};
-    sortedMembers.forEach(member => {
-      const memberRoleIds = member.roleIds || [];
-      const highestRole = roles
-        .filter(r => memberRoleIds.includes(r._id) || r.isDefault)
-        .sort((a,b) => b.position - a.position)[0];
-
-      const groupName = highestRole ? highestRole.name : 'Unassigned';
-      if (!groups[groupName]) {
-        groups[groupName] = [];
-      }
-      groups[groupName].push(member);
-    });
-
+    // 1. Initialize groups for all roles
     const everyoneRole = roles.find(r => r.isDefault);
-    const everyoneGroupName = everyoneRole?.name || '@everyone';
-    const everyoneMembers = groups[everyoneGroupName];
+    const groups: Record<string, ServerMember[]> = {};
 
+    if (everyoneRole) {
+      groups[everyoneRole.name] = [];
+    }
+
+    roles
+      .filter(r => !r.isDefault)
+      .sort((a, b) => b.position - a.position)
+      .forEach(role => {
+        groups[role.name] = [];
+      });
+
+    // 2. Assign members to their highest role group, filtering webhooks by channel
+    members.forEach(member => {
+      // Filter Webhooks: If member has a channelId, it must match the current channel
+      if (member.channelId && member.channelId !== currentChannelId) {
+        return;
+      }
+
+      const memberRoleIds = member.roleIds || [];
+      const highestExplicitRole = roles
+        .filter(r => !r.isDefault && memberRoleIds.includes(r._id))
+        .sort((a, b) => b.position - a.position)[0];
+
+      if (highestExplicitRole) {
+        groups[highestExplicitRole.name].push(member);
+      } else if (everyoneRole) {
+        groups[everyoneRole.name].push(member);
+      }
+    });
+
+    // 3. Sort members within each group
+    for (const groupName in groups) {
+      groups[groupName].sort((a, b) => {
+        const posA = getHighestRolePos(a, roles);
+        const posB = getHighestRolePos(b, roles);
+        if (posA !== posB) return posB - posA;
+        return (a.userId?.username || '').localeCompare(b.userId?.username || '');
+      });
+    }
+
+    // 4. Filter out empty groups and format for rendering
     return Object.entries(groups)
-      .filter(([name]) => name !== everyoneGroupName)
-      .sort((a, b) => {
-        const roleA = roles.find(r => r.name === a[0]);
-        const roleB = roles.find(r => r.name === b[0]);
-        if (roleA && roleB) return roleB.position - roleA.position;
-        return 0
-      })
-      .concat(everyoneMembers ? [[everyoneGroupName, everyoneMembers]] : []);
+      .filter(([, membersInGroup]) => membersInGroup.length > 0)
+      .sort(([nameA], [nameB]) => {
+        const roleA = roles.find(r => r.name === nameA);
+        const roleB = roles.find(r => r.name === nameB);
+        if (roleA && roleB) {
+          if (roleA.isDefault) return 1; // Always move @everyone to the end
+          if (roleB.isDefault) return -1;
+          return roleB.position - roleA.position; // Sort by role position descending
+        }
+        return 0;
+      });
 
-  }, [members, roles]);
+  }, [members, roles, currentChannelId]);
 
 
   return (

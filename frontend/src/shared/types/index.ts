@@ -32,9 +32,11 @@ export interface ServerMember {
   serverId: string;
   userId: User; // Populated user object
   roleIds?: string[]; // Corrected: The backend actually returns roleIds
+  channelId?: string; // Optional, primarily for virtual webhook members
   isOwner?: boolean; // Explicit owner flag
   nickname?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface Invite {

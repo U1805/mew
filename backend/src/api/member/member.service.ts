@@ -17,7 +17,7 @@ const memberService = {
 
     // Step 1: Get real members and convert to plain objects
     const members = await ServerMember.find({ serverId })
-      .populate('userId', 'username avatarUrl isBot')
+      .populate('userId', '_id username avatarUrl isBot email createdAt')
       .lean();
 
     // Step 2: Get the server's webhooks
@@ -34,11 +34,14 @@ const memberService = {
     const webhookMembers = webhooks.map(webhook => ({
       _id: webhook._id, // Use webhook's ID for a unique key
       serverId: webhook.serverId,
+      channelId: webhook.channelId, // Add channelId here
       userId: {
         _id: webhook.botUserId,
         username: webhook.name,
         avatarUrl: webhook.avatarUrl,
         isBot: true,
+        email: `webhook-${webhook._id}@internal.mew`,
+        createdAt: webhook.createdAt,
       },
       roleIds: [everyoneRoleId],
       isOwner: false,
