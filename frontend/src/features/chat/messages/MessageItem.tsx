@@ -180,16 +180,23 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
             </div>
             <div className="flex-1 min-w-0">
                 <div className="flex items-center">
-                    <span
+                    <div
                         className="font-medium text-white mr-2 hover:underline cursor-pointer"
                         onClick={() => openModal('userProfile', { user: author })}
                     >
-                        {author.username}
-                    </span>
+                        {author.isBot && message.payload?.webhookName && author.username !== message.payload.webhookName ? (
+                            <>
+                                <span className="font-medium text-white">{author.username}</span>
+                                <span className="text-sm text-mew-textMuted ml-1.5">@ {message.payload.webhookName}</span>
+                            </>
+                        ) : (
+                            <span>{author.username}</span>
+                        )}
+                    </div>
                     {author.isBot && (
-                        <span className="bg-[#5865F2] text-white text-[10px] px-1.5 rounded-[3px] h-[15px] flex items-center mr-2 uppercase font-bold">Bot</span>
+                        <span className="bg-[#5865F2] text-white text-[10px] font-bold px-1 rounded-[3px] leading-3 shrink-0">BOT</span>
                     )}
-                    <span className="text-xs text-mew-textMuted ml-1">{fullDateString}</span>
+                    <span className="text-xs text-mew-textMuted ml-2">{fullDateString}</span>
                 </div>
                 
                 {isRetracted ? (

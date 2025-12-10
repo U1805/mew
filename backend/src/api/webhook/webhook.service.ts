@@ -93,9 +93,10 @@ export const executeWebhook = async (webhookId: string, token: string, payload: 
       authorId: webhook.botUserId,
       content: payload.content,
       payload: {
+        webhookName: webhook.name,
         overrides: {
-            username: payload.username || webhook.name || botUser.username,
-            avatarUrl: payload.avatar_url || webhook.avatarUrl || botUser.avatarUrl,
+            username: payload.username || webhook.name,
+            avatarUrl: payload.avatar_url || webhook.avatarUrl,
         }
       }
     };

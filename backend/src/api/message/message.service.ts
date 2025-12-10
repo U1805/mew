@@ -88,7 +88,7 @@ export const getMessagesByChannel = async ({ channelId, limit, before }: GetMess
   const messages = await Message.find(query)
     .sort({ createdAt: -1 })
     .limit(limit)
-    .populate('authorId', 'username avatarUrl');
+    .populate('authorId', 'username avatarUrl isBot');
 
   // Apply overrides to historical messages before returning.
   return messages.map(applyAuthorOverride);
@@ -98,7 +98,7 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
   const message = new Message(data);
   await message.save();
 
-  const populatedMessage = await message.populate('authorId', 'username avatarUrl');
+  const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
   // Apply overrides for the real-time broadcast.
   const messageWithOverrides = applyAuthorOverride(populatedMessage);
@@ -129,7 +129,7 @@ export const getMessageById = async (messageId: string) => {
     message.editedAt = new Date();
     await message.save();
 
-    const populatedMessage = await message.populate('authorId', 'username avatarUrl');
+    const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), populatedMessage);
 
     return populatedMessage;
@@ -149,7 +149,7 @@ export const getMessageById = async (messageId: string) => {
 
     await message.save();
 
-    const populatedMessage = await message.populate('authorId', 'username avatarUrl');
+    const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
     // Broadcast a MESSAGE_UPDATE event so clients can show the retracted state.
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), populatedMessage);
@@ -166,7 +166,7 @@ export const getMessageById = async (messageId: string) => {
       const existingReaction = (message.reactions || []).find(r => r.userIds.map(id => id.toString()).includes(userId));
 
       if (existingReaction && existingReaction.emoji === emoji) {
-        return message.populate('authorId', 'username avatarUrl');
+        return message.populate('authorId', 'username avatarUrl isBot');
       }
 
       if (existingReaction) {
@@ -194,7 +194,7 @@ export const getMessageById = async (messageId: string) => {
         { _id: messageId },
         { $pull: { reactions: { userIds: { $size: 0 } } } },
         { new: true }
-      ).populate('authorId', 'username avatarUrl');
+      ).populate('authorId', 'username avatarUrl isBot');
 
       if (!finalMessage) {
           throw new NotFoundError('Message not found');
@@ -224,7 +224,7 @@ export const getMessageById = async (messageId: string) => {
         { _id: messageId },
         { $pull: { reactions: { userIds: { $size: 0 } } } },
         { new: true }
-      ).populate('authorId', 'username avatarUrl');
+      ).populate('authorId', 'username avatarUrl isBot');
 
       if (!finalMessage) {
           throw new NotFoundError('Message not found after reaction cleanup');

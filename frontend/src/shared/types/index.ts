@@ -100,10 +100,15 @@ export interface Reaction {
 }
 
 export interface MessagePayload {
+  webhookName?: string;
   title?: string;
   summary?: string;
   url?: string;
   thumbnail_url?: string;
+  overrides?: {
+    username?: string;
+    avatarUrl?: string;
+  };
   [key: string]: any;
 }
 
