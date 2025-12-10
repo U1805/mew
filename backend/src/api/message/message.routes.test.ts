@@ -115,67 +115,98 @@ describe('Message Routes', () => {
   });
 
   describe('POST /api/servers/:serverId/channels/:channelId/messages', () => {
-    describe('with permission checks', () => {
+    let memberToken = '';
+
+    describe('with permissions and mentions', () => {
       let everyoneRole: any;
-      let memberToken = '';
+      let memberToken = ''; // This will be the regular member
+      let mentionedUser: any;
+
       const memberUserData = {
-        email: 'member-msg-test@example.com',
-        username: 'membermsgtest',
+        email: 'member-ms-test@example.com',
+        username: 'membermstest',
         password: 'password123',
       };
 
       beforeEach(async () => {
+        // Setup @everyone role reference
         const server = await Server.findById(serverId).lean();
         everyoneRole = await Role.findById(server.everyoneRoleId);
 
-        // Create and setup a new member for the server
+        // --- Create and add a regular member for permission tests ---
         await request(app).post('/api/auth/register').send(memberUserData);
-        const loginRes = await request(app).post('/api/auth/login').send({ email: memberUserData.email, password: memberUserData.password });
-        memberToken = loginRes.body.token;
+        const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberUserData.email, password: memberUserData.password });
+        memberToken = memberLoginRes.body.token;
 
-        // Owner creates an invite
-        const inviteRes = await request(app)
-          .post(`/api/servers/${serverId}/invites`)
-          .set('Authorization', `Bearer ${token}`)
-          .send({});
+        const inviteRes = await request(app).post(`/api/servers/${serverId}/invites`).set('Authorization', `Bearer ${token}`).send({});
         const inviteCode = inviteRes.body.code;
+        await request(app).post(`/api/invites/${inviteCode}`).set('Authorization', `Bearer ${memberToken}`);
 
-        // New user accepts the invite
-        await request(app)
-          .post(`/api/invites/${inviteCode}`)
-          .set('Authorization', `Bearer ${memberToken}`);
+        // --- Create and add another user to be mentioned ---
+        const mentionedUserData = { email: 'mentioned@test.com', username: 'mentioned', password: 'password123' };
+        await request(app).post('/api/auth/register').send(mentionedUserData);
+        const mentionedLoginRes = await request(app).post('/api/auth/login').send({ email: mentionedUserData.email, password: mentionedUserData.password });
+        mentionedUser = mentionedLoginRes.body.user;
+        await request(app).post(`/api/invites/${inviteCode}`).set('Authorization', `Bearer ${mentionedLoginRes.body.token}`);
       });
 
       it('should return 403 if user does not have SEND_MESSAGES permission', async () => {
-        // By default, @everyone has SEND_MESSAGES. Let's remove it.
         everyoneRole.permissions = everyoneRole.permissions.filter(p => p !== 'SEND_MESSAGES');
         await everyoneRole.save();
 
-        const messageData = { content: 'This message should be blocked' };
         const res = await request(app)
           .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
           .set('Authorization', `Bearer ${memberToken}`)
-          .send(messageData);
+          .send({ content: 'This should be blocked' });
 
         expect(res.statusCode).toBe(403);
         expect(res.body.message).toContain('You do not have the required permission: SEND_MESSAGES');
       });
 
-      it('should return 201 if user has SEND_MESSAGES permission', async () => {
-        // Ensure the permission is present (it is by default, but we're being explicit)
-        if (!everyoneRole.permissions.includes('SEND_MESSAGES')) {
-          everyoneRole.permissions.push('SEND_MESSAGES');
-          await everyoneRole.save();
-        }
-
-        const messageData = { content: 'This message should be allowed' };
+      it('should add valid user IDs to the mentions array', async () => {
+        const messageData = { content: `Hello <@${mentionedUser._id}>!` };
         const res = await request(app)
           .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
-          .set('Authorization', `Bearer ${memberToken}`)
+          .set('Authorization', `Bearer ${token}`)
           .send(messageData);
 
         expect(res.statusCode).toBe(201);
-        expect(res.body.content).toBe(messageData.content);
+        expect(res.body.mentions).toEqual([mentionedUser._id]);
+      });
+
+      it('should not add non-member user IDs to mentions', async () => {
+        const nonMemberId = '60f8d3b7d1e8b2001c8e4a9f';
+        const messageData = { content: `Hey <@${nonMemberId}>` };
+        const res = await request(app)
+          .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+          .set('Authorization', `Bearer ${token}`)
+          .send(messageData);
+
+        expect(res.statusCode).toBe(201);
+        expect(res.body.mentions).toEqual([]);
+      });
+
+      it('should allow @everyone for users with MENTION_EVERYONE permission (owner)', async () => {
+        const res = await request(app)
+          .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+          .set('Authorization', `Bearer ${token}`)
+          .send({ content: 'Hi @everyone' });
+
+        expect(res.statusCode).toBe(201);
+      });
+
+      it('should block @everyone for users without MENTION_EVERYONE permission', async () => {
+        // Remove the permission from the @everyone role first
+        everyoneRole.permissions = everyoneRole.permissions.filter(p => p !== 'MENTION_EVERYONE');
+        await everyoneRole.save();
+
+        const res = await request(app)
+          .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+          .set('Authorization', `Bearer ${memberToken}`)
+          .send({ content: 'Hey @everyone' });
+
+        expect(res.statusCode).toBe(403);
+        expect(res.body.message).toContain('You do not have permission to use @everyone or @here');
       });
     });
 
@@ -201,6 +232,37 @@ describe('Message Routes', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({ content: 'Original message' });
       messageId = res.body._id;
+    });
+
+    it('should update mentions when a message is edited', async () => {
+      // This test requires a second user to mention
+      const mentionedUserData = { email: 'mentioned-edit@test.com', username: 'mentioned.edit', password: 'password123' };
+      await request(app).post('/api/auth/register').send(mentionedUserData);
+      const loginRes = await request(app).post('/api/auth/login').send({ email: mentionedUserData.email, password: mentionedUserData.password });
+      const mentionedUser = loginRes.body.user;
+
+      // Have the user join the server
+      const inviteRes = await request(app).post(`/api/servers/${serverId}/invites`).set('Authorization', `Bearer ${token}`).send({});
+      await request(app).post(`/api/invites/${inviteRes.body.code}`).set('Authorization', `Bearer ${loginRes.body.token}`);
+
+      // 1. Post a message with no mentions
+      const initialRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'Initial message' });
+      const messageIdToEdit = initialRes.body._id;
+      expect(initialRes.body.mentions).toEqual([]);
+
+      // 2. Edit the message to include a mention
+      const updatedData = { content: `Edited to mention <@${mentionedUser._id}>` };
+      const editRes = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}/messages/${messageIdToEdit}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(updatedData);
+
+      expect(editRes.statusCode).toBe(200);
+      expect(editRes.body.mentions).toHaveLength(1);
+      expect(editRes.body.mentions[0]).toBe(mentionedUser._id);
     });
 
     it('should update a message successfully by the author', async () => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
@@ -9,7 +9,7 @@ import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
 import { Message } from '../../../shared/types';
 import { messageApi } from '../../../shared/services/api';
-import { useAuthStore, useUIStore, useModalStore } from '../../../shared/stores/store';
+import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 interface MessageItemProps {
@@ -25,7 +25,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
 
   const [isEditing, setIsEditing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [applyFlash, setApplyFlash] = useState(false);
   const permissions = usePermissions(message.channelId);
+  const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
+  const itemRef = useRef<HTMLDivElement>(null);
 
   const canAddReaction = permissions.has('ADD_REACTIONS');
   const canManageMessages = permissions.has('MANAGE_MESSAGES');
@@ -34,6 +37,34 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   const isRssCard = message.type === 'app/x-rss-card';
   const isAuthor = user?._id?.toString() === author._id?.toString();
   const isRetracted = !!message.retractedAt;
+
+  // Phase 2: Highlight logic
+  // Check strict mentions array first, fallback to regex check for immediate UI feedback if backend sync is delayed/mocked
+  const isMentioned = user && (
+    (Array.isArray(message.mentions) && message.mentions.includes(user._id)) ||
+    message.content.includes('@everyone') ||
+    message.content.includes('@here')
+  );
+
+  useEffect(() => {
+    const isUnreadMention = unreadMentionMessageIds.has(message._id);
+
+    if (isUnreadMention) {
+      if (itemRef.current) {
+        const handleAnimationEnd = () => {
+          setApplyFlash(false);
+          // Delay removing from the set until animation is fully complete
+          setTimeout(() => removeUnreadMention(message._id), 100);
+        };
+        itemRef.current.addEventListener('animationend', handleAnimationEnd);
+        setApplyFlash(true);
+
+        return () => {
+          itemRef.current?.removeEventListener('animationend', handleAnimationEnd);
+        };
+      }
+    }
+  }, [message._id, unreadMentionMessageIds, removeUnreadMention]);
 
   const handleDelete = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -99,10 +130,23 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   }
 
   return (
-    <div 
+    <div
+        ref={itemRef}
         id={`message-${message._id}`}
-        className={clsx("group flex pr-4 hover:bg-[#2e3035] relative transition-colors duration-500", isSequential ? "py-0.5" : "mt-[17px] py-0.5 mb-1")}
+        className={clsx(
+            "group flex pr-4 relative transition-colors duration-200",
+            isSequential ? "py-0.5" : "mt-[17px] py-0.5 mb-1",
+            {
+              "animate-mention-flash-anim": applyFlash,
+              "hover:bg-[#2e3035]": !isMentioned,
+              "hover:bg-[#F0B232]/20": isMentioned
+            }
+        )}
     >
+      {/* Mention Highlight Border */}
+      {isMentioned && (
+          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#F0B232] rounded-r-sm opacity-0 group-hover:opacity-100 transition-opacity duration-200"></div>
+      )}
 
       {/* Hover Actions - Only show if NOT retracted */}
       {!isRetracted && (

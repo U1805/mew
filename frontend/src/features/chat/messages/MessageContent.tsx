@@ -1,5 +1,6 @@
 import React from 'react';
 import { Message } from '../../../shared/types';
+import { parseMessageContent } from '../../../shared/utils/messageParser';
 
 interface MessageContentProps {
     message: Message;
@@ -27,7 +28,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message }) => {
         );
     }
 
-    return <p className="whitespace-pre-wrap break-words">{message.content}</p>;
+        return <p className="whitespace-pre-wrap break-words leading-[1.375rem]">{parseMessageContent(message.content)}</p>;
 };
 
 export default MessageContent;

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Channel, Message } from '../types';
-import { useHiddenStore } from '../stores/store';
+import { useHiddenStore, useUnreadStore, useAuthStore } from '../stores/store';
 
 export const useGlobalSocketEvents = () => {
   const queryClient = useQueryClient();
@@ -33,6 +33,19 @@ export const useGlobalSocketEvents = () => {
       // 如果是DM消息，则从隐藏列表中移除该频道
       if (isDmMessage) {
         useHiddenStore.getState().removeHiddenChannel(message.channelId);
+      }
+
+      // --- 新增：处理未读提及 ---
+      const currentUser = useAuthStore.getState().user;
+      const isMentioned = currentUser && (
+        (message.mentions && message.mentions.includes(currentUser._id)) ||
+        message.content.includes('@everyone') ||
+        message.content.includes('@here')
+      );
+
+      if (isMentioned) {
+        useUnreadStore.getState().addUnreadMention(message._id);
+        useUnreadStore.getState().addUnreadChannel(message.channelId); // 同时标记频道为未读
       }
     };
 

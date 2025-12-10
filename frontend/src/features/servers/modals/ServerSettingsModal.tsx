@@ -7,6 +7,7 @@ import { toast } from 'react-hot-toast';
 import { useModalStore, useUIStore } from '../../../shared/stores/store';
 import { Role } from '../../../shared/types';
 import { roleApi, serverApi } from '../../../shared/services/api';
+import { Permission } from '../../../shared/constants/permissions';
 
 const PERMISSION_GROUPS = [
   { group: 'General Server Permissions', perms: [
@@ -136,9 +137,10 @@ export const ServerSettingsModal: React.FC = () => {
   const togglePermission = (permId: string) => {
     if (!selectedRole) return;
     const currentPerms = selectedRole.permissions || [];
-    const hasPerm = currentPerms.includes(permId);
+    const pId = permId as Permission;
+    const hasPerm = currentPerms.includes(pId);
 
-    const newPerms = hasPerm ? currentPerms.filter(p => p !== permId) : [...currentPerms, permId];
+    const newPerms = hasPerm ? currentPerms.filter(p => p !== pId) : [...currentPerms, pId];
     handleLocalRoleUpdate({ permissions: newPerms });
   };
 
@@ -315,7 +317,7 @@ export const ServerSettingsModal: React.FC = () => {
                                 <h3 className="text-xs font-bold text-mew-textMuted uppercase mb-4">{group.group}</h3>
                                 <div className="space-y-4">
                                   {group.perms.map(perm => {
-                                    const isEnabled = selectedRole.permissions?.includes(perm.id);
+                                    const isEnabled = selectedRole.permissions?.includes(perm.id as Permission);
                                     const isDisabled = selectedRole.isDefault && (perm.id === 'ADMINISTRATOR' || perm.id === 'KICK_MEMBERS' || perm.id === 'BAN_MEMBERS');
                                     return (
                                       <div key={perm.id} className={clsx("flex items-center justify-between", isDisabled && 'opacity-50')}>

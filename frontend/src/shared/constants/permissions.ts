@@ -3,9 +3,14 @@ export const ALL_PERMISSIONS = [
   'ADMINISTRATOR',
   'MANAGE_ROLES',
   'KICK_MEMBERS',
+  'BAN_MEMBERS',
   'CREATE_INVITE',
+  'CREATE_INSTANT_INVITE',
   'MANAGE_SERVER',
   'MANAGE_WEBHOOKS',
+  'MANAGE_CHANNELS',
+  'CHANGE_NICKNAME',
+  'MANAGE_NICKNAMES',
 
   // Channel-Level Permissions
   'MANAGE_CHANNEL',
@@ -14,6 +19,8 @@ export const ALL_PERMISSIONS = [
   'ADD_REACTIONS',
   'ATTACH_FILES',
   'MENTION_EVERYONE',
+  'READ_MESSAGE_HISTORY',
+  'EMBED_LINKS',
 ] as const;
 
 export type Permission = typeof ALL_PERMISSIONS[number];

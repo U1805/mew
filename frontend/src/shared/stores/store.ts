@@ -41,8 +41,11 @@ interface ModalState {
 
 interface UnreadState {
   unreadChannelIds: Set<string>;
+  unreadMentionMessageIds: Set<string>; // Added to track specific mention messages
   addUnreadChannel: (channelId: string) => void;
   removeUnreadChannel: (channelId: string) => void;
+  addUnreadMention: (messageId: string) => void;
+  removeUnreadMention: (messageId: string) => void;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -79,6 +82,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 export const useUnreadStore = create<UnreadState>((set, get) => ({
   unreadChannelIds: new Set(),
+  unreadMentionMessageIds: new Set(),
   addUnreadChannel: (channelId) => {
     if (get().unreadChannelIds.has(channelId)) return;
     set((state) => {
@@ -96,6 +100,24 @@ export const useUnreadStore = create<UnreadState>((set, get) => ({
       return { unreadChannelIds: newSet };
     });
     if (notifyServerStore) notifyServerStore(channelId, 'remove');
+  },
+
+  addUnreadMention: (messageId) => {
+    if (get().unreadMentionMessageIds.has(messageId)) return;
+    set((state) => {
+        const newSet = new Set(state.unreadMentionMessageIds);
+        newSet.add(messageId);
+        return { unreadMentionMessageIds: newSet };
+    });
+  },
+
+  removeUnreadMention: (messageId) => {
+    if (!get().unreadMentionMessageIds.has(messageId)) return;
+    set((state) => {
+        const newSet = new Set(state.unreadMentionMessageIds);
+        newSet.delete(messageId);
+        return { unreadMentionMessageIds: newSet };
+    });
   },
 }));
 

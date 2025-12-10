@@ -29,6 +29,7 @@
               }
             },
             animation: {
+              'mention-flash-anim': 'mention-flash 0.8s ease-in-out 2',
               'fade-in': 'fadeIn 0.2s ease-out forwards',
               'fade-in-up': 'fadeInUp 0.3s ease-out forwards',
               'scale-in': 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
@@ -36,6 +37,10 @@
               'scale-out': 'scaleOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards',
             },
             keyframes: {
+              'mention-flash': {
+                '0%, 100%': { backgroundColor: 'transparent' },
+                '25%, 75%': { backgroundColor: 'rgba(240, 178, 50, 0.4)' },
+              },
               fadeIn: {
                 '0%': { opacity: '0' },
                 '100%': { opacity: '1' },
