@@ -77,7 +77,7 @@ sidebar_label: 'REST API'
 
 | Method | Endpoint | 描述 | 权限要求 |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/` | 获取服务器的完整成员列表。 | (成员) |
+| `GET` | `/` | 获取服务器的完整成员列表（包括 Webhook 虚拟成员）。 | (成员) |
 | `PUT` | `/:userId/roles`| 替换成员的所有角色。**Body**: `{ "roleIds": ["..."] }` | `MANAGE_ROLES` + **层级检查** |
 | `DELETE`| `/:userId` | 将成员踢出服务器。 | `KICK_MEMBERS` + **层级检查** |
 | `DELETE`| `/@me` | 主动离开服务器。**注意**: 所有者需先转移所有权。 | (成员) |
@@ -129,7 +129,7 @@ sidebar_label: 'REST API'
 ### 获取消息
 *   **`GET`** `/api/servers/:serverId/channels/:channelId/messages`
 *   **`GET`** `/api/channels/:channelId/messages` (用于 DM)
-    *   **权限**: `VIEW_CHANNEL`
+    *   **权限**: 隐式 `VIEW_CHANNEL` (基于频道可见性)
     *   **Query Params**:
         *   `limit`: *number* (默认 50, 最大 100)
         *   `before`: *string* (Message ID, 用于分页加载旧消息)
@@ -143,23 +143,50 @@ sidebar_label: 'REST API'
 ### 编辑与删除
 *   **`PATCH`** `/api/.../messages/:messageId`
     *   编辑消息内容。
-    *   **权限**: 消息作者
+    *   **权限**: 消息作者 或 `MANAGE_MESSAGES`
     *   **Body**: `{ "content": "New content" }`
 *   **`DELETE`** `/api/.../messages/:messageId`
-    *   删除消息。
+    *   删除消息 (实际为撤回，内容被替换)。
     *   **权限**: 消息作者 或 `MANAGE_MESSAGES`
 
-## 10. 反应 (Reactions)
+## 10. 文件上传 (Uploads)
+
+*Path: `/api/channels/:channelId/uploads`*
+
+| Method | Endpoint | 描述 | 权限要求 |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/` | 上传文件至指定频道。成功后返回文件元数据，用于发送消息时的 `attachments` 数组。 | `ATTACH_FILES` |
+
+<details>
+<summary>👀 查看请求/响应示例</summary>
+
+**上传请求**:
+*   **Body**: `multipart/form-data`
+*   **Field**: `file` = `(binary)`
+
+**成功响应**:
+```json
+{
+  "filename": "my-image.png",
+  "contentType": "image/png",
+  "key": "aB1cD2eF3g.png",
+  "size": 123456
+}
+```
+</details>
+
+## 11. 反应 (Reactions)
 
 对消息添加 Emoji 回应。
 
 *   **`PUT`** `/api/.../messages/:messageId/reactions/:emoji/@me`
-    *   添加反应。`:emoji` 需要 URL 编码 (e.g., `👍` -> `%F0%9F%91%8D`).
+    *   添加或切换反应。`:emoji` 需要 URL 编码 (e.g., `👍` -> `%F0%9F%91%8D`)。
     *   **权限**: `ADD_REACTIONS`
 *   **`DELETE`** `/api/.../messages/:messageId/reactions/:emoji/@me`
     *   移除自己的反应。
+    *   **权限**: (成员)
 
-## 11. Webhooks
+## 12. Webhooks
 
 Bot 集成的核心入口。
 
@@ -183,7 +210,7 @@ Bot 集成的核心入口。
 ```
 </details>
 
-## 12. 搜索 (Search)
+## 13. 搜索 (Search)
 
 | Method | Endpoint | 描述 | 权限要求 |
 | :--- | :--- | :--- | :--- |
