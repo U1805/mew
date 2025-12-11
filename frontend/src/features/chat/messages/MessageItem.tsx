@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
@@ -201,7 +202,11 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
                     </div>
                  ) : (
                     <>
-                        <MessageContent message={message} />
+                        <MessageContent 
+                          message={message} 
+                          serverId={currentServerId || undefined} 
+                          channelId={message.channelId} 
+                        />
                         {message.editedAt && <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>}
                         <ReactionList reactions={message.reactions} currentUserId={user?._id} onReactionClick={handleReactionClick} />
                     </>
@@ -250,7 +255,11 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
                 ) : (
                     <>
                         <div className={clsx("text-mew-text text-[0.95rem] leading-[1.375rem]", isRssCard ? "mt-1" : "")}>
-                            <MessageContent message={message} />
+                            <MessageContent 
+                              message={message} 
+                              serverId={currentServerId || undefined} 
+                              channelId={message.channelId}
+                            />
                             {message.editedAt && <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>}
                         </div>
                         <ReactionList reactions={message.reactions} currentUserId={user?._id} onReactionClick={handleReactionClick} />

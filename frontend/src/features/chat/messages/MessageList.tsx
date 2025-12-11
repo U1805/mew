@@ -22,6 +22,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   const queryClient = useQueryClient();
   const { currentServerId, targetMessageId, setTargetMessageId } = useUIStore();
 
+  // [新增] 用于打破死循环的 Ref。记录本地已提交 ACK 的消息 ID
+  const lastAckedMessageIdRef = useRef<string | null>(null);
+
   // Effect for Auto-Scroll to Bottom (Standard Chat Behavior)
   // We only scroll to bottom if we are NOT trying to jump to a specific message history.
   useEffect(() => {
@@ -57,17 +60,45 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
     if (channel && channelId && messages.length > 0 && !isLoading) {
       const lastMessage = messages[messages.length - 1];
 
-      if (lastMessage._id !== channel.lastReadMessageId) {
+      // [核心修复 1]: 使用正则严格验证是否为 MongoDB ObjectId (24位 0-9 a-f 字符)
+      // 避免误判 ISO 时间戳 (也是24位)
+      const isValidObjectId = /^[0-9a-fA-F]{24}$/.test(lastMessage._id);
+
+      // [核心修复 2]: 死循环熔断机制
+      // 如果这个 ID 我们刚刚已经 ACK 过了，就不要再请求了
+      const alreadyAckedLocally = lastAckedMessageIdRef.current === lastMessage._id;
+
+      // 检查服务端状态
+      const serverNeedsAck = lastMessage._id !== channel.lastReadMessageId;
+
+      if (isValidObjectId && !alreadyAckedLocally && serverNeedsAck) {
+        // 立即标记为已处理，防止在 API 返回前再次触发
+        lastAckedMessageIdRef.current = lastMessage._id;
+
         channelApi.ack(channelId, lastMessage._id)
           .then(() => {
-            // Invalidate queries to refetch channel lists with updated read state
-            queryClient.invalidateQueries({ queryKey: ['dmChannels']});
+            // [修复] 使用 setQueryData 手动更新缓存，取代 invalidateQueries 以避免循环
+            const updateChannelCache = (channel: Channel) => {
+                if (channel._id === channelId) {
+                    return { ...channel, lastReadMessageId: lastMessage._id };
+                }
+                return channel;
+            };
+
+            queryClient.setQueryData<Channel[]>(['dmChannels'], (oldData) =>
+                oldData ? oldData.map(updateChannelCache) : []
+            );
+
             if (currentServerId) {
-              queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
+                queryClient.setQueryData<Channel[]>(['channels', currentServerId], (oldData) =>
+                    oldData ? oldData.map(updateChannelCache) : []
+                );
             }
           })
           .catch(err => {
-            console.error("Failed to acknowledge channel:", err);
+            console.warn("ACK failed, resetting local lock", err);
+            // 失败时重置锁，允许下次重试
+            lastAckedMessageIdRef.current = null;
           });
       }
     }

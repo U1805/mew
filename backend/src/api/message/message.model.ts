@@ -3,8 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IAttachment {
   filename: string;
   contentType: string;
-  url: string;
+  key: string;
   size: number;
+  url?: string; // Dynamically added, not stored in DB
 }
 
 export interface IReaction {
@@ -31,7 +32,7 @@ export interface IMessage extends Document {
 const AttachmentSchema: Schema = new Schema({
   filename: { type: String, required: true },
   contentType: { type: String, required: true },
-  url: { type: String, required: true },
+  key: { type: String, required: true },
   size: { type: Number, required: true },
 });
 
@@ -45,7 +46,7 @@ const MessageSchema: Schema = new Schema(
     channelId: { type: Schema.Types.ObjectId, ref: 'Channel', required: true, index: true },
     authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, default: 'message/default' },
-    content: { type: String, required: true },
+    content: { type: String },
     payload: { type: Object },
     attachments: [AttachmentSchema],
     mentions: [{ type: Schema.Types.ObjectId, ref: 'User' }],

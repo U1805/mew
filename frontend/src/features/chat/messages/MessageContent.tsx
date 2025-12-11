@@ -1,12 +1,16 @@
+
 import React from 'react';
 import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
+import { AttachmentList } from './AttachmentList'; // Import the new component
 
 interface MessageContentProps {
     message: Message;
+    serverId?: string;
+    channelId?: string;
 }
 
-const MessageContent: React.FC<MessageContentProps> = ({ message }) => {
+const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, channelId }) => {
     const isRssCard = message.type === 'app/x-rss-card';
 
     if (isRssCard && message.payload) {
@@ -28,7 +32,20 @@ const MessageContent: React.FC<MessageContentProps> = ({ message }) => {
         );
     }
 
-        return <p className="whitespace-pre-wrap break-words leading-[1.375rem]">{parseMessageContent(message.content)}</p>;
+    return (
+        <div>
+            {message.content && (
+                <p className="whitespace-pre-wrap break-words leading-[1.375rem]">
+                    {parseMessageContent(message.content)}
+                </p>
+            )}
+            <AttachmentList 
+                attachments={message.attachments || []} 
+                serverId={serverId} 
+                channelId={channelId} 
+            />
+        </div>
+    );
 };
 
 export default MessageContent;

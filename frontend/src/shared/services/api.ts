@@ -1,9 +1,11 @@
+
 import axios from 'axios';
 
 export interface LoginResponse {
   token: string;
 }
 import { useAuthStore } from '../stores/store';
+import { Attachment } from '../types';
 
 export const API_URL = 'http://localhost:3000/api';
 
@@ -51,7 +53,6 @@ export const serverApi = {
   get: (id: string) => api.get(`/servers/${id}`),
   update: (id: string, data: { name?: string; avatarUrl?: string }) => api.patch(`/servers/${id}`, data),
   delete: (id: string) => api.delete(`/servers/${id}`),
-  // Compatibility methods for components not yet updated to new API structure
   getRoles: (serverId: string) => roleApi.list(serverId),
   getMembers: (serverId: string) => memberApi.list(serverId),
   leaveServer: (serverId: string) => memberApi.leave(serverId),
@@ -78,7 +79,6 @@ export const channelApi = {
   createDM: (recipientId: string) => api.post(`/users/@me/channels`, { recipientId }),
   listDMs: () => api.get(`/users/@me/channels`),
   delete: (serverId: string | undefined, channelId: string) => {
-      // Adjusted based on typical REST patterns or previous usage
       return api.delete(`/servers/${serverId}/channels/${channelId}`);
   },
   ack: (channelId: string, lastMessageId: string) => api.post(`/channels/${channelId}/ack`, { lastMessageId }),
@@ -91,7 +91,7 @@ export const messageApi = {
       const prefix = serverId ? `/servers/${serverId}` : '';
       return api.get(`${prefix}/channels/${channelId}/messages`);
   },
-  send: (serverId: string | undefined, channelId: string, data: { content: string }) => {
+  send: (serverId: string | undefined, channelId: string, data: { content?: string; attachments?: Attachment[] }) => {
       const prefix = serverId ? `/servers/${serverId}` : '';
       return api.post(`${prefix}/channels/${channelId}/messages`, data);
   },
@@ -105,7 +105,6 @@ export const messageApi = {
   },
   addReaction: (serverId: string | undefined, channelId: string, messageId: string, emoji: string) => {
       const prefix = serverId ? `/servers/${serverId}` : '';
-      // Emoji must be URL encoded
       const encodedEmoji = encodeURIComponent(emoji);
       return api.put(`${prefix}/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`);
   },
@@ -127,5 +126,16 @@ export const webhookApi = {
   update: (serverId: string, channelId: string, webhookId: string, data: { name?: string; avatarUrl?: string }) => api.patch(`/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}`, data),
   delete: (serverId: string, channelId: string, webhookId: string) => api.delete(`/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}`),
 };
+
+export const uploadApi = {
+    uploadFile: (channelId: string, formData: FormData, onUploadProgress?: (progressEvent: any) => void) => {
+      // By letting Axios handle the FormData, it will automatically set the
+      // correct 'Content-Type' header with the required boundary.
+      // Manually setting it overrides this behavior and causes errors.
+      return api.post(`/channels/${channelId}/uploads`, formData, {
+        onUploadProgress,
+      });
+    },
+  };
 
 export default api;

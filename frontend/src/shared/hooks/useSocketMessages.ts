@@ -17,9 +17,21 @@ export const useSocketMessages = (channelId: string | null) => {
       // 1. Update cache if we are viewing this channel
       if (channelId && newMessage.channelId === channelId) {
         queryClient.setQueryData(['messages', channelId], (old: Message[] | undefined) => {
-          if (!old) return [newMessage];
-          if (old.find(m => m._id === newMessage._id)) return old;
-          return [...old, newMessage];
+            if (!old) return [newMessage];
+
+            // 检查是否存在重复的真实消息
+            if (old.find(m => m._id === newMessage._id)) return old;
+
+            // 寻找并替换乐观更新的临时消息
+            // 临时消息的ID是一个ISO日期字符串，不是一个有效的ObjectId
+            const tempMessageIndex = old.findIndex(m => !/^[0-9a-fA-F]{24}$/.test(m._id) && m.content === newMessage.content);
+
+            if (tempMessageIndex > -1) {
+                old[tempMessageIndex] = newMessage;
+                return [...old];
+            }
+
+            return [...old, newMessage];
         });
       }
 

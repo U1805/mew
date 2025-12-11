@@ -8,6 +8,7 @@ import roleRoutes from './api/role/role.routes';
 import { categoryRootRoutes, categoryDetailRoutes } from './api/category/category.routes';
 import invitePublicRoutes from './api/invite/public.routes';
 import dmChannelRoutes from './api/channel/dm.routes';
+import uploadRoutes from './api/upload/upload.routes';
 
 
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api/servers/:serverId/roles', roleRoutes);
 app.use('/api/channels', dmChannelRoutes);
 app.use('/api/servers/:serverId/categories', categoryRootRoutes);
 app.use('/api/categories', categoryDetailRoutes);
+app.use('/api/channels/:channelId/uploads', uploadRoutes);
 app.use('/api/invites', invitePublicRoutes);
 
 

@@ -1,4 +1,4 @@
-import Message, { IMessage } from './message.model';
+import Message, { IAttachment, IMessage } from './message.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
 import { calculateEffectivePermissions } from '../../utils/permission.service';
@@ -7,6 +7,19 @@ import Role from '../role/role.model';
 import Server from '../server/server.model';
 import Channel from '../channel/channel.model';
 import mongoose from 'mongoose';
+import config from '../../config';
+
+// [修正] 新增辅助函数，用于动态生成附件 URL
+function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
+  if (messageObject.attachments && messageObject.attachments.length > 0) {
+    messageObject.attachments.forEach(attachment => {
+      if (attachment.key) {
+        attachment.url = `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.bucketName}.${config.s3.webEndpoint}:${config.s3.webPort}/${attachment.key}`;
+      }
+    });
+  }
+  return messageObject;
+}
 
 async function parseAndValidateMentions(
   content: string,
@@ -87,21 +100,21 @@ async function checkMessagePermissions(messageId: string, userId: string) {
   }
 }
 
-/**
- * Applies author overrides from a message's payload.
- * This converts a Mongoose document to a plain object and modifies it.
- * @param message The Mongoose message document.
- * @returns A plain JavaScript object representing the message with overrides applied.
- */
-function applyAuthorOverride(message: IMessage): object {
-  const messageObject = message.toObject();
 
+function applyAuthorOverride<T extends { payload?: any; authorId?: any }>(messageObject: T): T {
   if (messageObject.payload && messageObject.payload.overrides && messageObject.authorId && typeof messageObject.authorId === 'object') {
     const author = messageObject.authorId as any;
     author.username = messageObject.payload.overrides.username || author.username;
     author.avatarUrl = messageObject.payload.overrides.avatarUrl || author.avatarUrl;
   }
+  return messageObject;
+}
 
+// [修正] 创建一个组合函数，应用所有转换
+function processMessageForClient<T extends IMessage>(message: T): object {
+  let messageObject = message.toObject();
+  messageObject = applyAuthorOverride(messageObject);
+  messageObject = hydrateAttachmentUrls(messageObject);
   return messageObject;
 }
 
@@ -123,8 +136,8 @@ export const getMessagesByChannel = async ({ channelId, limit, before }: GetMess
     .limit(limit)
     .populate('authorId', 'username avatarUrl isBot');
 
-  // Apply overrides to historical messages before returning.
-  return messages.map(applyAuthorOverride);
+  // [修正] 使用新的组合函数处理所有消息
+  return messages.map(processMessageForClient);
 };
 
 export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> => {
@@ -178,13 +191,13 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
-  // Apply overrides for the real-time broadcast.
-  const messageWithOverrides = applyAuthorOverride(populatedMessage);
+  // [修正] 使用组合函数处理要广播的消息
+  const messageForClient = processMessageForClient(populatedMessage);
 
-  socketManager.broadcast('MESSAGE_CREATE', populatedMessage.channelId.toString(), messageWithOverrides);
+  socketManager.broadcast('MESSAGE_CREATE', populatedMessage.channelId.toString(), messageForClient);
 
-  // Return the original Mongoose document, as the function signature promises.
-  return populatedMessage;
+  // [修正] 函数的返回值也应该被处理，以便 API 调用者获得完整的 URL
+  return messageForClient as IMessage;
 };
 
 export const getMessageById = async (messageId: string) => {
@@ -249,9 +262,12 @@ export const getMessageById = async (messageId: string) => {
     await message.save();
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
-    socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), populatedMessage);
 
-    return populatedMessage;
+    // [修正] 使用组合函数处理更新后的消息
+    const messageForClient = processMessageForClient(populatedMessage);
+    socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
+
+    return messageForClient as IMessage;
   };
 
   export const deleteMessage = async (messageId: string, userId: string) => {
@@ -270,10 +286,13 @@ export const getMessageById = async (messageId: string) => {
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
-    // Broadcast a MESSAGE_UPDATE event so clients can show the retracted state.
-    socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), populatedMessage);
+    // [修正] 使用组合函数处理撤回后的消息状态
+    const messageForClient = processMessageForClient(populatedMessage);
 
-    return populatedMessage;
+    // Broadcast a MESSAGE_UPDATE event so clients can show the retracted state.
+    socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
+
+    return messageForClient as IMessage;
   };
 
   export const addReaction = async (
@@ -285,7 +304,7 @@ export const getMessageById = async (messageId: string) => {
       const existingReaction = (message.reactions || []).find(r => r.userIds.map(id => id.toString()).includes(userId));
 
       if (existingReaction && existingReaction.emoji === emoji) {
-        return message.populate('authorId', 'username avatarUrl isBot');
+        return processMessageForClient(await message.populate('authorId', 'username avatarUrl isBot'));
       }
 
       if (existingReaction) {
@@ -319,9 +338,9 @@ export const getMessageById = async (messageId: string) => {
           throw new NotFoundError('Message not found');
       }
 
-      const messageWithOverrides = applyAuthorOverride(finalMessage);
-      socketManager.broadcast('MESSAGE_REACTION_ADD', finalMessage.channelId.toString(), messageWithOverrides);
-      return messageWithOverrides;
+      const messageForClient = processMessageForClient(finalMessage);
+      socketManager.broadcast('MESSAGE_REACTION_ADD', finalMessage.channelId.toString(), messageForClient);
+      return messageForClient;
     };
 
     export const removeReaction = async (
@@ -349,7 +368,7 @@ export const getMessageById = async (messageId: string) => {
           throw new NotFoundError('Message not found after reaction cleanup');
       }
 
-      const messageWithOverrides = applyAuthorOverride(finalMessage);
-      socketManager.broadcast('MESSAGE_REACTION_REMOVE', finalMessage.channelId.toString(), messageWithOverrides);
-      return messageWithOverrides;
+      const messageForClient = processMessageForClient(finalMessage);
+      socketManager.broadcast('MESSAGE_REACTION_REMOVE', finalMessage.channelId.toString(), messageForClient);
+      return messageForClient;
     };

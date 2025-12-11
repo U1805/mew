@@ -23,10 +23,24 @@ export const MentionSuggestionList: React.FC<MentionSuggestionListProps> = ({ se
 
     const globalSuggestions: (ServerMember & { isGlobal?: boolean })[] = [];
     if ('everyone'.includes(lowerQuery)) {
-      globalSuggestions.push({ _id: 'everyone', isGlobal: true, serverId, userId: { _id: 'everyone', username: 'everyone' } as any });
+      globalSuggestions.push({ 
+        _id: 'everyone', 
+        isGlobal: true, 
+        serverId, 
+        userId: { _id: 'everyone', username: 'everyone' } as any,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
     }
     if ('here'.includes(lowerQuery)) {
-      globalSuggestions.push({ _id: 'here', isGlobal: true, serverId, userId: { _id: 'here', username: 'here' } as any });
+      globalSuggestions.push({ 
+        _id: 'here', 
+        isGlobal: true, 
+        serverId, 
+        userId: { _id: 'here', username: 'here' } as any,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
     }
 
     return [...globalSuggestions, ...memberSuggestions].slice(0, 10);
