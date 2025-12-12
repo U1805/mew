@@ -1,11 +1,10 @@
-
-import React, { useEffect } from 'react';
+import { useEffect, type SVGProps } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { useServersWithChannels } from '../hooks/useServersWithChannels';
 
-const MewLogo = (props: React.SVGProps<SVGSVGElement>) => (
+const MewLogo = (props: SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 1136 944"
     fill="currentColor"
@@ -16,7 +15,7 @@ const MewLogo = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
-const ServerList: React.FC = () => {
+const ServerList = () => {
   const { currentServerId, setCurrentServer } = useUIStore();
   const { openModal } = useModalStore();
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
@@ -37,7 +36,6 @@ const ServerList: React.FC = () => {
     });
   }, [serverQueries, addUnreadChannel]);
 
-
   const hasUnread = (serverId: string, index: number) => {
     const channels = serverQueries[index].data;
     if (!channels) return false;
@@ -46,7 +44,6 @@ const ServerList: React.FC = () => {
 
   return (
     <div className="w-[72px] bg-mew-darkest flex flex-col items-center py-3 space-y-2 overflow-y-auto no-scrollbar flex-shrink-0 z-20">
-      {/* Home / DM Button */}
       <div className="relative flex items-center justify-center w-full">
         {currentServerId === null && (
            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[40px] bg-white rounded-r-full" />
@@ -64,7 +61,6 @@ const ServerList: React.FC = () => {
 
       <div className="w-8 h-[2px] bg-mew-darker rounded-full my-2" />
 
-      {/* Server List */}
       {servers?.map((server, index) => {
         const isUnread = hasUnread(server._id, index);
         const isActive = currentServerId === server._id;
@@ -100,7 +96,6 @@ const ServerList: React.FC = () => {
         )
       })}
 
-      {/* Add Server Button */}
       <button 
         onClick={() => openModal('createServer')}
         className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-green-500 hover:bg-green-600 hover:text-white transition-all duration-200 hover:rounded-[16px]"
@@ -108,7 +103,6 @@ const ServerList: React.FC = () => {
         <Icon icon="mdi:plus" width="24" height="24" className="transition-transform group-hover:rotate-90" />
       </button>
 
-      {/* Join Server Button */}
       <button 
         onClick={() => openModal('joinServer')}
         className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-mew-text hover:bg-[#35373C] hover:text-white transition-all duration-200 hover:rounded-[16px]"

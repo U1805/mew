@@ -10,9 +10,7 @@ declare global {
 }
 
 const twemojiClientModule: ClientModule = {
-    // onRouteDidUpdate is not called on the initial page load
     onRouteDidUpdate() {
-        // Use a timeout to allow Docusaurus/React to render the new page content
         setTimeout(() => {
             if (ExecutionEnvironment.canUseDOM && typeof window.twemoji !== 'undefined') {
                 window.twemoji.parse(document.body, {
@@ -24,9 +22,7 @@ const twemojiClientModule: ClientModule = {
     },
 };
 
-// This code in the module body will run once when the module is imported.
 if (ExecutionEnvironment.canUseDOM) {
-    // Parse for the first time on initial page load
     window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
              if (typeof window.twemoji !== 'undefined') {
@@ -35,7 +31,7 @@ if (ExecutionEnvironment.canUseDOM) {
                     ext: '.svg',
                 });
             }
-        }, 500); // 500ms for initial render
+        }, 100);
     });
 }
 

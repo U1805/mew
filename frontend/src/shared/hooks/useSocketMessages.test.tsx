@@ -1,11 +1,10 @@
 import { renderHook } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach, Mock } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import React from 'react';
+import type { ReactNode } from 'react';
 import { useSocketMessages } from './useSocketMessages';
 import { Message } from '../types';
 
-// Mock socket.io-client
 const mockSocket = {
   on: vi.fn(),
   off: vi.fn(),
@@ -15,7 +14,7 @@ vi.mock('../../shared/services/socket', () => ({
 }));
 
 const queryClient = new QueryClient();
-const wrapper = ({ children }: { children: React.ReactNode }) => (
+const wrapper = ({ children }: { children: ReactNode }) => (
   <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 );
 
@@ -52,7 +51,6 @@ describe('useSocketMessages', () => {
     queryClient.setQueryData(['messages', channelId], initialMessages);
     renderHook(() => useSocketMessages(channelId), { wrapper });
 
-    // Simulate a socket event
     const messageCreateHandler = (mockSocket.on as Mock).mock.calls.find(call => call[0] === 'MESSAGE_CREATE')[1];
     messageCreateHandler(newMessage);
 

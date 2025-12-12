@@ -1,33 +1,27 @@
-import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useModalStore, useAuthStore } from '../../../shared/stores';
+import type { MouseEvent } from 'react';
+import { useModalStore, useAuthStore, useUIStore } from '../../../shared/stores';
 import { ServerMember, User } from '../../../shared/types';
-import { useUIStore } from '../../../shared/stores';
 
 interface MentionProps {
   userId: string;
 }
 
-export const Mention: React.FC<MentionProps> = ({ userId }) => {
+export const Mention = ({ userId }: MentionProps) => {
   const { openModal } = useModalStore();
   const { user: currentUser } = useAuthStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
 
-  // Try to find the user in the server members cache first
   const members = queryClient.getQueryData<ServerMember[]>(['members', currentServerId]);
   const member = members?.find(m => m.userId?._id === userId);
-  
-  // If not in member list (e.g. DM or left server), try generic user cache or just fallback
-  // For MVP, we primarily rely on the loaded server members context.
   
   const username = member?.userId?.username || userId;
   const isMe = currentUser?._id === userId;
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
-    // Construct a partial user object to open the profile
     const targetUser: Partial<User> = member?.userId || { _id: userId, username: 'Unknown User', email: '', isBot: false, createdAt: '' };
     openModal('userProfile', { user: targetUser });
   };

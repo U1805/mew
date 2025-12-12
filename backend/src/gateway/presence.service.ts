@@ -2,8 +2,6 @@
  * @file Manages real-time user presence, tracking online users.
  */
 
-// Using a Map to store online users for efficient additions, removals, and lookups.
-// The key is the userId (string), and the value is the status ('online').
 export const onlineUsers = new Map<string, 'online'>();
 
 /**

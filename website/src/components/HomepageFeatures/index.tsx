@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useState, useRef, useEffect } from 'react'; // 引入 hooks
+import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import Link from '@docusaurus/Link';
@@ -106,7 +106,6 @@ const FeatureList: FeatureItem[] = [
     ],
   },
 ];
-// 新增：一个用于处理滚动显现的包装组件
 function FadeInSection({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   const [isVisible, setVisible] = useState(false);
   const domRef = useRef<HTMLDivElement>(null);
@@ -116,7 +115,6 @@ function FadeInSection({ children, delay = 0 }: { children: ReactNode; delay?: n
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           setVisible(true);
-          // 一旦显示就不再监听，避免反复闪烁
           if (domRef.current) observer.unobserve(domRef.current);
         }
       });
@@ -143,7 +141,6 @@ function FadeInSection({ children, delay = 0 }: { children: ReactNode; delay?: n
 
 function Feature({ title, image, description, reverse, tags, buttons }: FeatureItem) {
   return (
-    // 使用 FadeInSection 包裹整个 Row
     <FadeInSection>
       <div className={clsx(styles.featureRow, reverse && styles.featureRowReverse)}>
         <div className={clsx(styles.featureContent)}>
@@ -191,7 +188,6 @@ export default function HomepageFeatures(): ReactNode {
     <section className={styles.features}>
       <div className="container">
         <div className={styles.featuresHeader}>
-          {/* 标题也加一个动效 */}
           <FadeInSection>
              <Heading as="h2" style={{ textAlign: 'center' }}>功能总览</Heading>
           </FadeInSection>

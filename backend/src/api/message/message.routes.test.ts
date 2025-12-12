@@ -35,7 +35,6 @@ describe('Message Routes', () => {
       .send({ name: 'messages', type: ChannelType.GUILD_TEXT });
     channelId = channelRes.body._id;
 
-    // Create some test messages
     for (let i = 0; i < 20; i++) {
       await createMessage({ channelId, authorId: userId, content: `Message ${i}` });
     }
@@ -52,7 +51,7 @@ describe('Message Routes', () => {
       expect(res.body[0].content).toBe('Message 19');
     });
 
-        it('should support limit parameter', async () => {
+    it('should support limit parameter', async () => {
       const res = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages?limit=10`)
         .set('Authorization', `Bearer ${token}`)
@@ -61,7 +60,7 @@ describe('Message Routes', () => {
       expect(res.body.length).toBe(10);
     });
 
-        it('should support before parameter for pagination', async () => {
+    it('should support before parameter for pagination', async () => {
       const firstRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages?limit=10`)
         .set('Authorization', `Bearer ${token}`)
@@ -78,7 +77,6 @@ describe('Message Routes', () => {
     });
 
     it('should return an empty array for a channel with no messages', async () => {
-      // Create a new empty channel
       const emptyChannelRes = await request(app)
         .post(`/api/servers/${serverId}/channels`)
         .set('Authorization', `Bearer ${token}`)
@@ -94,23 +92,20 @@ describe('Message Routes', () => {
     });
 
     it('should return only remaining messages when limit exceeds available count during pagination', async () => {
-      // There are 20 messages. Let's get the first 15.
       const firstRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages?limit=15`)
         .set('Authorization', `Bearer ${token}`);
 
       expect(firstRes.body.length).toBe(15);
-      // The last message in this batch is 'Message 5' (20 total, sorted descending, so 19..5)
       const lastMessageId = firstRes.body[14]._id;
 
-      // Now, try to get 10 more messages before the last one. Only 5 are left.
       const secondRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages?limit=10&before=${lastMessageId}`)
         .set('Authorization', `Bearer ${token}`);
 
       expect(secondRes.statusCode).toBe(200);
-      expect(secondRes.body.length).toBe(5); // Should only return the remaining 5
-      expect(secondRes.body[0].content).toBe('Message 4'); // The next message in sequence
+      expect(secondRes.body.length).toBe(5);
+      expect(secondRes.body[0].content).toBe('Message 4');
     });
   });
 
@@ -129,11 +124,9 @@ describe('Message Routes', () => {
       };
 
       beforeEach(async () => {
-        // Setup @everyone role reference
         const server = await Server.findById(serverId).lean();
         everyoneRole = await Role.findById(server.everyoneRoleId);
 
-        // --- Create and add a regular member for permission tests ---
         await request(app).post('/api/auth/register').send(memberUserData);
         const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberUserData.email, password: memberUserData.password });
         memberToken = memberLoginRes.body.token;
@@ -142,7 +135,6 @@ describe('Message Routes', () => {
         const inviteCode = inviteRes.body.code;
         await request(app).post(`/api/invites/${inviteCode}`).set('Authorization', `Bearer ${memberToken}`);
 
-        // --- Create and add another user to be mentioned ---
         const mentionedUserData = { email: 'mentioned@test.com', username: 'mentioned', password: 'password123' };
         await request(app).post('/api/auth/register').send(mentionedUserData);
         const mentionedLoginRes = await request(app).post('/api/auth/login').send({ email: mentionedUserData.email, password: mentionedUserData.password });
@@ -196,7 +188,6 @@ describe('Message Routes', () => {
       });
 
       it('should block @everyone for users without MENTION_EVERYONE permission', async () => {
-        // Remove the permission from the @everyone role first
         everyoneRole.permissions = everyoneRole.permissions.filter(p => p !== 'MENTION_EVERYONE');
         await everyoneRole.save();
 
@@ -235,17 +226,14 @@ describe('Message Routes', () => {
     });
 
     it('should update mentions when a message is edited', async () => {
-      // This test requires a second user to mention
       const mentionedUserData = { email: 'mentioned-edit@test.com', username: 'mentioned.edit', password: 'password123' };
       await request(app).post('/api/auth/register').send(mentionedUserData);
       const loginRes = await request(app).post('/api/auth/login').send({ email: mentionedUserData.email, password: mentionedUserData.password });
       const mentionedUser = loginRes.body.user;
 
-      // Have the user join the server
       const inviteRes = await request(app).post(`/api/servers/${serverId}/invites`).set('Authorization', `Bearer ${token}`).send({});
       await request(app).post(`/api/invites/${inviteRes.body.code}`).set('Authorization', `Bearer ${loginRes.body.token}`);
 
-      // 1. Post a message with no mentions
       const initialRes = await request(app)
         .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
         .set('Authorization', `Bearer ${token}`)
@@ -253,7 +241,6 @@ describe('Message Routes', () => {
       const messageIdToEdit = initialRes.body._id;
       expect(initialRes.body.mentions).toEqual([]);
 
-      // 2. Edit the message to include a mention
       const updatedData = { content: `Edited to mention <@${mentionedUser._id}>` };
       const editRes = await request(app)
         .patch(`/api/servers/${serverId}/channels/${channelId}/messages/${messageIdToEdit}`)
@@ -312,7 +299,6 @@ describe('Message Routes', () => {
       expect(res.body.content).toBe('此消息已撤回');
       expect(res.body.retractedAt).toBeDefined();
 
-      // Verify the message is indeed updated in the database by fetching all messages again
       const getRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages`)
         .set('Authorization', `Bearer ${token}`);
@@ -379,12 +365,10 @@ describe('Message Routes', () => {
       const emoji1 = '👍';
       const emoji2 = '❤️';
 
-      // Add the first reaction
       await request(app)
         .put(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji1)}/@me`)
         .set('Authorization', `Bearer ${token}`);
 
-      // Add the second, different reaction
       const res = await request(app)
         .put(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}/reactions/${encodeURIComponent(emoji2)}/@me`)
         .set('Authorization', `Bearer ${token}`);

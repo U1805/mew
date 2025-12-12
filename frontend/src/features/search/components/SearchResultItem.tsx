@@ -1,4 +1,4 @@
-import React from 'react';
+import { useMemo } from 'react';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { format } from 'date-fns';
 import { Message } from '../../../shared/types';
@@ -10,27 +10,23 @@ interface SearchResultItemProps {
     onClick: () => void;
 }
 
-export const SearchResultItem: React.FC<SearchResultItemProps> = ({ message, channelName, searchQuery, onClick }) => {
+export const SearchResultItem = ({ message, channelName, searchQuery, onClick }: SearchResultItemProps) => {
     const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '' };
     const createdAt = message.createdAt ? new Date(message.createdAt) : new Date();
 
-    const highlightedContent = React.useMemo(() => {
+    const highlightedContent = useMemo(() => {
         if (!message.content) return '';
 
-        // 1. First, apply mention parsing to get an array of strings and <Mention> components
         const mentionParsedContent = parseMessageContent(message.content);
 
-        // 2. Then, if there's a search query, highlight it within the text parts
         if (searchQuery) {
             const escapedQuery = searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const regex = new RegExp(`(${escapedQuery})`, 'gi');
 
             return mentionParsedContent.flatMap((part, i) => {
                 if (part && typeof part.type === 'function' && part.type.name === 'Mention') {
-                    // It's already a <Mention> component, so leave it as is.
                     return part;
                 } else if (part && typeof part.props?.children === 'string') {
-                    // It's a <span> with text content from our parser
                     const text = part.props.children;
                     const splitText = text.split(regex).map((subPart, j) => {
                         if (subPart.toLowerCase() === searchQuery.toLowerCase()) {
@@ -44,7 +40,6 @@ export const SearchResultItem: React.FC<SearchResultItemProps> = ({ message, cha
             });
         }
 
-        // If no search query, just return the mention-parsed content
         return mentionParsedContent;
 
     }, [message.content, searchQuery]);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ServerMember } from '../../../shared/types';
@@ -10,13 +10,13 @@ interface MentionSuggestionListProps {
   onClose: () => void;
 }
 
-export const MentionSuggestionList: React.FC<MentionSuggestionListProps> = ({ serverId, query, onSelect, onClose }) => {
+export const MentionSuggestionList = ({ serverId, query, onSelect, onClose }: MentionSuggestionListProps) => {
   const queryClient = useQueryClient();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const members = queryClient.getQueryData<ServerMember[]>(['members', serverId]) || [];
 
-  const filteredMembers = React.useMemo(() => {
+  const filteredMembers = useMemo(() => {
     const lowerQuery = query.toLowerCase();
     const memberSuggestions = members
       .filter(m => m.userId && !m.userId.isBot && m.userId.username.toLowerCase().includes(lowerQuery));
@@ -46,12 +46,10 @@ export const MentionSuggestionList: React.FC<MentionSuggestionListProps> = ({ se
     return [...globalSuggestions, ...memberSuggestions].slice(0, 10);
   }, [members, query, serverId]);
 
-  // Reset selection when query changes
   useEffect(() => {
     setSelectedIndex(0);
   }, [query]);
 
-  // Handle keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (filteredMembers.length === 0) return;

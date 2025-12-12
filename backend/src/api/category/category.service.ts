@@ -8,15 +8,11 @@ export const createCategory = async (
   name: string,
   serverId: string
 ): Promise<ICategory> => {
-  // Permission is checked by middleware
-  const newCategory = await categoryRepository.create(name, serverId);
-  return newCategory;
+  return categoryRepository.create(name, serverId);
 };
 
 export const getCategoriesByServer = async (serverId: string): Promise<ICategory[]> => {
-  // Permission is checked by middleware
-  const categories = await categoryRepository.findByServer(serverId);
-  return categories;
+  return categoryRepository.findByServer(serverId);
 };
 
 export const updateCategoryById = async (
@@ -24,7 +20,6 @@ export const updateCategoryById = async (
   data: Partial<Pick<ICategory, 'name' | 'position'>>,
   userId: string
 ): Promise<ICategory> => {
-  // Permission is checked by middleware
   const category = await categoryRepository.updateById(categoryId, data);
   if (!category) {
     throw new NotFoundError('Category not found');
@@ -39,13 +34,11 @@ export const deleteCategoryById = async (
   categoryId: string,
   userId: string
 ): Promise<void> => {
-   // Permission is checked by middleware
   const category = await categoryRepository.findById(categoryId);
   if (!category) {
     throw new NotFoundError('Category not found');
   }
 
-  // Un-categorize channels in this category
   await Channel.updateMany({ categoryId }, { $unset: { categoryId: '' } });
 
   const serverId = category.serverId.toString();

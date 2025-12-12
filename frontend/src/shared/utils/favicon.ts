@@ -6,42 +6,32 @@ const ORIGINAL_FAVICON_URL = '/favicon.svg';
  * @returns A promise that resolves to a data URL of the new favicon.
  */
 export const generateFavicon = (count: number): Promise<string> => {
-  return new Promise((resolve) => {
-    if (count === 0) {
-      resolve(ORIGINAL_FAVICON_URL);
-      return;
-    }
+  if (count === 0) return Promise.resolve(ORIGINAL_FAVICON_URL);
 
+  return new Promise((resolve) => {
     const canvas = document.createElement('canvas');
     canvas.width = 32;
     canvas.height = 32;
     const context = canvas.getContext('2d');
-    if (!context) {
-      resolve(ORIGINAL_FAVICON_URL); // Fallback if context is not supported
-      return;
-    }
+    if (!context) return resolve(ORIGINAL_FAVICON_URL);
 
     const img = new Image();
     img.src = ORIGINAL_FAVICON_URL;
 
     img.onload = () => {
-      // Draw the original favicon
       context.drawImage(img, 0, 0, 32, 32);
 
-      // --- Draw the notification badge ---
       const text = count > 99 ? '99+' : count.toString();
       const badgeRadius = 8;
-      const badgeX = canvas.width - badgeRadius - 1; // Position at top-right
+      const badgeX = canvas.width - badgeRadius - 1;
       const badgeY = canvas.height - badgeRadius - 1;
 
-      // Red circle
       context.beginPath();
       context.arc(badgeX, badgeY, badgeRadius, 0, 2 * Math.PI);
-      context.fillStyle = '#f00'; // Red color
+      context.fillStyle = '#f00';
       context.fill();
 
-      // Text inside the circle
-      context.fillStyle = 'white'; // White text
+      context.fillStyle = 'white';
       context.font = 'bold 12px sans-serif';
       context.textAlign = 'center';
       context.textBaseline = 'middle';
@@ -50,10 +40,7 @@ export const generateFavicon = (count: number): Promise<string> => {
       resolve(canvas.toDataURL('image/png'));
     };
 
-    img.onerror = () => {
-      // Fallback if the original favicon fails to load
-      resolve(ORIGINAL_FAVICON_URL);
-    };
+    img.onerror = () => resolve(ORIGINAL_FAVICON_URL);
   });
 };
 

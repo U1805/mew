@@ -10,14 +10,13 @@ export const createMessageHandler = asyncHandler(async (req: Request, res: Respo
     throw new UnauthorizedError('Not authenticated');
   }
 
-  // [修复] 这里之前只解构了 content，导致 attachments 被丢弃
   const { content, attachments } = createMessageSchema.parse(req).body;
 
   const message = await messageService.createMessage({
     channelId: new Types.ObjectId(req.params.channelId),
     authorId: new Types.ObjectId(req.user.id),
     content,
-    attachments, // [修复] 将附件传递给 Service
+    attachments,
   });
 
   res.status(201).json(message);

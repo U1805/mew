@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
@@ -18,7 +17,7 @@ interface MessageItemProps {
   isSequential?: boolean;
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
+const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   const { user } = useAuthStore();
   const { currentServerId } = useUIStore();
   const { openModal } = useModalStore();
@@ -39,8 +38,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
   const isAuthor = user?._id?.toString() === author._id?.toString();
   const isRetracted = !!message.retractedAt;
 
-  // Phase 2: Highlight logic
-  // Check strict mentions array first, fallback to regex check for immediate UI feedback if backend sync is delayed/mocked
   const isMentioned = user && (
     (Array.isArray(message.mentions) && message.mentions.includes(user._id)) ||
     message.content.includes('@everyone') ||
@@ -54,7 +51,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
       if (itemRef.current) {
         const handleAnimationEnd = () => {
           setApplyFlash(false);
-          // Delay removing from the set until animation is fully complete
           setTimeout(() => removeUnreadMention(message._id), 100);
         };
         itemRef.current.addEventListener('animationend', handleAnimationEnd);
@@ -67,7 +63,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isSequential }) => {
     }
   }, [message._id, unreadMentionMessageIds, removeUnreadMention]);
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const handleDelete = (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       openModal('deleteMessage', { message, author });

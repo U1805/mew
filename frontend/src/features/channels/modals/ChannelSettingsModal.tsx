@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useModalStore, useUIStore } from '../../../shared/stores';
-import { channelApi, categoryApi, serverApi } from '../../../shared/services/api';
-import { Category, PermissionOverride, Role, ServerMember } from '../../../shared/types';
+import { channelApi } from '../../../shared/services/api';
+import { PermissionOverride, Role, ServerMember } from '../../../shared/types';
 import { WebhookManager } from './WebhookManager';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
@@ -39,7 +39,7 @@ interface DisplayOverride {
     deny: Set<string>;
 }
 
-export const ChannelSettingsModal: React.FC = () => {
+export const ChannelSettingsModal = () => {
   const { closeModal, modalData, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
@@ -50,7 +50,6 @@ export const ChannelSettingsModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'permissions' | 'integrations'>('overview');
   const permissions = usePermissions(modalData?.channel?._id);
 
-  // Permissions State
   const [selectedOverrideId, setSelectedOverrideId] = useState<string | null>(null);
   const [localOverrides, setLocalOverrides] = useState<PermissionOverride[]>([]);
 

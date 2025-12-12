@@ -5,7 +5,6 @@ import { ForbiddenError, UnauthorizedError, NotFoundError } from '../utils/error
 import Server from '../api/server/server.model';
 import asyncHandler from '../utils/asyncHandler';
 
-// Add 'member' to the Request type
 declare global {
   namespace Express {
     interface Request {
@@ -30,7 +29,6 @@ export const setServerIdFromCategory = asyncHandler(async (req: Request, res: Re
     return res.status(404).send({ message: 'Category not found' });
   }
 
-  // Attach serverId to params for subsequent middleware
   req.params.serverId = category.serverId.toString();
   next();
 });
@@ -42,7 +40,6 @@ export const checkServerMembership = asyncHandler(async (req: Request, res: Resp
 
   const { serverId } = req.params;
   if (!serverId) {
-    // This middleware is only for server-specific routes, do nothing if no serverId
     return next();
   }
 
@@ -60,4 +57,3 @@ export const checkServerMembership = asyncHandler(async (req: Request, res: Resp
   req.member = member;
   next();
 });
-

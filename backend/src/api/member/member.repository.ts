@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 class MemberRepository {
   async find(filter: any): Promise<any[]> {
-    // Note: The original populate and lean are kept here as they are data-access concerns.
+    // Repository owns populate/lean decisions.
     return ServerMember.find(filter)
       .populate('userId', '_id username avatarUrl isBot email createdAt')
       .lean();

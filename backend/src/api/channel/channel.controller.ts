@@ -1,15 +1,9 @@
 import { Request, Response } from 'express';
 import asyncHandler from '../../utils/asyncHandler';
-import {
-  ForbiddenError,
-  NotFoundError,
-  UnauthorizedError,
-  BadRequestError
-} from '../../utils/errors';
+import { NotFoundError, UnauthorizedError, BadRequestError } from '../../utils/errors';
 import channelService from './channel.service';
 import readStateService from './readState.service';
 import serverService from '../server/server.service';
-import ServerMember from '../member/member.model';
 
 export const createChannelHandler = asyncHandler(
   async (req: Request, res: Response) => {
@@ -19,7 +13,6 @@ export const createChannelHandler = asyncHandler(
     const server = await serverService.getServerById(serverId);
 
     if (!server) throw new NotFoundError('Server not found');
-
 
     const newChannel = await channelService.createChannel({
       ...req.body,
@@ -57,7 +50,6 @@ export const updateChannelHandler = asyncHandler(
       throw new BadRequestError('This operation is not applicable to DM channels.');
     }
 
-
     const updatedChannel = await channelService.updateChannel(
       channelId,
       req.body
@@ -79,7 +71,6 @@ export const deleteChannelHandler = asyncHandler(
       throw new BadRequestError('This operation is not applicable to DM channels.');
     }
 
-
     await channelService.deleteChannel(channelId);
 
     res.status(200).json({ message: 'Channel deleted successfully' });
@@ -96,8 +87,8 @@ export const getChannelsHandler = asyncHandler(async (req: Request, res: Respons
 });
 
 export const getPermissionOverridesHandler = asyncHandler(async (req: Request, res: Response) => {
-  // @ts-ignore
-  const overrides = await channelService.getPermissionOverrides(req.params.channelId);
+  const { channelId } = req.params as { channelId: string };
+  const overrides = await channelService.getPermissionOverrides(channelId);
   res.status(200).json(overrides);
 });
 
@@ -105,11 +96,10 @@ export const updatePermissionOverridesHandler = asyncHandler(async (req: Request
   if (!req.user) {
     throw new UnauthorizedError('User not authenticated');
   }
-  // @ts-ignore
-  const overrides = await channelService.updatePermissionOverrides(req.params.channelId, req.body, req.user.id);
+  const { channelId } = req.params as { channelId: string };
+  const overrides = await channelService.updatePermissionOverrides(channelId, req.body, req.user.id);
   res.status(200).json(overrides);
 });
-
 
 export const ackChannelHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {

@@ -10,7 +10,7 @@ import mentionService from './mention.service';
 import mongoose from 'mongoose';
 import config from '../../config';
 
-// [修正] 新增辅助函数，用于动态生成附件 URL
+// Convert stored attachment keys into client-consumable URLs.
 function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
   if (messageObject.attachments && messageObject.attachments.length > 0) {
     messageObject.attachments.forEach(attachment => {
@@ -22,16 +22,13 @@ function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messag
   return messageObject;
 }
 
-
 async function checkMessagePermissions(messageId: string, userId: string) {
   const message = await getMessageById(messageId);
 
-  // If the user is the author, they can always edit/delete.
   if (message.authorId.toString() === userId) {
     return;
   }
 
-  // If not the author, check for MANAGE_MESSAGES permission.
   const channel = await Channel.findById(message.channelId).lean();
   if (!channel || channel.type === 'DM' || !channel.serverId) {
     throw new ForbiddenError('Permission check failed: Invalid channel.');
@@ -79,7 +76,6 @@ function applyAuthorOverride<T extends { payload?: any; authorId?: any }>(messag
   return messageObject;
 }
 
-// [修正] 创建一个组合函数，应用所有转换
 function processMessageForClient<T extends IMessage>(message: T): object {
   let messageObject = message.toObject();
   messageObject = applyAuthorOverride(messageObject);
@@ -97,12 +93,10 @@ import { messageRepository } from './message.repository';
 
 export const getMessagesByChannel = async (options: GetMessagesOptions) => {
   const messages = await messageRepository.findByChannel(options);
-  // [修正] 使用新的组合函数处理所有消息
   return messages.map(processMessageForClient);
 };
 
 export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> => {
-  // We need the channel to determine server and type
   const channel = await Channel.findById(data.channelId).lean();
   if (!channel) {
     throw new NotFoundError('Channel not found');
@@ -112,7 +106,6 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
     throw new BadRequestError('Message must have a channel and an author');
   }
 
-  // Process mentions using the new service
   const validatedMentions = await mentionService.processMentions(
     data.content || '',
     data.channelId.toString(),
@@ -127,23 +120,19 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
-  // [修正] 使用组合函数处理要广播的消息
   const messageForClient = processMessageForClient(populatedMessage);
 
   const channelIdStr = populatedMessage.channelId.toString();
 
-  // Broadcast to the channel room for in-room users
   socketManager.broadcast('MESSAGE_CREATE', channelIdStr, messageForClient);
 
-  // DM reliability: also broadcast to each recipient's personal room so they
-  // receive messages even if their socket hasn't joined the DM room yet.
+  // Also broadcast to recipients' personal rooms for DM reliability.
   if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
     for (const recipient of channel.recipients) {
       socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_CREATE', messageForClient);
     }
   }
 
-  // [修正] 函数的返回值也应该被处理，以便 API 调用者获得完整的 URL
   return messageForClient as IMessage;
 };
 
@@ -168,7 +157,6 @@ export const getMessageById = async (messageId: string) => {
       throw new NotFoundError('Channel not found');
     }
 
-    // Process mentions using the new service for the updated content
     const validatedMentions = await mentionService.processMentions(
       content,
       message.channelId.toString(),
@@ -182,7 +170,6 @@ export const getMessageById = async (messageId: string) => {
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
-    // [修正] 使用组合函数处理更新后的消息
     const messageForClient = processMessageForClient(populatedMessage);
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
 
@@ -193,7 +180,7 @@ export const getMessageById = async (messageId: string) => {
     await checkMessagePermissions(messageId, userId);
     const message = await getMessageById(messageId);
 
-    // Instead of deleting, we update the message to mark it as retracted.
+    // Retraction keeps history stable for clients and avoids hard deletes.
     message.content = '此消息已撤回';
     message.editedAt = new Date();
     message.retractedAt = new Date();
@@ -205,10 +192,8 @@ export const getMessageById = async (messageId: string) => {
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
-    // [修正] 使用组合函数处理撤回后的消息状态
     const messageForClient = processMessageForClient(populatedMessage);
 
-    // Broadcast a MESSAGE_UPDATE event so clients can show the retracted state.
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
 
     return messageForClient as IMessage;

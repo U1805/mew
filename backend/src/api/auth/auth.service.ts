@@ -13,14 +13,10 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   }
 
   const user = await userRepository.findByEmailWithPassword(email);
-  if (!user) {
-    throw new UnauthorizedError('Invalid credentials');
-  }
+  if (!user) throw new UnauthorizedError('Invalid credentials');
 
   const isMatch = await bcrypt.compare(password, user.password || '');
-  if (!isMatch) {
-    throw new UnauthorizedError('Invalid credentials');
-  }
+  if (!isMatch) throw new UnauthorizedError('Invalid credentials');
 
   const payload = { id: user._id, username: user.username };
   const token = jwt.sign(payload, config.jwtSecret);
@@ -40,7 +36,6 @@ export const register = async (userData: Partial<IUser>) => {
 
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
-
     const newUser = await userRepository.create({
       email,
       username,
@@ -53,11 +48,9 @@ export const register = async (userData: Partial<IUser>) => {
     return userWithoutPassword;
   } catch (error: any) {
     if (error.name === 'MongoServerError' && error.code === 11000) {
-        // Determine which field caused the duplicate key error
-        const field = Object.keys(error.keyPattern)[0];
-        throw new ConflictError(`${field.charAt(0).toUpperCase() + field.slice(1)} already exists.`);
+      const field = Object.keys(error.keyPattern)[0];
+      throw new ConflictError(`${field.charAt(0).toUpperCase() + field.slice(1)} already exists.`);
     }
-    // Re-throw other errors to be handled by the global error handler
     throw error;
   }
 };

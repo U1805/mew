@@ -1,14 +1,10 @@
-
 export const ALL_PERMISSIONS = [
-  // Server-Level Permissions
   'ADMINISTRATOR',
   'MANAGE_ROLES',
   'KICK_MEMBERS',
   'CREATE_INVITE',
   'MANAGE_SERVER',
   'MANAGE_WEBHOOKS',
-
-  // Channel-Level Permissions
   'MANAGE_CHANNEL',
   'SEND_MESSAGES',
   'MANAGE_MESSAGES',
@@ -38,7 +34,7 @@ export const CHANNEL_PERMISSIONS: Permission[] = [
 ];
 
 export const DM_PERMISSIONS: Permission[] = [
-    'SEND_MESSAGES',
-    'ADD_REACTIONS',
-    'ATTACH_FILES',
+  'SEND_MESSAGES',
+  'ADD_REACTIONS',
+  'ATTACH_FILES',
 ];

@@ -1,5 +1,4 @@
-
-import React, { useState, useRef } from 'react';
+import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { messageApi, uploadApi } from '../../../shared/services/api';
@@ -14,7 +13,7 @@ interface MessageInputProps {
   channelId: string | null;
 }
 
-const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelId }) => {
+const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   const [inputValue, setInputValue] = useState('');
   const [attachments, setAttachments] = useState<Array<Partial<Attachment & { isUploading?: boolean; progress?: number; file?: File; localUrl?: string; error?: string; key?: string }>>>([]);
   const isUploading = attachments.some(a => a.isUploading);
@@ -28,7 +27,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
   const queryClient = useQueryClient();
   const canSendMessage = channel?.permissions?.includes('SEND_MESSAGES') ?? false;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !channelId) return;
 
     const files = Array.from(e.target.files);
@@ -45,7 +44,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
 
     setAttachments(prev => [...prev, ...newUploads]);
 
-    // Start uploading each file
     newUploads.forEach((upload, index) => {
       uploadFile(upload, attachments.length + index);
     });
@@ -57,7 +55,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
     if (!attachment.file || !channelId) return;
 
     try {
-            const formData = new FormData();
+      const formData = new FormData();
       formData.append('file', attachment.file);
 
       const response = await uploadApi.uploadFile(channelId, formData, (progressEvent) => {
@@ -71,14 +69,12 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
         });
       });
 
-      // Once uploaded, update the attachment with the real URL from S3
       setAttachments(prev => {
         const newAttachments = [...prev];
         if (newAttachments[index]) {
           newAttachments[index].isUploading = false;
-          newAttachments[index].key = response.data.key; // [修正] 存储 key 而不是 url
-          // The URL for preview is the local one, which is faster and doesn't depend on remote state.
-          // The final, persistent URL will be hydrated by the backend upon message creation/retrieval.
+          // Store the object `key`; backend hydrates the final URL.
+          newAttachments[index].key = response.data.key;
           newAttachments[index].progress = 100;
         }
         return newAttachments;
@@ -86,7 +82,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
 
     } catch (error) {
       console.error('File upload failed:', error);
-      // Handle error, e.g., show an error state on the attachment preview
       setAttachments(prev => {
           const newAttachments = [...prev];
           if (newAttachments[index]) {
@@ -102,7 +97,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setInputValue(val);
 
@@ -137,7 +132,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
     const isGlobal = (member as any).isGlobal;
     const username = member.userId.username;
 
-    // Do not add global mentions to the commit map. They don't need translation.
+    // Only user mentions need translation; @everyone/@here stay as text.
     if (!isGlobal && member.userId) {
       setCommittedMentions(prevMap => new Map(prevMap).set(username, member.userId._id));
     }
@@ -149,7 +144,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
     const lastAtIndex = textBefore.lastIndexOf('@');
     if (lastAtIndex === -1) return;
 
-    // For both global and user mentions, we insert the plain username.
     const newTextBefore = textBefore.slice(0, lastAtIndex) + `@${username}` + ' ';
     const newValue = newTextBefore + textAfter;
 
@@ -164,7 +158,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
     }, 0);
   };
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if ((!inputValue.trim() && attachments.length === 0) || !channelId || isUploading) return;
 
@@ -191,7 +185,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
       _id: tempId,
       channelId: channelId,
       authorId: user,
-      content: contentToSend, // Use the processed content
+      content: contentToSend,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       type: 'DEFAULT',
@@ -201,7 +195,7 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
           contentType: a.contentType || '',
           url: a.localUrl || '',
           size: a.size || 0
-      })), // Include attachments in optimistic update
+      })),
     };
 
     queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
@@ -215,7 +209,8 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
 
     try {
       const finalAttachments = attachments
-        .filter(a => !a.isUploading && a.key) // [修正] 确保我们只发送已上传并拥有 key 的附件
+        // Only send uploaded attachments (with key).
+        .filter(a => !a.isUploading && a.key)
         .map(({ filename, contentType, key, size }) => ({ filename, contentType, key, size } as unknown as Attachment));
 
       console.log('Sending attachments:', finalAttachments);
@@ -230,7 +225,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
         return oldData ? oldData.filter(m => m._id !== tempId) : [];
       });
       console.error("Failed to send message:", err);
-      // Restore state on failure
       setInputValue(inputValue);
       setAttachments(attachments);
     }
@@ -247,7 +241,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
           />
       )}
 
-      {/* Upload Preview */}
       {attachments.length > 0 && (
         <div className="flex gap-4 p-3 bg-[#2B2D31] rounded-t-lg border-b border-[#1E1F22] overflow-x-auto custom-scrollbar">
           {attachments.map((file, index) => {
@@ -263,7 +256,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
                   </>
                 )}
 
-                {/* Overlay for upload progress and status */}
                 {file.isUploading && (
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                     <div className="w-12 h-12 border-4 border-t-transparent border-mew-accent rounded-full animate-spin"></div>
@@ -271,7 +263,6 @@ const MessageInput: React.FC<MessageInputProps> = ({ channel, serverId, channelI
                   </div>
                 )}
 
-                {/* Remove Button */}
                 {!file.isUploading && (
                   <button
                     onClick={() => removeAttachment(index)}

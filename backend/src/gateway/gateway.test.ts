@@ -7,7 +7,6 @@ import app from '../app';
 import { SocketManager, socketManager as appSocketManager } from '../gateway/events';
 import { registerConnectionHandlers } from './handlers';
 
-// Mock the application's socketManager to intercept broadcasts
 vi.mock('../gateway/events', async (importOriginal) => {
   const original = await importOriginal() as any;
   return {
@@ -46,11 +45,9 @@ describe('WebSocket Gateway', () => {
   beforeEach(async () => {
     httpServer = createServer(app);
 
-    // Create a real SocketManager for the test environment
     const testSocketManager = new SocketManager();
     io = testSocketManager.init(httpServer);
 
-    // Make the mocked broadcast function call the real test instance's broadcast
     (appSocketManager.broadcast as ReturnType<typeof vi.fn>).mockImplementation(
       (event: string, roomId: string, payload: any) => {
         testSocketManager.broadcast(event, roomId, payload);
@@ -59,7 +56,6 @@ describe('WebSocket Gateway', () => {
 
     (appSocketManager.getIO as ReturnType<typeof vi.fn>).mockImplementation(() => io);
 
-    // Use the real auth middleware and connection handlers
     io.use(authMiddleware);
     io.on('connection', (socket) => {
         registerConnectionHandlers(io, socket)
@@ -81,7 +77,6 @@ describe('WebSocket Gateway', () => {
     token2 = loginRes2.body.token;
     userId2 = loginRes2.body.user._id;
 
-    // Server 1 for user1
     const server1Res = await request(app).post('/api/servers').set('Authorization', `Bearer ${token1}`).send({ name: 'Socket Test Server 1' });
     serverId = server1Res.body._id; // This is the server under test
 
@@ -94,7 +89,6 @@ describe('WebSocket Gateway', () => {
     const channel2Res = await request(app).post(`/api/servers/${serverId}/channels`).set('Authorization', `Bearer ${token1}`).send({ name: 'Channel Two', type: ChannelType.GUILD_TEXT });
     channel2Id = channel2Res.body._id;
 
-    // Server 2 for user2, to ensure they are in a different room
     const server2Res = await request(app).post('/api/servers').set('Authorization', `Bearer ${token2}`).send({ name: 'Socket Test Server 2' });
     const server2Id = server2Res.body._id;
     await request(app).post(`/api/servers/${server2Id}/channels`).set('Authorization', `Bearer ${token2}`).send({ name: 'Channel Two', type: ChannelType.GUILD_TEXT });
@@ -141,23 +135,17 @@ describe('WebSocket Gateway', () => {
       client2.on('MESSAGE_CREATE', () => {
         reject(new Error('Client 2 should not have received this message'));
       });
-      // If the message is not received after a short delay, resolve the promise.
       setTimeout(resolve, 500);
     });
 
-    // Wait for sockets to be fully ready (after joining rooms)
     await new Promise<void>(resolve => client1.on('ready', () => resolve()));
     await new Promise<void>(resolve => client2.on('ready', () => resolve()));
 
-    // client now automatically joins rooms on connection via `joinUserRooms`
-
-    // API call to create a message, which triggers the broadcast
     await request(app)
       .post(`/api/servers/${serverId}/channels/${channel1Id}/messages`)
       .set('Authorization', `Bearer ${token1}`)
       .send({ content: 'Hello from channel one' });
 
-    // Await all test promises
     await Promise.all([client1ReceivesMessage, client2DoesNotReceiveMessage]);
 
     const savedMsg = await Message.findOne({ channelId: channel1Id, content: 'Hello from channel one' });
@@ -165,7 +153,6 @@ describe('WebSocket Gateway', () => {
   });
 
   it('should make user join their own user ID room upon connection', async () => {
-    // Grant user2 membership to server1 temporarily for the test
     await request(app)
       .post(`/api/invites/${inviteCode}`)
       .set('Authorization', `Bearer ${token2}`)
@@ -175,17 +162,14 @@ describe('WebSocket Gateway', () => {
     const client2Ready = new Promise<void>(resolve => client2.on('ready', () => resolve()));
     await client2Ready;
 
-    // Add a small delay to allow server-side room joining to propagate
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    // Check server side if the socket is in the room
     const sockets = await io.in(userId2).fetchSockets();
     expect(sockets.length).toBe(1);
     expect(sockets[0].user.id).toBe(userId2);
   });
 
   it('should handle and broadcast presence updates correctly', async () => {
-    // Promise to resolve when client2 gets the initial state with just itself
     const client1InitialStatePromise = new Promise<void>((resolve, reject) => {
       client1 = createTestClient(port, token1);
       client1.on('PRESENCE_INITIAL_STATE', (onlineUserIds) => {
@@ -201,7 +185,6 @@ describe('WebSocket Gateway', () => {
     await client1InitialStatePromise;
 
     const client2OnlinePromise = new Promise<void>((resolve, reject) => {
-      // Client1 listens for client2's online presence update
       client1.on('PRESENCE_UPDATE', (data) => {
         try {
           expect(data).toEqual({ userId: userId2, status: 'online' });
@@ -212,12 +195,10 @@ describe('WebSocket Gateway', () => {
       });
     });
 
-    // Promise to resolve when client2 gets the initial state with both users
     const client2InitialStatePromise = new Promise<void>((resolve, reject) => {
       client2 = createTestClient(port, token2);
       client2.on('PRESENCE_INITIAL_STATE', (onlineUserIds) => {
         try {
-          // Order isn't guaranteed, so sort for comparison
           expect(onlineUserIds.sort()).toEqual([userId1, userId2].sort());
           resolve();
         } catch (e) {
@@ -226,10 +207,8 @@ describe('WebSocket Gateway', () => {
       });
     });
 
-    // Wait for client2 to connect and both clients to get their updates
     await Promise.all([client2OnlinePromise, client2InitialStatePromise]);
 
-    // Promise for when client2 receives the offline notification for client1
     const client1OfflinePromise = new Promise<void>((resolve, reject) => {
       client2.on('PRESENCE_UPDATE', (data) => {
         try {
@@ -241,7 +220,6 @@ describe('WebSocket Gateway', () => {
       });
     });
 
-    // Disconnect client1 and wait for the offline message to be received by client2
     client1.disconnect();
     await client1OfflinePromise;
   });

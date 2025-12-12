@@ -15,13 +15,8 @@ const memberService = {
       throw new ForbiddenError('You are not a member of this server.');
     }
 
-    // Step 1: Get real members
     const members = await memberRepository.find({ serverId });
-
-    // Step 2: Get virtual webhook members from the new service
     const webhookMembers = await webhookMemberService.getWebhookMembers(serverId);
-
-    // Step 3: Merge both member lists
     const allMembers = [...members, ...webhookMembers];
 
     return allMembers;
@@ -37,8 +32,7 @@ const memberService = {
     }
 
     if (!requester.isOwner) {
-      // This check will be replaced by a permission check in a later stage.
-      // For now, we allow non-owners but check their hierarchy.
+      // TODO: Replace hierarchy check with permission check.
       await checkMemberHierarchy(serverId, requesterId, userIdToRemove);
     }
     const result = await memberRepository.deleteOne({ serverId, userId: userIdToRemove });
@@ -77,7 +71,7 @@ const memberService = {
       throw new ForbiddenError('You are not a member of this server.');
     }
     if (!requester.isOwner) {
-        // This check will be replaced by a permission check in a later stage.
+        // TODO: Replace hierarchy check with permission check.
         await checkMemberHierarchy(serverId, requesterId, userIdToUpdate);
     }
     const member = await memberRepository.findOne({ serverId, userId: userIdToUpdate });
@@ -90,7 +84,7 @@ const memberService = {
     socketManager.broadcast('PERMISSIONS_UPDATE', serverId, { serverId, userId: userIdToUpdate });
     socketManager.broadcastToUser(userIdToUpdate, 'PERMISSIONS_UPDATE', { serverId, userId: userIdToUpdate });
 
-    // Asynchronously re-evaluate permissions for the updated member across all channels.
+    // Recompute per-channel permissions in background.
     (async () => {
       try {
         const serverChannels = await Channel.find({ serverId });

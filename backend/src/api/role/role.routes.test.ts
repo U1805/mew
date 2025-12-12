@@ -3,9 +3,6 @@ import request from 'supertest';
 import app from '../../app';
 import Role from './role.model';
 import Server from '../server/server.model';
-import ServerMember from '../member/member.model';
-import mongoose from 'mongoose';
-
 
 describe('Role Hierarchy Checks', () => {
   let ownerToken: string;
@@ -15,7 +12,6 @@ describe('Role Hierarchy Checks', () => {
   let lowRoleUserToken: string;
 
   beforeEach(async () => {
-    // Create owner and server
     await request(app).post('/api/auth/register').send({ email: 'rh-owner@test.com', username: 'rh-owner', password: 'password123' });
     const ownerLoginRes = await request(app).post('/api/auth/login').send({ email: 'rh-owner@test.com', password: 'password123' });
     ownerToken = ownerLoginRes.body.token;
@@ -23,13 +19,11 @@ describe('Role Hierarchy Checks', () => {
     serverId = serverRes.body._id;
     const server = await Server.findById(serverId);
 
-    // Create roles
     const highRoleRes = await request(app).post(`/api/servers/${serverId}/roles`).set('Authorization', `Bearer ${ownerToken}`).send({ name: 'Admin', position: 10 });
     highRoleId = highRoleRes.body._id;
     const lowRoleRes = await request(app).post(`/api/servers/${serverId}/roles`).set('Authorization', `Bearer ${ownerToken}`).send({ name: 'Moderator', position: 5 });
     lowRoleId = lowRoleRes.body._id;
 
-    // Create low-role user and assign them the low role
     await request(app).post('/api/auth/register').send({ email: 'rh-low@test.com', username: 'rh-low', password: 'password123' });
     const lowRoleUserLoginRes = await request(app).post('/api/auth/login').send({ email: 'rh-low@test.com', password: 'password123' });
     lowRoleUserToken = lowRoleUserLoginRes.body.token;
@@ -37,7 +31,7 @@ describe('Role Hierarchy Checks', () => {
     await request(app).post(`/api/invites/${(await request(app).post(`/api/servers/${serverId}/invites`).set('Authorization', `Bearer ${ownerToken}`).send({})).body.code}`).set('Authorization', `Bearer ${lowRoleUserToken}`);
     await request(app).put(`/api/servers/${serverId}/members/${lowRoleUserId}/roles`).set('Authorization', `Bearer ${ownerToken}`).send({ roleIds: [lowRoleId] });
 
-    // Grant MANAGE_ROLES to the low role to actually test the hierarchy checks
+    // 让低角色具备 MANAGE_ROLES，以验证层级拦截。
     const lowRole = await Role.findById(lowRoleId);
     lowRole!.permissions.push('MANAGE_ROLES');
     await lowRole!.save();
@@ -62,11 +56,11 @@ describe('Role Hierarchy Checks', () => {
     expect(res.body.message).toContain('equal or higher position');
   });
 
-   it('should prevent a user from moving a role to a position above their own highest role', async () => {
+  it('should prevent a user from moving a role to a position above their own highest role', async () => {
     const res = await request(app)
       .patch(`/api/servers/${serverId}/roles/positions`)
       .set('Authorization', `Bearer ${lowRoleUserToken}`)
-      .send([{ roleId: highRoleId, position: 11 }])
+      .send([{ roleId: highRoleId, position: 11 }]);
 
     expect(res.statusCode).toBe(403);
     expect(res.body.message).toContain('equal or higher position');
@@ -93,7 +87,6 @@ describe('Role Routes', () => {
   let nonOwnerToken: string;
 
   beforeEach(async () => {
-    // Create owner user and server
     const ownerData = { email: 'role-owner@test.com', username: 'roleowner', password: 'password123' };
     await request(app).post('/api/auth/register').send(ownerData);
     const ownerLoginRes = await request(app).post('/api/auth/login').send({ email: ownerData.email, password: ownerData.password });
@@ -103,7 +96,6 @@ describe('Role Routes', () => {
     const serverRes = await request(app).post('/api/servers').set('Authorization', `Bearer ${token}`).send({ name: 'Role Test Server' });
     serverId = serverRes.body._id;
 
-    // Create non-owner user
     const nonOwnerData = { email: 'non-owner@test.com', username: 'nonowner', password: 'password123' };
     await request(app).post('/api/auth/register').send(nonOwnerData);
     const nonOwnerLoginRes = await request(app).post('/api/auth/login').send({ email: nonOwnerData.email, password: nonOwnerData.password });
@@ -133,7 +125,7 @@ describe('Role Routes', () => {
 
   describe('GET /api/servers/:serverId/roles', () => {
     it('should return all roles for a server', async () => {
-        await request(app)
+      await request(app)
         .post(`/api/servers/${serverId}/roles`)
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'Tester', position: 2 });
@@ -153,11 +145,11 @@ describe('Role Routes', () => {
     let roleId: string;
 
     beforeEach(async () => {
-        const res = await request(app)
+      const res = await request(app)
         .post(`/api/servers/${serverId}/roles`)
         .set('Authorization', `Bearer ${token}`)
         .send({ name: 'Updatable' });
-        roleId = res.body._id;
+      roleId = res.body._id;
     });
 
     it('should allow owner to update a role', async () => {
@@ -172,7 +164,7 @@ describe('Role Routes', () => {
     });
 
     it('should prevent non-owner from updating a role', async () => {
-        const res = await request(app)
+      const res = await request(app)
         .patch(`/api/servers/${serverId}/roles/${roleId}`)
         .set('Authorization', `Bearer ${nonOwnerToken}`)
         .send({ name: 'Failed Update' });
@@ -214,11 +206,11 @@ describe('Role Routes', () => {
     });
 
     it('should prevent non-owner from deleting a role', async () => {
-        const res = await request(app)
+      const res = await request(app)
         .delete(`/api/servers/${serverId}/roles/${roleId}`)
         .set('Authorization', `Bearer ${nonOwnerToken}`);
 
       expect(res.statusCode).toBe(403);
-    })
+    });
   });
 });

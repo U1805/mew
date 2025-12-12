@@ -13,7 +13,6 @@ function HomepageHeader() {
   return (
     <header className={styles.heroBanner}>
       <div className="container">
-        {/* Top large image */}
         <div className={styles.heroImageWrapper}>
           <img src={heroImage} alt="Mew 预览" className={styles.heroImage} />
         </div>

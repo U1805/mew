@@ -1,13 +1,12 @@
-import React, { useEffect } from 'react';
+import { useEffect, useMemo, type MouseEvent } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores';
-import { useMemo } from 'react';
 import { useDmChannels } from '../hooks/useDmChannels';
 
-export const DMChannelList: React.FC = () => {
+export const DMChannelList = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();
   const { openModal } = useModalStore();
   const { user } = useAuthStore();
@@ -15,7 +14,6 @@ export const DMChannelList: React.FC = () => {
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
   const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
   const { hiddenDmChannelIds, addHiddenChannel } = useHiddenStore();
-
 
   const { data: dmChannels, isSuccess } = useDmChannels();
 
@@ -34,10 +32,8 @@ export const DMChannelList: React.FC = () => {
     }
   }, [dmChannels, isSuccess, addUnreadChannel]);
 
-  const handleRemoveDm = (e: React.MouseEvent, channelId: string) => {
-    e.stopPropagation(); // Prevent the parent div's onClick from firing
-
-    // If we are currently viewing the channel we are hiding, switch away from it.
+  const handleRemoveDm = (e: MouseEvent, channelId: string) => {
+    e.stopPropagation();
     if (useUIStore.getState().currentChannelId === channelId) {
       useUIStore.getState().setCurrentChannel(null);
     }
@@ -103,7 +99,6 @@ export const DMChannelList: React.FC = () => {
                       
                       <div className="flex-1 min-w-0 flex items-center">
                           <span className={clsx("truncate flex-1", hasUnread ? "font-bold" : "font-medium")}>{name}</span>
-                          {/* Unread Indicator - Right side */}
                           {hasUnread && currentChannelId !== dm._id && (
                              <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 ml-2"></div>
                           )}

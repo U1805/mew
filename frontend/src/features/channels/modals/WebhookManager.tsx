@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhookApi, API_URL } from '../../../shared/services/api';
 import { Webhook, Channel } from '../../../shared/types';
@@ -11,12 +11,11 @@ interface WebhookManagerProps {
   channel: Channel;
 }
 
-export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channel }) => {
+export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
   const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
   
-  // Form State
   const [name, setName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
 
@@ -66,7 +65,7 @@ export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channe
     setView('edit');
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
@@ -152,7 +151,6 @@ export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channe
     );
   }
 
-  // Create/Edit View
   return (
     <div>
         <div className="flex items-center mb-6">

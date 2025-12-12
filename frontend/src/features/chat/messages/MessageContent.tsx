@@ -2,7 +2,7 @@
 import React from 'react';
 import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
-import { AttachmentList } from './AttachmentList'; // Import the new component
+import { AttachmentList } from './AttachmentList';
 
 interface MessageContentProps {
     message: Message;

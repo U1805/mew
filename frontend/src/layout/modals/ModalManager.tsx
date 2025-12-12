@@ -1,4 +1,3 @@
-import React from 'react';
 import { useModalStore } from '../../shared/stores';
 import { CreateInviteModal } from '../../features/servers/modals/CreateInviteModal';
 import { JoinServerModal } from '../../features/servers/modals/JoinServerModal';
@@ -18,14 +17,12 @@ import { DeleteCategoryModal } from '../../features/channels/modals/DeleteCatego
 import { DeleteServerModal } from '../../features/servers/modals/DeleteServerModal';
 import { LeaveServerModal } from '../../features/servers/modals/LeaveServerModal';
 
-const ModalManager: React.FC = () => {
+const ModalManager = () => {
   const { activeModal } = useModalStore();
 
   if (!activeModal) return null;
 
-
   switch (activeModal) {
-    // Refactored modals
     case 'createServer':
       return <CreateServerModal />;
     case 'createCategory':
@@ -42,8 +39,6 @@ const ModalManager: React.FC = () => {
       return <DeleteServerModal />;
     case 'leaveServer':
       return <LeaveServerModal />;
-
-    // Existing modals
     case 'createInvite':
       return <CreateInviteModal />;
     case 'joinServer':
@@ -61,7 +56,7 @@ const ModalManager: React.FC = () => {
     case 'kickUser':
       return <KickUserModal />;
     case 'addPermissionOverride':
-        return <AddPermissionOverrideModal />;
+      return <AddPermissionOverrideModal />;
     default:
       return null;
   }

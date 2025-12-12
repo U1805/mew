@@ -1,4 +1,4 @@
-import React from 'react';
+import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
@@ -10,37 +10,27 @@ import { useServerPermissions } from '../../../shared/hooks/useServerPermissions
 import { useMembers } from '../../../shared/hooks/useMembers';
 import { useRoles } from '../../../shared/hooks/useRoles';
 
-
-// Get the highest role position for a member
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;
-  // 增加防御性检查
   if (!Array.isArray(roles)) return 0;
-  const memberRoleIds = member.roleIds || [];
-  if (memberRoleIds.length === 0) return 0;
-  const memberRoles = roles.filter(r => memberRoleIds.includes(r._id));
-  if (memberRoles.length === 0) return 0;
-  return Math.max(...memberRoles.map(r => r.position));
+  const memberRoles = roles.filter(r => member.roleIds?.includes(r._id));
+  return memberRoles.length ? Math.max(...memberRoles.map(r => r.position)) : 0;
 };
 
-const MemberList: React.FC = () => {
+const MemberList = () => {
   const { currentServerId, currentChannelId } = useUIStore();
   const onlineStatus = usePresenceStore(state => state.onlineStatus);
 
-  // Fetch server members
   const { data: members, isLoading: membersLoading } = useMembers(currentServerId);
-
-  // Fetch server roles
   const { data: roles, isLoading: rolesLoading } = useRoles(currentServerId);
 
   if (!currentServerId) return null;
 
   const isLoading = membersLoading || rolesLoading;
 
-  const memberGroups = React.useMemo(() => {
+  const memberGroups = useMemo(() => {
     if (!members || !roles) return [];
 
-    // 1. Initialize groups for all roles
     const everyoneRole = roles.find(r => r.isDefault);
     const groups: Record<string, ServerMember[]> = {};
 
@@ -55,9 +45,8 @@ const MemberList: React.FC = () => {
         groups[role.name] = [];
       });
 
-    // 2. Assign members to their highest role group, filtering webhooks by channel
     members.forEach(member => {
-      // Filter Webhooks: If member has a channelId, it must match the current channel
+      // Webhook 成员只在其所属频道展示。
       if (member.channelId && member.channelId !== currentChannelId) {
         return;
       }
@@ -74,7 +63,6 @@ const MemberList: React.FC = () => {
       }
     });
 
-    // 3. Sort members within each group
     for (const groupName in groups) {
       groups[groupName].sort((a, b) => {
         const posA = getHighestRolePos(a, roles);
@@ -84,7 +72,6 @@ const MemberList: React.FC = () => {
       });
     }
 
-    // 4. Filter out empty groups and format for rendering
     return Object.entries(groups)
       .filter(([, membersInGroup]) => membersInGroup.length > 0)
       .sort(([nameA], [nameB]) => {
@@ -99,7 +86,6 @@ const MemberList: React.FC = () => {
       });
 
   }, [members, roles, currentChannelId]);
-
 
   return (
     <div className="w-60 bg-[#2B2D31] flex flex-col flex-shrink-0 h-full overflow-y-auto custom-scrollbar p-3">
@@ -129,7 +115,7 @@ interface MemberGroupProps {
     onlineStatus: Record<string, 'online' | 'offline'>;
 }
 
-const MemberGroup: React.FC<MemberGroupProps> = ({ title, members, onlineStatus }) => {
+const MemberGroup = ({ title, members, onlineStatus }: MemberGroupProps) => {
     const { openModal } = useModalStore();
 
     if (members.length === 0) return null;
@@ -155,7 +141,7 @@ interface MemberItemProps {
     onClick: () => void;
 }
 
-const MemberItem: React.FC<MemberItemProps> = ({ member, isOnline, onClick }) => {
+const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
     const u = member.userId;
     if (!u) return null;
 
@@ -201,7 +187,7 @@ const MemberItem: React.FC<MemberItemProps> = ({ member, isOnline, onClick }) =>
     )
 }
 
-const MemberContextMenu: React.FC<{ targetMember: ServerMember }> = ({ targetMember }) => {
+const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => {
     const { currentServerId } = useUIStore();
     const { user: currentUser } = useAuthStore();
     const { openModal } = useModalStore();

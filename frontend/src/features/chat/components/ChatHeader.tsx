@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
@@ -18,28 +18,17 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
 
   const [inputValue, setInputValue] = useState('');
 
-  // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
-        setSearchQuery(inputValue);
-        if (inputValue.trim()) {
-            setSearchOpen(true);
-        } else if (isSearchOpen && inputValue === '') {
-            // Optional: Close search if cleared? keeping it open might be better if user just cleared to type something else
-            // but for now let's keep it open or let user close it via other means.
-            // If we want to strictly close on empty:
-            // setSearchOpen(false);
-        }
+      setSearchQuery(inputValue);
+      if (inputValue.trim()) setSearchOpen(true);
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [inputValue, setSearchQuery, setSearchOpen, isSearchOpen]);
+  }, [inputValue, setSearchQuery, setSearchOpen]);
 
-  // Clear input if search is closed externally
   useEffect(() => {
-      if (!isSearchOpen) {
-          setInputValue('');
-      }
+    if (!isSearchOpen) setInputValue('');
   }, [isSearchOpen]);
 
   const isDM = channel?.type === ChannelType.DM;
@@ -87,8 +76,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
       <div className="ml-auto flex items-center space-x-4 text-mew-textMuted">
         <Icon icon="mdi:bell" className="hover:text-mew-text cursor-pointer hidden sm:block" />
         <Icon icon="mdi:pin" className="hover:text-mew-text cursor-pointer hidden sm:block" />
-        
-        {/* Only show Member List toggle for Server Channels */}
+
         {!isDM && (
             <Icon
             icon="mdi:account-group"
@@ -96,8 +84,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
             onClick={toggleMemberList}
             />
         )}
-        
-        {/* Search Bar - only available in Servers for now based on API spec */}
+
         {currentServerId && (
             <div className={clsx("relative hidden lg:block transition-all", isSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
             <input 

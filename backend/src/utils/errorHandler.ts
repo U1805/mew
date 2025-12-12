@@ -18,12 +18,10 @@ export const errorHandler = (err: Error, req: Request, res: Response, next: Next
     return res.status(401).json({ message: err.message });
   }
 
-  // Handle validation errors from Zod or other libraries if needed
-  // Example for a generic validation error
   if (err.name === 'ValidationError' || err.name === 'CastError') {
-      return res.status(400).json({ message: 'Invalid data format provided.', error: err.message });
+    return res.status(400).json({ message: 'Invalid data format provided.', error: err.message });
   }
 
-  console.error(err); // Log unexpected errors
+  console.error(err);
   return res.status(500).json({ message: 'Internal Server Error' });
 };

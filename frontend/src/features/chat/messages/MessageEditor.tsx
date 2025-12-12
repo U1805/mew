@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Message } from '../../../shared/types';
@@ -10,7 +10,7 @@ interface MessageEditorProps {
     onCancel: () => void;
 }
 
-const MessageEditor: React.FC<MessageEditorProps> = ({ message, onCancel }) => {
+const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
     const { currentServerId } = useUIStore();
     const queryClient = useQueryClient();
     const [editContent, setEditContent] = useState(message.content);
@@ -24,9 +24,7 @@ const MessageEditor: React.FC<MessageEditorProps> = ({ message, onCancel }) => {
         }
 
         try {
-            // The original implementation had a bug where an empty string was passed instead of undefined.
             await messageApi.update(currentServerId || undefined, message.channelId, message._id, editContent);
-            // Optimistic update
             queryClient.setQueryData(['messages', message.channelId], (old: Message[] | undefined) => {
                 if (!old) return old;
                 return old.map(m => m._id === message._id ? { ...m, content: editContent, editedAt: new Date().toISOString() } : m);
@@ -37,7 +35,7 @@ const MessageEditor: React.FC<MessageEditorProps> = ({ message, onCancel }) => {
         }
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             handleEdit();

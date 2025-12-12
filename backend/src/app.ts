@@ -9,15 +9,14 @@ import { categoryRootRoutes, categoryDetailRoutes } from './api/category/categor
 import invitePublicRoutes from './api/invite/public.routes';
 import dmChannelRoutes from './api/channel/dm.routes';
 import uploadRoutes from './api/upload/upload.routes';
-
+import publicWebhookRoutes from './api/webhook/public.routes';
+import { errorHandler } from './utils/errorHandler';
 
 const app = express();
 
-// Middleware
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/servers', serverRoutes);
@@ -27,18 +26,12 @@ app.use('/api/servers/:serverId/categories', categoryRootRoutes);
 app.use('/api/categories', categoryDetailRoutes);
 app.use('/api/channels/:channelId/uploads', uploadRoutes);
 app.use('/api/invites', invitePublicRoutes);
-
-
-// Public webhook execution route
-import publicWebhookRoutes from './api/webhook/public.routes';
 app.use('/api/webhooks', publicWebhookRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');
 });
 
-// Error Handling Middleware
-import { errorHandler } from './utils/errorHandler';
 app.use(errorHandler);
 
 export default app;

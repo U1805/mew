@@ -1,11 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthScreen } from './AuthScreen';
 import { useAuthStore } from '../../../shared/stores';
 
-// Mock the auth store
 const setAuth = vi.fn();
 useAuthStore.setState({ setAuth });
 
@@ -34,7 +32,6 @@ describe('AuthScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => {
-        // The first call is to set the token, the second is to set the user
         expect(setAuth).toHaveBeenCalledWith('fake-token', null, false);
         expect(setAuth).toHaveBeenCalledWith('fake-token', expect.objectContaining({ email: 'test@example.com' }), false);
     });

@@ -78,10 +78,8 @@ const mentionService = {
       throw new NotFoundError('Channel not found');
     }
 
-    // 1. Check for @everyone/@here permission if used
     await checkEveryoneMentionPermission(content, channel, authorId);
 
-    // 2. Parse and validate user-specific mentions
     const validatedMentions = await parseAndValidateUserMentions(content, channel.serverId);
 
     return validatedMentions;

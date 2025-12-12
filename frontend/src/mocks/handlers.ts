@@ -4,7 +4,6 @@ const API_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 export const handlers = [
-  // 模拟登录成功
   http.post(`${API_URL}/auth/login`, async ({ request }) => {
     const { email } = await request.json() as { email: string };
     if (email === 'test@example.com') {
@@ -12,7 +11,6 @@ export const handlers = [
     }
   }),
 
-  // 模拟获取用户信息
   http.get(`${API_URL}/users/@me`, () => {
     return HttpResponse.json({
       _id: 'user-1',

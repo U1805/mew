@@ -1,11 +1,9 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
-import React from 'react';
 import { ChannelItem } from './ChannelItem';
 import { Channel, ChannelType } from '../../../shared/types';
 
-// Mock the usePermissions hook
 vi.mock('../../../shared/hooks/usePermissions');
 
 const mockUsePermissions = vi.mocked(usePermissions);
@@ -60,14 +58,10 @@ describe('ChannelItem', () => {
       />
     );
 
-    // The settings button is best found by its title
     const settingsButton = screen.getByTitle('Edit Channel');
     fireEvent.click(settingsButton);
 
     expect(handleSettingsClick).toHaveBeenCalledTimes(1);
-    // As the test for ChannelItem stands, it does not stop propagation.
-    // We'll test that it's called, but not that the other is not.
-    // expect(handleClick).not.toHaveBeenCalled();
   });
 
   it('applies active styles when isActive is true', () => {
@@ -79,7 +73,6 @@ describe('ChannelItem', () => {
         onSettingsClick={() => {}}
       />
     );
-    // Check for classes that are unique to the active state
     expect(container.firstChild).toHaveClass('bg-mew-dark', 'text-white');
   });
 

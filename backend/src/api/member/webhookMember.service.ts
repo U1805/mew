@@ -4,17 +4,14 @@ import { NotFoundError } from '../../utils/errors';
 
 const webhookMemberService = {
   async getWebhookMembers(serverId: string): Promise<any[]> {
-    // Step 1: Get the server's webhooks
     const webhooks = await Webhook.find({ serverId }).lean();
 
-    // Step 2: Get the @everyone role ID from the server
     const server = await Server.findById(serverId).select('everyoneRoleId').lean();
     if (!server) {
       throw new NotFoundError('Server not found.');
     }
     const everyoneRoleId = server.everyoneRoleId;
 
-    // Step 3: Build virtual member objects for each webhook
     const webhookMembers = webhooks.map(webhook => ({
       _id: webhook._id, // Use webhook's ID for a unique key
       serverId: webhook.serverId,

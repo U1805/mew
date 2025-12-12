@@ -1,12 +1,11 @@
-import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { useUIStore } from '../../../shared/stores';
 import { SearchResultItem } from './SearchResultItem';
-import { Message, Channel } from '../../../shared/types';
+import { Channel } from '../../../shared/types';
 import { useMessageSearch } from '../hooks/useMessageSearch';
 
-export const SearchResultsPanel: React.FC = () => {
+export const SearchResultsPanel = () => {
     const { currentServerId, searchQuery, isSearchOpen, setSearchOpen, setCurrentChannel, setTargetMessageId } = useUIStore();
     const queryClient = useQueryClient();
 
@@ -15,15 +14,11 @@ export const SearchResultsPanel: React.FC = () => {
     if (!isSearchOpen || !currentServerId) return null;
 
     const messages = searchData?.messages || [];
-    // Fix: Cast the result of getQueryData to the correct type or handle undefined
     const channels = queryClient.getQueryData<Channel[]>(['channels', currentServerId]);
 
     const handleResultClick = (channelId: string, messageId: string) => {
-        // Navigate to the channel
         setCurrentChannel(channelId);
-        // Set target message to scroll to
         setTargetMessageId(messageId);
-        // Close search to show the message in context
         setSearchOpen(false);
     };
 

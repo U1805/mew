@@ -14,7 +14,6 @@ const s3Client = new S3Client({
   forcePathStyle: true, // Necessary for MinIO, Garage, etc.
 });
 
-// [新增] 配置 Bucket CORS 的函数
 export const configureBucketCors = async () => {
   try {
     const command = new PutBucketCorsCommand({
@@ -22,7 +21,6 @@ export const configureBucketCors = async () => {
       CORSConfiguration: {
         CORSRules: [
           {
-            // 允许所有标准请求头和自定义请求头
             AllowedHeaders: ['*', 'authorization', 'content-type', 'x-amz-date', 'x-amz-security-token', 'x-amz-user-agent'],
             AllowedMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE'],
             AllowedOrigins: ['*'],
@@ -34,9 +32,9 @@ export const configureBucketCors = async () => {
     });
 
     await s3Client.send(command);
-    console.log(`✅ S3 CORS configured for bucket: ${config.s3.bucketName}`);
+    console.log(`S3 CORS configured for bucket: ${config.s3.bucketName}`);
   } catch (error) {
-    console.error('❌ Failed to configure S3 CORS:', error);
+    console.error('Failed to configure S3 CORS:', error);
     // 不抛出错误，以免阻断服务器启动，Garage 可能尚未就绪
   }
 };
@@ -57,6 +55,5 @@ export const uploadFile = async (file: Express.Multer.File) => {
 
   await upload.done();
 
-  // Construct the URL based on the S3 configuration
   return { key: newFilename, mimetype: file.mimetype, size: file.size };
 };

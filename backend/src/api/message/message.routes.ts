@@ -8,11 +8,10 @@ import {
   updateMessageHandler,
 } from './message.controller';
 import { protect } from '../../middleware/auth';
-import { authorizeChannel } from '../../middleware/checkPermission'; // SEND_MESSAGES is still needed
+import { authorizeChannel } from '../../middleware/checkPermission';
 
 const router = Router({ mergeParams: true });
 
-// All routes are protected
 router.use(protect);
 
 router.post('/', authorizeChannel('SEND_MESSAGES'), createMessageHandler);

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import ServerList from '../features/servers/components/ServerList';
 import ChannelList from '../features/channels/components/ChannelList';
 import ChatArea from '../features/chat/components/ChatArea';
@@ -12,37 +12,28 @@ import { useUIStore, useUnreadServerStore, useUnreadStore } from '../shared/stor
 import { useMembers } from '../shared/hooks/useMembers';
 import { useServers } from '../features/servers/hooks/useServers';
 
-const Layout: React.FC = () => {
+const Layout = () => {
   usePresenceEvents();
   useGlobalSocketEvents();
   useTabNotifier();
   const queryClient = useQueryClient();
   const initializeNotifier = useUnreadServerStore(state => state.initializeNotifier);
 
-  // Fetch all servers to provide their IDs to the unread server store
   const { data: servers } = useServers();
-
   const { currentServerId } = useUIStore();
-
-  // Pre-fetch members for the current server to populate mention cache
   useMembers(currentServerId);
 
-  // Initialize the communication bridge between a channel unread state and server unread state
   useEffect(() => {
-    if (servers) {
-      const serverIds = servers.map(s => s._id);
-      initializeNotifier(queryClient, serverIds);
-    }
+    if (!servers) return;
+    initializeNotifier(queryClient, servers.map(s => s._id));
   }, [servers, initializeNotifier, queryClient]);
 
   const { targetMessageId, setTargetMessageId } = useUIStore();
   const addUnreadMention = useUnreadStore(state => state.addUnreadMention);
 
-  // Effect to trigger mention flash when jumping to a message
   useEffect(() => {
     if (targetMessageId) {
       addUnreadMention(targetMessageId);
-      // Immediately clear it so it doesn't re-trigger on component re-renders
       setTargetMessageId(null);
     }
   }, [targetMessageId, addUnreadMention, setTargetMessageId]);

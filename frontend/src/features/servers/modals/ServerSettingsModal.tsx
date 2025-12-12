@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -37,7 +37,7 @@ const PRESET_COLORS = [
   '#99AAB5', '#1ABC9C', '#2ECC71', '#3498DB', '#9B59B6', '#E91E63', '#F1C40F', '#E67E22', '#E74C3C', '#95A5A6', '#607D8B'
 ];
 
-export const ServerSettingsModal: React.FC = () => {
+export const ServerSettingsModal = () => {
   const { closeModal, modalData, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
@@ -45,10 +45,8 @@ export const ServerSettingsModal: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'emoji' | 'stickers'>('overview');
   const [name, setName] = useState('');
 
-  // --- Data Fetching ---
   const { data: serverRoles, isLoading: isLoadingRoles } = useRoles(currentServerId);
 
-  // --- Local State for Edits ---
   const [localRoles, setLocalRoles] = useState<Role[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [roleTab, setRoleTab] = useState<'display' | 'permissions'>('display');
@@ -56,7 +54,7 @@ export const ServerSettingsModal: React.FC = () => {
 
   useEffect(() => {
     if (serverRoles) {
-      setLocalRoles(JSON.parse(JSON.stringify(serverRoles))); // Deep copy
+      setLocalRoles(JSON.parse(JSON.stringify(serverRoles))); // Deep copy to avoid mutating cached roles
       if (!selectedRoleId || !serverRoles.some(r => r._id === selectedRoleId)) {
         setSelectedRoleId(serverRoles.find(r => r.isDefault)?._id || serverRoles[0]?._id || null);
       }
@@ -75,8 +73,6 @@ export const ServerSettingsModal: React.FC = () => {
     setHasChanges(originalJson !== localJson);
   }, [localRoles, serverRoles]);
 
-
-  // --- Mutations ---
   const saveMutation = useMutation({
       mutationFn: async () => {
         if (!currentServerId) throw new Error("No server ID");
@@ -115,10 +111,8 @@ export const ServerSettingsModal: React.FC = () => {
       }
   })
 
-  // --- Computed State ---
   const selectedRole = useMemo(() => localRoles.find(r => r._id === selectedRoleId), [localRoles, selectedRoleId]);
 
-  // --- Event Handlers ---
   const handleResetChanges = () => {
       if (serverRoles) {
         setLocalRoles(JSON.parse(JSON.stringify(serverRoles)));
@@ -166,7 +160,6 @@ export const ServerSettingsModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
-         {/* Sidebar */}
          <div className="w-[30%] min-w-[220px] bg-[#2B2D31] flex flex-col items-end pt-[60px] pb-4 px-2">
              <div className="w-[192px] px-1.5">
                 <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5">Server Settings</h2>
@@ -187,10 +180,7 @@ export const ServerSettingsModal: React.FC = () => {
              </div>
          </div>
 
-         {/* Content Area */}
          <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[800px] overflow-hidden flex flex-col h-full">
-
-             {/* OVERVIEW TAB */}
              {activeTab === 'overview' && (
                <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10">
                  <h2 className="text-xl font-bold text-white mb-6">Server Overview</h2>
@@ -225,10 +215,8 @@ export const ServerSettingsModal: React.FC = () => {
                </div>
              )}
 
-             {/* ROLES TAB */}
              {activeTab === 'roles' && (
                 <div className="flex h-full animate-fade-in relative">
-                  {/* Role List */}
                   <div className="w-[200px] flex-shrink-0 flex flex-col pr-4 border-r border-[#3F4147] h-full">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xs font-bold text-mew-textMuted uppercase">Roles</h3>
@@ -257,7 +245,6 @@ export const ServerSettingsModal: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Edit Role Area */}
                   {selectedRole ? (
                   <div className="flex-1 pl-6 flex flex-col overflow-hidden">
                      <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#3F4147]">
@@ -322,7 +309,6 @@ export const ServerSettingsModal: React.FC = () => {
                                           <div className="text-xs text-[#B5BAC1]">{perm.desc}</div>
                                         </div>
 
-                                        {/* Toggle Switch */}
                                         <div onClick={() => !isDisabled && togglePermission(perm.id)} className={clsx("w-10 h-6 rounded-full p-1 transition-colors flex-shrink-0 relative", isEnabled ? "bg-green-500" : "bg-[#80848E]", isDisabled ? 'cursor-not-allowed' : 'cursor-pointer' )}>
                                           <div className={clsx("w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200", isEnabled ? "translate-x-4" : "translate-x-0" )}></div>
                                         </div>
@@ -355,7 +341,6 @@ export const ServerSettingsModal: React.FC = () => {
                 </div>
              )}
 
-             {/* Placeholder for other tabs */}
              {(activeTab === 'emoji' || activeTab === 'stickers') && (
                 <div className="flex flex-col items-center justify-center h-full text-mew-textMuted">
                     <Icon icon="mdi:hammer-wrench" width="48" className="mb-2 opacity-50" />
@@ -364,7 +349,6 @@ export const ServerSettingsModal: React.FC = () => {
              )}
          </div>
 
-         {/* Close Button */}
          <div className="w-[18%] min-w-[60px] pt-[60px] pl-5">
              <div className="flex flex-col items-center cursor-pointer group" onClick={closeModal}>
                  <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
@@ -377,7 +361,7 @@ export const ServerSettingsModal: React.FC = () => {
   )
 }
 
-const SidebarItem: React.FC<{ label: string; isActive?: boolean; onClick: () => void }> = ({ label, isActive, onClick }) => {
+const SidebarItem = ({ label, isActive, onClick }: { label: string; isActive?: boolean; onClick: () => void }) => {
     return (
         <div
             onClick={onClick}

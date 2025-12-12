@@ -12,54 +12,39 @@ import { useRoles } from './useRoles';
  * @returns An object containing a Set of permission strings and a boolean `isOwner` flag.
  */
 export const useServerPermissions = (): { permissions: Set<string>; isOwner: boolean } => {
-    const { currentServerId } = useUIStore();
-    const { user } = useAuthStore();
+  const { currentServerId } = useUIStore();
+  const { user } = useAuthStore();
+  const { data: members, isLoading: membersLoading } = useMembers(currentServerId);
+  const { data: roles, isLoading: rolesLoading } = useRoles(currentServerId);
+  const isLoading = membersLoading || rolesLoading;
 
-    const { data: members, isLoading: membersLoading } = useMembers(currentServerId);
-    const { data: roles, isLoading: rolesLoading } = useRoles(currentServerId);
-    const isLoading = membersLoading || rolesLoading;
+  const serverPermissions = useMemo(() => {
+    const result = { permissions: new Set<string>(), isOwner: false };
+    // 防御非数组/缺失数据的缓存形态。
+    if (isLoading || !Array.isArray(members) || !Array.isArray(roles) || !user) return result;
 
-    const serverPermissions = useMemo(() => {
-        const result = { permissions: new Set<string>(), isOwner: false };
+    const myMember = members.find(m => m.userId?._id === user._id);
+    if (!myMember) return result;
 
-        // 增加 Array.isArray 检查以防御潜在的数据格式问题
-        if (isLoading || !members || !Array.isArray(members) || !roles || !Array.isArray(roles) || !user) {
-            return result;
-        }
+    result.isOwner = !!myMember.isOwner;
+    if (myMember.isOwner) {
+      result.permissions = new Set<string>(ALL_PERMISSIONS);
+      return result;
+    }
 
-        const myMember = members.find(m => m.userId?._id === user._id);
-        if (!myMember) {
-            return result;
-        }
+    const everyoneRole = roles.find(r => r.isDefault);
+    const finalPermissions = new Set<string>(everyoneRole?.permissions || []);
+    const myRoleIds = myMember.roleIds || [];
 
-        result.isOwner = myMember.isOwner || false;
+    roles.filter(role => myRoleIds.includes(role._id)).forEach(role => {
+      role.permissions.forEach(perm => finalPermissions.add(perm));
+    });
 
-        if (myMember.isOwner) {
-            result.permissions = new Set<string>(ALL_PERMISSIONS);
-            return result;
-        }
+    result.permissions = finalPermissions.has('ADMINISTRATOR')
+      ? new Set<string>(ALL_PERMISSIONS)
+      : finalPermissions;
+    return result;
+  }, [isLoading, members, roles, user]);
 
-        const everyoneRole = roles.find(r => r.isDefault);
-        const finalPermissions = new Set<string>(everyoneRole?.permissions || []);
-
-        const myRoleIds = myMember.roleIds || [];
-        const memberRoles = roles.filter(role => myRoleIds.includes(role._id));
-
-        memberRoles.forEach(role => {
-            role.permissions.forEach(perm => {
-                finalPermissions.add(perm);
-            });
-        });
-
-        if (finalPermissions.has('ADMINISTRATOR')) {
-            result.permissions = new Set<string>(ALL_PERMISSIONS);
-            return result;
-        }
-
-        result.permissions = finalPermissions;
-        return result;
-
-    }, [isLoading, members, roles, user]);
-
-    return serverPermissions;
+  return serverPermissions;
 };

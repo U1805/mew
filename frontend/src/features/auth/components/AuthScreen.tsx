@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import clsx from 'clsx';
 import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
 import { useAuthStore } from '../../../shared/stores';
 
-export const AuthScreen: React.FC = () => {
+export const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -13,26 +13,20 @@ export const AuthScreen: React.FC = () => {
   const [error, setError] = useState('');
   const setAuth = useAuthStore((state) => state.setAuth);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     try {
       if (isLogin) {
-        // 1. Login to get Token
         const res = await authApi.login({ email, password });
         const token = res.data.token;
-        
-        // 2. Set temporary token to allow the next request to pass interceptor
-        // Pass rememberMe preference
-        setAuth(token, null, rememberMe); 
+        setAuth(token, null, rememberMe);
 
-        // 3. Fetch full User Profile
         try {
             const userRes = await authApi.getMe();
             setAuth(token, userRes.data, rememberMe);
         } catch (userErr) {
             console.error("Failed to fetch user profile", userErr);
-            // Fallback if getMe fails
             setAuth(token, { _id: 'temp', username: 'User', email, isBot: false, createdAt: new Date().toISOString() }, rememberMe);
         }
       } else {
@@ -43,7 +37,6 @@ export const AuthScreen: React.FC = () => {
       }
     } catch (err: any) {
       setError(err.response?.data?.message || 'An error occurred');
-      // If login failed, ensure auth is cleared
       setAuth('', null);
     }
   };
