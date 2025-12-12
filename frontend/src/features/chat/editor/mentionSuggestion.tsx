@@ -25,7 +25,7 @@ function getItems(queryClient: QueryClient, serverId: string, query: string): Me
   const memberSuggestions: MentionSuggestionItem[] = members
     .filter((m) => m.userId.username.toLowerCase().includes(lowerQuery))
     .slice(0, 10)
-    .map((m) => ({ id: m.userId._id, label: m.userId.username }));
+    .map((m) => ({ id: m.userId._id, label: m.userId.username, avatarUrl: m.userId.avatarUrl }));
 
   const globals: MentionSuggestionItem[] = [];
   if ('everyone'.includes(lowerQuery)) globals.push({ id: 'everyone', label: 'everyone', isGlobal: true });

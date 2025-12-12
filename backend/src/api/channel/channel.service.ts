@@ -12,6 +12,14 @@ import { ChannelReadState } from './readState.model';
 import ServerMember from '../member/member.model';
 import { DM_PERMISSIONS } from '../../constants/permissions';
 import { Webhook } from '../webhook/webhook.model';
+import { getS3PublicUrl } from '../../utils/s3';
+
+function hydrateUserAvatarUrl<T extends { avatarUrl?: string }>(user: T): T {
+  if (user.avatarUrl) {
+    user.avatarUrl = getS3PublicUrl(user.avatarUrl);
+  }
+  return user;
+}
 
 const channelService = {
   async createChannel(channelData: Omit<IChannel, 'createdAt' | 'updatedAt'>): Promise<IChannel> {
@@ -121,6 +129,11 @@ const channelService = {
 
     let newDmChannel = await channelRepository.createDmChannel(userId, recipientId);
     newDmChannel = await newDmChannel.populate('recipients', 'username avatarUrl');
+
+    if (Array.isArray((newDmChannel as any).recipients)) {
+      (newDmChannel as any).recipients = (newDmChannel as any).recipients.map(hydrateUserAvatarUrl);
+    }
+
     socketManager.broadcastToUser(recipientId, 'DM_CHANNEL_CREATE', newDmChannel);
     return newDmChannel;
   },
@@ -129,6 +142,12 @@ const channelService = {
     const userObjectId = new mongoose.Types.ObjectId(userId);
 
     const channels = await channelRepository.findDmChannelsByUser(userId);
+
+    channels.forEach((channel) => {
+      if (Array.isArray(channel.recipients)) {
+        channel.recipients = channel.recipients.map(hydrateUserAvatarUrl);
+      }
+    });
 
     return channels;
   },

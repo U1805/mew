@@ -5,6 +5,7 @@ export type MentionSuggestionItem = {
   id: string;
   label: string;
   isGlobal?: boolean;
+  avatarUrl?: string;
 };
 
 type MentionListProps = {
@@ -81,9 +82,17 @@ const MentionSuggestionList = forwardRef(function MentionSuggestionList(
               </div>
             ) : (
               <div className="w-6 h-6 rounded-full bg-mew-accent flex items-center justify-center mr-2 overflow-hidden flex-shrink-0">
-                <span className="text-[10px] font-bold text-white">
-                  {item.label.substring(0, 2).toUpperCase()}
-                </span>
+                {item.avatarUrl ? (
+                  <img
+                    src={item.avatarUrl}
+                    alt={item.label}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[10px] font-bold text-white">
+                    {item.label.substring(0, 2).toUpperCase()}
+                  </span>
+                )}
               </div>
             )}
             <span className="truncate font-medium text-sm">{item.label}</span>
@@ -100,4 +109,3 @@ const MentionSuggestionList = forwardRef(function MentionSuggestionList(
 });
 
 export default MentionSuggestionList;
-

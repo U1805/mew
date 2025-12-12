@@ -9,20 +9,19 @@ import { Role } from '../../../shared/types';
 import { Permission } from '../../../shared/constants/permissions';
 import { useRoles } from '../../../shared/hooks/useRoles';
 import { roleApi, serverApi } from '../../../shared/services/api';
-import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 
 const PERMISSION_GROUPS = [
   { group: 'General Server Permissions', perms: [
-    { id: 'MANAGE_CHANNELS', name: 'Manage Channels', desc: 'Allows members to create, edit, or delete channels.' },
+    { id: 'ADMINISTRATOR', name: 'Administrator', desc: 'Grants all permissions and bypasses all permission checks.' },
+    { id: 'MANAGE_CHANNEL', name: 'Manage Channels', desc: 'Allows members to create, edit, or delete channels.' },
     { id: 'MANAGE_ROLES', name: 'Manage Roles', desc: 'Allows members to create new roles and edit/delete roles lower than their highest role.' },
     { id: 'MANAGE_SERVER', name: 'Manage Server', desc: "Allows members to change this server's name or move its region." },
   ]},
   { group: 'Membership Permissions', perms: [
-    { id: 'CREATE_INSTANT_INVITE', name: 'Create Invite', desc: 'Allows members to invite new people to this server.' },
+    { id: 'CREATE_INVITE', name: 'Create Invite', desc: 'Allows members to invite new people to this server.' },
     { id: 'CHANGE_NICKNAME', name: 'Change Nickname', desc: 'Allows members to change their own nickname.' },
     { id: 'MANAGE_NICKNAMES', name: 'Manage Nicknames', desc: "Allows members to change other members' nicknames." },
     { id: 'KICK_MEMBERS', name: 'Kick Members', desc: 'Allows members to remove other members from this server.' },
-    { id: 'BAN_MEMBERS', name: 'Ban Members', desc: 'Allows members to permanently ban other members from this server.' },
   ]},
   { group: 'Text Channel Permissions', perms: [
     { id: 'SEND_MESSAGES', name: 'Send Messages', desc: 'Allows members to send messages in text channels.' },
@@ -65,6 +64,8 @@ export const ServerSettingsModal = () => {
   const [roleTab, setRoleTab] = useState<'display' | 'permissions'>('display');
   const [hasChanges, setHasChanges] = useState(false);
   const [hasOverviewChanges, setHasOverviewChanges] = useState(false);
+  const [draggedRoleId, setDraggedRoleId] = useState<string | null>(null);
+  const [dragOverRoleId, setDragOverRoleId] = useState<string | null>(null);
 
   useEffect(() => {
     if (serverRoles) {
@@ -120,7 +121,10 @@ export const ServerSettingsModal = () => {
             await roleApi.update(currentServerId, role._id, { name: role.name, permissions: role.permissions, color: role.color });
         }
 
-        const positions = localRoles.filter(r => originalIds.has(r._id)).map((role, index) => ({ roleId: role._id, position: localRoles.length - index }));
+        const orderedByPosition = getOrderedRoles(localRoles);
+        const positions = orderedByPosition
+          .filter(r => originalIds.has(r._id))
+          .map((role, index) => ({ roleId: role._id, position: orderedByPosition.length - index }));
         if (positions.length > 0) {
             await roleApi.updatePositions(currentServerId, positions);
         }
@@ -135,6 +139,26 @@ export const ServerSettingsModal = () => {
   })
 
   const selectedRole = useMemo(() => localRoles.find(r => r._id === selectedRoleId), [localRoles, selectedRoleId]);
+  const isOwnerRole = useMemo(() => {
+    if (!selectedRole) return false;
+    return selectedRole.name === 'Owner' || selectedRole.permissions?.includes('ADMINISTRATOR' as Permission);
+  }, [selectedRole]);
+  const isEveryoneRole = (role: Role) => role.isDefault || role.name === '@everyone';
+  const isPinnedRole = (role: Role) => isEveryoneRole(role) || role.name === 'Owner' || role.permissions?.includes('ADMINISTRATOR' as Permission);
+
+  const getOrderedRoles = (roles: Role[]) => {
+    const owner = roles.find(r => r.name === 'Owner' || r.permissions?.includes('ADMINISTRATOR' as Permission));
+    const everyone = roles.find(r => isEveryoneRole(r));
+    const middle = roles
+      .filter(r => r !== owner && r !== everyone)
+      .sort((a, b) => b.position - a.position);
+
+    return [
+      ...(owner ? [owner] : []),
+      ...middle,
+      ...(everyone ? [everyone] : []),
+    ];
+  };
 
   const handleResetChanges = () => {
       if (serverRoles) {
@@ -155,6 +179,53 @@ export const ServerSettingsModal = () => {
 
     const newPerms = hasPerm ? currentPerms.filter(p => p !== pId) : [...currentPerms, pId];
     handleLocalRoleUpdate({ permissions: newPerms });
+  };
+
+  const isRoleDraggable = (role: Role) => {
+    if (isPinnedRole(role)) return false;
+    return true;
+  };
+
+  const applyRoleOrderByIds = (orderedIds: string[]) => {
+    const maxPosition = orderedIds.length;
+    const positionById = new Map<string, number>();
+    orderedIds.forEach((id, index) => {
+      positionById.set(id, maxPosition - index);
+    });
+
+    setLocalRoles(prev =>
+      prev.map(r => {
+        const nextPos = positionById.get(r._id);
+        return nextPos ? { ...r, position: nextPos } : r;
+      }),
+    );
+  };
+
+  const handleRoleDrop = (targetRoleId: string) => {
+    if (!draggedRoleId) return;
+    if (draggedRoleId === targetRoleId) return;
+
+    const ordered = getOrderedRoles(localRoles);
+    const fromIndex = ordered.findIndex(r => r._id === draggedRoleId);
+    const toIndex = ordered.findIndex(r => r._id === targetRoleId);
+
+    if (fromIndex < 0 || toIndex < 0) return;
+
+    const dragged = ordered[fromIndex];
+    if (!dragged || !isRoleDraggable(dragged)) return;
+
+    ordered.splice(fromIndex, 1);
+
+    const target = ordered[toIndex];
+    const targetIsOwner = !!target && (target.name === 'Owner' || target.permissions?.includes('ADMINISTRATOR' as Permission));
+    const targetIsEveryone = !!target && isEveryoneRole(target);
+
+    const insertIndex = targetIsOwner ? Math.min(1, ordered.length) : targetIsEveryone ? Math.max(ordered.length - 1, 0) : toIndex;
+    ordered.splice(insertIndex, 0, dragged);
+
+    const normalized = getOrderedRoles(ordered);
+
+    applyRoleOrderByIds(normalized.map(r => r._id));
   };
 
   const handleSaveOverview = async () => {
@@ -216,7 +287,7 @@ export const ServerSettingsModal = () => {
   };
 
   const handleDeleteRole = () => {
-    if (!selectedRole || selectedRole.isDefault) return;
+    if (!selectedRole || selectedRole.isDefault || isOwnerRole) return;
     openModal('confirm', {
         title: `Delete Role '${selectedRole.name}'`,
         description: 'Are you sure you want to delete this role? This cannot be undone.',
@@ -272,36 +343,36 @@ export const ServerSettingsModal = () => {
                  <h2 className="text-xl font-bold text-white mb-6">Server Overview</h2>
                  <div className="flex gap-8">
                      <div className="flex items-center justify-center">
-                         <div
-                             className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center relative group cursor-pointer overflow-hidden"
-                             onClick={handleIconClick}
-                         >
-                             <input
-                                 type="file"
-                                 ref={fileInputRef}
-                                 className="hidden"
-                                 accept="image/png, image/jpeg, image/gif"
-                                 onChange={handleFileChange}
-                             />
+                         <div className="relative group cursor-pointer" onClick={handleIconClick}>
+                             <div className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center overflow-hidden relative">
+                                 <input
+                                     type="file"
+                                     ref={fileInputRef}
+                                     className="hidden"
+                                     accept="image/png, image/jpeg, image/gif"
+                                     onChange={handleFileChange}
+                                 />
 
-                             {iconPreview ? (
-                                <img src={iconPreview} alt="Server Icon" className="w-full h-full object-cover" />
-                             ) : (
-                                <div className="text-white text-3xl font-bold">{server?.name?.substring(0,2).toUpperCase()}</div>
-                             )}
-
-                             <div className={clsx(
-                                 "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
-                                 isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                             )}>
-                                 {isUploading ? (
-                                     <Icon icon="mdi:loading" className="text-white animate-spin" width="32" />
+                                 {iconPreview ? (
+                                    <img src={iconPreview} alt="Server Icon" className="w-full h-full object-cover" />
                                  ) : (
-                                     <span className="text-xs font-bold text-white uppercase text-center px-2">Change Icon</span>
+                                    <div className="text-white text-3xl font-bold">{server?.name?.substring(0,2).toUpperCase()}</div>
                                  )}
+
+                                 <div className={clsx(
+                                     "absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-opacity",
+                                     isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                 )}>
+                                     {isUploading ? (
+                                         <Icon icon="mdi:loading" className="text-white animate-spin" width="32" />
+                                     ) : (
+                                         <span className="text-xs font-bold text-white uppercase text-center px-2">Change Icon</span>
+                                     )}
+                                 </div>
                              </div>
+
                              {!isUploading && (
-                                <div className="absolute top-0 right-0 bg-white rounded-full p-1 shadow-md group-hover:hidden">
+                                <div className="absolute top-0 right-0 bg-white rounded-full p-1 shadow-md">
                                     <Icon icon="mdi:image-plus" className="text-black" width="16" />
                                 </div>
                              )}
@@ -346,22 +417,62 @@ export const ServerSettingsModal = () => {
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0.5">
                     {isLoadingRoles && <p className='text-center text-sm'>Loading Roles...</p>}
-                      {[...localRoles].sort((a,b) => b.position - a.position).map(role => (
-                        <div
-                          key={role._id}
-                          className={clsx(
-                            "flex items-center px-2 py-1.5 rounded cursor-pointer group mb-1",
-                            selectedRoleId === role._id ? "bg-[#404249]" : "hover:bg-[#35373C]"
-                          )}
-                          onClick={() => setSelectedRoleId(role._id)}
-                        >
-                          <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: role.color }}></div>
-                          <span className={clsx("text-sm font-medium truncate flex-1", selectedRoleId === role._id ? "text-white" : "text-[#B5BAC1]")}>
-                            {role.name}
-                          </span>
-                          <Icon icon="mdi:drag" className="text-mew-textMuted opacity-0 group-hover:opacity-100 cursor-grab" width="16" />
-                        </div>
-                      ))}
+                      {getOrderedRoles(localRoles).map(role => {
+                        const draggable = isRoleDraggable(role);
+                        const isDragging = draggedRoleId === role._id;
+                        const isOver = dragOverRoleId === role._id;
+
+                        return (
+                          <div
+                            key={role._id}
+                            className={clsx(
+                              "flex items-center px-2 py-1.5 rounded cursor-pointer group mb-1",
+                              selectedRoleId === role._id ? "bg-[#404249]" : "hover:bg-[#35373C]",
+                              isOver && "ring-1 ring-mew-textMuted/40",
+                              isDragging && "opacity-60"
+                            )}
+                            onClick={() => setSelectedRoleId(role._id)}
+                            draggable={draggable}
+                            onDragStart={(e) => {
+                              if (!draggable) return;
+                              e.dataTransfer.effectAllowed = 'move';
+                              setDraggedRoleId(role._id);
+                            }}
+                            onDragEnd={() => {
+                              setDraggedRoleId(null);
+                              setDragOverRoleId(null);
+                            }}
+                            onDragOver={(e) => {
+                              if (!draggedRoleId) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                              setDragOverRoleId(role._id);
+                            }}
+                            onDragLeave={() => {
+                              setDragOverRoleId((prev) => (prev === role._id ? null : prev));
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              handleRoleDrop(role._id);
+                              setDraggedRoleId(null);
+                              setDragOverRoleId(null);
+                            }}
+                          >
+                            <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: role.color }}></div>
+                            <span className={clsx("text-sm font-medium truncate flex-1", selectedRoleId === role._id ? "text-white" : "text-[#B5BAC1]")}>
+                              {role.name}
+                            </span>
+                            <Icon
+                              icon="mdi:drag"
+                              className={clsx(
+                                "text-mew-textMuted opacity-0 group-hover:opacity-100",
+                                draggable ? "cursor-grab" : "cursor-not-allowed opacity-30 group-hover:opacity-30",
+                              )}
+                              width="16"
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -401,7 +512,7 @@ export const ServerSettingsModal = () => {
                                   ))}
                                </div>
                             </div>
-                            {!selectedRole.isDefault && (<div>
+                            {!selectedRole.isDefault && !isOwnerRole && (<div>
                                <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Manage</label>
                                 <button onClick={handleDeleteRole} className='text-sm text-red-400 hover:underline'>Delete Role</button>
                             </div>)}
@@ -420,8 +531,17 @@ export const ServerSettingsModal = () => {
                                 <h3 className="text-xs font-bold text-mew-textMuted uppercase mb-4">{group.group}</h3>
                                 <div className="space-y-4">
                                   {group.perms.map(perm => {
-                                    const isEnabled = selectedRole.permissions?.includes(perm.id as Permission);
-                                    const isDisabled = selectedRole.isDefault && (perm.id === 'ADMINISTRATOR' || perm.id === 'KICK_MEMBERS' || perm.id === 'BAN_MEMBERS');
+                                    const hasAdmin = selectedRole.permissions?.includes('ADMINISTRATOR' as Permission);
+                                    const isEnabled = hasAdmin ? true : selectedRole.permissions?.includes(perm.id as Permission);
+
+                                    const isDefaultLocked =
+                                      selectedRole.isDefault &&
+                                      (perm.id === 'ADMINISTRATOR' ||
+                                        perm.id === 'KICK_MEMBERS');
+
+                                    const isAdminLocked = hasAdmin && perm.id !== 'ADMINISTRATOR';
+
+                                    const isDisabled = isDefaultLocked || isAdminLocked;
                                     return (
                                       <div key={perm.id} className={clsx("flex items-center justify-between", isDisabled && 'opacity-50')}>
                                         <div className="mr-4">
