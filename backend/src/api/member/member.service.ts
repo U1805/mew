@@ -1,6 +1,7 @@
 import { IServerMember } from './member.model';
 import Channel from '../channel/channel.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { getS3PublicUrl } from '../../utils/s3';
 import { checkMemberHierarchy } from '../../utils/hierarchy.utils';
 import { socketManager } from '../../gateway/events';
 import mongoose from 'mongoose';
@@ -19,7 +20,14 @@ const memberService = {
     const webhookMembers = await webhookMemberService.getWebhookMembers(serverId);
     const allMembers = [...members, ...webhookMembers];
 
-    return allMembers;
+    // Hydrate avatar URLs before sending to the client
+    return allMembers.map(member => {
+        const memberObject = member.toObject ? member.toObject() : { ...member }; // Handle both Mongoose docs and plain objects
+        if (memberObject.userId && typeof memberObject.userId === 'object' && memberObject.userId.avatarUrl) {
+            memberObject.userId.avatarUrl = getS3PublicUrl(memberObject.userId.avatarUrl);
+        }
+        return memberObject;
+    });
   },
 
   async removeMember(serverId: string, userIdToRemove: string, requesterId: string): Promise<void> {
@@ -96,7 +104,12 @@ const memberService = {
       }
     })();
 
-    return member;
+    const populatedMember = await member.populate('userId');
+    const memberObject = populatedMember.toObject();
+    if (memberObject.userId && typeof memberObject.userId === 'object' && memberObject.userId.avatarUrl) {
+      memberObject.userId.avatarUrl = getS3PublicUrl(memberObject.userId.avatarUrl);
+    }
+    return memberObject;
   },
 };
 

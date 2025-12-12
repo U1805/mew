@@ -4,7 +4,7 @@ import MessageItem from './MessageItem';
 import TimestampDivider from './TimestampDivider';
 import { formatDividerTimestamp } from '../../../shared/utils/date';
 import { isSameDay } from 'date-fns';
-import { Message, Channel, ChannelType } from '../../../shared/types';
+import { Message, Channel, ChannelType, User } from '../../../shared/types';
 import { useAuthStore, useUIStore } from '../../../shared/stores';
 import { channelApi } from '../../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -76,7 +76,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   }, [messages, channel, channelId, isLoading, queryClient, currentServerId]);
 
   const isDM = channel?.type === ChannelType.DM;
-  const otherUser = isDM ? channel?.recipients?.find((r: any) => r._id !== user?._id) : null;
+  const otherUser = isDM 
+    ? (channel?.recipients?.find((r: any) => typeof r === 'object' && r._id !== user?._id) as User | undefined)
+    : null;
 
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">

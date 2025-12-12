@@ -8,6 +8,7 @@ import { socketManager } from '../../gateway/events';
 import ServerMember from '../member/member.model';
 import Role from '../role/role.model';
 import { Webhook } from '../webhook/webhook.model';
+import { getS3PublicUrl } from '../../utils/s3';
 
 interface CreateServerData {
   name: string;
@@ -60,7 +61,11 @@ const serverService = {
     await ownerRole.save(); // 别忘了保存 ownerRole
     await ownerMember.save();
 
-    return server;
+    const serverObject = server.toObject();
+    if (serverObject.avatarUrl) {
+      serverObject.avatarUrl = getS3PublicUrl(serverObject.avatarUrl);
+    }
+    return serverObject;
   },
 
   async getServerById(serverId: string) {
@@ -68,11 +73,22 @@ const serverService = {
     if (!server) {
       throw new NotFoundError('Server not found');
     }
-    return server;
+    const serverObject = server.toObject();
+    if (serverObject.avatarUrl) {
+        serverObject.avatarUrl = getS3PublicUrl(serverObject.avatarUrl);
+    }
+    return serverObject;
   },
 
   async getServersForUser(userId: string) {
-    return serverRepository.findServersByUserId(userId);
+    const servers = await serverRepository.findServersByUserId(userId);
+    return servers.map(server => {
+        const serverObject = server.toObject();
+        if (serverObject.avatarUrl) {
+            serverObject.avatarUrl = getS3PublicUrl(serverObject.avatarUrl);
+        }
+        return serverObject;
+    });
   },
 
   async updateServer(serverId: string, data: Partial<CreateServerData>) {
@@ -80,8 +96,12 @@ const serverService = {
     if (!server) {
       throw new NotFoundError('Server not found');
     }
-    socketManager.broadcast('SERVER_UPDATE', serverId, server);
-    return server;
+    const serverObject = server.toObject();
+    if (serverObject.avatarUrl) {
+      serverObject.avatarUrl = getS3PublicUrl(serverObject.avatarUrl);
+    }
+    socketManager.broadcast('SERVER_UPDATE', serverId, serverObject);
+    return serverObject;
   },
 
   async deleteServer(serverId: string) {
@@ -103,6 +123,10 @@ const serverService = {
 
     socketManager.broadcast('SERVER_DELETE', serverId, { serverId });
     return { message: 'Server deleted successfully' };
+  },
+
+  async updateServerIcon(serverId: string, iconUrl: string) {
+    return this.updateServer(serverId, { avatarUrl: iconUrl });
   },
 };
 

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authorizeChannel } from '../../middleware/checkPermission';
-import { upload } from '../../middleware/upload';
+import { uploadAttachment } from '../../middleware/upload';
 import * as uploadController from './upload.controller';
 
 const router = Router({ mergeParams: true });
@@ -9,7 +9,7 @@ const router = Router({ mergeParams: true });
 router.post(
   '/',
   authorizeChannel('ATTACH_FILES'),
-  upload.single('file'),
+  uploadAttachment.single('file'),
   uploadController.uploadFileHandler
 );
 

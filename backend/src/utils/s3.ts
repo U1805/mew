@@ -39,6 +39,14 @@ export const configureBucketCors = async () => {
   }
 };
 
+// Helper to convert a stored S3 key into a full, publicly accessible URL.
+export const getS3PublicUrl = (key: string): string => {
+  if (!key) return '';
+  // Don't re-hydrate a URL that is already complete.
+  if (key.startsWith('http')) return key;
+  return `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.bucketName}.${config.s3.webEndpoint}:${config.s3.webPort}/${key}`;
+};
+
 export const uploadFile = async (file: Express.Multer.File) => {
   const fileExtension = path.extname(file.originalname);
   const newFilename = `${nanoid()}${fileExtension}`;

@@ -32,7 +32,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
     const files = Array.from(e.target.files);
 
-    const newUploads = files.map(file => ({
+    const newUploads = files.map((file: File) => ({
       filename: file.name,
       contentType: file.type,
       size: file.size,
@@ -51,7 +51,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const uploadFile = async (attachment: Partial<Attachment & { file: File }>, index: number) => {
+  const uploadFile = async (attachment: any, index: number) => {
     if (!attachment.file || !channelId) return;
 
     try {

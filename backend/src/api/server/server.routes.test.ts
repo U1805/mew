@@ -1,5 +1,12 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
+// Mock the socketManager to prevent errors in tests that indirectly trigger socket events
+vi.mock('../../gateway/events', () => ({
+  socketManager: {
+    broadcastToUser: vi.fn(),
+    broadcast: vi.fn(),
+  },
+}));
 import app from '../../app';
 import ServerMemberModel from '../member/member.model';
 import RoleModel from '../role/role.model';
@@ -315,6 +322,72 @@ describe('Server Routes', () => {
       // 4. Verify the webhook is deleted directly from the database
       const webhook = await Webhook.findById(webhookId);
       expect(webhook).toBeNull();
+    });
+  });
+
+  describe('POST /api/servers/:serverId/icon', () => {
+    let serverId: string;
+
+    beforeEach(async () => {
+      const res = await request(app)
+        .post('/api/servers')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'ServerForIconUpload' });
+      serverId = res.body._id;
+    });
+
+    it('should allow the owner to upload a server icon', async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/icon`)
+        .set('Authorization', `Bearer ${token}`)
+        .attach('icon', Buffer.from('fake icon data'), 'icon.png');
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.avatarUrl).toBeDefined();
+      expect(res.body.avatarUrl).toMatch(/\.png$/);
+    });
+
+    it('should return 403 if a non-member tries to upload', async () => {
+      const anotherUserData = { email: 'non-member@example.com', username: 'nonmember', password: 'password123' };
+      await request(app).post('/api/auth/register').send(anotherUserData);
+      const loginRes = await request(app).post('/api/auth/login').send({ email: anotherUserData.email, password: anotherUserData.password });
+      const anotherToken = loginRes.body.token;
+
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/icon`)
+        .set('Authorization', `Bearer ${anotherToken}`)
+        .attach('icon', Buffer.from('fake icon data'), 'icon.png');
+
+      expect(res.statusCode).toBe(403); // Forbidden, as they aren't even a member
+    });
+
+    it('should return 403 if a member without MANAGE_SERVER permission tries to upload', async () => {
+      const memberData = { email: 'icon-member@example.com', username: 'iconmember', password: 'password123' };
+      await request(app).post('/api/auth/register').send(memberData);
+      const memberLoginRes = await request(app).post('/api/auth/login').send({ email: memberData.email, password: memberData.password });
+      const memberToken = memberLoginRes.body.token;
+
+      // Make the user a member
+      const inviteRes = await request(app).post(`/api/servers/${serverId}/invites`).set('Authorization', `Bearer ${token}`).send({});
+      await request(app).post(`/api/invites/${inviteRes.body.code}`).set('Authorization', `Bearer ${memberToken}`);
+
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/icon`)
+        .set('Authorization', `Bearer ${memberToken}`)
+        .attach('icon', Buffer.from('fake icon data'), 'icon.png');
+
+      expect(res.statusCode).toBe(403);
+      expect(res.body.message).toContain('You do not have the required permission: MANAGE_SERVER');
+    });
+
+    it('should return 400 for invalid file type', async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/icon`)
+        .set('Authorization', `Bearer ${token}`)
+        .attach('icon', Buffer.from('this is not an image'), 'test.txt');
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('Invalid file type');
     });
   });
 });

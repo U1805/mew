@@ -10,6 +10,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
   isLoading?: boolean;
   isDestructive?: boolean;
+  children?: React.ReactNode;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -21,6 +22,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onCancel,
   isLoading = false,
   isDestructive = true,
+  children
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -28,6 +30,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="p-4 pt-5 pb-3">
           <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
           <p className="text-mew-textMuted text-sm leading-5">{description}</p>
+          {children}
         </div>
 
         <div className="bg-[#2B2D31] p-4 flex justify-end items-center mt-2 space-x-3">

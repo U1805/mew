@@ -33,8 +33,8 @@ export const useHiddenStore = create<HiddenState>()(
       storage: createJSONStorage(() => localStorage, {
         reviver: (key, value) => {
           if (key === 'hiddenDmChannelIds' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
-            // @ts-expect-error - Zustand's persist middleware for Sets
-            return new Set(value.value);
+            // Zustand's persist middleware for Sets
+            return new Set((value as any).value);
           }
           return value;
         },
@@ -49,4 +49,3 @@ export const useHiddenStore = create<HiddenState>()(
     }
   )
 );
-

@@ -23,6 +23,22 @@ Generate structured Git Tag/Release notes based on the provided version number a
 - <Description> (<commit_hash>). <Impact Analysis>.
 ```
 
+## Versioning Specifications
+
+Follow the Semantic Versioning standard (`v<Major>.<Minor>.<Patch>`) for the version number:
+
+1.  **Major (v**`X`**.0.0)**:
+    - **Meaning**: Major release with incompatible API changes.
+    - **Trigger**: Increment this digit when the release contains **💥 Breaking Changes**.
+
+2.  **Minor (v1.**`X`**.0)**:
+    - **Meaning**: New functionality added in a backward-compatible manner.
+    - **Trigger**: Increment this digit when the release contains **✨ New Features** (but no breaking changes).
+
+3.  **Patch (v1.0.**`X`**)**:
+    - **Meaning**: Backward-compatible bug fixes or minor adjustments.
+    - **Trigger**: Increment this digit when the release contains only **🐛 Bug Fixes** or maintenance tasks.
+
 ## Category Selection Rules
 
 **✨ New Features (Features):**

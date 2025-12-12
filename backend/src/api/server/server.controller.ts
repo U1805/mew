@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import serverService from './server.service';
 import asyncHandler from '../../utils/asyncHandler';
+import { BadRequestError } from '../../utils/errors';
+import { uploadFile } from '../../utils/s3';
 
 export const createServerHandler = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   const data = {
@@ -34,4 +36,16 @@ export const deleteServerHandler = asyncHandler(async (req: Request, res: Respon
     req.params.serverId
   );
   res.status(200).json(result);
+});
+
+export const updateServerIconHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new BadRequestError('No file uploaded.');
+  }
+
+  const { serverId } = req.params;
+  const result = await uploadFile(req.file);
+  const server = await serverService.updateServerIcon(serverId, result.key);
+
+  res.status(200).json(server);
 });

@@ -1,13 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Icon } from '@iconify/react';
 import { useModalStore } from '../../../shared/stores';
 import { serverApi } from '../../../shared/services/api';
+import toast from 'react-hot-toast';
 
 export const CreateServerModal: React.FC = () => {
   const { closeModal, openModal } = useModalStore();
   const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [iconFile, setIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+          toast.error("Image size must be less than 2MB");
+          return;
+      }
+
+      setIconFile(file);
+      setIconPreview(URL.createObjectURL(file));
+      e.target.value = ''; // Reset input
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,11 +34,25 @@ export const CreateServerModal: React.FC = () => {
 
     setIsLoading(true);
     try {
-      await serverApi.create({ name });
-      queryClient.invalidateQueries({ queryKey: ['servers'] });
+      const res = await serverApi.create({ name });
+      const serverId = res.data._id;
+      
+      if (iconFile) {
+          try {
+              const formData = new FormData();
+              formData.append('icon', iconFile);
+              await serverApi.uploadIcon(serverId, formData);
+          } catch (uploadError) {
+              console.error("Failed to upload icon:", uploadError);
+              toast.error("Server created, but icon upload failed.");
+          }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ['servers'] });
       closeModal();
-    } catch (error) {
+  } catch (error) {
       console.error("Failed to create server:", error);
+      toast.error("Failed to create server");
     } finally {
       setIsLoading(false);
     }
@@ -28,12 +61,41 @@ export const CreateServerModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
-        <div className="p-4 pt-5 pb-3">
-          <h2 className="text-xl font-bold text-white mb-2">Customize Your Server</h2>
-          <p className="text-mew-textMuted text-sm leading-5">Give your new server a personality with a name and an icon. You can always change it later.</p>
+        <div className="p-4 pt-5 pb-3 text-center">
+          <h2 className="text-2xl font-bold text-white mb-2">Customize Your Server</h2>
+          <p className="text-mew-textMuted text-sm leading-5 px-4">Give your new server a personality with a name and an icon. You can always change it later.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="px-4">
+          <div className="flex justify-center mb-6">
+              <div 
+                  className="w-[80px] h-[80px] rounded-full bg-[#1E1F22] border-dashed border-2 border-[#4E5058] flex flex-col items-center justify-center cursor-pointer hover:border-mew-textMuted transition-colors relative overflow-hidden group"
+                  onClick={() => fileInputRef.current?.click()}
+              >
+                  <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      className="hidden" 
+                      accept="image/png, image/jpeg, image/gif"
+                      onChange={handleFileChange}
+                  />
+
+                  {iconPreview ? (
+                      <>
+                          <img src={iconPreview} alt="Preview" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <span className="text-[10px] font-bold text-white uppercase">Change</span>
+                          </div>
+                      </>
+                  ) : (
+                      <>
+                          <Icon icon="mdi:camera-plus" className="text-mew-textMuted group-hover:text-white mb-1 transition-colors" width="24" />
+                          <span className="text-[10px] font-bold text-mew-textMuted group-hover:text-white uppercase transition-colors">Upload</span>
+                      </>
+                  )}
+              </div>
+          </div>
+
           <div className="mb-4">
             <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Server Name</label>
             <input
@@ -56,9 +118,9 @@ export const CreateServerModal: React.FC = () => {
           </div>
         </form>
 
-        <div className="bg-[#2B2D31] p-4 flex justify-end items-center mt-2 space-x-3">
+        <div className="bg-[#2B2D31] p-4 flex justify-between items-center mt-2">
           <button type="button" onClick={closeModal} className="text-white hover:underline text-sm font-medium px-4">
-            Cancel
+            Back
           </button>
           <button onClick={handleSubmit} disabled={isLoading || !name.trim()} className="px-6 py-2 rounded-[3px] font-medium text-sm transition-colors text-white bg-mew-accent hover:bg-mew-accentHover disabled:opacity-50 disabled:cursor-not-allowed">
             Create

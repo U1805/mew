@@ -8,6 +8,7 @@ import Server from '../server/server.model';
 import Channel from '../channel/channel.model';
 import mentionService from './mention.service';
 import mongoose from 'mongoose';
+import { getS3PublicUrl } from '../../utils/s3';
 import config from '../../config';
 
 // Convert stored attachment keys into client-consumable URLs.
@@ -15,7 +16,7 @@ function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messag
   if (messageObject.attachments && messageObject.attachments.length > 0) {
     messageObject.attachments.forEach(attachment => {
       if (attachment.key) {
-        attachment.url = `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.bucketName}.${config.s3.webEndpoint}:${config.s3.webPort}/${attachment.key}`;
+        attachment.url = getS3PublicUrl(attachment.key);
       }
     });
   }
@@ -78,8 +79,18 @@ function applyAuthorOverride<T extends { payload?: any; authorId?: any }>(messag
 
 function processMessageForClient<T extends IMessage>(message: T): object {
   let messageObject = message.toObject();
+
+  // Apply webhook overrides first, as they might change author data
   messageObject = applyAuthorOverride(messageObject);
+
+  // Hydrate the author's avatar URL after potential overrides
+  if (messageObject.authorId && typeof messageObject.authorId === 'object' && (messageObject.authorId as any).avatarUrl) {
+    (messageObject.authorId as any).avatarUrl = getS3PublicUrl((messageObject.authorId as any).avatarUrl);
+  }
+
+  // Finally, hydrate any attachments in the message
   messageObject = hydrateAttachmentUrls(messageObject);
+
   return messageObject;
 }
 

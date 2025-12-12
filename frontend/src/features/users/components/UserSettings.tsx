@@ -1,17 +1,73 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import { useUIStore, useAuthStore } from '../../../shared/stores';
+import { userApi } from '../../../shared/services/api';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 
 const UserSettings: React.FC = () => {
   const { isSettingsOpen, closeSettings } = useUIStore();
-  const { user, logout } = useAuthStore();
+  const { user, logout, setAuth, token } = useAuthStore();
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   if (!isSettingsOpen) return null;
 
   const handleLogout = () => {
       logout();
       closeSettings();
+  };
+
+  const handleAvatarClick = () => {
+      if (isUploading) return;
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+          toast.error("Image size must be less than 2MB");
+          return;
+      }
+
+      setPendingFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+      e.target.value = ''; // Reset input to allow re-selecting the same file if cancelled
+  };
+
+  const cancelUpload = () => {
+      setPendingFile(null);
+      if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          setPreviewUrl(null);
+      }
+  };
+
+  const confirmUpload = async () => {
+      if (!pendingFile) return;
+
+      const formData = new FormData();
+      formData.append('avatar', pendingFile);
+
+      setIsUploading(true);
+      try {
+          const res = await userApi.updateProfile(formData);
+          const remember = !!localStorage.getItem('mew_token');
+          setAuth(token!, res.data, remember);
+          toast.success("Avatar updated!");
+          cancelUpload();
+      } catch (error) {
+          console.error(error);
+          toast.error("Failed to update avatar");
+      } finally {
+          setIsUploading(false);
+      }
   };
 
   return (
@@ -61,14 +117,40 @@ const UserSettings: React.FC = () => {
             <div className="h-[100px] bg-mew-accent relative">
                 {/* Avatar */}
                 <div className="absolute left-4 -bottom-[36px]">
-                    <div className="w-[80px] h-[80px] rounded-full p-[6px] bg-[#1E1F22]">
-                        {user?.avatarUrl ? (
-                            <img src={user.avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                            <div className="w-full h-full rounded-full bg-mew-accentHover flex items-center justify-center text-white text-2xl font-bold">
-                                {user?.username?.slice(0, 2).toUpperCase()}
+                    <div 
+                        className="w-[80px] h-[80px] rounded-full p-[6px] bg-[#1E1F22] relative group cursor-pointer"
+                        onClick={handleAvatarClick}
+                    >
+                        <input 
+                            type="file" 
+                            ref={fileInputRef} 
+                            className="hidden" 
+                            accept="image/png, image/jpeg, image/gif" 
+                            onChange={handleFileChange}
+                        />
+                        
+                        <div className="w-full h-full rounded-full overflow-hidden relative">
+                            {user?.avatarUrl ? (
+                                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full bg-mew-accentHover flex items-center justify-center text-white text-2xl font-bold">
+                                    {user?.username?.slice(0, 2).toUpperCase()}
+                                </div>
+                            )}
+                            
+                            {/* Hover Overlay */}
+                            <div className={clsx(
+                                "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
+                                isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}>
+                                {isUploading ? (
+                                    <Icon icon="mdi:loading" className="text-white animate-spin" width="24" />
+                                ) : (
+                                    <span className="text-white text-[10px] font-bold uppercase tracking-wide">Change</span>
+                                )}
                             </div>
-                        )}
+                        </div>
+
                         <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#1E1F22]"></div>
                     </div>
                 </div>
@@ -81,7 +163,11 @@ const UserSettings: React.FC = () => {
                         <h3 className="text-xl font-bold text-white">{user?.username}</h3>
                         <p className="text-sm text-mew-textMuted">#{user?._id?.slice(0, 4) || '0000'}</p>
                     </div>
-                    <button className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
+                    <button 
+                        onClick={handleAvatarClick}
+                        disabled={isUploading}
+                        className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                    >
                         Edit User Profile
                     </button>
                 </div>
@@ -157,6 +243,24 @@ const UserSettings: React.FC = () => {
              <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
          </div>
       </div>
+
+      {pendingFile && (
+        <ConfirmModal
+            title="Change Avatar"
+            description="Are you sure you want to use this image as your new avatar?"
+            onConfirm={confirmUpload}
+            onCancel={cancelUpload}
+            confirmText="Apply"
+            isLoading={isUploading}
+            isDestructive={false}
+        >
+            <div className="flex justify-center my-6">
+                <div className="w-32 h-32 rounded-full overflow-hidden ring-4 ring-mew-accent/50 shadow-xl">
+                    <img src={previewUrl || ''} className="w-full h-full object-cover" alt="Preview" />
+                </div>
+            </div>
+        </ConfirmModal>
+      )}
     </div>
   );
 };

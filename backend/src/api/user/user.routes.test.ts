@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 
 // Mock the socketManager to prevent errors in tests that indirectly trigger socket events
@@ -285,6 +285,48 @@ describe('User Routes', () => {
         .get(`/api/users/${nonExistentId}`)
         .set('Authorization', `Bearer ${token}`);
       expect(res.statusCode).toBe(404);
+    });
+  });
+
+  describe('PATCH /api/users/@me', () => {
+    it('should update the user avatar when a valid image is uploaded', async () => {
+      const res = await request(app)
+        .patch('/api/users/@me')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('avatar', Buffer.from('fake image data'), 'test-avatar.png');
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.avatarUrl).toBeDefined();
+      expect(res.body.avatarUrl).not.toBe(null);
+      expect(res.body.avatarUrl).toMatch(/\.png$/);
+    });
+
+    it('should return 400 if no file is provided', async () => {
+      const res = await request(app)
+        .patch('/api/users/@me')
+        .set('Authorization', `Bearer ${token}`)
+        .send(); // No file attached
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toBe('No update data provided.');
+    });
+
+    it('should return 400 for invalid file type', async () => {
+      const res = await request(app)
+        .patch('/api/users/@me')
+        .set('Authorization', `Bearer ${token}`)
+        .attach('avatar', Buffer.from('this is not an image'), 'test.txt');
+
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('Invalid file type');
+    });
+
+    it('should return 401 if not authenticated', async () => {
+      const res = await request(app)
+        .patch('/api/users/@me')
+        .attach('avatar', Buffer.from('fake image data'), 'test-avatar.png');
+
+      expect(res.statusCode).toBe(401);
     });
   });
 });

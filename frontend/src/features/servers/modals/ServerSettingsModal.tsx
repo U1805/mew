@@ -1,13 +1,15 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { Role } from '../../../shared/types';
 import { Permission } from '../../../shared/constants/permissions';
 import { useRoles } from '../../../shared/hooks/useRoles';
+import { roleApi, serverApi } from '../../../shared/services/api';
+import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 
 const PERMISSION_GROUPS = [
   { group: 'General Server Permissions', perms: [
@@ -38,12 +40,23 @@ const PRESET_COLORS = [
 ];
 
 export const ServerSettingsModal = () => {
-  const { closeModal, modalData, openModal } = useModalStore();
+  const { closeModal, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'emoji' | 'stickers'>('overview');
   const [name, setName] = useState('');
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [pendingIconFile, setPendingIconFile] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState<string | null>(null);
+
+  const { data: server, isLoading: isLoadingServer } = useQuery({
+    queryKey: ['server', currentServerId],
+    queryFn: () => serverApi.get(currentServerId!).then((res) => res.data),
+    enabled: !!currentServerId,
+  });
 
   const { data: serverRoles, isLoading: isLoadingRoles } = useRoles(currentServerId);
 
@@ -51,6 +64,7 @@ export const ServerSettingsModal = () => {
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
   const [roleTab, setRoleTab] = useState<'display' | 'permissions'>('display');
   const [hasChanges, setHasChanges] = useState(false);
+  const [hasOverviewChanges, setHasOverviewChanges] = useState(false);
 
   useEffect(() => {
     if (serverRoles) {
@@ -62,16 +76,25 @@ export const ServerSettingsModal = () => {
   }, [serverRoles]);
 
   useEffect(() => {
-    if (modalData?.server) {
-      setName(modalData.server.name || '');
+    if (server) {
+      setName(server.name || '');
+      setIconPreview(server.avatarUrl || null);
     }
-  }, [modalData]);
+  }, [server]);
 
   useEffect(() => {
     const originalJson = JSON.stringify(serverRoles?.map(r => ({...r, _id: r._id.toString()})).sort((a, b) => a._id.localeCompare(b._id)));
     const localJson = JSON.stringify(localRoles?.map(r => ({...r, _id: r._id.toString()})).sort((a, b) => a._id.localeCompare(b._id)));
     setHasChanges(originalJson !== localJson);
   }, [localRoles, serverRoles]);
+
+  useEffect(() => {
+    if (server) {
+      const nameChanged = name !== server.name;
+      const iconChanged = !!pendingIconFile;
+      setHasOverviewChanges(nameChanged || iconChanged);
+    }
+  }, [name, pendingIconFile, server]);
 
   const saveMutation = useMutation({
       mutationFn: async () => {
@@ -134,6 +157,49 @@ export const ServerSettingsModal = () => {
     handleLocalRoleUpdate({ permissions: newPerms });
   };
 
+  const handleSaveOverview = async () => {
+    if (!currentServerId || !server || !hasOverviewChanges) return;
+
+    setIsUploading(true);
+    try {
+      let updated = false;
+
+      // Upload icon if changed
+      if (pendingIconFile) {
+        const formData = new FormData();
+        formData.append('icon', pendingIconFile);
+        await serverApi.uploadIcon(currentServerId, formData);
+        updated = true;
+      }
+
+      // Update name if changed
+      if (name !== server.name) {
+        await serverApi.update(currentServerId, { name });
+        updated = true;
+      }
+
+      if (updated) {
+        await queryClient.invalidateQueries({ queryKey: ['server', currentServerId] });
+        await queryClient.invalidateQueries({ queryKey: ['servers'] });
+        toast.success("Server settings updated!");
+        setPendingIconFile(null); // Clear pending file after successful upload
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update server settings");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleResetOverview = () => {
+    if (server) {
+      setName(server.name);
+      setPendingIconFile(null);
+      setIconPreview(server.avatarUrl || null);
+    }
+  };
+
   const handleCreateRole = () => {
     const newRole: Role = {
       _id: `new_${Date.now()}`,
@@ -158,6 +224,25 @@ export const ServerSettingsModal = () => {
     });
   };
 
+  const handleIconClick = () => {
+      if (isUploading) return;
+      fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 2 * 1024 * 1024) {
+          toast.error("Image size must be less than 2MB");
+          return;
+      }
+      setPendingIconFile(file);
+      setIconPreview(URL.createObjectURL(file));
+      e.target.value = ''; // Allow re-selecting the same file
+  };
+
+
   return (
     <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
          <div className="w-[30%] min-w-[220px] bg-[#2B2D31] flex flex-col items-end pt-[60px] pb-4 px-2">
@@ -172,7 +257,7 @@ export const ServerSettingsModal = () => {
 
                 <div
                     className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] font-medium text-sm cursor-pointer mb-0.5 flex justify-between group text-red-400"
-                    onClick={() => openModal('deleteServer', { server: modalData.server })}
+                    onClick={() => openModal('deleteServer', { server })}
                 >
                     <span>Delete Server</span>
                     <Icon icon="mdi:trash-can-outline" />
@@ -182,18 +267,44 @@ export const ServerSettingsModal = () => {
 
          <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[800px] overflow-hidden flex flex-col h-full">
              {activeTab === 'overview' && (
+               <>
                <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10">
                  <h2 className="text-xl font-bold text-white mb-6">Server Overview</h2>
                  <div className="flex gap-8">
                      <div className="flex items-center justify-center">
-                         <div className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center relative group cursor-pointer">
-                             <div className="text-white text-3xl font-bold">{modalData?.server?.name?.substring(0,2).toUpperCase()}</div>
-                             <div className="absolute top-0 right-0 bg-white rounded-full p-1 shadow-md">
-                                 <Icon icon="mdi:image-plus" className="text-black" width="16" />
+                         <div
+                             className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center relative group cursor-pointer overflow-hidden"
+                             onClick={handleIconClick}
+                         >
+                             <input
+                                 type="file"
+                                 ref={fileInputRef}
+                                 className="hidden"
+                                 accept="image/png, image/jpeg, image/gif"
+                                 onChange={handleFileChange}
+                             />
+
+                             {iconPreview ? (
+                                <img src={iconPreview} alt="Server Icon" className="w-full h-full object-cover" />
+                             ) : (
+                                <div className="text-white text-3xl font-bold">{server?.name?.substring(0,2).toUpperCase()}</div>
+                             )}
+
+                             <div className={clsx(
+                                 "absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity",
+                                 isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                             )}>
+                                 {isUploading ? (
+                                     <Icon icon="mdi:loading" className="text-white animate-spin" width="32" />
+                                 ) : (
+                                     <span className="text-xs font-bold text-white uppercase text-center px-2">Change Icon</span>
+                                 )}
                              </div>
-                             <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-white uppercase">
-                                 Change Icon
-                             </div>
+                             {!isUploading && (
+                                <div className="absolute top-0 right-0 bg-white rounded-full p-1 shadow-md group-hover:hidden">
+                                    <Icon icon="mdi:image-plus" className="text-black" width="16" />
+                                </div>
+                             )}
                          </div>
                      </div>
                      <div className="flex-1 space-y-4">
@@ -206,13 +317,22 @@ export const ServerSettingsModal = () => {
                                 className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
                             />
                          </div>
-                         <div className="flex gap-4">
-                             <button className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors">Save Changes</button>
-                             <button onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
-                         </div>
                      </div>
                  </div>
                </div>
+
+                {hasOverviewChanges && (
+                    <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up">
+                        <span className="text-sm text-mew-textMuted">You have unsaved changes!</span>
+                        <div>
+                            <button onClick={handleResetOverview} className="text-white hover:underline text-sm font-medium px-4 py-2">Reset</button>
+                            <button onClick={handleSaveOverview} disabled={isUploading} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">
+                                {isUploading ? 'Saving...' : 'Save Changes'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+               </>
              )}
 
              {activeTab === 'roles' && (
@@ -292,7 +412,7 @@ export const ServerSettingsModal = () => {
                           <div className="space-y-8 animate-fade-in">
                             <div className="text-sm text-mew-textMuted bg-[#404249] p-3 rounded flex items-start">
                               <Icon icon="mdi:information-outline" className="mr-2 mt-0.5 flex-shrink-0" width="18" />
-                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who don&apos;t have a specific role assignment.</span>
+                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who don't have a specific role assignment.</span>
                             </div>
 
                             {PERMISSION_GROUPS.map(group => (
@@ -357,6 +477,7 @@ export const ServerSettingsModal = () => {
                  <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
              </div>
          </div>
+
     </div>
   )
 }

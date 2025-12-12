@@ -8,6 +8,7 @@ export const serverApi = {
   get: (id: string) => api.get(`/servers/${id}`),
   update: (id: string, data: { name?: string; avatarUrl?: string }) =>
     api.patch(`/servers/${id}`, data),
+  uploadIcon: (id: string, data: FormData) => api.post(`/servers/${id}/icon`, data),
   delete: (id: string) => api.delete(`/servers/${id}`),
   getRoles: (serverId: string) => roleApi.list(serverId),
   getMembers: (serverId: string) => memberApi.list(serverId),
@@ -16,4 +17,3 @@ export const serverApi = {
 };
 
 export default serverApi;
-
