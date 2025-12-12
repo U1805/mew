@@ -1,6 +1,7 @@
 import Message from '../message/message.model';
 import Channel from '../channel/channel.model';
 import { NotFoundError } from '../../utils/errors';
+import { getS3PublicUrl } from '../../utils/s3';
 
 interface SearchMessagesParams {
   serverId: string;
@@ -46,7 +47,36 @@ export const searchMessagesInServer = async ({
     .lean();
 
   return {
-    messages,
+    messages: messages.map((message: any) => {
+      if (
+        message.payload?.overrides &&
+        message.authorId &&
+        typeof message.authorId === 'object'
+      ) {
+        message.authorId.username =
+          message.payload.overrides.username || message.authorId.username;
+        message.authorId.avatarUrl =
+          message.payload.overrides.avatarUrl || message.authorId.avatarUrl;
+      }
+
+      if (
+        message.authorId &&
+        typeof message.authorId === 'object' &&
+        message.authorId.avatarUrl
+      ) {
+        message.authorId.avatarUrl = getS3PublicUrl(message.authorId.avatarUrl);
+      }
+
+      if (Array.isArray(message.attachments)) {
+        for (const attachment of message.attachments) {
+          if (attachment?.key) {
+            attachment.url = getS3PublicUrl(attachment.key);
+          }
+        }
+      }
+
+      return message;
+    }),
     pagination: {
       page,
       limit,

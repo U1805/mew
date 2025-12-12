@@ -1,4 +1,4 @@
-import { Fragment, useRef, useEffect } from 'react';
+import { Fragment, useRef, useEffect, useLayoutEffect } from 'react';
 import { Icon } from '@iconify/react';
 import MessageItem from './MessageItem';
 import TimestampDivider from './TimestampDivider';
@@ -18,6 +18,7 @@ interface MessageListProps {
 
 const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel, channelId }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const { currentServerId, targetMessageId, setTargetMessageId } = useUIStore();
@@ -25,10 +26,28 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   // 本地 ACK 熔断：避免 setQueryData + effect 互相触发导致死循环。
   const lastAckedMessageIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (useUIStore.getState().targetMessageId) return;
-    if (messages.length) bottomRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [channelId, messages.length]);
+  const didInitialScrollRef = useRef<string | null>(null);
+
+  const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior });
+  };
+
+  // 初次进入频道/DM 时默认停留在最底部（最新消息）。
+  useLayoutEffect(() => {
+    if (targetMessageId) return;
+    if (!channelId || isLoading || !messages.length) return;
+    if (didInitialScrollRef.current === channelId) return;
+
+    // 让布局（尤其是图片高度）先稳定一帧再滚动，避免回弹到顶部。
+    requestAnimationFrame(() => {
+      scrollToBottom('auto');
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+    });
+
+    didInitialScrollRef.current = channelId;
+  }, [channelId, isLoading, messages.length, targetMessageId]);
 
   useEffect(() => {
     if (targetMessageId && messages.length && !isLoading) {
@@ -81,7 +100,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
     : null;
 
   return (
-    <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
+    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
       {!isLoading ? (
         <div className="flex flex-col mt-auto">
           <div className="flex flex-col pb-4">
