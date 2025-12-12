@@ -1,11 +1,20 @@
-import { useState, useRef, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { messageApi, uploadApi } from '../../../shared/services/api';
-import { Channel, Message, ServerMember, Attachment } from '../../../shared/types';
+import { Channel, Message, Attachment } from '../../../shared/types';
 import { useAuthStore } from '../../../shared/stores';
-import { MentionSuggestionList } from './MentionSuggestionList';
 import { formatFileSize } from '../../../shared/utils/file';
+import { EditorContent, useEditor } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Mention from '@tiptap/extension-mention';
+import Placeholder from '@tiptap/extension-placeholder';
+import { createMentionSuggestion } from '../editor/mentionSuggestion';
+import {
+  extractMentionIdsFromDoc,
+  parseContentStringToTiptapDoc,
+  serializeTiptapDocToContentString,
+} from '../editor/chatContent';
 
 interface MessageInputProps {
   channel: Channel | null;
@@ -14,18 +23,86 @@ interface MessageInputProps {
 }
 
 const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
-  const [inputValue, setInputValue] = useState('');
   const [attachments, setAttachments] = useState<Array<Partial<Attachment & { isUploading?: boolean; progress?: number; file?: File; localUrl?: string; error?: string; key?: string }>>>([]);
   const isUploading = attachments.some(a => a.isUploading);
-  const [mentionQuery, setMentionQuery] = useState('');
-  const [showSuggestions, setShowSuggestions] = useState(false);
   
-  const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [committedMentions, setCommittedMentions] = useState<Map<string, string>>(new Map());
+  const placeholderRef = useRef('');
+  const sendMessageRef = useRef<() => void>(() => {});
 
   const queryClient = useQueryClient();
   const canSendMessage = channel?.permissions?.includes('SEND_MESSAGES') ?? false;
+
+  const placeholderText = useMemo(() => {
+    if (isUploading) return 'Uploading files...';
+    if (!canSendMessage) return 'You do not have permission to send messages in this channel';
+    return `Message #${channel?.name || 'channel'}`;
+  }, [canSendMessage, channel?.name, isUploading]);
+
+  placeholderRef.current = placeholderText;
+
+  const mentionExtension = useMemo(() => {
+    if (!serverId) return null;
+
+    return Mention.configure({
+      HTMLAttributes: {
+        class:
+          'inline-flex items-center px-1 rounded-[3px] font-medium cursor-pointer transition-colors select-none mx-0.5 align-baseline bg-[#5865F2]/10 text-[#5865F2] hover:bg-[#5865F2]/20',
+      },
+      suggestion: createMentionSuggestion({ queryClient, serverId }),
+    });
+  }, [queryClient, serverId]);
+
+  const emptyDoc = useMemo(() => parseContentStringToTiptapDoc(''), []);
+
+  const extensions = useMemo(() => {
+    return [
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+      }),
+      ...(mentionExtension ? [mentionExtension] : []),
+      Placeholder.configure({
+        placeholder: () => placeholderRef.current,
+      }),
+    ];
+  }, [mentionExtension]);
+
+  const editorProps = useMemo(() => {
+    return {
+      attributes: {
+        class:
+          'outline-none text-mew-text placeholder-mew-textMuted whitespace-pre-wrap break-words min-h-[22px]',
+      },
+      handleKeyDown: (_: any, event: KeyboardEvent) => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendMessageRef.current();
+          return true;
+        }
+
+        if (event.key === 'Escape') {
+          return true;
+        }
+
+        return false;
+      },
+    };
+  }, []);
+
+  const editor = useEditor({
+    extensions,
+    content: emptyDoc,
+    editable: canSendMessage && !isUploading,
+    editorProps,
+  });
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setEditable(canSendMessage && !isUploading);
+  }, [canSendMessage, editor, isUploading]);
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !channelId) return;
@@ -97,82 +174,14 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setInputValue(val);
+  const handleSendMessage = async () => {
+    if (!editor || !channelId || isUploading) return;
 
-    setCommittedMentions(prevMap => {
-        const newMap = new Map(prevMap);
-        let updated = false;
-        for (const username of newMap.keys()) {
-            const mentionRegex = new RegExp(`@${username}\\b`);
-            if (!mentionRegex.test(val)) {
-                newMap.delete(username);
-                updated = true;
-            }
-        }
-        return updated ? newMap : prevMap;
-    });
+    const doc = editor.getJSON();
+    const contentToSend = serializeTiptapDocToContentString(doc);
+    if (!contentToSend.trim() && attachments.length === 0) return;
 
-    if (serverId) {
-        const cursor = e.target.selectionStart || 0;
-        const textBefore = val.slice(0, cursor);
-        const match = textBefore.match(/@([\w]*)$/);
-
-        if (match) {
-            setMentionQuery(match[1]);
-            setShowSuggestions(true);
-        } else {
-            setShowSuggestions(false);
-        }
-    }
-  };
-
-  const handleMentionSelect = (member: ServerMember) => {
-    const isGlobal = (member as any).isGlobal;
-    const username = member.userId.username;
-
-    // Only user mentions need translation; @everyone/@here stay as text.
-    if (!isGlobal && member.userId) {
-      setCommittedMentions(prevMap => new Map(prevMap).set(username, member.userId._id));
-    }
-
-    const cursor = inputRef.current?.selectionStart || 0;
-    const textBefore = inputValue.slice(0, cursor);
-    const textAfter = inputValue.slice(cursor);
-
-    const lastAtIndex = textBefore.lastIndexOf('@');
-    if (lastAtIndex === -1) return;
-
-    const newTextBefore = textBefore.slice(0, lastAtIndex) + `@${username}` + ' ';
-    const newValue = newTextBefore + textAfter;
-
-    setInputValue(newValue);
-    setShowSuggestions(false);
-
-    setTimeout(() => {
-        if(inputRef.current) {
-            inputRef.current.focus();
-            inputRef.current.setSelectionRange(newTextBefore.length, newTextBefore.length);
-        }
-    }, 0);
-  };
-
-  const handleSendMessage = async (e: FormEvent) => {
-    e.preventDefault();
-    if ((!inputValue.trim() && attachments.length === 0) || !channelId || isUploading) return;
-
-    let contentToSend = inputValue;
-    const mentionsToSend: string[] = [];
-    committedMentions.forEach((userId, username) => {
-        const regex = new RegExp(`@${username}\\b`, 'g');
-        if (regex.test(contentToSend)) {
-             contentToSend = contentToSend.replace(regex, `<@${userId}>`);
-             if (!mentionsToSend.includes(userId)) {
-                mentionsToSend.push(userId);
-             }
-        }
-    });
+    const mentionsToSend = extractMentionIdsFromDoc(doc);
 
     const currentServerId = serverId ? serverId : undefined;
 
@@ -202,10 +211,8 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       return oldData ? [...oldData, newMessage] : [newMessage];
     });
 
-    setInputValue('');
+    editor.commands.setContent(emptyDoc, true);
     setAttachments([]);
-    setShowSuggestions(false);
-    setCommittedMentions(new Map());
 
     try {
       const finalAttachments = attachments
@@ -225,21 +232,19 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         return oldData ? oldData.filter(m => m._id !== tempId) : [];
       });
       console.error("Failed to send message:", err);
-      setInputValue(inputValue);
       setAttachments(attachments);
     }
   };
 
+  sendMessageRef.current = () => {
+    void handleSendMessage();
+  };
+
   return (
     <div className="px-4 pb-6 pt-2 flex-shrink-0 relative">
-      {showSuggestions && serverId && (
-          <MentionSuggestionList
-             serverId={serverId}
-             query={mentionQuery}
-             onSelect={handleMentionSelect}
-             onClose={() => setShowSuggestions(false)}
-          />
-      )}
+      <style>{`
+        .mew-chat-editor .ProseMirror p { margin: 0; }
+      `}</style>
 
       {attachments.length > 0 && (
         <div className="flex gap-4 p-3 bg-[#2B2D31] rounded-t-lg border-b border-[#1E1F22] overflow-x-auto custom-scrollbar">
@@ -284,7 +289,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       )}
 
       <form 
-        onSubmit={handleSendMessage} 
+        onSubmit={(e) => { e.preventDefault(); void handleSendMessage(); }} 
         className={attachments.length > 0 ? "bg-[#383A40] rounded-b-lg p-2.5 flex items-center relative z-10" : "bg-[#383A40] rounded-lg p-2.5 flex items-center relative z-10"}
       >
         <input
@@ -304,16 +309,9 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         >
           <Icon icon="mdi:plus-circle" width="24" height="24" />
         </button>
-        <input
-          ref={inputRef}
-          type="text"
-          value={inputValue}
-          onChange={handleChange}
-          placeholder={isUploading ? 'Uploading files...' : (canSendMessage ? `Message #${channel?.name || 'channel'}` : 'You do not have permission to send messages in this channel')}
-          className="bg-transparent flex-1 text-mew-text placeholder-mew-textMuted focus:outline-none disabled:cursor-not-allowed"
-          disabled={!canSendMessage || isUploading}
-          autoComplete="off"
-        />
+        <div className="mew-chat-editor bg-transparent flex-1 disabled:cursor-not-allowed">
+          {editor ? <EditorContent editor={editor} /> : null}
+        </div>
         <div className="flex items-center space-x-2 mr-2">
           <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:gift" width="24" height="24" /></button>
           <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:sticker-emoji" width="24" height="24" /></button>
