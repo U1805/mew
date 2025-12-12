@@ -3,7 +3,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Invite } from '../../../shared/types';
 import { inviteApi } from '../../../shared/services/api';
-import { useModalStore, useUIStore } from '../../../shared/stores/store';
+import { useModalStore, useUIStore } from '../../../shared/stores';
 
 export const CreateInviteModal: React.FC = () => {
   const { closeModal } = useModalStore();

@@ -9,7 +9,9 @@ Mew 提供了一套双模态的 API 体系，旨在满足不同的交互需求�
 1.  **REST API**: 基于 HTTP 的同步操作（CRUD），用于获取数据或执行指令。
 2.  **WebSocket API**: 基于 Socket.io 的异步通信，用于接收服务器端的实时推送。
 
-> **🔗 Base URL**: `http://localhost:3000/api` (开发环境)
+> **🔗 REST Base URL**: `http://localhost:3000/api` (开发环境)
+>
+> **🔗 WebSocket URL**: `http://localhost:3000`（不带 `/api`）
 
 ---
 
@@ -38,7 +40,7 @@ Authorization: Bearer <your_jwt_token_here>
 
 ## 🚦 错误处理 (Error Handling)
 
-我们遵循标准的 HTTP 语义。若请求失败，API 将返回 JSON 格式的错误详情。
+我们遵循标准的 HTTP 语义。若请求失败，API 将返回 JSON 格式的错误详情；对 Zod 校验失败或 Mongo CastError 等输入问题，会返回 `400` 并附带 `error` 字段。
 
 **错误响应示例**:
 ```json

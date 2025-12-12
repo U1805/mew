@@ -6,6 +6,8 @@ export interface IUser extends Document {
   password?: string;
   avatarUrl?: string;
   isBot: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const UserSchema: Schema = new Schema(

@@ -1,13 +1,14 @@
 import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
-import { serverApi, memberApi } from '../../../shared/services/api';
-import { ServerMember, Role, User } from '../../../shared/types';
+import { memberApi } from '../../../shared/services/api';
+import { ServerMember, Role } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores/store';
+import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores';
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
-import { usePermissions } from '../../../shared/hooks/usePermissions';
+import { useMembers } from '../../../shared/hooks/useMembers';
+import { useRoles } from '../../../shared/hooks/useRoles';
 
 
 // Get the highest role position for a member
@@ -27,18 +28,10 @@ const MemberList: React.FC = () => {
   const onlineStatus = usePresenceStore(state => state.onlineStatus);
 
   // Fetch server members
-  const { data: members, isLoading: membersLoading } = useQuery({
-    queryKey: ['members', currentServerId],
-    queryFn: () => serverApi.getMembers(currentServerId!).then(res => res.data as ServerMember[]),
-    enabled: !!currentServerId
-  });
+  const { data: members, isLoading: membersLoading } = useMembers(currentServerId);
 
   // Fetch server roles
-  const { data: roles, isLoading: rolesLoading } = useQuery({
-    queryKey: ['roles', currentServerId],
-    queryFn: () => serverApi.getRoles(currentServerId!).then(res => res.data as Role[]),
-    enabled: !!currentServerId,
-  });
+  const { data: roles, isLoading: rolesLoading } = useRoles(currentServerId);
 
   if (!currentServerId) return null;
 

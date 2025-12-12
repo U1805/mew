@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
-import { Webhook, IWebhook } from './webhook.model';
+import { IWebhook } from './webhook.model';
+import { webhookRepository } from './webhook.repository';
 import UserModel from '../user/user.model';
 import ServerModel from '../server/server.model';
 import * as MessageService from '../message/message.service';
@@ -38,25 +39,22 @@ export const createWebhook = async (channelId: string, serverId: string, data: W
     const botUser = await findOrCreateBotUserForServer(serverId);
     const token = crypto.randomBytes(32).toString('hex');
 
-    const webhook = new Webhook({
+    const webhook = await webhookRepository.create({
       ...data,
-      channelId,
-      serverId,
+      channelId: new mongoose.Types.ObjectId(channelId),
+      serverId: new mongoose.Types.ObjectId(serverId),
       botUserId: botUser._id,
       token,
     });
-
-    await webhook.save();
     return webhook;
 };
 
 export const getWebhooksByChannel = async (channelId: string): Promise<IWebhook[]> => {
-  const webhooks = await Webhook.find({ channelId });
-  return webhooks;
+  return webhookRepository.findByChannel(channelId);
 };
 
 export const updateWebhook = async (webhookId: string, data: Partial<WebhookCreationData>): Promise<IWebhook> => {
-  const webhook = await Webhook.findByIdAndUpdate(webhookId, data, { new: true });
+  const webhook = await webhookRepository.findByIdAndUpdate(webhookId, data);
   if (!webhook) {
     throw new NotFoundError('Webhook not found');
   }
@@ -64,7 +62,7 @@ export const updateWebhook = async (webhookId: string, data: Partial<WebhookCrea
 };
 
 export const deleteWebhook = async (webhookId: string): Promise<void> => {
-  const result = await Webhook.deleteOne({ _id: webhookId });
+  const result = await webhookRepository.deleteOne({ _id: webhookId });
   if (result.deletedCount === 0) {
     throw new NotFoundError('Webhook not found');
   }
@@ -77,7 +75,7 @@ interface ExecuteWebhookPayload {
 }
 
 export const executeWebhook = async (webhookId: string, token: string, payload: ExecuteWebhookPayload) => {
-    const webhook = await Webhook.findOne({ _id: webhookId, token });
+    const webhook = await webhookRepository.findByIdAndToken(webhookId, token);
 
     if (!webhook) {
       throw new UnauthorizedError('Invalid webhook token');

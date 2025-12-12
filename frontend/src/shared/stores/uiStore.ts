@@ -1,0 +1,46 @@
+import { create } from 'zustand';
+import { useUnreadStore } from './unreadStore';
+import { useHiddenStore } from './hiddenStore';
+
+interface UIState {
+  currentServerId: string | null;
+  currentChannelId: string | null;
+  isMemberListOpen: boolean;
+  isSettingsOpen: boolean;
+  isSearchOpen: boolean;
+  searchQuery: string;
+  targetMessageId: string | null;
+  setCurrentServer: (id: string | null) => void;
+  setCurrentChannel: (id: string | null) => void;
+  toggleMemberList: () => void;
+  openSettings: () => void;
+  closeSettings: () => void;
+  setSearchOpen: (isOpen: boolean) => void;
+  setSearchQuery: (query: string) => void;
+  setTargetMessageId: (id: string | null) => void;
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  currentServerId: null,
+  currentChannelId: null,
+  isMemberListOpen: true,
+  isSettingsOpen: false,
+  isSearchOpen: false,
+  searchQuery: '',
+  targetMessageId: null,
+  setCurrentServer: (id) => set({ currentServerId: id, currentChannelId: null, isSearchOpen: false, searchQuery: '' }),
+  setCurrentChannel: (id) => {
+    if (id) {
+      useUnreadStore.getState().removeUnreadChannel(id);
+      useHiddenStore.getState().removeHiddenChannel(id);
+    }
+    set({ currentChannelId: id });
+  },
+  toggleMemberList: () => set((state) => ({ isMemberListOpen: !state.isMemberListOpen })),
+  openSettings: () => set({ isSettingsOpen: true }),
+  closeSettings: () => set({ isSettingsOpen: false }),
+  setSearchOpen: (isOpen) => set({ isSearchOpen: isOpen }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+  setTargetMessageId: (id) => set({ targetMessageId: id }),
+}));
+

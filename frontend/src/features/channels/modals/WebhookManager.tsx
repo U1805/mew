@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhookApi, API_URL } from '../../../shared/services/api';
 import { Webhook, Channel } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { useWebhooks } from '../hooks/useWebhooks';
 
 interface WebhookManagerProps {
   serverId: string;
@@ -21,13 +22,7 @@ export const WebhookManager: React.FC<WebhookManagerProps> = ({ serverId, channe
 
   const queryClient = useQueryClient();
 
-  const { data: webhooks, isLoading } = useQuery({
-    queryKey: ['webhooks', channel._id],
-    queryFn: async () => {
-      const res = await webhookApi.list(serverId, channel._id);
-      return res.data as Webhook[];
-    }
-  });
+  const { data: webhooks, isLoading } = useWebhooks(serverId, channel._id);
 
   const createMutation = useMutation({
     mutationFn: (data: { name: string; avatarUrl?: string }) => 

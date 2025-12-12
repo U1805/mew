@@ -1,5 +1,5 @@
 import React from 'react';
-import { useModalStore } from '../../../shared/stores/store';
+import { useModalStore } from '../../../shared/stores';
 import { PermissionTargetSelector } from './PermissionTargetSelector';
 
 export const AddPermissionOverrideModal: React.FC = () => {

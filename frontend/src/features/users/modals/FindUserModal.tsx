@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { User } from '../../../shared/types';
-import { userApi, channelApi } from '../../../shared/services/api';
-import { useModalStore, useUIStore } from '../../../shared/stores/store';
+import { channelApi } from '../../../shared/services/api';
+import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useUserSearch } from '../hooks/useUserSearch';
 
 export const FindUserModal: React.FC = () => {
   const { closeModal } = useModalStore();
@@ -18,15 +19,7 @@ export const FindUserModal: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { data: searchResults, isFetching: isSearching } = useQuery({
-    queryKey: ['userSearch', debouncedQuery],
-    queryFn: async () => {
-        if (!debouncedQuery) return [];
-        const res = await userApi.search(debouncedQuery);
-        return res.data as User[];
-    },
-    enabled: !!debouncedQuery
-  });
+  const { data: searchResults, isFetching: isSearching } = useUserSearch(debouncedQuery);
 
   const handleCreateDM = async (user: User) => {
     if (loadingUserId) return;

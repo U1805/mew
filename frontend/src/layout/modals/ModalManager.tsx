@@ -1,6 +1,5 @@
 import React from 'react';
-import { GenericModal } from './GenericModal';
-import { useModalStore } from '../../shared/stores/store';
+import { useModalStore } from '../../shared/stores';
 import { CreateInviteModal } from '../../features/servers/modals/CreateInviteModal';
 import { JoinServerModal } from '../../features/servers/modals/JoinServerModal';
 import { ServerSettingsModal } from '../../features/servers/modals/ServerSettingsModal';
@@ -10,22 +9,41 @@ import { FindUserModal } from '../../features/users/modals/FindUserModal';
 import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
 import { KickUserModal } from '../../features/servers/modals/KickUserModal';
 import { AddPermissionOverrideModal } from '../../features/channels/modals/AddPermissionOverrideModal';
+import { CreateServerModal } from '../../features/servers/modals/CreateServerModal';
+import { CreateCategoryModal } from '../../features/channels/modals/CreateCategoryModal';
+import { CreateChannelModal } from '../../features/channels/modals/CreateChannelModal';
+import { DeleteChannelModal } from '../../features/channels/modals/DeleteChannelModal';
+import { DeleteMessageModal } from '../../features/messages/modals/DeleteMessageModal';
+import { DeleteCategoryModal } from '../../features/channels/modals/DeleteCategoryModal';
+import { DeleteServerModal } from '../../features/servers/modals/DeleteServerModal';
+import { LeaveServerModal } from '../../features/servers/modals/LeaveServerModal';
 
 const ModalManager: React.FC = () => {
   const { activeModal } = useModalStore();
 
   if (!activeModal) return null;
 
-  const genericModals = [
-      'createServer', 'createCategory', 'createChannel',
-      'deleteChannel', 'deleteMessage', 'deleteCategory', 'deleteServer', 'leaveServer'
-  ];
-
-  if (genericModals.includes(activeModal)) {
-      return <GenericModal />;
-  }
 
   switch (activeModal) {
+    // Refactored modals
+    case 'createServer':
+      return <CreateServerModal />;
+    case 'createCategory':
+      return <CreateCategoryModal />;
+    case 'createChannel':
+      return <CreateChannelModal />;
+    case 'deleteChannel':
+      return <DeleteChannelModal />;
+    case 'deleteMessage':
+      return <DeleteMessageModal />;
+    case 'deleteCategory':
+      return <DeleteCategoryModal />;
+    case 'deleteServer':
+      return <DeleteServerModal />;
+    case 'leaveServer':
+      return <LeaveServerModal />;
+
+    // Existing modals
     case 'createInvite':
       return <CreateInviteModal />;
     case 'joinServer':

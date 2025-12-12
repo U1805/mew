@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Message } from '../../../shared/types';
 import { messageApi } from '../../../shared/services/api';
-import { useUIStore } from '../../../shared/stores/store';
+import { useUIStore } from '../../../shared/stores';
 
 interface MessageEditorProps {
     message: Message;

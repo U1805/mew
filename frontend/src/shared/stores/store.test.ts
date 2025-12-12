@@ -1,4 +1,4 @@
-import { useAuthStore } from './store';
+import { useAuthStore } from '.';
 import { act } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { User } from '../types';

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import Server from './server.model';
+import { serverRepository } from './server.repository';
 import Channel from '../channel/channel.model';
 import Message from '../message/message.model';
 import { NotFoundError } from '../../utils/errors';
@@ -54,7 +55,7 @@ const serverService = {
     });
 
     // 4. 保存所有文档
-    await server.save();
+    await serverRepository.save(server);
     await everyoneRole.save();
     await ownerRole.save(); // 别忘了保存 ownerRole
     await ownerMember.save();
@@ -63,7 +64,7 @@ const serverService = {
   },
 
   async getServerById(serverId: string) {
-    const server = await Server.findById(serverId);
+    const server = await serverRepository.findById(serverId);
     if (!server) {
       throw new NotFoundError('Server not found');
     }
@@ -71,17 +72,14 @@ const serverService = {
   },
 
   async getServersForUser(userId: string) {
-    const memberships = await ServerMember.find({ userId }).populate('serverId');
-    const servers = memberships
-      .map((m: any) => m.serverId)
-      .filter((s) => s !== null);
-    return servers;
+    return serverRepository.findServersByUserId(userId);
   },
 
   async updateServer(serverId: string, data: Partial<CreateServerData>) {
-    const server = await this.getServerById(serverId);
-    Object.assign(server, data);
-    await server.save();
+    const server = await serverRepository.updateById(serverId, data);
+    if (!server) {
+      throw new NotFoundError('Server not found');
+    }
     socketManager.broadcast('SERVER_UPDATE', serverId, server);
     return server;
   },
@@ -101,7 +99,7 @@ const serverService = {
     await ServerMember.deleteMany({ serverId: serverId as any });
     await Webhook.deleteMany({ serverId: serverId as any });
     await Role.deleteMany({ serverId: serverId as any });
-    await Server.deleteOne({ _id: serverId as any });
+    await serverRepository.deleteById(serverId);
 
     socketManager.broadcast('SERVER_DELETE', serverId, { serverId });
     return { message: 'Server deleted successfully' };

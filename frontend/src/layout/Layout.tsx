@@ -7,10 +7,10 @@ import ModalManager from '../layout/modals/ModalManager';
 import { usePresenceEvents } from '../shared/hooks/usePresenceEvents';
 import { useGlobalSocketEvents } from '../shared/hooks/useGlobalSocketEvents';
 import useTabNotifier from '../shared/hooks/useTabNotifier';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { serverApi } from '../shared/services/api';
-import { useUIStore, useUnreadServerStore, useUnreadStore } from '../shared/stores/store';
+import { useQueryClient } from '@tanstack/react-query';
+import { useUIStore, useUnreadServerStore, useUnreadStore } from '../shared/stores';
 import { useMembers } from '../shared/hooks/useMembers';
+import { useServers } from '../features/servers/hooks/useServers';
 
 const Layout: React.FC = () => {
   usePresenceEvents();
@@ -20,10 +20,7 @@ const Layout: React.FC = () => {
   const initializeNotifier = useUnreadServerStore(state => state.initializeNotifier);
 
   // Fetch all servers to provide their IDs to the unread server store
-  const { data: servers } = useQuery({
-    queryKey: ['servers'],
-    queryFn: () => serverApi.list().then(res => res.data),
-  });
+  const { data: servers } = useServers();
 
   const { currentServerId } = useUIStore();
 

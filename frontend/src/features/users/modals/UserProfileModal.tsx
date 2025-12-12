@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { User } from '../../../shared/types';
-import { channelApi, userApi } from '../../../shared/services/api';
-import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores/store';
+import { channelApi } from '../../../shared/services/api';
+import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
+import { useUser } from '../hooks/useUser';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
@@ -17,16 +18,7 @@ export const UserProfileModal: React.FC = () => {
 
   const initialUser = modalData?.user as User;
 
-  const { data: user } = useQuery({
-    queryKey: ['user', initialUser?._id],
-    queryFn: async () => {
-        if (!initialUser?._id) return null;
-        const res = await userApi.getById(initialUser._id);
-        return res.data as User;
-    },
-    enabled: !!initialUser?._id,
-    initialData: initialUser,
-  });
+  const { data: user } = useUser(initialUser?._id, initialUser);
 
   if (!user) return null;
 

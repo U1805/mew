@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { ChannelItem } from './ChannelItem';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
-import { channelApi, serverApi, categoryApi } from '../../../shared/services/api';
-import { useUIStore, useAuthStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
-import { Channel, ChannelType, Server, Category, ServerMember } from '../../../shared/types';
+import { useUIStore, useModalStore } from '../../../shared/stores';
+import { Channel, ChannelType } from '../../../shared/types';
 import { useServerEvents } from '../../../shared/hooks/useServerEvents';
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
+import { useServer } from '../../servers/hooks/useServer';
+import { useCategories } from '../hooks/useCategories';
+import { useServerChannels } from '../hooks/useServerChannels';
 
 export const ServerChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel } = useUIStore();
   const { openModal } = useModalStore();
-  const { user } = useAuthStore();
-  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -34,36 +34,9 @@ export const ServerChannelList: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const { data: server } = useQuery({
-    queryKey: ['server', currentServerId],
-    queryFn: async () => {
-        if (!currentServerId) return null;
-        const res = await serverApi.get(currentServerId);
-        return res.data as Server;
-    },
-    enabled: !!currentServerId
-  });
-
-
-  const { data: categories } = useQuery({
-    queryKey: ['categories', currentServerId],
-    queryFn: async () => {
-        if (!currentServerId) return [];
-        const res = await categoryApi.list(currentServerId);
-        return res.data as Category[];
-    },
-    enabled: !!currentServerId
-  });
-
-  const { data: channels, isSuccess } = useQuery({
-    queryKey: ['channels', currentServerId],
-    queryFn: async () => {
-      if (!currentServerId) return [];
-      const res = await channelApi.list(currentServerId);
-      return res.data as Channel[];
-    },
-    enabled: !!currentServerId,
-  });
+  const { data: server } = useServer(currentServerId);
+  const { data: categories } = useCategories(currentServerId);
+  const { data: channels } = useServerChannels(currentServerId);
 
   const channelsByCategory: Record<string, Channel[]> = {};
   const noCategoryChannels: Channel[] = [];

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 
-import { useModalStore, useUIStore } from '../../../shared/stores/store';
+import { useModalStore, useUIStore } from '../../../shared/stores';
 import { Role } from '../../../shared/types';
-import { roleApi, serverApi } from '../../../shared/services/api';
 import { Permission } from '../../../shared/constants/permissions';
+import { useRoles } from '../../../shared/hooks/useRoles';
 
 const PERMISSION_GROUPS = [
   { group: 'General Server Permissions', perms: [
@@ -46,11 +46,7 @@ export const ServerSettingsModal: React.FC = () => {
   const [name, setName] = useState('');
 
   // --- Data Fetching ---
-  const { data: serverRoles, isLoading: isLoadingRoles } = useQuery({
-    queryKey: ['roles', currentServerId],
-    queryFn: () => roleApi.list(currentServerId!).then(res => res.data), // 统一缓存结构为数组
-    enabled: !!currentServerId,
-  });
+  const { data: serverRoles, isLoading: isLoadingRoles } = useRoles(currentServerId);
 
   // --- Local State for Edits ---
   const [localRoles, setLocalRoles] = useState<Role[]>([]);
@@ -309,7 +305,7 @@ export const ServerSettingsModal: React.FC = () => {
                           <div className="space-y-8 animate-fade-in">
                             <div className="text-sm text-mew-textMuted bg-[#404249] p-3 rounded flex items-start">
                               <Icon icon="mdi:information-outline" className="mr-2 mt-0.5 flex-shrink-0" width="18" />
-                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who don't have a specific role assignment.</span>
+                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who don&apos;t have a specific role assignment.</span>
                             </div>
 
                             {PERMISSION_GROUPS.map(group => (

@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useUIStore } from '../stores/store';
+import { useUIStore } from '../stores';
 import { Channel } from '../types';
 import { useMemo } from 'react';
 

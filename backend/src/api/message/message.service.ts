@@ -1,11 +1,12 @@
-import Message, { IAttachment, IMessage } from './message.model';
-import { ForbiddenError, NotFoundError } from '../../utils/errors';
+import { IAttachment, IMessage } from './message.model';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
 import { calculateEffectivePermissions } from '../../utils/permission.service';
 import Member from '../member/member.model';
 import Role from '../role/role.model';
 import Server from '../server/server.model';
 import Channel from '../channel/channel.model';
+import mentionService from './mention.service';
 import mongoose from 'mongoose';
 import config from '../../config';
 
@@ -21,38 +22,6 @@ function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messag
   return messageObject;
 }
 
-async function parseAndValidateMentions(
-  content: string,
-  serverId: mongoose.Types.ObjectId | string | null | undefined
-): Promise<mongoose.Types.ObjectId[]> {
-  if (!serverId) {
-    return []; // No mentions in DMs
-  }
-
-  const mentionRegex = /<@(\w+)>/g;
-  const matches = content.matchAll(mentionRegex);
-  const potentialUserIds = new Set<string>();
-  for (const match of matches) {
-    // Ensure the ID is a valid MongoDB ObjectId string.
-    if (mongoose.Types.ObjectId.isValid(match[1])) {
-      potentialUserIds.add(match[1]);
-    }
-  }
-
-  if (potentialUserIds.size === 0) {
-    return [];
-  }
-
-  const validUserIds = Array.from(potentialUserIds);
-
-  const members = await Member.find({
-    serverId,
-    userId: { $in: validUserIds.map(id => new mongoose.Types.ObjectId(id)) },
-  }).select('userId');
-
-  // Return an array of valid ObjectId's
-  return members.map((member) => member.userId as mongoose.Types.ObjectId);
-}
 
 async function checkMessagePermissions(messageId: string, userId: string) {
   const message = await getMessageById(messageId);
@@ -124,18 +93,10 @@ interface GetMessagesOptions {
   before?: string;
 }
 
-export const getMessagesByChannel = async ({ channelId, limit, before }: GetMessagesOptions) => {
-  const query: any = { channelId };
+import { messageRepository } from './message.repository';
 
-  if (before) {
-    query._id = { $lt: before };
-  }
-
-  const messages = await Message.find(query)
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .populate('authorId', 'username avatarUrl isBot');
-
+export const getMessagesByChannel = async (options: GetMessagesOptions) => {
+  const messages = await messageRepository.findByChannel(options);
   // [修正] 使用新的组合函数处理所有消息
   return messages.map(processMessageForClient);
 };
@@ -147,47 +108,22 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
     throw new NotFoundError('Channel not found');
   }
 
-  // --- BEGIN MENTION LOGIC ---
-
-  // 1. Check for @everyone/@here permission if used
-  if (channel.type !== 'DM' && data.content && (data.content.includes('@everyone') || data.content.includes('@here'))) {
-    if (!data.authorId || !channel.serverId) {
-      throw new ForbiddenError('Cannot verify mention permissions for a message without author or server.');
-    }
-
-    const { authorId, serverId } = { authorId: data.authorId, serverId: channel.serverId };
-
-    const [member, roles, server] = await Promise.all([
-      Member.findOne({ userId: authorId, serverId: serverId as any }).lean(),
-      Role.find({ serverId: serverId as any }).lean(),
-      Server.findById(serverId as any).select('everyoneRoleId').lean(),
-    ]);
-
-    if (!member || !server || !server.everyoneRoleId) {
-      throw new ForbiddenError('Cannot verify mention permissions.');
-    }
-
-    const everyoneRole = roles.find((r) => r._id.equals(server.everyoneRoleId!));
-    if (!everyoneRole) {
-      throw new Error('Server configuration error: @everyone role not found.');
-    }
-
-    const permissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
-    if (!permissions.has('MENTION_EVERYONE')) {
-      throw new ForbiddenError('You do not have permission to use @everyone or @here in this channel.');
-    }
+  if (!data.channelId || !data.authorId) {
+    throw new BadRequestError('Message must have a channel and an author');
   }
 
-  // 2. Parse and validate user-specific mentions
-  const validatedMentions = await parseAndValidateMentions(data.content || '', channel.serverId);
+  // Process mentions using the new service
+  const validatedMentions = await mentionService.processMentions(
+    data.content || '',
+    data.channelId.toString(),
+    data.authorId.toString()
+  );
 
-  // --- END MENTION LOGIC ---
-
-  const message = new Message({
+  const message = messageRepository.create({
     ...data,
     mentions: validatedMentions, // Add validated mentions to the message data
   });
-  await message.save();
+  await messageRepository.save(message);
 
   const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
@@ -201,7 +137,7 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 };
 
 export const getMessageById = async (messageId: string) => {
-    const message = await Message.findById(messageId);
+    const message = await messageRepository.findById(messageId);
     if (!message) {
       throw new NotFoundError('Message not found');
     }
@@ -216,50 +152,22 @@ export const getMessageById = async (messageId: string) => {
     await checkMessagePermissions(messageId, userId);
     const message = await getMessageById(messageId);
 
-    // --- BEGIN MENTION LOGIC ---
     const channel = await Channel.findById(message.channelId).lean();
     if (!channel) {
       throw new NotFoundError('Channel not found');
     }
 
-    // 1. Check for @everyone/@here permission if used
-    if (channel.type !== 'DM' && (content.includes('@everyone') || content.includes('@here'))) {
-      if (!channel.serverId) {
-        throw new ForbiddenError('Cannot verify mention permissions in a channel without a server.');
-      }
-      const serverId = channel.serverId;
-
-      // The 'userId' here is the user performing the update.
-      const [member, roles, server] = await Promise.all([
-        Member.findOne({ userId, serverId: serverId as any }).lean(),
-        Role.find({ serverId: serverId as any }).lean(),
-        Server.findById(serverId as any).select('everyoneRoleId').lean(),
-      ]);
-
-      if (!member || !server || !server.everyoneRoleId) {
-        throw new ForbiddenError('Cannot verify mention permissions.');
-      }
-
-      const everyoneRole = roles.find((r) => r._id.equals(server.everyoneRoleId!));
-      if (!everyoneRole) {
-        throw new Error('Server configuration error: @everyone role not found.');
-      }
-
-      const permissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
-      if (!permissions.has('MENTION_EVERYONE')) {
-        throw new ForbiddenError('You do not have permission to use @everyone or @here in this channel.');
-      }
-    }
-
-    // 2. Parse and validate user-specific mentions for the updated content
-    const validatedMentions = await parseAndValidateMentions(content, channel.serverId);
-
-    // --- END MENTION LOGIC ---
+    // Process mentions using the new service for the updated content
+    const validatedMentions = await mentionService.processMentions(
+      content,
+      message.channelId.toString(),
+      userId
+    );
 
     message.content = content;
     message.editedAt = new Date();
     message.mentions = validatedMentions as mongoose.Types.ObjectId[]; // Update mentions field
-    await message.save();
+    await messageRepository.save(message);
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
@@ -282,7 +190,7 @@ export const getMessageById = async (messageId: string) => {
     message.payload = {};
     message.mentions = [];
 
-    await message.save();
+    await messageRepository.save(message);
 
     const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
 
@@ -307,32 +215,7 @@ export const getMessageById = async (messageId: string) => {
         return processMessageForClient(await message.populate('authorId', 'username avatarUrl isBot'));
       }
 
-      if (existingReaction) {
-        await Message.updateOne(
-          { _id: messageId, 'reactions.emoji': existingReaction.emoji },
-          { $pull: { 'reactions.$.userIds': userId } }
-        );
-      }
-
-      let updatedMessage = await Message.findOneAndUpdate(
-        { _id: messageId, 'reactions.emoji': emoji },
-        { $addToSet: { 'reactions.$.userIds': userId } },
-        { new: true }
-      );
-
-      if (!updatedMessage) {
-        updatedMessage = await Message.findOneAndUpdate(
-          { _id: messageId },
-          { $push: { reactions: { emoji, userIds: [userId] } } },
-          { new: true }
-        );
-      }
-
-      const finalMessage = await Message.findOneAndUpdate(
-        { _id: messageId },
-        { $pull: { reactions: { userIds: { $size: 0 } } } },
-        { new: true }
-      ).populate('authorId', 'username avatarUrl isBot');
+      const finalMessage = await messageRepository.addReaction(messageId, userId, emoji, existingReaction?.emoji);
 
       if (!finalMessage) {
           throw new NotFoundError('Message not found');
@@ -348,24 +231,10 @@ export const getMessageById = async (messageId: string) => {
       userId: string,
       emoji: string
     ) => {
-      const updatedMessage = await Message.findOneAndUpdate(
-        { _id: messageId, 'reactions.emoji': emoji },
-        { $pull: { 'reactions.$.userIds': userId } },
-        { new: true }
-      );
-
-      if (!updatedMessage) {
-        throw new NotFoundError('Message or reaction not found');
-      }
-
-      const finalMessage = await Message.findOneAndUpdate(
-        { _id: messageId },
-        { $pull: { reactions: { userIds: { $size: 0 } } } },
-        { new: true }
-      ).populate('authorId', 'username avatarUrl isBot');
+      const finalMessage = await messageRepository.removeReaction(messageId, userId, emoji);
 
       if (!finalMessage) {
-          throw new NotFoundError('Message not found after reaction cleanup');
+          throw new NotFoundError('Message not found or reaction could not be removed');
       }
 
       const messageForClient = processMessageForClient(finalMessage);

@@ -42,6 +42,11 @@ socket.on("connect", () => {
 | `MESSAGE_UPDATE` | 消息被编辑或撤回（删除）时 | `MessageObject` (更新后的完整消息对象) |
 | `MESSAGE_REACTION_ADD` | 有人添加回应时 | `MessageObject` (更新后的完整消息对象) |
 | `MESSAGE_REACTION_REMOVE` | 有人取消回应时 | `MessageObject` (更新后的完整消息对象) |
+
+> **消息负载补充**：
+> - `authorId` 在下行事件中为已填充的用户对象（`username/avatarUrl/isBot`）。
+> - `attachments[].url` 由后端根据 `key` 动态补全（S3 公开访问地址）。
+> - Webhook 消息会在 `payload.webhookName` 与 `payload.overrides` 中携带展示用作者覆盖信息。
 | **频道与分组事件 (Channel & Category Events)** | | |
 | `CHANNEL_UPDATE` | 服务器频道信息变更（如名称、所属分组） | `ChannelObject` |
 | `CHANNEL_DELETE` | 服务器频道被删除 | `{ channelId: string, serverId: string }` |

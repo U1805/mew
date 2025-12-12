@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { serverApi } from '../../../shared/services/api';
-import { useModalStore } from '../../../shared/stores/store';
+import { useModalStore } from '../../../shared/stores';
 
 export const KickUserModal: React.FC = () => {
     const { closeModal, modalData } = useModalStore();

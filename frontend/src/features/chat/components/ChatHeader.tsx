@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
-import { useAuthStore, useUIStore } from '../../../shared/stores/store';
+import { useAuthStore, useUIStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 
 interface ChatHeaderProps {

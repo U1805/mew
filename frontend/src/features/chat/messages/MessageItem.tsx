@@ -10,7 +10,7 @@ import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
 import { Message } from '../../../shared/types';
 import { messageApi } from '../../../shared/services/api';
-import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
+import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 interface MessageItemProps {

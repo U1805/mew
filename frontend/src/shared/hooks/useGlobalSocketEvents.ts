@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Channel, Message } from '../types';
-import { useHiddenStore, useUnreadStore, useAuthStore } from '../stores/store';
+import { useHiddenStore, useUnreadStore, useAuthStore } from '../stores';
 
 export const useGlobalSocketEvents = () => {
   const queryClient = useQueryClient();

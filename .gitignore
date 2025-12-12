@@ -6,7 +6,7 @@
 
 # Environment variables
 .env
-.env.*
+!.env.*
 !.env.example
 
 # Node.js & pnpm

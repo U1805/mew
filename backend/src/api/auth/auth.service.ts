@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User, { IUser } from '../user/user.model';
+import { IUser } from '../user/user.model';
 import config from '../../config';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/errors';
+import { userRepository } from '../user/user.repository';
 
 export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const { email, password } = loginData;
@@ -11,7 +12,7 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
     throw new BadRequestError('Password is required');
   }
 
-  const user = await User.findOne({ email }).select('+password');
+  const user = await userRepository.findByEmailWithPassword(email);
   if (!user) {
     throw new UnauthorizedError('Invalid credentials');
   }
@@ -40,13 +41,11 @@ export const register = async (userData: Partial<IUser>) => {
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = new User({
+    const newUser = await userRepository.create({
       email,
       username,
       password: hashedPassword,
     });
-
-    await newUser.save();
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...userWithoutPassword } = newUser.toObject();

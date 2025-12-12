@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Message } from '../types';
-import { useUIStore, useUnreadStore } from '../stores/store';
+import { useUIStore, useUnreadStore } from '../stores';
 
 export const useSocketMessages = (channelId: string | null) => {
   const queryClient = useQueryClient();

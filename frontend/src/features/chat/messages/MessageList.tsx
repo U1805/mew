@@ -5,7 +5,7 @@ import TimestampDivider from './TimestampDivider';
 import { formatDividerTimestamp } from '../../../shared/utils/date';
 import { isSameDay } from 'date-fns';
 import { Message, Channel, ChannelType } from '../../../shared/types';
-import { useAuthStore, useUIStore } from '../../../shared/stores/store';
+import { useAuthStore, useUIStore } from '../../../shared/stores';
 import { channelApi } from '../../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 

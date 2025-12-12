@@ -1,11 +1,9 @@
 
 import React, { useEffect } from 'react';
-import { useQuery, useQueries } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { Server, Channel } from '../../../shared/types';
-import { serverApi, channelApi } from '../../../shared/services/api';
-import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores/store';
+import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
+import { useServersWithChannels } from '../hooks/useServersWithChannels';
 
 const MewLogo = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -24,24 +22,7 @@ const ServerList: React.FC = () => {
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
   const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
 
-  const { data: servers } = useQuery({
-    queryKey: ['servers'],
-    queryFn: async () => {
-      const res = await serverApi.list();
-      return res.data as Server[];
-    },
-  });
-
-  const serverQueries = useQueries({
-    queries: (servers || []).map(server => ({
-      queryKey: ['channels', server._id],
-      queryFn: async () => {
-        const res = await channelApi.list(server._id);
-        return res.data as Channel[];
-      },
-      staleTime: 5 * 60 * 1000,
-    }))
-  });
+  const { servers, channelQueries: serverQueries } = useServersWithChannels();
 
   useEffect(() => {
     serverQueries.forEach(queryResult => {

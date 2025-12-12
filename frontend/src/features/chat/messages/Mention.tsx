@@ -1,9 +1,9 @@
 import React from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
-import { useModalStore, useAuthStore } from '../../../shared/stores/store';
+import { useModalStore, useAuthStore } from '../../../shared/stores';
 import { ServerMember, User } from '../../../shared/types';
-import { useUIStore } from '../../../shared/stores/store';
+import { useUIStore } from '../../../shared/stores';
 
 interface MentionProps {
   userId: string;

@@ -2,7 +2,7 @@ import React from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel } from '../../../shared/types';
-import { useUnreadStore } from '../../../shared/stores/store';
+import { useUnreadStore } from '../../../shared/stores';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 interface ChannelItemProps {

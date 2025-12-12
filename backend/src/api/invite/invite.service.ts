@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
-import Invite, { IInvite } from './invite.model';
+import { IInvite } from './invite.model';
+import { inviteRepository } from './invite.repository';
 import ServerMember from '../member/member.model';
 import Server from '../server/server.model';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
@@ -7,7 +8,7 @@ import { Types } from 'mongoose';
 
 // This internal function gets and validates an invite, returning a Mongoose document.
 async function _getAndValidateInvite(inviteCode: string): Promise<IInvite & import('mongoose').Document> {
-  const invite = await Invite.findOne({ code: inviteCode });
+  const invite = await inviteRepository.findOne({ code: inviteCode });
 
   if (!invite) {
     throw new NotFoundError('Invite not found.');
@@ -50,10 +51,10 @@ const inviteService = {
 
     const code = nanoid(10);
 
-    return Invite.create({
+    return inviteRepository.create({
       code,
-      serverId,
-      creatorId,
+      serverId: new Types.ObjectId(serverId),
+      creatorId: new Types.ObjectId(creatorId),
       expiresAt: options.expiresAt ? new Date(options.expiresAt) : undefined,
       maxUses: options.maxUses,
     });

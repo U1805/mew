@@ -1,63 +1,34 @@
-import ServerMember, { IServerMember } from './member.model';
+import { IServerMember } from './member.model';
 import Channel from '../channel/channel.model';
 import { ForbiddenError, NotFoundError } from '../../utils/errors';
 import { checkMemberHierarchy } from '../../utils/hierarchy.utils';
 import { socketManager } from '../../gateway/events';
 import mongoose from 'mongoose';
 import { syncUserChannelPermissions } from '../../utils/permission.service';
-import { Webhook } from '../webhook/webhook.model';
-import Server from '../server/server.model';
+import webhookMemberService from './webhookMember.service';
+import { memberRepository } from './member.repository';
 
 const memberService = {
   async getMembersByServer(serverId: string, requesterId: string): Promise<any[]> {
-    const requester = await ServerMember.findOne({ serverId, userId: requesterId });
+    const requester = await memberRepository.findOne({ serverId, userId: requesterId });
     if (!requester) {
       throw new ForbiddenError('You are not a member of this server.');
     }
 
-    // Step 1: Get real members and convert to plain objects
-    const members = await ServerMember.find({ serverId })
-      .populate('userId', '_id username avatarUrl isBot email createdAt')
-      .lean();
+    // Step 1: Get real members
+    const members = await memberRepository.find({ serverId });
 
-    // Step 2: Get the server's webhooks
-    const webhooks = await Webhook.find({ serverId }).lean();
+    // Step 2: Get virtual webhook members from the new service
+    const webhookMembers = await webhookMemberService.getWebhookMembers(serverId);
 
-    // Step 3: Get the @everyone role ID from the server
-    const server = await Server.findById(serverId).select('everyoneRoleId').lean();
-    if (!server) {
-      throw new NotFoundError('Server not found.');
-    }
-    const everyoneRoleId = server.everyoneRoleId;
-
-    // Step 4: Build virtual member objects for each webhook
-    const webhookMembers = webhooks.map(webhook => ({
-      _id: webhook._id, // Use webhook's ID for a unique key
-      serverId: webhook.serverId,
-      channelId: webhook.channelId, // Add channelId here
-      userId: {
-        _id: webhook.botUserId,
-        username: webhook.name,
-        avatarUrl: webhook.avatarUrl,
-        isBot: true,
-        email: `webhook-${webhook._id}@internal.mew`,
-        createdAt: webhook.createdAt,
-      },
-      roleIds: [everyoneRoleId],
-      isOwner: false,
-      nickname: null,
-      createdAt: webhook.createdAt,
-      updatedAt: webhook.updatedAt,
-    }));
-
-    // Step 5: Merge real members and virtual webhook members
+    // Step 3: Merge both member lists
     const allMembers = [...members, ...webhookMembers];
 
     return allMembers;
   },
 
   async removeMember(serverId: string, userIdToRemove: string, requesterId: string): Promise<void> {
-    const requester = await ServerMember.findOne({ serverId, userId: requesterId });
+    const requester = await memberRepository.findOne({ serverId, userId: requesterId });
     if (!requester) {
       throw new ForbiddenError('You are not a member of this server.');
     }
@@ -70,7 +41,7 @@ const memberService = {
       // For now, we allow non-owners but check their hierarchy.
       await checkMemberHierarchy(serverId, requesterId, userIdToRemove);
     }
-    const result = await ServerMember.deleteOne({ serverId, userId: userIdToRemove });
+    const result = await memberRepository.deleteOne({ serverId, userId: userIdToRemove });
     if (result.deletedCount === 0) {
       throw new NotFoundError('Member not found in this server.');
     }
@@ -83,17 +54,17 @@ const memberService = {
   },
 
   async leaveServer(serverId: string, requesterId: string): Promise<void> {
-    const member = await ServerMember.findOne({ serverId, userId: requesterId });
+    const member = await memberRepository.findOne({ serverId, userId: requesterId });
     if (!member) {
       throw new NotFoundError('You are not a member of this server.');
     }
     if (member.isOwner) {
-      const otherOwners = await ServerMember.countDocuments({ serverId, isOwner: true, userId: { $ne: requesterId } });
+      const otherOwners = await memberRepository.count({ serverId, isOwner: true, userId: { $ne: requesterId } });
       if (otherOwners === 0) {
         throw new ForbiddenError('You are the only owner. Please transfer ownership before leaving.');
       }
     }
-    await ServerMember.deleteOne({ _id: member._id });
+    await memberRepository.deleteOne({ _id: member._id });
     await Channel.updateMany(
       { serverId },
       { $pull: { permissionOverrides: { targetType: 'member', targetId: requesterId } } }
@@ -101,7 +72,7 @@ const memberService = {
   },
 
   async updateMemberRoles(serverId: string, userIdToUpdate: string, requesterId: string, roleIds: string[]): Promise<IServerMember> {
-    const requester = await ServerMember.findOne({ serverId, userId: requesterId });
+    const requester = await memberRepository.findOne({ serverId, userId: requesterId });
     if (!requester) {
       throw new ForbiddenError('You are not a member of this server.');
     }
@@ -109,12 +80,12 @@ const memberService = {
         // This check will be replaced by a permission check in a later stage.
         await checkMemberHierarchy(serverId, requesterId, userIdToUpdate);
     }
-    const member = await ServerMember.findOne({ serverId, userId: userIdToUpdate });
+    const member = await memberRepository.findOne({ serverId, userId: userIdToUpdate });
     if (!member) {
       throw new NotFoundError('Member not found.');
     }
     member.roleIds = roleIds.map(id => new mongoose.Types.ObjectId(id));
-    await member.save();
+    await memberRepository.save(member);
 
     socketManager.broadcast('PERMISSIONS_UPDATE', serverId, { serverId, userId: userIdToUpdate });
     socketManager.broadcastToUser(userIdToUpdate, 'PERMISSIONS_UPDATE', { serverId, userId: userIdToUpdate });

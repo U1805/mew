@@ -143,11 +143,11 @@ sidebar_label: 'REST API'
 ### 编辑与删除
 *   **`PATCH`** `/api/.../messages/:messageId`
     *   编辑消息内容。
-    *   **权限**: 消息作者 或 `MANAGE_MESSAGES`
+    *   **权限**: 消息作者 或 `MANAGE_MESSAGES`（在服务层校验）。
     *   **Body**: `{ "content": "New content" }`
 *   **`DELETE`** `/api/.../messages/:messageId`
     *   删除消息 (实际为撤回，内容被替换)。
-    *   **权限**: 消息作者 或 `MANAGE_MESSAGES`
+    *   **权限**: 消息作者 或 `MANAGE_MESSAGES`（在服务层校验）。
 
 ## 10. 文件上传 (Uploads)
 
@@ -181,7 +181,7 @@ sidebar_label: 'REST API'
 
 *   **`PUT`** `/api/.../messages/:messageId/reactions/:emoji/@me`
     *   添加或切换反应。`:emoji` 需要 URL 编码 (e.g., `👍` -> `%F0%9F%91%8D`)。
-    *   **权限**: `ADD_REACTIONS`
+    *   **权限**: 当前实现未在路由/服务层显式校验 `ADD_REACTIONS`，仅要求认证与频道可见/成员资格；后续会补齐权限检查。
 *   **`DELETE`** `/api/.../messages/:messageId/reactions/:emoji/@me`
     *   移除自己的反应。
     *   **权限**: (成员)
@@ -192,11 +192,13 @@ Bot 集成的核心入口。
 
 | Method | Endpoint | 描述 | 权限要求 |
 | :--- | :--- | :--- | :--- |
-| `GET` | `/api/servers/:serverId/channels/:channelId/webhooks` | 获取频道的 Webhook 列表。 | `MANAGE_WEBHOOKS` |
-| `POST` | `/api/servers/:serverId/channels/:channelId/webhooks` | 为频道创建 Webhook。 | `MANAGE_WEBHOOKS` |
-| `PATCH` | `/api/servers/:serverId/channels/:channelId/webhooks/:webhookId`| 更新 Webhook。 | `MANAGE_WEBHOOKS` |
-| `DELETE`| `/api/servers/:serverId/channels/:channelId/webhooks/:webhookId`| 删除 Webhook。 | `MANAGE_WEBHOOKS` |
+| `GET` | `/api/servers/:serverId/channels/:channelId/webhooks` | 获取频道的 Webhook 列表。 | (成员) |
+| `POST` | `/api/servers/:serverId/channels/:channelId/webhooks` | 为频道创建 Webhook。 | (成员) |
+| `PATCH` | `/api/servers/:serverId/channels/:channelId/webhooks/:webhookId`| 更新 Webhook。 | (成员) |
+| `DELETE`| `/api/servers/:serverId/channels/:channelId/webhooks/:webhookId`| 删除 Webhook。 | (成员) |
 | `POST` | `/api/webhooks/:webhookId/:token` | **(公开)** 执行 Webhook 发送消息。 | (无) |
+
+> **说明**：当前管理类 Webhook 路由仅做了认证与服务器成员校验（通过上层频道路由），尚未在路由/服务层显式校验 `MANAGE_WEBHOOKS`。
 
 <details>
 <summary>👀 查看 Webhook 执行请求 Body</summary>

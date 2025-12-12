@@ -1,13 +1,11 @@
 import React, { useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
-import { channelApi } from '../../../shared/services/api';
-import { Channel } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores/store';
+import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores';
 import { useMemo } from 'react';
+import { useDmChannels } from '../hooks/useDmChannels';
 
 export const DMChannelList: React.FC = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();
@@ -19,18 +17,7 @@ export const DMChannelList: React.FC = () => {
   const { hiddenDmChannelIds, addHiddenChannel } = useHiddenStore();
 
 
-  const { data: dmChannels, isSuccess } = useQuery({
-      queryKey: ['dmChannels'],
-      queryFn: async () => {
-          try {
-             const res = await channelApi.listDMs();
-             return res.data as Channel[];
-          } catch {
-              return [];
-          }
-      },
-      enabled: true // Always fetch DMs when this component is rendered
-  });
+  const { data: dmChannels, isSuccess } = useDmChannels();
 
   const visibleDmChannels = useMemo(() => {
     if (!dmChannels) return [];

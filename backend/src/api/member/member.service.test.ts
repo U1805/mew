@@ -8,8 +8,15 @@ vi.mock('../../gateway/events', () => ({
   },
 }));
 
+vi.mock('./webhookMember.service', () => ({
+  default: {
+    getWebhookMembers: vi.fn(),
+  },
+}));
+
 import mongoose from 'mongoose';
 import memberService from './member.service';
+import webhookMemberService from './webhookMember.service';
 import ServerMember from './member.model';
 import User from '../user/user.model';
 import { Webhook } from '../webhook/webhook.model';
@@ -57,47 +64,43 @@ describe('Member Service', () => {
   });
 
   describe('getMembersByServer', () => {
-    let everyoneRoleId: string;
-
-    beforeEach(async () => {
-      await Webhook.deleteMany({});
-      await Server.deleteMany({});
-
-      everyoneRoleId = new mongoose.Types.ObjectId().toHexString();
-      await Server.create({ _id: serverId, name: 'Test Server', everyoneRoleId });
-
-      await Webhook.create({
+    const mockWebhookMembers = [
+      {
         _id: new mongoose.Types.ObjectId(),
-        name: 'Test Webhook',
-        avatarUrl: 'http://example.com/webhook.png',
-        serverId,
-        channelId: new mongoose.Types.ObjectId().toHexString(),
-        botUserId: new mongoose.Types.ObjectId().toHexString(),
-        token: 'test-token',
-      });
+        userId: {
+          _id: new mongoose.Types.ObjectId(),
+          username: 'Test Webhook',
+          avatarUrl: 'http://example.com/webhook.png',
+          isBot: true
+        },
+        roleIds: [new mongoose.Types.ObjectId()],
+      }
+    ];
+
+    beforeEach(() => {
+      (webhookMemberService.getWebhookMembers as ReturnType<typeof vi.fn>).mockResolvedValue(mockWebhookMembers);
     });
 
-    it('should return member list for a server member', async () => {
+    it('should return a combined list of real and webhook members', async () => {
       const members = await memberService.getMembersByServer(serverId, ownerId);
-      // 2 real members + 1 webhook
+      // 2 real members + 1 mocked webhook member
       expect(members.length).toBe(3);
+      expect(webhookMemberService.getWebhookMembers).toHaveBeenCalledWith(serverId);
     });
 
-    it('should include virtual members for webhooks', async () => {
+    it('should include the mocked virtual members correctly', async () => {
       const members = await memberService.getMembersByServer(serverId, ownerId);
       const webhookMember = members.find(m => m.userId && m.userId.isBot);
 
       expect(webhookMember).toBeDefined();
       expect(webhookMember.userId.username).toBe('Test Webhook');
-      expect(webhookMember.userId.avatarUrl).toBe('http://example.com/webhook.png');
-      expect(webhookMember.userId.isBot).toBe(true);
-      expect(webhookMember.roleIds.map(String)).toContain(everyoneRoleId);
     });
 
     it('should throw ForbiddenError for a non-member', async () => {
       await expect(memberService.getMembersByServer(serverId, nonMemberId)).rejects.toThrow(
         ForbiddenError
       );
+      expect(webhookMemberService.getWebhookMembers).not.toHaveBeenCalled();
     });
   });
 

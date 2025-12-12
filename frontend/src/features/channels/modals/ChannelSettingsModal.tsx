@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useModalStore, useUIStore } from '../../../shared/stores/store';
+import { useModalStore, useUIStore } from '../../../shared/stores';
 import { channelApi, categoryApi, serverApi } from '../../../shared/services/api';
 import { Category, PermissionOverride, Role, ServerMember } from '../../../shared/types';
 import { WebhookManager } from './WebhookManager';
-import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
+import { useMembers } from '../../../shared/hooks/useMembers';
+import { useRoles } from '../../../shared/hooks/useRoles';
+import { useCategories } from '../hooks/useCategories';
+import { usePermissionOverrides } from '../hooks/usePermissionOverrides';
 
 const CHANNEL_PERMS = [
     { group: 'General', perms: [
@@ -52,23 +56,11 @@ export const ChannelSettingsModal: React.FC = () => {
 
   const channelId = modalData?.channel?._id;
 
-  const { data: serverRoles } = useQuery<Role[]>({
-    queryKey: ['roles', currentServerId],
-    queryFn: () => serverApi.getRoles(currentServerId!).then(res => res.data),
-    enabled: !!currentServerId
-  });
+  const { data: serverRoles } = useRoles(currentServerId);
 
-  const { data: serverMembers } = useQuery<ServerMember[]>({
-    queryKey: ['members', currentServerId],
-    queryFn: () => serverApi.getMembers(currentServerId!).then(res => res.data),
-    enabled: !!currentServerId
-  });
+  const { data: serverMembers } = useMembers(currentServerId);
 
-  const { data: initialOverrides, isLoading: isLoadingOverrides } = useQuery<PermissionOverride[]>({
-    queryKey: ['permissionOverrides', channelId],
-    queryFn: () => channelApi.getPermissionOverrides(currentServerId!, channelId!).then(res => res.data),
-    enabled: !!currentServerId && !!channelId
-  });
+  const { data: initialOverrides, isLoading: isLoadingOverrides } = usePermissionOverrides(currentServerId, channelId);
 
   const updatePermissionsMutation = useMutation({
       mutationFn: (overrides: PermissionOverride[]) =>
@@ -103,15 +95,7 @@ export const ChannelSettingsModal: React.FC = () => {
     }
   }, [modalData]);
 
-  const { data: categories } = useQuery({
-    queryKey: ['categories', currentServerId],
-    queryFn: async () => {
-        if (!currentServerId) return [];
-        const res = await categoryApi.list(currentServerId);
-        return res.data as Category[];
-    },
-    enabled: !!currentServerId
-  });
+  const { data: categories } = useCategories(currentServerId);
 
   const handleChannelUpdate = async () => {
       if (!currentServerId || !modalData?.channel) return;

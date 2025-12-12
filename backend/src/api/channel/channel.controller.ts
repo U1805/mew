@@ -7,6 +7,7 @@ import {
   BadRequestError
 } from '../../utils/errors';
 import channelService from './channel.service';
+import readStateService from './readState.service';
 import serverService from '../server/server.service';
 import ServerMember from '../member/member.model';
 
@@ -117,7 +118,7 @@ export const ackChannelHandler = asyncHandler(async (req: Request, res: Response
   const { channelId } = req.params;
   const { lastMessageId } = req.body;
 
-  await channelService.ackChannel(req.user.id, channelId, lastMessageId);
+  await readStateService.ackChannel(req.user.id, channelId, lastMessageId);
 
   res.status(204).send();
 });

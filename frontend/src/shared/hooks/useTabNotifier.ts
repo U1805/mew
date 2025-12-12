@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useUnreadStore } from '../stores/store';
+import { useUnreadStore } from '../stores';
 import { generateFavicon, updateFavicon } from '../utils/favicon';
 
 const useTabNotifier = () => {

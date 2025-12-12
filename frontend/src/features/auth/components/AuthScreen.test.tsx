@@ -3,7 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthScreen } from './AuthScreen';
-import { useAuthStore } from '../../../shared/stores/store';
+import { useAuthStore } from '../../../shared/stores';
 
 // Mock the auth store
 const setAuth = vi.fn();

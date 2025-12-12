@@ -1,44 +1,34 @@
-import { NotFoundError, ForbiddenError } from '../../utils/errors';
-import { calculateEffectivePermissions } from '../../utils/permission.service';
-import { Permission } from '../../constants/permissions';
-import Role from '../role/role.model';
-import Server from '../server/server.model';
+import { NotFoundError } from '../../utils/errors';
 import Channel from '../channel/channel.model';
-import Category, { ICategory } from './category.model';
+import { ICategory } from './category.model';
 import { socketManager } from '../../gateway/events';
-import ServerMember from '../member/member.model';
-
+import { categoryRepository } from './category.repository';
 
 export const createCategory = async (
   name: string,
   serverId: string
 ): Promise<ICategory> => {
   // Permission is checked by middleware
-  const newCategory = await Category.create({ name, serverId });
-
+  const newCategory = await categoryRepository.create(name, serverId);
   return newCategory;
 };
 
 export const getCategoriesByServer = async (serverId: string): Promise<ICategory[]> => {
   // Permission is checked by middleware
-  const categories = await Category.find({ serverId });
+  const categories = await categoryRepository.findByServer(serverId);
   return categories;
 };
-
 
 export const updateCategoryById = async (
   categoryId: string,
   data: Partial<Pick<ICategory, 'name' | 'position'>>,
   userId: string
 ): Promise<ICategory> => {
-  
-  const category = await Category.findById(categoryId);
+  // Permission is checked by middleware
+  const category = await categoryRepository.updateById(categoryId, data);
   if (!category) {
-    throw new NotFoundError('Category not found'); // Should be caught by check, but for safety
+    throw new NotFoundError('Category not found');
   }
-
-  Object.assign(category, data);
-  await category.save();
 
   socketManager.broadcast('CATEGORY_UPDATE', category.serverId.toString(), category);
 
@@ -49,17 +39,17 @@ export const deleteCategoryById = async (
   categoryId: string,
   userId: string
 ): Promise<void> => {
-  
-  const category = await Category.findById(categoryId);
+   // Permission is checked by middleware
+  const category = await categoryRepository.findById(categoryId);
   if (!category) {
-    throw new NotFoundError('Category not found'); // Should be caught by check, but for safety
+    throw new NotFoundError('Category not found');
   }
 
   // Un-categorize channels in this category
   await Channel.updateMany({ categoryId }, { $unset: { categoryId: '' } });
 
   const serverId = category.serverId.toString();
-  await category.deleteOne();
+  await categoryRepository.deleteById(categoryId);
 
   socketManager.broadcast('CATEGORY_DELETE', serverId, { categoryId });
 };

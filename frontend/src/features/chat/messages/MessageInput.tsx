@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { messageApi, uploadApi } from '../../../shared/services/api';
 import { Channel, Message, ServerMember, Attachment } from '../../../shared/types';
-import { useAuthStore } from '../../../shared/stores/store';
+import { useAuthStore } from '../../../shared/stores';
 import { MentionSuggestionList } from './MentionSuggestionList';
 import { formatFileSize } from '../../../shared/utils/file';
 

@@ -160,6 +160,10 @@ interface Invite {
 }
 ```
 
+> **说明**：
+> - `GET /api/invites/:inviteCode` 的预览响应只包含上述字段（不会返回 `serverId/creatorId`）。
+> - `POST /api/invites/:inviteCode` 接受邀请后返回 `{ serverId: string }`。
+
 ## WebhookObject
 Webhook 对象，允许外部服务向频道发送消息。
 

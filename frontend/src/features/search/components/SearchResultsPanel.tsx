@@ -1,25 +1,16 @@
 import React from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
-import { useUIStore } from '../../../shared/stores/store';
-import { searchApi } from '../../../shared/services/api';
+import { useUIStore } from '../../../shared/stores';
 import { SearchResultItem } from './SearchResultItem';
 import { Message, Channel } from '../../../shared/types';
+import { useMessageSearch } from '../hooks/useMessageSearch';
 
 export const SearchResultsPanel: React.FC = () => {
     const { currentServerId, searchQuery, isSearchOpen, setSearchOpen, setCurrentChannel, setTargetMessageId } = useUIStore();
     const queryClient = useQueryClient();
 
-    const { data: searchData, isLoading } = useQuery({
-        queryKey: ['messageSearch', currentServerId, searchQuery],
-        queryFn: async () => {
-            if (!currentServerId || !searchQuery) return { messages: [], pagination: {} };
-            const res = await searchApi.searchMessages(currentServerId, { q: searchQuery });
-            return res.data as { messages: Message[], pagination: any };
-        },
-        enabled: !!currentServerId && !!searchQuery && isSearchOpen,
-        staleTime: 1000 * 60, // 1 minute
-    });
+    const { data: searchData, isLoading } = useMessageSearch(currentServerId, searchQuery, isSearchOpen);
 
     if (!isSearchOpen || !currentServerId) return null;
 

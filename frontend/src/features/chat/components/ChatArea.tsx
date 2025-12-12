@@ -1,5 +1,4 @@
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import MemberList from './MemberList';
 import ChatHeader from './ChatHeader';
@@ -7,31 +6,15 @@ import MessageList from '../messages/MessageList';
 import MessageInput from '../messages/MessageInput';
 import { SearchResultsPanel } from '../../search/components/SearchResultsPanel';
 import { Channel } from '../../../shared/types';
-import { useUIStore } from '../../../shared/stores/store';
+import { useUIStore } from '../../../shared/stores';
 import { useSocketMessages } from '../../../shared/hooks/useSocketMessages';
 import { useMessages } from '../../../shared/hooks/useMessages';
-import { channelApi } from '../../../shared/services/api';
+import { useChannel } from '../hooks/useChannel';
 
 const ChatArea: React.FC = () => {
-  const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList, isSearchOpen } = useUIStore();
+  const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList } = useUIStore();
 
-  const { data: channel } = useQuery({
-    queryKey: ['channel', currentChannelId],
-    queryFn: async () => {
-      if (!currentChannelId) return null;
-      
-      // Since we don't have a single getChannel endpoint in the API spec, 
-      // we search within the relevant list based on context.
-      if (currentServerId) {
-          const res = await channelApi.list(currentServerId);
-          return (res.data as Channel[]).find(c => c._id === currentChannelId) || null;
-      } else {
-          const res = await channelApi.listDMs();
-          return (res.data as Channel[]).find(c => c._id === currentChannelId) || null;
-      }
-    },
-    enabled: !!currentChannelId
-  });
+  const { data: channel } = useChannel(currentServerId, currentChannelId);
 
   const { data: messages = [], isLoading } = useMessages(currentServerId, currentChannelId);
   useSocketMessages(currentChannelId);
