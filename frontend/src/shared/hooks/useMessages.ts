@@ -6,13 +6,13 @@ export const useMessages = (serverId: string | null, channelId: string | null) =
   return useQuery({
     queryKey: ['messages', channelId],
     queryFn: async () => {
-      if (!serverId || !channelId) return [];
-      const res = await messageApi.list(serverId, channelId);
+      if (!channelId) return [];
+      const res = await messageApi.list(serverId ?? undefined, channelId);
       return (res.data as Message[]).sort((a, b) =>
         new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       );
     },
-    enabled: !!serverId && !!channelId,
+    enabled: !!channelId,
     refetchOnWindowFocus: false,
   });
 };

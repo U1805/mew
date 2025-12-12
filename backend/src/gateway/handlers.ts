@@ -42,12 +42,10 @@ const registerMessageHandlers = (io: SocketIOServer, socket: Socket) => {
     try {
       if (!socket.user) return;
 
-      const message = await createMessage({
+      await createMessage({
         ...data,
         authorId: socket.user.id,
       });
-
-      io.to(data.channelId).emit('MESSAGE_CREATE', message);
     } catch (error) {
       console.error('Error creating message:', error);
       // Optionally, emit an error event back to the client

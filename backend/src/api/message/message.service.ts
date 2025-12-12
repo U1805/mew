@@ -130,7 +130,18 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
   // [修正] 使用组合函数处理要广播的消息
   const messageForClient = processMessageForClient(populatedMessage);
 
-  socketManager.broadcast('MESSAGE_CREATE', populatedMessage.channelId.toString(), messageForClient);
+  const channelIdStr = populatedMessage.channelId.toString();
+
+  // Broadcast to the channel room for in-room users
+  socketManager.broadcast('MESSAGE_CREATE', channelIdStr, messageForClient);
+
+  // DM reliability: also broadcast to each recipient's personal room so they
+  // receive messages even if their socket hasn't joined the DM room yet.
+  if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
+    for (const recipient of channel.recipients) {
+      socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_CREATE', messageForClient);
+    }
+  }
 
   // [修正] 函数的返回值也应该被处理，以便 API 调用者获得完整的 URL
   return messageForClient as IMessage;
