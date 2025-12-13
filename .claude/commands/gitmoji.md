@@ -2,7 +2,57 @@
 description: "gitmoji"
 ---
 
-Generate commit messages following Gitmoji conventions based on code changes.\n\n## Format\n```\n:emoji_code: <message>\n\n<detailed description>\n```\n\n## Common Emoji Code Selection Table\n\n**Bug Fixes:**\n- `:bug:` Fix bugs\n- `:ambulance:` Critical hotfix\n- `:lock:` Fix security issues\n\n**New Features:**\n- `:sparkles:` New features\n- `:zap:` Performance improvements\n- `:lipstick:` UI/style updates\n\n**Documentation & Configuration:**\n- `:memo:` Update documentation\n- `:wrench:` Configuration files\n- `:hammer:` Development scripts\n\n**Others:**\n- `:microscope:` Testing related\n- `:construction:` Work in progress\n- `:fire:` Remove content\n- `:rocket:` Deploy/release\n\n## Writing Requirements\n\n1. **Message**: Start with a verb, within 50 characters (e.g., \"Fix user login bug\")\n2. **Detailed description**: Explain the reason and impact of changes\n3. **Choose appropriate emoji code**: Select based on the main type of change\n\n## Example\n```\n:sparkles: Add Google OAuth login functionality\n\nImplement OAuth2 flow to allow users to log in with their Google accounts. This reduces registration steps and provides a more secure authentication method.\n\nIncludes token validation, user information mapping, and session management features.\n```\n\n---\n**Usage Instructions**: Please tell me about your code changes, and I will generate the corresponding commit message.
+Generate commit messages following Gitmoji conventions based on code changes.
+
+## Format
+```
+:emoji_code: <message>
+
+<detailed description>
+```
+
+## Common Emoji Code Selection Table
+
+**Bug Fixes:**
+- `:bug:` Fix bugs
+- `:ambulance:` Critical hotfix
+- `:lock:` Fix security issues
+
+**New Features:**
+- `:sparkles:` New features
+- `:zap:` Performance improvements
+- `:lipstick:` UI/style updates
+
+**Documentation & Configuration:**
+- `:memo:` Update documentation
+- `:wrench:` Configuration files
+- `:hammer:` Development scripts
+
+**Others:**
+- `:microscope:` Testing related
+- `:construction:` Work in progress
+- `:fire:` Remove content
+- `:rocket:` Deploy/release
+
+## Writing Requirements
+
+1. **Message**: Start with a verb, within 50 characters (e.g., \"Fix user login bug\")
+2. **Detailed description**: Explain the reason and impact of changes
+3. **Choose appropriate emoji code**: Select based on the main type of change
+
+## Example
+```
+:sparkles: Add Google OAuth login functionality
+
+Implement OAuth2 flow to allow users to log in with their Google accounts. This reduces registration steps and provides a more secure authentication method.
+
+Includes token validation, user information mapping, and session management features.
+```
+
+---
+**Usage Instructions**: Please tell me about your code changes, and I will generate the corresponding commit message.
+
+
 
 总结一下更新帮我写一个 git commit message (english), 在根目录新建一个md文件写入其中。
 

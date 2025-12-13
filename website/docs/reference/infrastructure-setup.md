@@ -1,5 +1,7 @@
 ---
 sidebar_label: '基础设施部署'
+sidebar_position: 10
+slug: /reference/infrastructure-setup
 ---
 
 # 💾 基础设施部署

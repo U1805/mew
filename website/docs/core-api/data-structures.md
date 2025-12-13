@@ -1,181 +1,286 @@
 ---
 sidebar_label: '数据模型'
+sidebar_position: 10
 ---
 
-# 📦 数据模型 (Data Structures)
+# 📦 数据模型（Data Structures）
 
-为了方便理解，我们使用 TypeScript Interface 风格来描述核心对象。
+本文档描述 **API 对外返回的对象形态**（JSON）。实现来源主要来自后端 Mongoose 模型与 service/controller 的实际返回值。
 
-## UserObject
-用户对象代表一个独立的用户账户。
+通用约定：
 
-```typescript
-interface User {
+- `ObjectId` 在 HTTP/WebSocket payload 中表现为 `string`（24 位十六进制）。
+- `createdAt/updatedAt/editedAt/...` 在 JSON 中表现为 ISO 字符串。
+- 部分字段在数据库中存储为 **S3 key**，对外返回时会被“补全”为可访问 URL（详见下文说明）。
+
+---
+
+## User
+
+来源：`backend/src/api/user/user.model.ts`
+
+```ts
+export interface User {
   _id: string;
   email: string;
   username: string;
-  avatarUrl?: string;
   isBot: boolean;
-  createdAt: string; // ISO 8601 Timestamp
+  avatarUrl?: string;
+  createdAt: string;
   updatedAt: string;
 }
 ```
 
-## ServerObject
-服务器对象，即社区或群组。
+说明：
 
-```typescript
-interface Server {
+- `password` 不会出现在响应里（Mongoose `select: false`）。
+- `avatarUrl` 在服务端内部通常存储为对象存储的 `key`；多数对外响应会将其补全为公开 URL（见 `backend/src/utils/s3.ts#getS3PublicUrl`）。
+
+---
+
+## Server
+
+来源：`backend/src/api/server/server.model.ts` 与 `backend/src/api/server/server.service.ts`
+
+```ts
+export interface Server {
   _id: string;
   name: string;
   avatarUrl?: string;
-  everyoneRoleId: string; // 默认 "@everyone" 角色 ID
+  everyoneRoleId: string;
   createdAt: string;
   updatedAt: string;
 }
 ```
 
-## CategoryObject
-频道分类对象，用于在服务器内组织频道。
+---
 
-```typescript
-interface Category {
+## Role
+
+来源：`backend/src/api/role/role.model.ts`、`backend/src/constants/permissions.ts`
+
+```ts
+export type Permission =
+  | 'ADMINISTRATOR'
+  | 'MANAGE_ROLES'
+  | 'KICK_MEMBERS'
+  | 'CREATE_INVITE'
+  | 'MANAGE_SERVER'
+  | 'MANAGE_WEBHOOKS'
+  | 'MANAGE_CHANNEL'
+  | 'SEND_MESSAGES'
+  | 'MANAGE_MESSAGES'
+  | 'ADD_REACTIONS'
+  | 'ATTACH_FILES'
+  | 'MENTION_EVERYONE';
+
+export interface Role {
   _id: string;
+  serverId: string;
   name: string;
-  serverId: string;
-  position?: number;
+  permissions: Permission[];
+  color: string;
+  position: number;
+  isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }
 ```
 
-## RoleObject
-角色对象，定义了一组权限。
+---
 
-```typescript
-interface Role {
-  _id: string;
-  name: string;
-  serverId: string;
-  permissions: string[]; // 权限标识符的数组
-  color: string;         // Hex 色值
-  position: number;      // 用于层级排序，数字越大，层级越高
-  isDefault: boolean;    // 标记是否为 @everyone 角色
-  createdAt: string;
-  updatedAt: string;
-}
-```
+## ServerMember
 
-## ServerMemberObject
-服务器成员对象，代表用户与服务器的关联关系。
+来源：`backend/src/api/member/member.model.ts` 与 `backend/src/api/member/member.service.ts`
 
-```typescript
-interface ServerMember {
+```ts
+export interface ServerMember {
   _id: string;
   serverId: string;
-  userId: User;          // 已填充(Populated)的用户对象
+  userId: User | string; // 常见返回为已填充对象
   roleIds: string[];
   isOwner: boolean;
-  nickname?: string;
-  channelId?: string;    // 仅用于代表 Webhook 的虚拟成员
+  nickname?: string | null;
   createdAt: string;
   updatedAt: string;
+
+  // 仅“Webhook 虚拟成员”会出现（member 列表接口会合并返回）
+  channelId?: string;
 }
 ```
 
-## ChannelObject
-频道对象，可以是服务器内的文本频道或私信频道。
+说明：
 
-```typescript
-interface Channel {
+- 服务器成员列表接口会额外合并“Webhook 虚拟成员”（见 `backend/src/api/member/webhookMember.service.ts`），其 `userId` 会被伪造为 `{ isBot: true, username: <webhook name>, ... }`，并附带 `channelId` 以标识归属频道。
+
+---
+
+## Category
+
+来源：`backend/src/api/category/category.model.ts`
+
+```ts
+export interface Category {
   _id: string;
-  type: "GUILD_TEXT" | "DM";
-  name?: string;                     // 仅 GUILD_TEXT 类型拥有
-  serverId?: string;                 // 仅 GUILD_TEXT 类型拥有
-  categoryId?: string;               // 频道所属分组 ID
+  serverId: string;
+  name: string;
   position?: number;
-  recipients?: User[];               // 仅 DM 类型拥有 (Populated)
-  permissionOverrides?: Array<{       // 权限覆盖规则
-    targetType: 'role' | 'member';
-    targetId: string;
-    allow: string[];
-    deny: string[];
-  }>;
   createdAt: string;
   updatedAt: string;
-
-  // --- 以下字段在获取频道列表时由后端动态计算并附加 ---
-  lastMessage?: Message;             // 该频道的最后一条消息
-  lastReadMessageId?: string;        // 当前用户最后已读的消息 ID
-  permissions?: string[];            // 当前用户在此频道的最终有效权限
 }
 ```
 
-## MessageObject
-消息对象，是通信的基本单元。
+---
 
-```typescript
-interface Message {
+## Channel
+
+来源：`backend/src/api/channel/channel.model.ts` 与 `backend/src/api/channel/channel.repository.ts`
+
+```ts
+export type ChannelType = 'GUILD_TEXT' | 'DM';
+
+export interface PermissionOverride {
+  targetType: 'role' | 'member';
+  targetId: string;
+  allow: Permission[];
+  deny: Permission[];
+}
+
+export interface Channel {
+  _id: string;
+  type: ChannelType;
+
+  // GUILD_TEXT
+  name?: string;
+  serverId?: string;
+  categoryId?: string | null;
+  position?: number;
+  permissionOverrides?: PermissionOverride[];
+
+  // DM
+  recipients?: Array<Pick<User, '_id' | 'username' | 'avatarUrl'> & Partial<Pick<User, 'email' | 'isBot'>>>;
+
+  createdAt: string;
+  updatedAt: string;
+
+  // 列表接口附加字段（服务端聚合/计算而来）
+  lastMessage?: Message | null;
+  lastReadMessageId?: string | null;
+  permissions?: Permission[]; // 对当前用户生效的最终权限
+}
+```
+
+说明：
+
+- 服务器频道列表 `GET /api/servers/:serverId/channels` 会为每个频道附加 `lastMessage/lastReadMessageId/permissions`。
+- DM 列表 `GET /api/users/@me/channels` 同样会附加 `lastMessage/lastReadMessageId/permissions`，并将 `recipients` 填充为用户对象数组。
+
+---
+
+## ChannelReadState（内部模型）
+
+来源：`backend/src/api/channel/readState.model.ts`
+
+该模型不直接作为独立资源对外暴露，但其数据会影响频道列表中的 `lastReadMessageId`，并可通过 `ack` 接口更新。
+
+```ts
+export interface ChannelReadState {
+  _id: string;
+  userId: string;
+  channelId: string;
+  lastReadMessageId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+---
+
+## Message
+
+来源：`backend/src/api/message/message.model.ts` 与 `backend/src/api/message/message.service.ts`
+
+```ts
+export interface Attachment {
+  filename: string;
+  contentType: string;
+  key: string; // 上传返回的对象存储 key（会被补全为 url）
+  size: number;
+  url?: string; // 对外返回时动态补全
+}
+
+export interface Reaction {
+  emoji: string;
+  userIds: string[];
+}
+
+export interface Message {
   _id: string;
   channelId: string;
-  authorId: User;          // 已填充(Populated)的用户对象
-  type: string;            // e.g., 'message/default', 'app/x-rss-card'
-  content: string;
-  payload?: Record<string, any>; // 用于自定义消息类型的附加数据
-  attachments?: Array<{
-    filename: string;
-    contentType: string;
-    key: string;           // S3 对象存储中的唯一键
-    size: number;
-    url?: string;          // 由后端根据 key 动态生成，不存储于数据库
-  }>;
-  mentions?: string[];     // 被提及用户的 User ID 数组
-  referencedMessageId?: string; // 回复的消息 ID
-  reactions?: Array<{
-    emoji: string;
-    userIds: string[];
-  }>;
+
+  // API 返回通常会 populate authorId（只包含部分字段）
+  authorId: Pick<User, '_id' | 'username' | 'avatarUrl' | 'isBot'> | string;
+
+  type: string; // 默认 message/default
+  content?: string;
+  payload?: Record<string, any>;
+  attachments?: Attachment[];
+  mentions?: string[];
+  referencedMessageId?: string;
+  reactions?: Reaction[];
+
   createdAt: string;
   updatedAt: string;
-  editedAt?: string;       // 消息被编辑的时间戳
-  retractedAt?: string;    // 消息被撤回的时间戳
+  editedAt?: string;
+  retractedAt?: string;
 }
 ```
 
-## InviteObject
-邀请链接对象，用于邀请用户加入服务器。
+说明：
 
-```typescript
-interface Invite {
+- 后端会对 `attachments[].key` 进行 URL 补全，写入 `attachments[].url`（见 `backend/src/api/message/message.service.ts`）。
+- Webhook 消息会在 `payload.overrides` 中携带“展示覆盖信息”（见 `backend/src/api/webhook/webhook.service.ts`），后端会在返回前应用覆盖（例如替换 `authorId.username/avatarUrl`）。
+
+---
+
+## Invite（邀请预览响应）
+
+来源：`backend/src/api/invite/invite.service.ts#getInviteDetails`
+
+```ts
+export interface InvitePreview {
   code: string;
   uses: number;
-  maxUses: number;
+  maxUses?: number;
   expiresAt?: string;
-  server: {                // API 返回时填充的服务器信息
+  server: {
     _id: string;
     name: string;
     avatarUrl?: string;
-    memberCount: number;   // 动态计算的成员数量
+    memberCount: number;
   };
 }
 ```
 
-> **说明**：
-> - `GET /api/invites/:inviteCode` 的预览响应只包含上述字段（不会返回 `serverId/creatorId`）。
-> - `POST /api/invites/:inviteCode` 接受邀请后返回 `{ serverId: string }`。
+说明：
 
-## WebhookObject
-Webhook 对象，允许外部服务向频道发送消息。
+- 该预览响应当前不会对 `server.avatarUrl` 做 URL 补全（以实现为准）。
 
-```typescript
-interface Webhook {
+---
+
+## Webhook
+
+来源：`backend/src/api/webhook/webhook.model.ts`
+
+```ts
+export interface Webhook {
   _id: string;
   name: string;
   avatarUrl?: string;
   channelId: string;
   serverId: string;
-  token: string;           // 用于公开执行 Webhook 的令牌
-  botUserId: string;       // 关联的机器人用户 ID
+  token: string;
+  botUserId: string;
   createdAt: string;
   updatedAt: string;
 }

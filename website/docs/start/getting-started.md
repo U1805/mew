@@ -1,5 +1,7 @@
 ---
 sidebar_label: '快速上手'
+sidebar_position: 20
+slug: /guide/getting-started
 ---
 
 # 🚀 快速上手
@@ -18,13 +20,20 @@ sidebar_label: '快速上手'
 
 ### 核心依赖
 无论选择哪种方式，你需要：
-*   **MongoDB**: `v6.0+` (推荐)。你需要一个运行中的 MongoDB 实例（本地安装或云数据库均可）。
+*   **MongoDB**：一个可用的 MongoDB 实例（本地/容器/云均可）。
+    *   Mew 的后端默认连接 `mongodb://localhost:27017/mew`（可通过 `MONGO_URI` 修改）。
+    *   如需“手把手装 MongoDB + Garage”，请看参考文档：[基础设施部署](../reference/infrastructure-setup.md)。
 
 ### 开发环境依赖
 如果你计划运行源码进行开发，请额外安装：
-*   **Node.js**: `v18.0` 或更高版本 (推荐使用 LTS)。
-*   **pnpm**: `v8.0+` (本项目使用 pnpm workspace 管理 Monorepo)。
-    *   *没有安装 pnpm?* 运行 `npm install -g pnpm` 即可。
+*   **Node.js**：`v18+`（建议使用 LTS）。
+*   **pnpm**：建议使用仓库声明的版本（见根目录 `package.json#packageManager`）。
+    *   没有安装 pnpm：`npm install -g pnpm`
+*   **Git**：用于拉取与协作（可选但强烈建议）。
+
+### 可选依赖（不影响基础功能启动）
+*   **S3 兼容对象存储（如 Garage/MinIO）**：用于头像与附件上传。
+    *   未配置时，登录/聊天等基础功能仍可用，但上传相关接口会失败（后端启动时也可能打印 S3 CORS 配置失败的日志，不会阻断启动）。
 
 ---
 
@@ -35,7 +44,7 @@ Mew 遵循 **The Twelve-Factor App** 原则，通过环境变量管理配置。
 ### 1. 设置环境变量
 后端服务 需要敏感配置才能启动。
 
-在**项目根目录**下，执行以下命令来初始化配置文件：
+在**项目根目录**下，初始化后端配置文件：
 
 ```bash
 # 进入后端目录
@@ -43,6 +52,12 @@ cd backend
 
 # 复制示例配置文件
 cp .env.example .env
+```
+
+Windows PowerShell：
+```powershell
+Set-Location backend
+Copy-Item .env.example .env
 ```
 
 ### 2. 修改配置参数
@@ -66,6 +81,18 @@ JWT_SECRET=replace-this-with-a-super-secret-key
 
 # ⏳ JWT 过期时间 (例如: 1d, 7d)
 JWT_EXPIRES_IN=1d
+
+# （可选）S3 兼容对象存储：头像与附件上传需要
+# 不配置也能启动，但上传接口将不可用
+# S3_ENDPOINT=localhost
+# S3_WEB_ENDPOINT=web.garage.localhost
+# S3_PORT=3900
+# S3_WEB_PORT=3902
+# S3_REGION=garage
+# S3_BUCKET_NAME=mew-bucket
+# S3_ACCESS_KEY_ID=...
+# S3_SECRET_ACCESS_KEY=...
+# S3_USE_SSL=false
 ```
 
 > **⚠️ 注意**：Mew 目前不提供 CLI 用户初始化。首次启动后，请直接访问前端页面注册管理员账户。

@@ -1,5 +1,7 @@
 ---
 sidebar_label: 'Bot 生态系统'
+sidebar_position: 10
+slug: /guide/bot-ecosystem
 ---
 
 # 🤖 Bot 生态系统

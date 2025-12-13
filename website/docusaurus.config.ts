@@ -100,25 +100,10 @@ const config: Config = {
       },
       items: [
         {
-          type: 'doc',
-          docId: 'guide/introduction',
+          type: 'docSidebar',
+          sidebarId: 'docs',
           position: 'left',
-          label: '指南',
-        },
-        {
-          type: 'dropdown',
-          label: 'SDK',
-          position: 'left',
-          items: [
-            {
-              label: '核心 API',
-              to: '/docs/core-api',
-            },
-            {
-              label: 'Bot 开发',
-              to: '/docs/bot-sdk',
-            },
-          ],
+          label: '文档',
         },
         {to: '/blog', label: '博客', position: 'left'},
         {
@@ -140,7 +125,7 @@ const config: Config = {
           items: [
             {
               label: 'Documentation',
-              to: '/docs/guide/introduction',
+              to: '/docs',
             },
           ],
         },
