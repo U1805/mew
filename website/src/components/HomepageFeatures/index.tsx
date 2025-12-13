@@ -58,7 +58,7 @@ const FeatureList: FeatureItem[] = [
       </>
     ),
     buttons: [
-      { label: '了解更多', to: '/docs/guide/02-platform-design', type: 'secondary' },
+      { label: '了解更多', to: '/docs/guide/platform-design', type: 'secondary' },
     ],
   },
   {
@@ -77,7 +77,7 @@ const FeatureList: FeatureItem[] = [
       </>
     ),
     buttons: [
-      { label: '了解更多', to: '/docs/guide/02-platform-design', type: 'secondary' },
+      { label: '了解更多', to: '/docs/guide/platform-design', type: 'secondary' },
     ],
   },
   {
