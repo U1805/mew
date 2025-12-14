@@ -100,6 +100,18 @@ export interface Reaction {
   userIds: string[];
 }
 
+export interface Embed {
+  url: string;
+  title?: string;
+  siteName?: string;
+  description?: string;
+  images?: string[];
+  mediaType?: string;
+  contentType?: string;
+  videos?: any[];
+  favicons?: string[];
+}
+
 export interface MessagePayload {
   webhookName?: string;
   title?: string;
@@ -110,6 +122,7 @@ export interface MessagePayload {
     username?: string;
     avatarUrl?: string;
   };
+  embeds?: Embed[];
   [key: string]: any;
 }
 

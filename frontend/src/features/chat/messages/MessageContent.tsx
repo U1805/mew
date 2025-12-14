@@ -3,6 +3,7 @@ import React from 'react';
 import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { AttachmentList } from './AttachmentList';
+import { UrlEmbed } from './UrlEmbed';
 
 interface MessageContentProps {
     message: Message;
@@ -39,10 +40,13 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
                     {parseMessageContent(message.content)}
                 </p>
             )}
-            <AttachmentList 
-                attachments={message.attachments || []} 
-                serverId={serverId} 
-                channelId={channelId} 
+            {message.payload?.embeds && message.payload.embeds.length > 0 && (
+              <UrlEmbed embed={message.payload.embeds[0]} />
+            )}
+            <AttachmentList
+                attachments={message.attachments || []}
+                serverId={serverId}
+                channelId={channelId}
             />
         </div>
     );

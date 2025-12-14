@@ -8,6 +8,27 @@ export interface IAttachment {
   url?: string; // Dynamically added, not stored in DB
 }
 
+export interface IEmbed {
+  url: string;
+  title?: string;
+  siteName?: string;
+  description?: string;
+  images?: string[];
+  mediaType?: string;
+  contentType?: string;
+  videos?: any[];
+  favicons?: string[];
+}
+
+export interface IMessagePayload {
+  overrides?: {
+    username?: string;
+    avatarUrl?: string;
+  };
+  embeds?: IEmbed[];
+  [key: string]: any;
+}
+
 export interface IReaction {
   emoji: string;
   userIds: mongoose.Types.ObjectId[];
@@ -18,7 +39,7 @@ export interface IMessage extends Document {
   authorId: mongoose.Types.ObjectId;
   type: string;
   content: string;
-  payload?: Record<string, any>;
+  payload?: IMessagePayload;
   attachments?: IAttachment[];
   mentions?: mongoose.Types.ObjectId[];
   referencedMessageId?: mongoose.Types.ObjectId;
