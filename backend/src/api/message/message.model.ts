@@ -79,6 +79,6 @@ const MessageSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-MessageSchema.index({ content: 'text' });
+MessageSchema.index({ content: 1 });
 
 export default mongoose.model<IMessage>('Message', MessageSchema);

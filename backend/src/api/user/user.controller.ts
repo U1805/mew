@@ -53,6 +53,17 @@ export const getUserByIdHandler = asyncHandler(async (req: Request, res: Respons
   res.status(200).json(user);
 });
 
+export const changePasswordHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
+  }
+  const { oldPassword, newPassword } = req.body;
+
+  await userService.changePassword(req.user.id, oldPassword, newPassword);
+
+  res.status(204).send();
+});
+
 export const updateMeHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.user) {
     throw new UnauthorizedError('Not authenticated');
@@ -61,8 +72,8 @@ export const updateMeHandler = asyncHandler(async (req: Request, res: Response) 
   const updateData: { username?: string; avatarUrl?: string } = {};
 
   // For now, we only support avatar updates. Username can be added later.
-  // const { username } = req.body;
-  // if (username) updateData.username = username;
+  const { username } = req.body || {};
+  if (username) updateData.username = username;
 
   if (req.file) {
     const result = await uploadFile(req.file);

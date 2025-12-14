@@ -5,15 +5,21 @@ import toast from 'react-hot-toast';
 import { useUIStore, useAuthStore } from '../../../shared/stores';
 import { userApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
+import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 
 const UserSettings: React.FC = () => {
   const { isSettingsOpen, closeSettings } = useUIStore();
   const { user, logout, setAuth, token } = useAuthStore();
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isEditUsernameModalOpen, setIsEditUsernameModalOpen] = useState(false);
+  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   if (!isSettingsOpen) return null;
 
@@ -68,6 +74,39 @@ const UserSettings: React.FC = () => {
       } finally {
           setIsUploading(false);
       }
+  };
+
+  const handleSaveUsername = async (newUsername: string) => {
+    if (!newUsername.trim() || newUsername.trim() === user?.username) {
+      return;
+    }
+    setIsUpdatingUsername(true);
+    try {
+      const res = await userApi.updateProfile({ username: newUsername.trim() });
+      const remember = !!localStorage.getItem('mew_token');
+      setAuth(token!, res.data, remember);
+      toast.success("Username updated!");
+      setIsEditUsernameModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update username");
+    } finally {
+      setIsUpdatingUsername(false);
+    }
+  };
+
+  const handleSavePassword = async (passwords: { oldPassword, newPassword }) => {
+    setIsUpdatingPassword(true);
+    try {
+      await userApi.changePassword(passwords);
+      toast.success("Password updated successfully!");
+      setIsChangePasswordModalOpen(false);
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update password. Please check your old password.");
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   return (
@@ -181,7 +220,7 @@ const UserSettings: React.FC = () => {
                             <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Display Name</div>
                             <div className="text-white text-sm font-medium">{user?.username}</div>
                         </div>
-                        <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
+                        <button onClick={() => setIsEditUsernameModalOpen(true)} className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
                             Edit
                         </button>
                     </div>
@@ -218,7 +257,7 @@ const UserSettings: React.FC = () => {
 
         {/* Password & Auth */}
         <h3 className="text-lg font-bold text-white mb-4">Password and Authentication</h3>
-        <button className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors mb-2">
+        <button onClick={() => setIsChangePasswordModalOpen(true)} className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors mb-2">
             Change Password
         </button>
         <div className="text-xs text-mew-textMuted mt-4 mb-8">
@@ -261,6 +300,21 @@ const UserSettings: React.FC = () => {
             </div>
         </ConfirmModal>
       )}
+
+      <EditDisplayNameModal
+        isOpen={isEditUsernameModalOpen}
+        onClose={() => setIsEditUsernameModalOpen(false)}
+        onSave={handleSaveUsername}
+        currentUsername={user?.username || ''}
+        isLoading={isUpdatingUsername}
+      />
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
+        onSave={handleSavePassword}
+        isLoading={isUpdatingPassword}
+      />
     </div>
   );
 };

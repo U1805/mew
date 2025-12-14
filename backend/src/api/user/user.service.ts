@@ -1,4 +1,5 @@
-import { NotFoundError } from '../../utils/errors';
+import bcrypt from 'bcryptjs';
+import { NotFoundError, UnauthorizedError, BadRequestError } from '../../utils/errors';
 import { getS3PublicUrl } from '../../utils/s3';
 import { userRepository } from './user.repository';
 
@@ -47,6 +48,30 @@ const userService = {
         userObject.avatarUrl = getS3PublicUrl(userObject.avatarUrl);
     }
     return userObject;
+  },
+
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    if (!oldPassword || !newPassword) {
+      throw new BadRequestError('Old and new passwords are required');
+    }
+
+    const user = await userRepository.findByIdWithPassword(userId);
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const isMatch = await bcrypt.compare(oldPassword, user.password || '');
+    if (!isMatch) {
+      throw new UnauthorizedError('Invalid old password');
+    }
+
+    if (oldPassword === newPassword) {
+      throw new BadRequestError('New password cannot be the same as the old password');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await userRepository.updateById(userId, { password: hashedPassword });
   },
 };
 
