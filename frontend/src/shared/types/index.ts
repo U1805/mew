@@ -76,6 +76,7 @@ export interface PermissionOverride {
 export interface Channel {
   _id: string;
   name?: string;
+  topic?: string;
   type: ChannelType;
   serverId?: string;
   categoryId?: string;

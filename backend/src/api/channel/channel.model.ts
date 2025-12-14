@@ -8,6 +8,7 @@ export enum ChannelType {
 export interface IChannelUpdate {
   name?: string;
   categoryId?: mongoose.Types.ObjectId;
+  topic?: string;
 }
 
 interface IPermissionOverride {
@@ -19,6 +20,7 @@ interface IPermissionOverride {
 
 export interface IChannel extends Document {
   name?: string;
+  topic?: string;
   type: ChannelType;
   serverId?: mongoose.Types.ObjectId;
   categoryId?: mongoose.Types.ObjectId;
@@ -40,6 +42,7 @@ const PermissionOverrideSchema = new Schema<IPermissionOverride>(
 const ChannelSchema: Schema = new Schema(
   {
     name: { type: String },
+    topic: { type: String, maxlength: 1024 },
     type: { type: String, enum: Object.values(ChannelType), required: true },
     serverId: { type: Schema.Types.ObjectId, ref: 'Server' },
     categoryId: { type: Schema.Types.ObjectId, ref: 'Category' },

@@ -69,7 +69,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
 
       {!isDM && (
           <span className="text-xs text-mew-textMuted border-l border-mew-textMuted pl-2 ml-2 hidden md:block truncate">
-            Welcome to the beginning of the #{title} channel.
+            {channel?.topic || `Welcome to the beginning of the #${title} channel.`}
           </span>
       )}
       
