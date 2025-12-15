@@ -7,10 +7,13 @@ import { userApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
+import { BotManagementPanel } from './BotManagementPanel';
 
 const UserSettings: React.FC = () => {
   const { isSettingsOpen, closeSettings } = useUIStore();
   const { user, logout, setAuth, token } = useAuthStore();
+
+  const [activeTab, setActiveTab] = useState('account');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -116,9 +119,10 @@ const UserSettings: React.FC = () => {
          <div className="w-[192px] px-1.5">
             <div className="text-xs font-bold text-mew-textMuted uppercase px-2.5 mb-1.5 mt-2">User Settings</div>
             
-            <SidebarItem label="My Account" isActive />
+            <SidebarItem label="My Account" isActive={activeTab === 'account'} onClick={() => setActiveTab('account')} />
             <SidebarItem label="Profiles" />
             <SidebarItem label="Privacy & Safety" />
+            <SidebarItem label="Bots" isActive={activeTab === 'bots'} onClick={() => setActiveTab('bots')} />
             <SidebarItem label="Family Center" />
             <SidebarItem label="Authorized Apps" />
             <SidebarItem label="Devices" />
@@ -148,125 +152,132 @@ const UserSettings: React.FC = () => {
 
       {/* Main Content (Center) */}
       <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[740px] overflow-y-auto custom-scrollbar">
-        <h2 className="text-xl font-bold text-white mb-6">My Account</h2>
+        
+        {activeTab === 'account' && (
+            <>
+                <h2 className="text-xl font-bold text-white mb-6">My Account</h2>
 
-        {/* Profile Card */}
-        <div className="bg-[#1E1F22] rounded-lg mb-8 overflow-hidden">
-            {/* Banner Area */}
-            <div className="h-[100px] bg-mew-accent relative">
-                {/* Avatar */}
-                <div className="absolute left-4 -bottom-[36px]">
-                    <div 
-                        className="w-[80px] h-[80px] rounded-full p-[6px] bg-[#1E1F22] relative group cursor-pointer"
-                        onClick={handleAvatarClick}
-                    >
-                        <input 
-                            type="file" 
-                            ref={fileInputRef} 
-                            className="hidden" 
-                            accept="image/png, image/jpeg, image/gif" 
-                            onChange={handleFileChange}
-                        />
-                        
-                        <div className="w-full h-full rounded-full overflow-hidden relative">
-                            {user?.avatarUrl ? (
-                                <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="w-full h-full bg-mew-accentHover flex items-center justify-center text-white text-2xl font-bold">
-                                    {user?.username?.slice(0, 2).toUpperCase()}
+                {/* Profile Card */}
+                <div className="bg-[#1E1F22] rounded-lg mb-8 overflow-hidden">
+                    {/* Banner Area */}
+                    <div className="h-[100px] bg-mew-accent relative">
+                        {/* Avatar */}
+                        <div className="absolute left-4 -bottom-[36px]">
+                            <div 
+                                className="w-[80px] h-[80px] rounded-full p-[6px] bg-[#1E1F22] relative group cursor-pointer"
+                                onClick={handleAvatarClick}
+                            >
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    className="hidden" 
+                                    accept="image/png, image/jpeg, image/gif" 
+                                    onChange={handleFileChange}
+                                />
+                                
+                                <div className="w-full h-full rounded-full overflow-hidden relative">
+                                    {user?.avatarUrl ? (
+                                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-mew-accentHover flex items-center justify-center text-white text-2xl font-bold">
+                                            {user?.username?.slice(0, 2).toUpperCase()}
+                                        </div>
+                                    )}
+                                    
+                                    {/* Hover Overlay */}
+                                    <div className={clsx(
+                                        "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
+                                        isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                    )}>
+                                        {isUploading ? (
+                                            <Icon icon="mdi:loading" className="text-white animate-spin" width="24" />
+                                        ) : (
+                                            <span className="text-white text-[10px] font-bold uppercase tracking-wide">Change</span>
+                                        )}
+                                    </div>
                                 </div>
-                            )}
-                            
-                            {/* Hover Overlay */}
-                            <div className={clsx(
-                                "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
-                                isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                            )}>
-                                {isUploading ? (
-                                    <Icon icon="mdi:loading" className="text-white animate-spin" width="24" />
-                                ) : (
-                                    <span className="text-white text-[10px] font-bold uppercase tracking-wide">Change</span>
-                                )}
+
+                                <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#1E1F22]"></div>
                             </div>
                         </div>
+                    </div>
 
-                        <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#1E1F22]"></div>
+                    {/* Info Area */}
+                    <div className="pt-12 pb-4 px-4">
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-xl font-bold text-white">{user?.username}</h3>
+                                <p className="text-sm text-mew-textMuted">#{user?._id?.slice(0, 4) || '0000'}</p>
+                            </div>
+                            <button 
+                                onClick={handleAvatarClick}
+                                disabled={isUploading}
+                                className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
+                            >
+                                Edit User Profile
+                            </button>
+                        </div>
+
+                        {/* Account Details Block */}
+                        <div className="bg-[#2B2D31] rounded-lg p-4 space-y-5">
+                            
+                            {/* Display Name */}
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Display Name</div>
+                                    <div className="text-white text-sm font-medium">{user?.username}</div>
+                                </div>
+                                <button onClick={() => setIsEditUsernameModalOpen(true)} className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
+                                    Edit
+                                </button>
+                            </div>
+
+                            {/* Email */}
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Email</div>
+                                    <div className="text-white text-sm font-medium">
+                                        {user?.email ? user.email.replace(/(.{2})(.*)(@.*)/, "$1*****$3") : 'No Email'}
+                                    </div>
+                                </div>
+                                <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
+                                    Edit
+                                </button>
+                            </div>
+
+                            {/* Phone Number */}
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Phone Number</div>
+                                    <div className="text-mew-textMuted text-sm">You haven&rsquo;t added a phone number yet.</div>
+                                </div>
+                                <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
+                                    Add
+                                </button>
+                            </div>
+
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            {/* Info Area */}
-            <div className="pt-12 pb-4 px-4">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 className="text-xl font-bold text-white">{user?.username}</h3>
-                        <p className="text-sm text-mew-textMuted">#{user?._id?.slice(0, 4) || '0000'}</p>
-                    </div>
-                    <button 
-                        onClick={handleAvatarClick}
-                        disabled={isUploading}
-                        className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
-                    >
-                        Edit User Profile
+                <div className="h-[1px] bg-mew-divider my-8"></div>
+
+                {/* Password & Auth */}
+                <h3 className="text-lg font-bold text-white mb-4">Password and Authentication</h3>
+                <button onClick={() => setIsChangePasswordModalOpen(true)} className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors mb-2">
+                    Change Password
+                </button>
+                <div className="text-xs text-mew-textMuted mt-4 mb-8">
+                    <h4 className="font-bold uppercase mb-2">Two-Factor Authentication</h4>
+                    <p className="mb-4">Protect your account with an extra layer of security. Once configured, you&rsquo;ll be required to enter both your password and an authentication code from your mobile phone in order to sign in.</p>
+                    <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+                        Enable Two-Factor Auth
                     </button>
                 </div>
+            </>
+        )}
 
-                {/* Account Details Block */}
-                <div className="bg-[#2B2D31] rounded-lg p-4 space-y-5">
-                    
-                    {/* Display Name */}
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Display Name</div>
-                            <div className="text-white text-sm font-medium">{user?.username}</div>
-                        </div>
-                        <button onClick={() => setIsEditUsernameModalOpen(true)} className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                            Edit
-                        </button>
-                    </div>
-
-                    {/* Email */}
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Email</div>
-                            <div className="text-white text-sm font-medium">
-                                {user?.email ? user.email.replace(/(.{2})(.*)(@.*)/, "$1*****$3") : 'No Email'}
-                            </div>
-                        </div>
-                        <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                            Edit
-                        </button>
-                    </div>
-
-                    {/* Phone Number */}
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Phone Number</div>
-                            <div className="text-mew-textMuted text-sm">You haven&rsquo;t added a phone number yet.</div>
-                        </div>
-                        <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                            Add
-                        </button>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <div className="h-[1px] bg-mew-divider my-8"></div>
-
-        {/* Password & Auth */}
-        <h3 className="text-lg font-bold text-white mb-4">Password and Authentication</h3>
-        <button onClick={() => setIsChangePasswordModalOpen(true)} className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors mb-2">
-            Change Password
-        </button>
-        <div className="text-xs text-mew-textMuted mt-4 mb-8">
-            <h4 className="font-bold uppercase mb-2">Two-Factor Authentication</h4>
-            <p className="mb-4">Protect your account with an extra layer of security. Once configured, you&rsquo;ll be required to enter both your password and an authentication code from your mobile phone in order to sign in.</p>
-            <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-2 rounded text-sm font-medium transition-colors">
-                Enable Two-Factor Auth
-            </button>
-        </div>
+        {activeTab === 'bots' && <BotManagementPanel />}
 
       </div>
 
@@ -319,14 +330,17 @@ const UserSettings: React.FC = () => {
   );
 };
 
-const SidebarItem: React.FC<{ label: string; isActive?: boolean }> = ({ label, isActive }) => {
+const SidebarItem: React.FC<{ label: string; isActive?: boolean; onClick?: () => void }> = ({ label, isActive, onClick }) => {
     return (
-        <div className={clsx(
-            "px-2.5 py-1.5 rounded-[4px] cursor-pointer mb-0.5 font-medium text-sm transition-colors",
-            isActive 
-                ? "bg-[#404249] text-white" 
-                : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text"
-        )}>
+        <div 
+            onClick={onClick}
+            className={clsx(
+                "px-2.5 py-1.5 rounded-[4px] cursor-pointer mb-0.5 font-medium text-sm transition-colors",
+                isActive 
+                    ? "bg-[#404249] text-white" 
+                    : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text"
+            )}
+        >
             {label}
         </div>
     )

@@ -153,3 +153,16 @@ export interface Webhook {
   token: string;
   botUserId: string;
 }
+
+export interface Bot {
+  _id: string;
+  ownerId: string;
+  name: string;
+  avatarUrl?: string;
+  accessToken?: string;
+  botType: 'Official' | 'Custom';
+  dmEnabled: boolean;
+  config?: string; // JSON String
+  createdAt: string;
+  updatedAt: string;
+}

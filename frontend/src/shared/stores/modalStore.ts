@@ -18,7 +18,8 @@ type ModalType =
   | 'joinServer'
   | 'kickUser'
   | 'addPermissionOverride'
-  | 'confirm';
+  | 'confirm'
+  | 'manageBot';
 
 interface ModalState {
   activeModal: ModalType | null;
