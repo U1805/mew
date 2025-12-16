@@ -7,7 +7,6 @@
 # Environment variables
 .env
 !.env.*
-!.env.example
 
 # Node.js & pnpm
 node_modules/
@@ -36,7 +35,8 @@ lerna-debug.log*
 # OS generated files
 .DS_Store
 Thumbs.db
-summary.md
+
 /*.md
 !/CLAUDE.md
 !/README.md
+backend/coverage/*

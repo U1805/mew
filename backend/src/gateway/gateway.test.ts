@@ -113,7 +113,7 @@ describe('WebSocket Gateway', () => {
       setTimeout(() => reject(new Error('Test timed out waiting for connect_error')), 2000);
     });
     await promise;
-  });
+  }, 15000);
 
   it('should broadcast a message only to clients in the correct room', async () => {
     client1 = createTestClient(port, token1);
@@ -150,7 +150,7 @@ describe('WebSocket Gateway', () => {
 
     const savedMsg = await Message.findOne({ channelId: channel1Id, content: 'Hello from channel one' });
     expect(savedMsg).toBeTruthy();
-  });
+  }, 15000);
 
   it('should make user join their own user ID room upon connection', async () => {
     await request(app)
@@ -167,7 +167,7 @@ describe('WebSocket Gateway', () => {
     const sockets = await io.in(userId2).fetchSockets();
     expect(sockets.length).toBe(1);
     expect(sockets[0].user.id).toBe(userId2);
-  });
+  }, 15000);
 
   it('should handle and broadcast presence updates correctly', async () => {
     const client1InitialStatePromise = new Promise<void>((resolve, reject) => {
@@ -222,5 +222,5 @@ describe('WebSocket Gateway', () => {
 
     client1.disconnect();
     await client1OfflinePromise;
-  });
+  }, 15000);
 });

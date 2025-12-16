@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
-import path from 'path';
 
 // Mock the socketManager to prevent errors in tests
 vi.mock('../../gateway/events', () => ({
@@ -50,7 +49,10 @@ describe('Bot Routes (/@me/bots)', () => {
       expect(res.statusCode).toBe(201);
       expect(res.body.name).toBe('MyTestBot');
       expect(res.body.ownerId).toBe(userId);
-      expect(res.body).not.toHaveProperty('accessToken');
+      // Token is only returned on creation (and on explicit regeneration)
+      expect(res.body).toHaveProperty('accessToken');
+      expect(res.body.accessToken).toBeTypeOf('string');
+      expect(res.body.accessToken.length).toBe(32);
     });
 
     it('should create a new bot with an avatar', async () => {

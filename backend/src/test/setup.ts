@@ -1,8 +1,16 @@
-import { beforeAll, afterAll, afterEach } from 'vitest';
+import { beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import mongoose from 'mongoose';
 
 let replSet: MongoMemoryReplSet;
+
+// Prevent tests from making real S3 network calls via @aws-sdk/lib-storage Upload.
+// Individual tests (e.g. src/utils/s3.test.ts) can still override this mock.
+vi.mock('@aws-sdk/lib-storage', () => ({
+  Upload: vi.fn().mockImplementation(function (this: any) {
+    this.done = vi.fn().mockResolvedValue({});
+  }),
+}));
 
 beforeAll(async () => {
   replSet = await MongoMemoryReplSet.create({
