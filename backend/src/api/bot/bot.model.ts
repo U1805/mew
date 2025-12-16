@@ -1,8 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export enum BotType {
-  Official = 'Official',
-  Custom = 'Custom',
+  Rss = 'Rss',
 }
 
 export interface IBot extends Document {
@@ -37,7 +36,7 @@ const BotSchema: Schema = new Schema(
       type: String,
       enum: Object.values(BotType),
       required: true,
-      default: BotType.Custom,
+      default: BotType.Rss,
     },
     dmEnabled: { type: Boolean, default: false },
     config: { type: String, default: '{}' },

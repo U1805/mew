@@ -7,7 +7,7 @@ describe('bot.validation', () => {
     const parsed = createBotSchema.parse({
       body: {
         name: 'My Bot',
-        botType: BotType.Custom,
+        botType: BotType.Rss,
         dmEnabled: 'true',
         config: '{"a":1}',
       },
