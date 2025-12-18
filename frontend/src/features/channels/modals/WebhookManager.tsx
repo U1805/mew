@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhookApi, API_URL } from '../../../shared/services/api';
-import { Webhook, Channel } from '../../../shared/types';
+import { Webhook, Channel, ServerMember } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useWebhooks } from '../hooks/useWebhooks';
@@ -28,6 +28,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
       webhookApi.create(serverId, channel._id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks', channel._id] });
+      queryClient.invalidateQueries({ queryKey: ['members', serverId] });
       setView('list');
       resetForm();
     }
@@ -38,15 +39,36 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
       webhookApi.update(serverId, channel._id, data.id, { name: data.name, avatarUrl: data.avatarUrl }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks', channel._id] });
+      queryClient.invalidateQueries({ queryKey: ['members', serverId] });
       setView('list');
       resetForm();
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => webhookApi.delete(serverId, channel._id, id),
+  const deleteMutation = useMutation<unknown, Error, Webhook, { previousMembers?: ServerMember[] }>({
+    mutationFn: (webhook: Webhook) => webhookApi.delete(serverId, channel._id, webhook._id),
+    onMutate: async (webhook: Webhook) => {
+      await queryClient.cancelQueries({ queryKey: ['members', serverId] });
+
+      const previousMembers = queryClient.getQueryData<ServerMember[]>(['members', serverId]);
+      if (previousMembers) {
+        queryClient.setQueryData<ServerMember[]>(['members', serverId], () =>
+          previousMembers.filter(
+            m => !(m.channelId === channel._id && m.userId?._id === webhook.botUserId)
+          )
+        );
+      }
+
+      return { previousMembers };
+    },
+    onError: (_err, _webhook, context) => {
+      if (context?.previousMembers) {
+        queryClient.setQueryData(['members', serverId], context.previousMembers);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks', channel._id] });
+      queryClient.invalidateQueries({ queryKey: ['members', serverId] });
       setView('list');
       resetForm();
     }
@@ -134,7 +156,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                     <button onClick={() => handleEdit(wh)} className="bg-[#1E1F22] hover:bg-[#111214] text-white p-1.5 rounded transition-colors">
                        <Icon icon="mdi:pencil" width="16" />
                     </button>
-                    <button onClick={() => deleteMutation.mutate(wh._id)} className="bg-[#1E1F22] hover:bg-red-500 text-white p-1.5 rounded transition-colors">
+                    <button onClick={() => deleteMutation.mutate(wh)} className="bg-[#1E1F22] hover:bg-red-500 text-white p-1.5 rounded transition-colors">
                        <Icon icon="mdi:trash-can-outline" width="16" />
                     </button>
                  </div>
@@ -214,7 +236,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
               {view === 'edit' && selectedWebhook ? (
                   <button 
                     type="button"
-                    onClick={() => deleteMutation.mutate(selectedWebhook._id)}
+                    onClick={() => deleteMutation.mutate(selectedWebhook)}
                     className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
                   >
                     Delete Webhook
