@@ -2,10 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
+import { useQuery } from '@tanstack/react-query';
 import { useModalStore } from '../../../shared/stores';
 import { Bot } from '../../../shared/types';
 import { useCreateBot, useUpdateBot, useDeleteBot, useRegenerateBotToken } from '../hooks/useBots';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { infraApi } from '../../../shared/services/api';
+import type { AvailableService } from '../../../shared/services/infra.api';
 
 export const BotEditorModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
@@ -14,7 +17,7 @@ export const BotEditorModal: React.FC = () => {
   const isEditing = !!internalBot;
 
   const [name, setName] = useState(internalBot?.name || '');
-  const [botType, setBotType] = useState(internalBot?.botType || 'Custom');
+  const [serviceType, setServiceType] = useState(internalBot?.serviceType || '');
   const [dmEnabled, setDmEnabled] = useState(internalBot?.dmEnabled || false);
   const [config, setConfig] = useState(internalBot?.config || '{}');
   const [configError, setConfigError] = useState('');
@@ -43,11 +46,28 @@ export const BotEditorModal: React.FC = () => {
     setShowRegenConfirm(false);
   });
 
+  const { data: availableServices } = useQuery({
+    queryKey: ['availableServices'],
+    queryFn: async () => {
+      const res = await infraApi.availableServices();
+      return (res.data?.services || []) as AvailableService[];
+    },
+  });
+
+  useEffect(() => {
+    if (isEditing) return;
+    if (serviceType) return;
+    const services = availableServices || [];
+    if (services.length === 0) return;
+    const preferred = services.find((s) => s.online) || services[0];
+    setServiceType(preferred.serviceType);
+  }, [availableServices, isEditing, serviceType]);
+
   useEffect(() => {
     const initialValues = modalData?.bot as Bot | undefined;
     if (initialValues) {
       setName(initialValues.name);
-      setBotType(initialValues.botType || 'Custom');
+      setServiceType(initialValues.serviceType || '');
       setDmEnabled(initialValues.dmEnabled || false);
       setConfig(initialValues.config || '{}');
       setAvatarPreview(initialValues.avatarUrl || null);
@@ -90,11 +110,15 @@ export const BotEditorModal: React.FC = () => {
       toast.error('Bot name is required');
       return;
     }
+    if (!serviceType) {
+      toast.error('Service type is required');
+      return;
+    }
     if (configError) return;
 
     const formData = new FormData();
     formData.append('name', name);
-    formData.append('botType', botType);
+    formData.append('serviceType', serviceType);
     formData.append('dmEnabled', String(dmEnabled));
     formData.append('config', config);
     if (avatarFile) {
@@ -208,14 +232,18 @@ export const BotEditorModal: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Type</label>
+                  <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Service Type</label>
                   <select
-                    value={botType}
-                    onChange={(e) => setBotType(e.target.value)}
+                    value={serviceType}
+                    onChange={(e) => setServiceType(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none font-medium appearance-none"
                   >
-                    <option value="Official">Official</option>
-                    <option value="Custom">Custom</option>
+                    <option value="" disabled>Select a service type</option>
+                    {(availableServices || []).map((s) => (
+                      <option key={s.serviceType} value={s.serviceType}>
+                        {s.serviceType}{s.online ? ' (online)' : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

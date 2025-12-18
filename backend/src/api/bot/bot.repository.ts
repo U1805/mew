@@ -56,3 +56,20 @@ export const findByIdWithToken = async (
 ): Promise<IBot | null> => {
   return Bot.findOne({ _id: botId, ownerId }).select('+accessToken');
 };
+
+/**
+ * Finds all bots for a given service type, including access tokens (for infra bootstrap).
+ */
+export const findByServiceTypeWithToken = async (serviceType: string): Promise<IBot[]> => {
+  if (serviceType === 'rss-fetcher') {
+    return Bot.find({ $or: [{ serviceType }, { serviceType: { $exists: false } }] }).select('+accessToken');
+  }
+  return Bot.find({ serviceType }).select('+accessToken');
+};
+
+/**
+ * Finds a bot by ID, including access token (infra-only).
+ */
+export const findByIdWithTokenUnscoped = async (botId: string): Promise<IBot | null> => {
+  return Bot.findById(botId).select('+accessToken');
+};

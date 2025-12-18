@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
+import ServiceTypeModel from '../infra/serviceType.model';
 
 // Mock the socketManager to prevent errors in tests
 vi.mock('../../gateway/events', () => ({
   socketManager: {
     broadcastToUser: vi.fn(),
+    getIO: vi.fn(() => ({
+      of: vi.fn(() => ({
+        to: vi.fn(() => ({ emit: vi.fn() })),
+      })),
+    })),
   },
 }));
 
@@ -27,6 +33,8 @@ describe('Bot Routes (/@me/bots)', () => {
   };
 
   beforeEach(async () => {
+    await ServiceTypeModel.create({ name: 'rss-fetcher' });
+
     // Register and login user 1
     const regRes1 = await request(app).post('/api/auth/register').send(user1Data);
     userId = regRes1.body.user._id;
@@ -44,7 +52,7 @@ describe('Bot Routes (/@me/bots)', () => {
       const res = await request(app)
         .post('/api/users/@me/bots')
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'MyTestBot' });
+        .send({ name: 'MyTestBot', serviceType: 'rss-fetcher' });
 
       expect(res.statusCode).toBe(201);
       expect(res.body.name).toBe('MyTestBot');
@@ -60,6 +68,7 @@ describe('Bot Routes (/@me/bots)', () => {
         .post('/api/users/@me/bots')
         .set('Authorization', `Bearer ${token}`)
         .field('name', 'MyBotWithAvatar')
+        .field('serviceType', 'rss-fetcher')
         .attach('avatar', Buffer.from('fakeimagedata'), 'test-avatar.png');
 
       expect(res.statusCode).toBe(201);
@@ -81,8 +90,8 @@ describe('Bot Routes (/@me/bots)', () => {
   describe('GET /api/users/@me/bots', () => {
     beforeEach(async () => {
       // Create a bot for the user
-      await request(app).post('/api/users/@me/bots').set('Authorization', `Bearer ${token}`).send({ name: 'Bot1' });
-      await request(app).post('/api/users/@me/bots').set('Authorization', `Bearer ${token}`).send({ name: 'Bot2' });
+      await request(app).post('/api/users/@me/bots').set('Authorization', `Bearer ${token}`).send({ name: 'Bot1', serviceType: 'rss-fetcher' });
+      await request(app).post('/api/users/@me/bots').set('Authorization', `Bearer ${token}`).send({ name: 'Bot2', serviceType: 'rss-fetcher' });
     });
 
     it('should return a list of bots owned by the user', async () => {
@@ -110,7 +119,7 @@ describe('Bot Routes (/@me/bots)', () => {
     let botId = '';
 
     beforeEach(async () => {
-      const createRes = await request(app).post('/api/users/@me/bots').set('Authorization', `Bearer ${token}`).send({ name: 'SpecificBot' });
+      const createRes = await request(app).post('/api/users/@me/bots').set('Authorization', `Bearer ${token}`).send({ name: 'SpecificBot', serviceType: 'rss-fetcher' });
       botId = createRes.body._id;
     });
 
@@ -137,7 +146,7 @@ describe('Bot Routes (/@me/bots)', () => {
       const res = await request(app)
         .patch(`/api/users/@me/bots/${botId}`)
         .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'UpdatedBotName', dmEnabled: true });
+        .send({ name: 'UpdatedBotName', dmEnabled: true, serviceType: 'rss-fetcher' });
 
       expect(res.statusCode).toBe(200);
       expect(res.body.name).toBe('UpdatedBotName');

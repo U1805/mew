@@ -59,7 +59,7 @@ export const BotManagementPanel = () => {
                     <span className="text-[10px] bg-[#5865F2] text-white px-1.5 py-0.5 rounded uppercase font-bold">BOT</span>
                   </div>
                   <div className="text-xs text-mew-textMuted mt-0.5 flex items-center gap-3">
-                    <span>{bot.botType}</span>
+                    <span>{bot.serviceType}</span>
                     <span className="w-1 h-1 bg-mew-textMuted rounded-full"></span>
                     <span>{bot.dmEnabled ? 'DM Enabled' : 'DM Disabled'}</span>
                   </div>

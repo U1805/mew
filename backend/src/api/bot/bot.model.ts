@@ -1,15 +1,11 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export enum BotType {
-  Rss = 'Rss',
-}
-
 export interface IBot extends Document {
   ownerId: mongoose.Types.ObjectId;
   name: string;
   avatarUrl?: string;
   accessToken: string;
-  botType: BotType;
+  serviceType: string;
   dmEnabled: boolean;
   config: string; // JSON string
   createdAt: Date;
@@ -32,11 +28,10 @@ const BotSchema: Schema = new Schema(
       unique: true,
       select: false
     },
-    botType: {
+    serviceType: {
       type: String,
-      enum: Object.values(BotType),
       required: true,
-      default: BotType.Rss,
+      index: true,
     },
     dmEnabled: { type: Boolean, default: false },
     config: { type: String, default: '{}' },

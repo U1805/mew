@@ -160,7 +160,7 @@ export interface Bot {
   name: string;
   avatarUrl?: string;
   accessToken?: string;
-  botType: 'Official' | 'Custom';
+  serviceType: string;
   dmEnabled: boolean;
   config?: string; // JSON String
   createdAt: string;

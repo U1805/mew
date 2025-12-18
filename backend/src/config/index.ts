@@ -7,6 +7,11 @@ const config = {
   port: process.env.PORT || 3000,
   jwtSecret: process.env.JWT_SECRET || 'a-very-secret-key',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || 86400,
+  adminSecret: process.env.MEW_ADMIN_SECRET || '',
+  infraAllowedIps: (process.env.MEW_INFRA_ALLOWED_IPS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
   s3: {
     endpoint: process.env.S3_ENDPOINT || 'localhost',
     webEndpoint: process.env.S3_WEB_ENDPOINT || 'web.garage.localhost',

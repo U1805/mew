@@ -33,6 +33,8 @@ slug: /guide/backend-guide
 可选配置：
 
 - `S3_*`：头像与附件上传（Garage/MinIO 等 S3 兼容存储）；后端启动时会尝试配置 Bucket CORS（失败不会阻断启动，见 `backend/src/utils/s3.ts`）。
+- `MEW_ADMIN_SECRET`：基础设施共享密钥（Bot Service 引导/注册、`/infra` Socket 命名空间鉴权）。
+- `MEW_INFRA_ALLOWED_IPS`：基础设施接口的 IP 白名单（逗号分隔；为空则默认仅允许私网 IP + 127.0.0.1）。
 
 ---
 
@@ -46,6 +48,8 @@ slug: /guide/backend-guide
 - `/api/channels/:channelId/uploads`：上传
 - `/api/invites`：邀请详情与接受邀请
 - `/api/webhooks`：公开执行 Webhook
+- `/api/infra`：服务类型在线状态（供前端下拉框/高亮）
+- `/api/bots`：基础设施引导接口（仅内网 + `MEW_ADMIN_SECRET`）
 
 模块组织遵循“Feature-First”，典型文件：
 
@@ -88,6 +92,14 @@ slug: /guide/backend-guide
 服务层在数据变更后会广播事件（例如消息创建后广播 `MESSAGE_CREATE`），让前端实时更新，而不是轮询。
 
 ---
+
+## 🤖 Bot Service 引导（Infrastructure）
+
+为避免用户手动复制动态 Token，Bot 的“托管归属”改为 `serviceType`：
+
+- 前端创建/编辑 Bot 时必须选择 `serviceType`（来源：`GET /api/infra/available-services`）。
+- Bot Service 通过内网接口批量拉取配置：`POST /api/bots/bootstrap`（Header: `X-Mew-Admin-Secret`，Body: `{ serviceType }`）。
+- 后端在 Bot 创建/更新后会向 `/infra` 命名空间的对应房间广播 `SYSTEM_BOT_CONFIG_UPDATE`（payload: `{ serviceType, botId }`），Bot Service 可用 `GET /api/bots/:botId/bootstrap` 热更新单个 Bot。
 
 ## 📎 文件上传（S3 兼容）
 

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { BotType } from './bot.model';
 import { createBotSchema, updateBotSchema } from './bot.validation';
 
 describe('bot.validation', () => {
@@ -7,7 +6,7 @@ describe('bot.validation', () => {
     const parsed = createBotSchema.parse({
       body: {
         name: 'My Bot',
-        botType: BotType.Rss,
+        serviceType: 'rss-fetcher',
         dmEnabled: 'true',
         config: '{"a":1}',
       },
@@ -26,8 +25,7 @@ describe('bot.validation', () => {
   });
 
   it('updateBotSchema allows partial updates', () => {
-    const parsed = updateBotSchema.parse({ body: { dmEnabled: true } });
+    const parsed = updateBotSchema.parse({ body: { dmEnabled: true, serviceType: 'rss-fetcher' } });
     expect(parsed.body.dmEnabled).toBe(true);
   });
 });
-

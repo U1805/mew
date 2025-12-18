@@ -37,9 +37,11 @@ func main() {
 }
 
 func syncConfig() {
-    // 1. 调用 Mew API 获取所有 type="rss" 的配置
-    // GET /api/bots?type=rss
-    bots, _ := apiClient.GetBots("rss")
+    // 1. 调用 Mew 引导接口批量获取本服务类型的 Bot 配置
+    // POST /api/bots/bootstrap
+    // Header: X-Mew-Admin-Secret: <MEW_ADMIN_SECRET>
+    // Body: { "serviceType": "rss-fetcher" }
+    bots, _ := apiClient.Bootstrap("rss-fetcher")
 
     for _, bot := range bots {
         // 如果任务已经在运行，则跳过 (生产环境可能需要更复杂的 Update 逻辑)

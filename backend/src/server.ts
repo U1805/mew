@@ -7,10 +7,12 @@ import { configureBucketCors } from './utils/s3';
 import { authMiddleware } from './gateway/middleware';
 import { registerConnectionHandlers } from './gateway/handlers';
 import { socketManager } from './gateway/events';
+import { registerInfraNamespace } from './infra/infraSocket';
 
 const httpServer = http.createServer(app);
 const io = socketManager.init(httpServer);
 socketManager.getIO().use(authMiddleware);
+registerInfraNamespace(io);
 
 io.on('connection', (socket) => {
   registerConnectionHandlers(io, socket);
