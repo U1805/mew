@@ -20,6 +20,12 @@
 - `MEW_API_BASE`：可选，直接指定 API 基址（如 `http://localhost:3000/api`；优先级高于 `MEW_URL`）
 - `MEW_SERVICE_TYPE`：默认 `test`
 - `MEW_CONFIG_SYNC_INTERVAL_SECONDS`：轮询同步间隔，默认 `60`
+- `MEW_DOTENV`：可选，设置为 `0/false/off/no` 可禁用 `.env` 加载（默认启用）
+
+本地开发会自动尝试从以下文件加载环境变量（仅在变量尚未设置时才会写入）：
+
+- `.env.local`（优先）
+- `.env`
 
 运行：
 

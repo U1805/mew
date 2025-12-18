@@ -2,16 +2,24 @@ package main
 
 import (
 	"context"
+	"errors"
+	"io/fs"
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	loadDotEnv()
+
 	adminSecret := strings.TrimSpace(os.Getenv("MEW_ADMIN_SECRET"))
 	if adminSecret == "" {
 		log.Fatal("MEW_ADMIN_SECRET is required")
@@ -67,5 +75,44 @@ func main() {
 				log.Printf("[test-bot] sync failed: %v", err)
 			}
 		}
+	}
+}
+
+func loadDotEnv() {
+	if isDotEnvDisabled() {
+		return
+	}
+
+	// Prefer local overrides, then defaults.
+	paths := []string{".env.local", ".env"}
+
+	// When running from repo root (e.g. `go run ./plugins/test`), also try the plugin directory.
+	if _, file, _, ok := runtime.Caller(0); ok {
+		dir := filepath.Dir(file)
+		paths = append(paths, filepath.Join(dir, ".env.local"), filepath.Join(dir, ".env"))
+	}
+
+	for _, p := range paths {
+		if err := godotenv.Load(p); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				continue
+			}
+			log.Fatalf("failed to load %s: %v", p, err)
+		} else {
+			log.Printf("[test-bot] loaded env from %s", p)
+		}
+	}
+}
+
+func isDotEnvDisabled() bool {
+	v := strings.TrimSpace(os.Getenv("MEW_DOTENV"))
+	if v == "" {
+		return false
+	}
+	switch strings.ToLower(v) {
+	case "0", "false", "off", "no":
+		return true
+	default:
+		return false
 	}
 }
