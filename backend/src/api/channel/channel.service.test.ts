@@ -44,7 +44,7 @@ vi.mock('../role/role.model', () => ({
 
 vi.mock('../../utils/permission.service', () => ({
   calculateEffectivePermissions: vi.fn(),
-  syncUserChannelPermissions: vi.fn(),
+  syncUsersPermissionsForChannel: vi.fn(),
 }));
 
 import channelService from './channel.service';
@@ -118,7 +118,11 @@ describe('channel.service', () => {
     };
     vi.mocked(channelRepository.findById).mockResolvedValue(channel);
     vi.mocked((ServerMember as any).findOne).mockResolvedValue({ isOwner: true, roleIds: [], userId: mkId('u1') });
-    vi.mocked((ServerMember as any).find).mockResolvedValue([]);
+    vi.mocked((ServerMember as any).find).mockReturnValue({
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([]),
+      }),
+    });
     vi.mocked(channelRepository.save).mockResolvedValue(channel);
 
     const overrides = [{ targetType: 'role', targetId: 'r0', allow: [], deny: [] }];

@@ -39,7 +39,8 @@ export const createBot = async (
   let avatarUrl: string | undefined;
 
   if (avatarFile) {
-    const { key } = await uploadFile(avatarFile);
+    const existingKey = (avatarFile as any).key as string | undefined;
+    const { key } = existingKey ? { key: existingKey } : await uploadFile(avatarFile);
     avatarUrl = getS3PublicUrl(key);
   }
 
@@ -95,7 +96,8 @@ export const updateBot = async (
 
   let avatarUrl: string | undefined;
   if (avatarFile) {
-    const { key } = await uploadFile(avatarFile);
+    const existingKey = (avatarFile as any).key as string | undefined;
+    const { key } = existingKey ? { key: existingKey } : await uploadFile(avatarFile);
     avatarUrl = getS3PublicUrl(key);
   }
 

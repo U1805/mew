@@ -39,16 +39,20 @@ export function calculateEffectivePermissions(
   }
 
   // 2. Calculate base permissions from all of the member's roles.
-  let basePermissions = new Set(
+  const roleById = new Map<string, IRole>();
+  for (const role of roles) {
+    roleById.set(role._id.toString(), role);
+  }
+
+  const basePermissions = new Set(
     everyoneRole.permissions.filter((p) =>
       VALID_PERMISSIONS.has(p as Permission)
     ) as Permission[]
   );
   const memberRoles: IRole[] = [];
 
-  member.roleIds.forEach((roleId) => {
-    // Find the role from the pre-fetched list.
-    const role = roles.find((r) => r._id.toString() === roleId.toString());
+  for (const roleId of member.roleIds) {
+    const role = roleById.get(roleId.toString());
     if (role) {
       memberRoles.push(role); // Also collect for override iteration
       role.permissions.forEach((p) => {
@@ -57,7 +61,7 @@ export function calculateEffectivePermissions(
         }
       });
     }
-  });
+  }
 
   // 3. If base permissions include ADMINISTRATOR, they get all permissions.
   if (basePermissions.has('ADMINISTRATOR')) {
@@ -65,13 +69,23 @@ export function calculateEffectivePermissions(
   }
 
   // 4. Apply channel-specific permission overrides.
-  let effectivePermissions = new Set(basePermissions);
+  const effectivePermissions = new Set(basePermissions);
   const overrides = channel.permissionOverrides || [];
+  const roleOverrideById = new Map<string, (typeof overrides)[number]>();
+  let memberOverride: (typeof overrides)[number] | undefined;
+  for (const override of overrides) {
+    if (override.targetType === 'role') {
+      roleOverrideById.set(override.targetId.toString(), override);
+    } else if (
+      override.targetType === 'member' &&
+      override.targetId.toString() === member.userId.toString()
+    ) {
+      memberOverride = override;
+    }
+  }
 
   // 4a. Apply @everyone override.
-  const everyoneOverride = overrides.find(
-    (o) => o.targetType === 'role' && o.targetId.toString() === everyoneRole._id.toString()
-  );
+  const everyoneOverride = roleOverrideById.get(everyoneRole._id.toString());
   if (everyoneOverride) {
     everyoneOverride.allow.forEach((p) => {
       if (VALID_PERMISSIONS.has(p as Permission)) {
@@ -87,9 +101,7 @@ export function calculateEffectivePermissions(
   // Sort member roles by position to apply overrides in the correct hierarchy.
   memberRoles.sort((a, b) => a.position - b.position);
   memberRoles.forEach((role) => {
-    const roleOverride = overrides.find(
-      (o) => o.targetType === 'role' && o.targetId.toString() === role._id.toString()
-    );
+    const roleOverride = roleOverrideById.get(role._id.toString());
     if (roleOverride) {
       roleOverride.allow.forEach((p) => {
         if (VALID_PERMISSIONS.has(p as Permission)) {
@@ -103,9 +115,6 @@ export function calculateEffectivePermissions(
   });
 
   // 4c. Apply member-specific override (has the highest precedence).
-  const memberOverride = overrides.find(
-    (o) => o.targetType === 'member' && o.targetId.toString() === member.userId.toString()
-  );
   if (memberOverride) {
     memberOverride.allow.forEach((p) => {
       if (VALID_PERMISSIONS.has(p as Permission)) {
@@ -126,6 +135,10 @@ import ServerMember from '../api/member/member.model';
 import Channel from '../api/channel/channel.model';
 import Server from '../api/server/server.model';
 import Role from '../api/role/role.model';
+
+function uniqStrings(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
 
 /**
  * Re-calculates a user's permissions for a specific channel and enforces
@@ -152,4 +165,106 @@ export async function syncUserChannelPermissions(
   if (!everyoneRole) return;
 
   const newPermissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
+}
+
+/**
+ * Syncs a single user's permissions across all channels in a server.
+ * Optimized to avoid per-channel DB fetches during bulk updates (role/member changes).
+ */
+export async function syncUserPermissionsForServerChannels(
+  userId: string,
+  serverId: string
+): Promise<void> {
+  const [member, server, roles, channels] = await Promise.all([
+    ServerMember.findOne({ userId, serverId } as any).lean(),
+    Server.findById(serverId).select('everyoneRoleId').lean(),
+    Role.find({ serverId } as any).select('_id permissions position').lean(),
+    Channel.find({ serverId } as any).select('type permissionOverrides').lean(),
+  ]);
+
+  if (!member || !server) return;
+  const everyoneRole = roles.find((r: any) => r._id.toString() === server.everyoneRoleId.toString());
+  if (!everyoneRole) return;
+
+  for (const channel of channels) {
+    calculateEffectivePermissions(member as any, roles as any, everyoneRole as any, channel as any);
+  }
+}
+
+/**
+ * Syncs many users' permissions across all channels in a server with batched member fetches.
+ * Keeps work bounded and avoids spawning unbounded background promises.
+ */
+export async function syncUsersPermissionsForServerChannels(options: {
+  serverId: string;
+  userIds: string[];
+  userBatchSize?: number;
+}): Promise<void> {
+  const userIds = uniqStrings(options.userIds);
+  if (userIds.length === 0) return;
+
+  const userBatchSize = options.userBatchSize ?? 200;
+
+  const [server, roles, channels] = await Promise.all([
+    Server.findById(options.serverId).select('everyoneRoleId').lean(),
+    Role.find({ serverId: options.serverId } as any).select('_id permissions position').lean(),
+    Channel.find({ serverId: options.serverId } as any).select('type permissionOverrides').lean(),
+  ]);
+
+  if (!server) return;
+  const everyoneRole = roles.find((r: any) => r._id.toString() === server.everyoneRoleId.toString());
+  if (!everyoneRole) return;
+
+  for (let i = 0; i < userIds.length; i += userBatchSize) {
+    const batch = userIds.slice(i, i + userBatchSize);
+    const members = await ServerMember.find({
+      serverId: options.serverId as any,
+      userId: { $in: batch } as any,
+    } as any).lean();
+
+    for (const member of members) {
+      for (const channel of channels) {
+        calculateEffectivePermissions(member as any, roles as any, everyoneRole as any, channel as any);
+      }
+    }
+  }
+}
+
+/**
+ * Syncs many users' permissions for a specific channel.
+ * Useful when updating that channel's permission overrides.
+ */
+export async function syncUsersPermissionsForChannel(options: {
+  channelId: string;
+  userIds: string[];
+  userBatchSize?: number;
+}): Promise<void> {
+  const userIds = uniqStrings(options.userIds);
+  if (userIds.length === 0) return;
+
+  const channel = await Channel.findById(options.channelId).select('type serverId permissionOverrides').lean();
+  if (!channel || !channel.serverId) return;
+
+  const userBatchSize = options.userBatchSize ?? 200;
+
+  const [server, roles] = await Promise.all([
+    Server.findById(channel.serverId).select('everyoneRoleId').lean(),
+    Role.find({ serverId: channel.serverId } as any).select('_id permissions position').lean(),
+  ]);
+
+  if (!server) return;
+  const everyoneRole = roles.find((r: any) => r._id.toString() === server.everyoneRoleId.toString());
+  if (!everyoneRole) return;
+
+  for (let i = 0; i < userIds.length; i += userBatchSize) {
+    const batch = userIds.slice(i, i + userBatchSize);
+    const members = await ServerMember.find({
+      serverId: channel.serverId as any,
+      userId: { $in: batch } as any,
+    } as any).lean();
+
+    for (const member of members) {
+      calculateEffectivePermissions(member as any, roles as any, everyoneRole as any, channel as any);
+    }
+  }
 }

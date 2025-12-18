@@ -91,16 +91,15 @@ describe('user.controller', () => {
   });
 
   it('updateMeHandler uploads avatar and calls userService.updateMe', async () => {
-    vi.mocked(uploadFile).mockResolvedValue({ key: 'avatar.png' } as any);
     vi.mocked(userService.updateMe).mockResolvedValue({ _id: 'u1', avatarUrl: 'avatar.png' } as any);
 
-    const req: any = { user: { id: 'u1' }, body: {}, file: { originalname: 'a.png' } };
+    const req: any = { user: { id: 'u1' }, body: {}, file: { originalname: 'a.png', key: 'avatar.png' } };
     const res = makeRes();
     const next = vi.fn();
 
     await updateMeHandler(req, res, next);
 
-    expect(uploadFile).toHaveBeenCalledWith(req.file);
+    expect(uploadFile).not.toHaveBeenCalled();
     expect(userService.updateMe).toHaveBeenCalledWith('u1', { avatarUrl: 'avatar.png' });
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.json).toHaveBeenCalledWith({ _id: 'u1', avatarUrl: 'avatar.png' });

@@ -39,16 +39,15 @@ vi.mock('../../gateway/events', () => ({
 }));
 
 vi.mock('../../utils/permission.service', () => ({
-  syncUserChannelPermissions: vi.fn(),
+  syncUsersPermissionsForServerChannels: vi.fn(),
 }));
 
 import roleService from './role.service';
 import { roleRepository } from './role.repository';
 import ServerMember from '../member/member.model';
-import Channel from '../channel/channel.model';
 import { checkRoleHierarchy } from '../../utils/hierarchy.utils';
 import { socketManager } from '../../gateway/events';
-import { syncUserChannelPermissions } from '../../utils/permission.service';
+import { syncUsersPermissionsForServerChannels } from '../../utils/permission.service';
 
 const mkId = (id: string) => ({
   toString: () => id,
@@ -113,13 +112,14 @@ describe('role.service (unit)', () => {
       vi.mocked((ServerMember as any).findOne).mockResolvedValue({ isOwner: true });
       vi.mocked(roleRepository.updateById).mockResolvedValue({ _id: mkId('r1') } as any);
       vi.mocked((ServerMember as any).find).mockResolvedValue([{ userId: mkId('u2') }] as any);
-      vi.mocked((Channel as any).find).mockResolvedValue([{ _id: mkId('c1') }, { _id: mkId('c2') }] as any);
+      vi.mocked(syncUsersPermissionsForServerChannels as any).mockResolvedValue(undefined);
 
       await roleService.updateRole('r1', 's1', 'u1', { permissions: ['SEND_MESSAGES'] as any });
       await new Promise((r) => setTimeout(r, 0));
 
-      expect(syncUserChannelPermissions).toHaveBeenCalledWith('u2', 'c1');
-      expect(syncUserChannelPermissions).toHaveBeenCalledWith('u2', 'c2');
+      expect(syncUsersPermissionsForServerChannels).toHaveBeenCalledWith(
+        expect.objectContaining({ serverId: 's1', userIds: ['u2'] })
+      );
     });
 
     it('swallows background sync errors', async () => {

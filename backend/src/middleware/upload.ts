@@ -1,7 +1,8 @@
 import multer from 'multer';
 import { BadRequestError } from '../utils/errors';
+import { s3StreamingStorage } from './s3Storage';
 
-const storage = multer.memoryStorage();
+const storage = s3StreamingStorage();
 
 // --- General Attachment Configuration ---
 const attachmentLimits = {

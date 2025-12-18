@@ -62,7 +62,6 @@ describe('bot.service', () => {
   });
 
   it('createBot uploads avatar when provided', async () => {
-    vi.mocked(uploadFile).mockResolvedValue({ key: 'avatar.png', mimetype: 'image/png', size: 3 } as any);
     const savedBot: any = {
       accessToken: 't'.repeat(32),
       serviceType: 'rss-fetcher',
@@ -71,10 +70,10 @@ describe('bot.service', () => {
     };
     vi.mocked(botRepository.create).mockResolvedValue(savedBot);
 
-    const file = { originalname: 'a.png', mimetype: 'image/png', size: 3, buffer: Buffer.from('x') } as any;
+    const file = { originalname: 'a.png', mimetype: 'image/png', size: 3, key: 'avatar.png' } as any;
     const result: any = await botService.createBot('u1', { name: 'MyBot', serviceType: 'rss-fetcher' } as any, file);
 
-    expect(uploadFile).toHaveBeenCalledTimes(1);
+    expect(uploadFile).not.toHaveBeenCalled();
     expect(botRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         avatarUrl: 'http://cdn.local/avatar.png',

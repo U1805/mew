@@ -3,9 +3,13 @@ import { Upload } from '@aws-sdk/lib-storage';
 import config from '../config';
 import { nanoid } from 'nanoid';
 import path from 'path';
+import { Transform } from 'stream';
+
+const S3_ENDPOINT = `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.endpoint}:${config.s3.port}`;
+const S3_PUBLIC_BASE = `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.bucketName}.${config.s3.webEndpoint}:${config.s3.webPort}`;
 
 const s3Client = new S3Client({
-  endpoint: `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.endpoint}:${config.s3.port}`,
+  endpoint: S3_ENDPOINT,
   region: config.s3.region,
   credentials: {
     accessKeyId: config.s3.accessKeyId,
@@ -44,7 +48,7 @@ export const getS3PublicUrl = (key: string): string => {
   if (!key) return '';
   // Don't re-hydrate a URL that is already complete.
   if (key.startsWith('http')) return key;
-  return `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.bucketName}.${config.s3.webEndpoint}:${config.s3.webPort}/${key}`;
+  return `${S3_PUBLIC_BASE}/${key}`;
 };
 
 export const uploadFile = async (file: Express.Multer.File) => {
@@ -64,4 +68,39 @@ export const uploadFile = async (file: Express.Multer.File) => {
   await upload.done();
 
   return { key: newFilename, mimetype: file.mimetype, size: file.size };
+};
+
+class ByteCounter extends Transform {
+  public bytes = 0;
+
+  _transform(chunk: any, encoding: BufferEncoding, callback: (error?: Error | null, data?: any) => void) {
+    this.bytes += chunk?.length ?? 0;
+    callback(null, chunk);
+  }
+}
+
+export const uploadStream = async (options: {
+  stream: NodeJS.ReadableStream;
+  originalname: string;
+  mimetype: string;
+}) => {
+  const fileExtension = path.extname(options.originalname);
+  const newFilename = `${nanoid()}${fileExtension}`;
+
+  const counter = new ByteCounter();
+  options.stream.pipe(counter);
+
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: config.s3.bucketName,
+      Key: newFilename,
+      Body: counter,
+      ContentType: options.mimetype,
+    },
+  });
+
+  await upload.done();
+
+  return { key: newFilename, mimetype: options.mimetype, size: counter.bytes };
 };
