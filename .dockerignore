@@ -1,0 +1,15 @@
+.git
+.claude
+.vscode
+.notepad
+
+**/node_modules
+**/coverage
+**/dist
+**/.docusaurus
+website/build
+
+npm-debug.log*
+pnpm-debug.log*
+**/*.tsbuildinfo
+
