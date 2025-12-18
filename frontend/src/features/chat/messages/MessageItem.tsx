@@ -216,10 +216,10 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
                 onClick={() => openModal('userProfile', { user: author })}
             >
                 {author.avatarUrl ? (
-                <img src={author.avatarUrl} alt={author.username} className="w-10 h-10 rounded-full hover:opacity-80 transition-opacity" />
+                <img src={author.avatarUrl} alt={author.username} className="w-10 h-10 rounded-full object-cover hover:opacity-80 transition-opacity" />
                 ) : (
                 <div className="w-10 h-10 rounded-full bg-mew-accent flex items-center justify-center text-white font-semibold">
-                    {author.username.slice(0, 2).toUpperCase()}
+                    {author.username.slice(0, 1).toUpperCase()}
                 </div>
                 )}
             </div>

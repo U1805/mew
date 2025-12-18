@@ -1,4 +1,3 @@
-
 export { API_URL } from './http';
 export { authApi } from './auth.api';
 export { userApi } from './user.api';
@@ -12,6 +11,8 @@ export { messageApi } from './message.api';
 export { searchApi } from './search.api';
 export { webhookApi } from './webhook.api';
 export { uploadApi } from './upload.api';
+export { botApi } from './bot.api';
+export { infraApi } from './infra.api';
 export type { LoginResponse } from './auth.api';
 
 export { default } from './http';

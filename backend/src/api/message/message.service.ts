@@ -1,6 +1,7 @@
-import { IAttachment, IMessage } from './message.model';
+import { IAttachment, IEmbed, IMessage } from './message.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
+import { extractFirstUrl, getLinkPreviewWithSafety } from '../metadata/metadata.service';
 import { calculateEffectivePermissions } from '../../utils/permission.service';
 import Member from '../member/member.model';
 import Role from '../role/role.model';
@@ -136,6 +137,43 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
   const channelIdStr = populatedMessage.channelId.toString();
 
   socketManager.broadcast('MESSAGE_CREATE', channelIdStr, messageForClient);
+
+  // --- Async Metadata Fetching ---
+  if (data.content && !data.attachments?.length && extractFirstUrl(data.content)) {
+    getLinkPreviewWithSafety(data.content)
+      .then(async (previewData) => {
+        if (previewData && 'title' in previewData) {
+          const embed: IEmbed = {
+            url: previewData.url!,
+            title: previewData.title,
+            siteName: previewData.siteName,
+            description: previewData.description,
+            mediaType: previewData.mediaType,
+            contentType: previewData.contentType,
+            images: previewData.images,
+            videos: previewData.videos,
+            favicons: previewData.favicons,
+          };
+
+          populatedMessage.payload = { ...(populatedMessage.payload || {}), embeds: [embed] };
+          await messageRepository.save(populatedMessage);
+
+          const updatedMessageForClient = processMessageForClient(populatedMessage);
+
+          socketManager.broadcast('MESSAGE_UPDATE', channelIdStr, updatedMessageForClient);
+          if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
+            for (const recipient of channel.recipients) {
+              socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_UPDATE', updatedMessageForClient);
+            }
+          }
+        }
+      })
+      .catch(err => {
+        // Log error but don't crash the flow
+        console.error(`[MessageService] Async link preview failed for message ${populatedMessage._id}:`, err);
+      });
+  }
+  // --- End Async Metadata Fetching ---
 
   // Also broadcast to recipients' personal rooms for DM reliability.
   if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {

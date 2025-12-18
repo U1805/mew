@@ -79,7 +79,7 @@ export const FindUserModal: React.FC = () => {
                                     {user.avatarUrl ? (
                                         <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                                     ) : (
-                                        user.username.substring(0, 2).toUpperCase()
+                                        user.username.substring(0, 1).toUpperCase()
                                     )}
                                 </div>
                                 <div className="font-medium text-white">{user.username}</div>

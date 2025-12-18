@@ -83,7 +83,7 @@ const ServerList = () => {
                         <img src={server.avatarUrl} alt={server.name} className="w-full h-full object-cover" />
                         ) : (
                         <span className="text-sm font-medium text-mew-text group-hover:text-white transition-colors">
-                            {server.name.substring(0, 2).toUpperCase()}
+                            {server.name.substring(0, 1).toUpperCase()}
                         </span>
                         )}
                     </button>

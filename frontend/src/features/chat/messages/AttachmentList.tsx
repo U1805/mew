@@ -3,6 +3,7 @@ import { Attachment } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import { formatFileSize } from '../../../shared/utils/file';
 import { AttachmentLightbox } from './AttachmentLightbox';
+import { VideoPlayer } from './VideoPlayer';
 
 interface AttachmentListProps {
   attachments: Attachment[];
@@ -20,6 +21,18 @@ export const AttachmentList = ({ attachments, serverId, channelId }: AttachmentL
       <div className="flex flex-wrap gap-2 mt-2 max-w-[600px]">
         {attachments.map((attachment, index) => {
           const isImage = attachment.contentType.startsWith('image/');
+          const isVideo = attachment.contentType.startsWith('video/');
+
+          if (isVideo) {
+            return (
+              <VideoPlayer
+                key={index}
+                src={attachment.url}
+                contentType={attachment.contentType}
+                filename={attachment.filename}
+              />
+            )
+          }
 
           if (isImage) {
             return (

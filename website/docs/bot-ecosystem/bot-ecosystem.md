@@ -79,7 +79,7 @@ Bot 的代码逻辑（Code）与业务配置（Config）是完全分离的。Bot
 
 ### 3.2.1 数据模型
 
-每个 Bot 在数据库中存储为一个对象，其中最核心的是 `type` 和 `config` 字段。
+每个 Bot 在数据库中存储为一个对象，其中最核心的是 `serviceType` 和 `config` 字段。
 
 ```typescript
 // Collection: bots
@@ -87,10 +87,10 @@ interface Bot {
   _id: ObjectId;
   name: string;        // 🤖 显示名称
   avatar: string;      // 🖼️ 头像 URL
-  token: string;       // 🔑 身份令牌 (用于 API/WebSocket 鉴权)
+  accessToken: string; // 🔑 身份令牌 (用于 Bot API/WebSocket 鉴权)
   
   // 核心字段
-  type: string;        // 🏷️ 实现类型 (e.g., 'rss', 'openai_chat')
+  serviceType: string; // 🏷️ 托管服务类型 (e.g., 'rss-fetcher', 'openai-chat')
   config: any;         // ⚙️ 动态配置对象 (Schema 由 type 决定)
   
   dm_enabled: boolean; // 是否允许私聊
@@ -116,19 +116,28 @@ interface Bot {
 Fetcher 服务是一个纯后台守护进程。
 
 ### 配置示例
-在 Mew UI 中，你可以为 `type: 'rss'` 或 `type: 'x'` 的 Bot 填入如下 JSON：
+在 Mew UI 中，你可以为 `serviceType: 'rss-fetcher'` 等 Bot 填入如下 JSON：
 
-#### 📰 RSS 订阅 (`type: 'rss'`)
+#### 📰 RSS 订阅 (`serviceType: 'rss-fetcher'`)
 ```json
-{
-  // 目标 RSS 源
-  "url": "https://hn.algolia.com/rss",
-  // 轮询间隔 (秒)
-  "interval": 3600,
-  // 投递目标 (这是解耦的关键!)
-  "webhook": "http://mew-backend/api/webhooks/v1/78sdyf..." 
-}
+[
+  {
+    "rss_url": "https://hn.algolia.com/rss",
+    "interval_seconds": 3600,
+    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>",
+    "enabled": true,
+    "send_history_on_start": false,
+    "max_items_per_poll": 5
+  }
+]
 ```
+
+说明：
+
+- `rss_url`：RSS/Atom 地址（兼容 `url` 别名）
+- `interval_seconds`（或 `interval`）：轮询间隔（秒）
+- `webhook`：频道 Webhook 投递地址（后端路由：`POST /api/webhooks/:webhookId/:token`）
+- 推送消息类型默认为 `app/x-rss-card`（前端会渲染为 RSS 卡片）
 
 #### 🐦 Twitter/X 监控 (`type: 'x'`)
 支持数组结构，一个 Bot 实例监控多个账号。
@@ -137,12 +146,12 @@ Fetcher 服务是一个纯后台守护进程。
   {
     "username": "elonmusk",
     "interval": 600,
-    "webhook": "http://mew-backend/api/webhooks/v1/user_A_channel"
+    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>"
   },
   {
     "username": "nasa",
     "interval": 1800,
-    "webhook": "http://mew-backend/api/webhooks/v1/user_B_channel"
+    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>"
   }
 ]
 ```

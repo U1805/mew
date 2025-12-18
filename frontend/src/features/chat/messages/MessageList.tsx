@@ -111,7 +111,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
                         {otherUser.avatarUrl ? (
                              <img src={otherUser.avatarUrl} alt={otherUser.username} className="w-full h-full object-cover" />
                         ) : (
-                             <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 2).toUpperCase()}</span>
+                             <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 1).toUpperCase()}</span>
                         )}
                     </div>
                     <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>

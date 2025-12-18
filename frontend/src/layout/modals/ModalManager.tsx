@@ -16,6 +16,7 @@ import { DeleteMessageModal } from '../../features/messages/modals/DeleteMessage
 import { DeleteCategoryModal } from '../../features/channels/modals/DeleteCategoryModal';
 import { DeleteServerModal } from '../../features/servers/modals/DeleteServerModal';
 import { LeaveServerModal } from '../../features/servers/modals/LeaveServerModal';
+import { BotEditorModal } from '../../features/users/modals/BotEditorModal';
 
 const ModalManager = () => {
   const { activeModal } = useModalStore();
@@ -57,6 +58,8 @@ const ModalManager = () => {
       return <KickUserModal />;
     case 'addPermissionOverride':
       return <AddPermissionOverrideModal />;
+    case 'manageBot':
+      return <BotEditorModal />;
     default:
       return null;
   }

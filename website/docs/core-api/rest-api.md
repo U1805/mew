@@ -144,7 +144,7 @@ Token 类型：
 |---|---|---|
 | GET | `/servers/:serverId/channels` | 获取服务器可见频道（附带 `permissions/lastMessage/lastReadMessageId`） |
 | POST | `/servers/:serverId/channels` | 创建频道（需 `MANAGE_CHANNEL`） |
-| PATCH | `/servers/:serverId/channels/:channelId` | 更新频道（需 `MANAGE_CHANNEL`） |
+| PATCH | `/servers/:serverId/channels/:channelId` | 更新频道（`name`, `categoryId`, `topic`）（需 `MANAGE_CHANNEL`） |
 | DELETE | `/servers/:serverId/channels/:channelId` | 删除频道（需 `MANAGE_CHANNEL`） |
 | GET | `/servers/:serverId/channels/:channelId/permissions` | 获取频道权限覆盖（需 `MANAGE_CHANNEL`） |
 | PUT | `/servers/:serverId/channels/:channelId/permissions` | 替换权限覆盖（需 `MANAGE_CHANNEL`，含自我锁定保护） |

@@ -122,6 +122,38 @@ describe('Webhook Routes', () => {
       expect(res.body.authorId._id).toBe(webhook.botUserId);
     });
 
+    it('should execute a webhook and post an RSS card message', async () => {
+      const payload = {
+        type: 'app/x-rss-card',
+        content: 'Example title',
+        payload: {
+          title: 'Example title',
+          summary: 'Example summary',
+          url: 'https://example.com/post',
+          thumbnail_url: 'https://example.com/img.png',
+          feed_title: 'Example Feed',
+          published_at: '2025-01-01T00:00:00Z',
+          ignored_field: 'should not be persisted',
+        },
+      };
+
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}`)
+        .send(payload);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.type).toBe('app/x-rss-card');
+      expect(res.body.payload).toMatchObject({
+        title: payload.payload.title,
+        summary: payload.payload.summary,
+        url: payload.payload.url,
+        thumbnail_url: payload.payload.thumbnail_url,
+        feed_title: payload.payload.feed_title,
+        published_at: payload.payload.published_at,
+      });
+      expect(res.body.payload.ignored_field).toBeUndefined();
+    });
+
     it('should fail with an invalid token', async () => {
       const payload = { content: 'This should fail' };
       const res = await request(app)

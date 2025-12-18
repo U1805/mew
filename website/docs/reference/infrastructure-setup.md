@@ -19,6 +19,30 @@ slug: /reference/infrastructure-setup
 
 ---
 
+## 0. 使用 Docker Compose（一键启动，推荐）
+
+仓库已经提供 `docker-compose.yml`，会自动启动：
+
+- MongoDB（数据库）
+- Garage（S3 对象存储）
+- Backend（API + Socket.IO）
+- Frontend（Nginx 托管 + 反代 `/api`、`/socket.io`）
+- `plugins/test` Bot（示例 Bot Service）
+
+```bash
+docker compose up --build
+```
+
+默认端口：
+
+- 前端：`http://localhost:8080`
+- 后端：`http://localhost:3000`
+- Garage S3 API：`http://localhost:3900`
+- Garage Web（公共读）：`http://localhost:3902`
+
+> ℹ️ Garage Web 默认使用 `*.web.garage.localhost`（例如：`http://mew-bucket.web.garage.localhost:3902/<key>`）。
+> 大多数系统里 `*.localhost` 会解析到 `127.0.0.1`；如你的环境不支持，请改用 hosts/DNS 或调整 `S3_WEB_ENDPOINT`。
+
 ## 1. 部署 MongoDB
 
 我们将部署 MongoDB 社区版作为主数据库。
@@ -58,6 +82,9 @@ sudo docker ps --filter "name=mongodb"
 ## 2. 部署 Garage S3 服务
 
 [Garage](https://garagehq.deuxfleurs.fr/) 是一个轻量级、自包含的 S3 兼容对象存储服务。我们将通过 **配置生成** -> **服务启动** -> **集群初始化** 三步完成部署。
+
+> 如果你使用的是仓库根目录的 `docker-compose.yml`，Garage 会由 `garage`/`garage-init` 服务自动启动并初始化（包含 bucket、key、website/public read）。
+> 你可以直接跳过本节，或把本节作为“手动部署/生产部署”的参考。
 
 ### 2.1 自动化生成配置
 
@@ -200,6 +227,13 @@ Secret key:   8122334f0f2d5f5cd7...        <-- Secret Key (密码)
 
 > 执行以下命令查看密钥详情:
 > sudo docker exec garaged ./garage key info mew-app-key
+
+将上面的 `Key ID` / `Secret key` 填入后端环境变量：
+
+- `S3_ACCESS_KEY_ID=<Key ID>`
+- `S3_SECRET_ACCESS_KEY=<Secret key>`
+
+如果你使用的是 `docker-compose.yml`，默认会把它们写到 `garage_secrets` 卷里的 `s3-credentials.json`，并通过 `S3_CREDENTIALS_FILE` 注入给后端。
 
 ### 4.3 授权绑定
 

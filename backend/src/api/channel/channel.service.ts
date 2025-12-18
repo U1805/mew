@@ -60,6 +60,11 @@ const channelService = {
       channel.name = channelData.name;
     }
 
+    // Check for topic separately to allow setting an empty topic
+    if (channelData.topic !== undefined) {
+        channel.topic = channelData.topic;
+    }
+
     const updatedChannel = await channelRepository.save(channel);
     socketManager.broadcast('CHANNEL_UPDATE', serverId.toString(), updatedChannel);
     return updatedChannel;

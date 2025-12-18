@@ -63,7 +63,7 @@ export const SearchResultItem = ({ message, channelName, searchQuery, onClick }:
                     {author.avatarUrl ? (
                          <img src={author.avatarUrl} alt={author.username} className="w-full h-full object-cover" />
                     ) : (
-                         <span className="text-xs font-bold text-white">{author.username?.substring(0,2).toUpperCase()}</span>
+                         <span className="text-xs font-bold text-white">{author.username?.substring(0,1).toUpperCase()}</span>
                     )}
                  </div>
                  <div className="flex-1 min-w-0">

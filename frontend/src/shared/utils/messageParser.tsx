@@ -7,11 +7,28 @@ import { Mention } from '../../features/chat/messages/Mention';
  * @returns An array of strings and React elements to be rendered.
  */
 export const parseMessageContent = (content: string) => {
-  const parts = content.split(/(<@[a-zA-Z0-9_]+>|@everyone|@here)/g);
+    const parts = content.split(/(<@[a-zA-Z0-9_]+>|@everyone|@here|https?:\/\/\S+)/g);
 
   return parts.map((part, index) => {
     const userMentionMatch = part.match(/^<@([a-zA-Z0-9_]+)>$/);
     if (userMentionMatch) return <Mention key={index} userId={userMentionMatch[1]} />;
+
+    // URLs: http:// or https://
+    if (/^https?:\/\/\S+$/.test(part)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-mew-accent hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+
     if (part === '@everyone' || part === '@here') {
       return (
         <span key={index} className="inline-flex items-center px-1 rounded-[3px] font-medium bg-[#F0B232]/30 text-[#F0B232] mx-0.5 align-baseline">

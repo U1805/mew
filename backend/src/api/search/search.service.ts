@@ -27,7 +27,7 @@ export const searchMessagesInServer = async ({
 
   // 2. Build the search query
   const matchQuery: any = {
-    $text: { $search: query },
+    content: { $regex: query, $options: 'i' },
     channelId: { $in: channelIds },
   };
 
@@ -41,7 +41,7 @@ export const searchMessagesInServer = async ({
   // 4. Perform the paginated search
   const messages = await Message.find(matchQuery)
     .populate('authorId', 'username avatarUrl')
-    .sort({ score: { $meta: 'textScore' } })
+    .sort({ createdAt: -1 })
     .limit(limit)
     .skip((page - 1) * limit)
     .lean();

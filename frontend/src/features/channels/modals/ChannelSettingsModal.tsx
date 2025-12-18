@@ -46,6 +46,7 @@ export const ChannelSettingsModal = () => {
 
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [topic, setTopic] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'permissions' | 'integrations'>('overview');
   const permissions = usePermissions(modalData?.channel?._id);
@@ -91,6 +92,7 @@ export const ChannelSettingsModal = () => {
     if (modalData?.channel) {
       setName(modalData.channel.name || '');
       setCategoryId(modalData.channel.categoryId || '');
+      setTopic(modalData.channel.topic || '');
     }
   }, [modalData]);
 
@@ -103,9 +105,11 @@ export const ChannelSettingsModal = () => {
           const catId = categoryId === '' ? null : categoryId;
           await channelApi.update(currentServerId, modalData.channel._id, {
               name,
-              categoryId: catId
+              categoryId: catId,
+              topic,
           });
           queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
+          queryClient.invalidateQueries({ queryKey: ['channel', modalData.channel._id] });
           closeModal();
       } catch (error) {
           console.error(error);
@@ -297,6 +301,8 @@ export const ChannelSettingsModal = () => {
                             <textarea
                                 className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium h-20 resize-none"
                                 placeholder="Let everyone know how to use this channel!"
+                                value={topic}
+                                onChange={(e) => setTopic(e.target.value)}
                             />
                         </div>
                         <div className="flex gap-4 pt-4">

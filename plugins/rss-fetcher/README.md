@@ -1,0 +1,61 @@
+# RSS Fetcher Bot (serviceType: `rss-fetcher`)
+
+这个 Bot 会从后端批量拉取所有 `serviceType=rss-fetcher` 的 Bot 实例配置，并把配置中的每个任务当作一个独立的定时任务：按间隔抓取 `rss_url`，检测到新条目后向对应 `webhook` 推送消息。
+
+推送默认使用消息类型 `app/x-rss-card`（RSS 卡片），由前端以卡片样式渲染。
+
+## 配置格式（Bot.config，JSON 字符串）
+
+### 推荐：数组（多任务）
+
+```json
+[
+  {
+    "interval_seconds": 3600,
+    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>",
+    "rss_url": "https://example.com/feed.xml",
+    "enabled": true,
+    "send_history_on_start": false,
+    "max_items_per_poll": 5,
+    "user_agent": "mew-rss-fetcher-bot/1.0"
+  },
+  {
+    "interval_seconds": 7200,
+    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>",
+    "rss_url": "https://another.example/rss",
+    "enabled": true
+  }
+]
+```
+
+### 兼容：单任务对象 / 包装对象
+
+也支持：
+
+- 单任务对象（等价于数组只包含 1 个元素）
+- `{ "tasks": [...] }`（等价于直接数组）
+- `url` 字段作为 `rss_url` 的别名（兼容旧文档）
+
+字段说明：
+
+- `interval_seconds` / `interval`：轮询间隔（秒）
+- `enabled`：可选，默认为 `true`；为 `false` 时该任务不运行
+- `send_history_on_start`：可选，默认为 `false`；为 `true` 时首次启动会推送当前 feed 的历史条目（谨慎开启避免刷屏）
+- `max_items_per_poll`：可选，单次最多推送多少条新内容（默认 `5`，上限 `20`）
+- `user_agent`：可选，自定义抓取 UA（默认 `mew-rss-fetcher-bot/1.0`）
+
+## 去重与缓存
+
+- 支持 `ETag` / `Last-Modified` 条件请求，减少重复流量
+- 支持本地持久化去重 state（默认写到系统临时目录的 `mew/rss-fetcher/<botId>/...`），避免重启后重复推送
+
+## 运行
+
+环境变量：
+`.env.local/.env` 加载规则与通用环境变量说明见 `plugins/README.md`（由 `plugins/sdk` 提供）。
+
+运行：
+
+```bash
+go run .
+```

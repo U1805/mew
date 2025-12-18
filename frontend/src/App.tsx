@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthScreen } from './features/auth/components/AuthScreen';
 import Layout from './layout/Layout';
+import ModalManager from './layout/modals/ModalManager';
 import { getSocket } from './shared/services/socket';
 import { useAuthStore, useModalStore, useUIStore } from './shared/stores';
 
@@ -57,6 +58,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       {token ? <Layout /> : <AuthScreen />}
+      <ModalManager />
     </QueryClientProvider>
   );
 };

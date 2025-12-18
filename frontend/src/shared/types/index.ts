@@ -76,6 +76,7 @@ export interface PermissionOverride {
 export interface Channel {
   _id: string;
   name?: string;
+  topic?: string;
   type: ChannelType;
   serverId?: string;
   categoryId?: string;
@@ -99,6 +100,18 @@ export interface Reaction {
   userIds: string[];
 }
 
+export interface Embed {
+  url: string;
+  title?: string;
+  siteName?: string;
+  description?: string;
+  images?: string[];
+  mediaType?: string;
+  contentType?: string;
+  videos?: any[];
+  favicons?: string[];
+}
+
 export interface MessagePayload {
   webhookName?: string;
   title?: string;
@@ -109,6 +122,7 @@ export interface MessagePayload {
     username?: string;
     avatarUrl?: string;
   };
+  embeds?: Embed[];
   [key: string]: any;
 }
 
@@ -138,4 +152,17 @@ export interface Webhook {
   serverId: string;
   token: string;
   botUserId: string;
+}
+
+export interface Bot {
+  _id: string;
+  ownerId: string;
+  name: string;
+  avatarUrl?: string;
+  accessToken?: string;
+  serviceType: string;
+  dmEnabled: boolean;
+  config?: string; // JSON String
+  createdAt: string;
+  updatedAt: string;
 }

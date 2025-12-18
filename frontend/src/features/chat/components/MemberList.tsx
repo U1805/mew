@@ -9,6 +9,7 @@ import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores'
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
 import { useMembers } from '../../../shared/hooks/useMembers';
 import { useRoles } from '../../../shared/hooks/useRoles';
+import { filterMembersForChannel } from './memberListUtils';
 
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;
@@ -31,6 +32,8 @@ const MemberList = () => {
   const memberGroups = useMemo(() => {
     if (!members || !roles) return [];
 
+    const visibleMembers = filterMembersForChannel(members, currentChannelId);
+
     const everyoneRole = roles.find(r => r.isDefault);
     const groups: Record<string, ServerMember[]> = {};
 
@@ -45,12 +48,7 @@ const MemberList = () => {
         groups[role.name] = [];
       });
 
-    members.forEach(member => {
-      // Webhook 成员只在其所属频道展示。
-      if (member.channelId && member.channelId !== currentChannelId) {
-        return;
-      }
-
+    visibleMembers.forEach(member => {
       const memberRoleIds = member.roleIds || [];
       const highestExplicitRole = roles
         .filter(r => !r.isDefault && memberRoleIds.includes(r._id))
@@ -65,9 +63,10 @@ const MemberList = () => {
 
     for (const groupName in groups) {
       groups[groupName].sort((a, b) => {
-        const posA = getHighestRolePos(a, roles);
-        const posB = getHighestRolePos(b, roles);
-        if (posA !== posB) return posB - posA;
+        const botA = !!a.userId?.isBot;
+        const botB = !!b.userId?.isBot;
+        if (botA !== botB) return botA ? -1 : 1;
+
         return (a.userId?.username || '').localeCompare(b.userId?.username || '');
       });
     }
@@ -155,7 +154,7 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
             {u.avatarUrl ? (
               <img src={u.avatarUrl} alt={u.username} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-white text-xs font-bold">{u.username.substring(0, 2).toUpperCase()}</span>
+              <span className="text-white text-xs font-bold">{u.username.substring(0, 1).toUpperCase()}</span>
             )}
           </div>
           {isOnline && !u.isBot && (

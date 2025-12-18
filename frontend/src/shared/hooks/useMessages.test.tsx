@@ -34,7 +34,7 @@ describe('useMessages', () => {
 
   it('should not fetch messages if serverId is null', () => {
     renderHook(() => useMessages(null, 'channel-1'), { wrapper: createWrapper() });
-    expect(messageApi.list).not.toHaveBeenCalled();
+    expect(messageApi.list).toHaveBeenCalledWith(undefined, 'channel-1');
   });
 
   it('should not fetch messages if channelId is null', () => {

@@ -11,6 +11,10 @@ class UserRepository {
     return User.findOne({ email });
   }
 
+  public async findByIdWithPassword(userId: string): Promise<IUser | null> {
+    return User.findById(userId).select('+password');
+  }
+
   public async findByEmailWithPassword(email: string): Promise<IUser | null> {
     return User.findOne({ email }).select('+password');
   }
