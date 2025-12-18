@@ -56,7 +56,7 @@ export const UserProfileModal: React.FC = () => {
                          {user.avatarUrl ? (
                              <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                          ) : (
-                             <span className="text-2xl font-bold text-white">{user.username.substring(0, 2).toUpperCase()}</span>
+                             <span className="text-2xl font-bold text-white">{user.username.substring(0, 1).toUpperCase()}</span>
                          )}
                      </div>
                      <div className={clsx(

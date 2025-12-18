@@ -5,7 +5,7 @@ import { webhookRepository } from './webhook.repository';
 import UserModel from '../user/user.model';
 import ServerModel from '../server/server.model';
 import * as MessageService from '../message/message.service';
-import { NotFoundError, UnauthorizedError } from '../../utils/errors';
+import { BadRequestError, NotFoundError, UnauthorizedError } from '../../utils/errors';
 
 interface WebhookCreationData {
   name: string;
@@ -69,9 +69,11 @@ export const deleteWebhook = async (webhookId: string): Promise<void> => {
 };
 
 interface ExecuteWebhookPayload {
-    content: string;
+    content?: string;
     username?: string;
     avatar_url?: string;
+    type?: string;
+    payload?: Record<string, any>;
 }
 
 export const executeWebhook = async (webhookId: string, token: string, payload: ExecuteWebhookPayload) => {
@@ -86,18 +88,42 @@ export const executeWebhook = async (webhookId: string, token: string, payload: 
       throw new NotFoundError('Associated bot user not found');
     }
 
+    const content = typeof payload.content === 'string' ? payload.content : '';
+    const requestedType = typeof payload.type === 'string' ? payload.type : '';
+    const isRssCard = requestedType === 'app/x-rss-card';
+
+    if (!isRssCard && content.trim() === '') {
+      throw new BadRequestError('content is required');
+    }
+
+    const rssPayload = isRssCard && payload.payload && typeof payload.payload === 'object'
+      ? {
+          title: payload.payload.title,
+          summary: payload.payload.summary,
+          url: payload.payload.url,
+          thumbnail_url: payload.payload.thumbnail_url,
+          feed_title: payload.payload.feed_title,
+          published_at: payload.payload.published_at,
+        }
+      : undefined;
+
     const messageData: any = {
       channelId: webhook.channelId,
       authorId: webhook.botUserId,
-      content: payload.content,
+      type: isRssCard ? 'app/x-rss-card' : 'message/default',
+      content,
       payload: {
         webhookName: webhook.name,
         overrides: {
             username: payload.username || webhook.name,
             avatarUrl: payload.avatar_url || webhook.avatarUrl,
         }
-      }
+      },
     };
+
+    if (rssPayload) {
+      messageData.payload = { ...messageData.payload, ...rssPayload };
+    }
 
     const createdMessage = await MessageService.createMessage(messageData);
 

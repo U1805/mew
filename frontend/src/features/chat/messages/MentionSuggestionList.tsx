@@ -99,7 +99,7 @@ export const MentionSuggestionList = ({ serverId, query, onSelect, onClose }: Me
                 {member.userId.avatarUrl ? (
                     <img src={member.userId.avatarUrl} alt={member.userId.username} className="w-full h-full object-cover" />
                 ) : (
-                    <span className="text-[10px] font-bold text-white">{member.userId.username.substring(0, 2).toUpperCase()}</span>
+                    <span className="text-[10px] font-bold text-white">{member.userId.username.substring(0, 1).toUpperCase()}</span>
                 )}
               </div>
             )}

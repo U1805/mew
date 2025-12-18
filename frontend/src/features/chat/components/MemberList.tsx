@@ -154,7 +154,7 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
             {u.avatarUrl ? (
               <img src={u.avatarUrl} alt={u.username} className="w-full h-full object-cover" />
             ) : (
-              <span className="text-white text-xs font-bold">{u.username.substring(0, 2).toUpperCase()}</span>
+              <span className="text-white text-xs font-bold">{u.username.substring(0, 1).toUpperCase()}</span>
             )}
           </div>
           {isOnline && !u.isBot && (

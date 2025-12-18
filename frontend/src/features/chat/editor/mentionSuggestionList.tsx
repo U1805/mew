@@ -90,7 +90,7 @@ const MentionSuggestionList = forwardRef(function MentionSuggestionList(
                   />
                 ) : (
                   <span className="text-[10px] font-bold text-white">
-                    {item.label.substring(0, 2).toUpperCase()}
+                    {item.label.substring(0, 1).toUpperCase()}
                   </span>
                 )}
               </div>

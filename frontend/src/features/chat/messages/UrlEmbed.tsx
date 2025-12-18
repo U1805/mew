@@ -7,10 +7,15 @@ interface UrlEmbedProps {
 
 export const UrlEmbed: React.FC<UrlEmbedProps> = ({ embed }) => {
   const hasImage = embed.images && embed.images.length > 0;
+  const ariaLabel = embed.title || embed.siteName || embed.url;
 
   return (
-    <div
-      className="flex max-w-lg mt-2 bg-mew-darker border-l-4 border-mew-accent rounded overflow-hidden shadow-sm"
+    <a
+      href={embed.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={ariaLabel}
+      className="group flex max-w-lg mt-2 bg-mew-darker border-l-4 border-mew-accent rounded overflow-hidden shadow-sm transition-colors hover:bg-mew-dark focus:outline-none focus:ring-2 focus:ring-mew-accent focus:ring-offset-2 focus:ring-offset-mew-darker"
       onClick={(e) => e.stopPropagation()} // Prevent event bubbling
     >
       <div className="p-3 flex-1 min-w-0">
@@ -21,14 +26,9 @@ export const UrlEmbed: React.FC<UrlEmbedProps> = ({ embed }) => {
         )}
 
         {embed.title && (
-          <a
-            href={embed.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-mew-accent-hover hover:underline font-semibold block mt-1 truncate"
-          >
+          <div className="text-mew-accent-hover underline-offset-2 group-hover:underline font-semibold block mt-1 truncate">
             {embed.title}
-          </a>
+          </div>
         )}
 
         {embed.description && (
@@ -39,15 +39,12 @@ export const UrlEmbed: React.FC<UrlEmbedProps> = ({ embed }) => {
       </div>
 
       {hasImage && (
-        <a
-          href={embed.url}
-          target="_blank"
-          rel="noopener noreferrer"
+        <div
           className="flex-shrink-0 w-24 h-auto ml-2 bg-cover bg-center"
           style={{ backgroundImage: `url(${embed.images![0]})` }}
-          aria-label="Embedded image link"
+          aria-hidden="true"
         />
       )}
-    </div>
+    </a>
   );
 };

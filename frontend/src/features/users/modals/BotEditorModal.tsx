@@ -72,23 +72,27 @@ export const BotEditorModal: React.FC = () => {
       setConfig(initialValues.config || '{}');
       setAvatarPreview(initialValues.avatarUrl || null);
     }
+  }, [modalData]);
 
+  useEffect(() => {
     try {
       JSON.parse(config);
       setConfigError('');
     } catch {
       setConfigError('Invalid JSON format');
     }
-  }, [modalData]);
+  }, [config]);
 
   const handleConfigChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setConfig(val);
+    setConfig(e.target.value);
+  };
+
+  const handleFormatConfig = () => {
     try {
-      JSON.parse(val);
-      setConfigError('');
+      const parsed = JSON.parse(config);
+      setConfig(JSON.stringify(parsed, null, 2));
     } catch {
-      setConfigError('Invalid JSON format');
+      toast.error('Invalid JSON format');
     }
   };
 
@@ -186,7 +190,7 @@ export const BotEditorModal: React.FC = () => {
       <div className="bg-[#313338] w-full max-w-2xl rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[90vh]">
         <div className="p-6 pb-0">
           <h2 className="text-xl font-bold text-white mb-2">{isEditing ? `Edit Bot - ${name}` : 'Create a Bot'}</h2>
-          <p className="text-mew-textMuted text-sm">Configure your bot's appearance and settings.</p>
+          <p className="text-mew-textMuted text-sm">Configure your bot appearance and settings.</p>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
@@ -323,7 +327,19 @@ export const BotEditorModal: React.FC = () => {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Configuration (JSON)</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-mew-textMuted uppercase">Configuration (JSON)</label>
+                  <button
+                    type="button"
+                    onClick={handleFormatConfig}
+                    disabled={!config.trim() || !!configError}
+                    className="flex items-center gap-1.5 text-xs text-mew-textMuted hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Format JSON"
+                  >
+                    <Icon icon="mdi:format-indent-increase" width="16" />
+                    Format
+                  </button>
+                </div>
                 <textarea
                   value={config}
                   onChange={handleConfigChange}

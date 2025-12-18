@@ -24,7 +24,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	client := sdk.NewMewClient(cfg.APIBase, cfg.AdminSecret)
+	client, err := sdk.NewMewClient(cfg.APIBase, cfg.AdminSecret)
+	if err != nil {
+		log.Fatal(err)
+	}
 	manager := sdk.NewBotManager(client, cfg.ServiceType, "[test-bot]", func(botID, botName, rawConfig string) (sdk.Runner, error) {
 		return NewTestBotRunner(botID, botName, rawConfig)
 	})

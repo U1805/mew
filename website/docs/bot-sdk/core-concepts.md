@@ -21,14 +21,13 @@ sidebar_label: '核心概念'
 Mew 奉行 **"Code is Stateless, Config is State"** 的原则。
 你的 Bot 代码不应包含任何硬编码的任务列表。它应该在启动时从 Mew 平台拉取配置。
 
-**配置示例 (JSON)**:
+**配置示例（rss-fetcher）**：
+
+在 Mew 中，Bot 的 `config` 通常以“JSON 字符串”的形式存储（Fetcher Bot 常用数组来表达多个任务）。
+
 ```json
 {
-  "type": "rss",
-  "config": {
-    "url": "https://news.ycombinator.com/rss",
-    "interval": 300,
-    "webhook": "http://mew-api/webhooks/xyz"
-  }
+  "serviceType": "rss-fetcher",
+  "config": "[{\"rss_url\":\"https://news.ycombinator.com/rss\",\"interval_seconds\":300,\"webhook\":\"http://mew-backend/api/webhooks/<webhookId>/<token>\"}]"
 }
 ```

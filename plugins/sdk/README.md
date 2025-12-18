@@ -6,7 +6,7 @@
 
 - `.env.local/.env` 加载：`sdk.LoadDotEnv(logPrefix)`
 - 运行时配置解析：`sdk.LoadRuntimeConfig(serviceType)`（serviceType 推荐用 `sdk.ServiceTypeFromCaller()` 自动获取）
-- 后端 bootstrap client：`sdk.NewMewClient(apiBase, adminSecret)`
+- 后端 bootstrap client：`sdk.NewMewClient(apiBase, adminSecret)`（支持代理环境变量）
 - 通用 BotManager（热重载）：`sdk.NewBotManager(client, serviceType, logPrefix, factory)`
 
 ## Runner 接口
@@ -24,3 +24,12 @@
 ## `.env` 约定
 
 见 `plugins/README.md` 的“通用环境变量”和“.env.local/.env 加载规则”。
+
+## 请求代理（可选）
+
+SDK 默认**不使用代理**（即使系统设置了 `HTTP_PROXY/HTTPS_PROXY`）。
+
+如需开启，请设置：
+
+- `MEW_API_PROXY=env`：使用 Go 的 ProxyFromEnvironment（`HTTP_PROXY/HTTPS_PROXY/NO_PROXY`）
+- `MEW_API_PROXY=http://127.0.0.1:7890`：固定代理（也支持直接写 `127.0.0.1:7890`，会自动补 `http://`）

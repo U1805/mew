@@ -6,14 +6,16 @@ This project is a monorepo containing the frontend, backend, and bot services.
 
 ## Documentation
 
-For detailed information about the project's vision, architecture, and implementation plan, please refer to the documents in the `/docs` directory:
+Project docs live in `website/docs` (Docusaurus).
 
-- **[Project Vision](./docs/PROJECT.md):** The core vision and goals of the project.
-- **[Implementation Plan](./docs/IMPLEMENTATION_PLAN.md):** Detailed technical specifications for the IM platform.
+- Local preview: `pnpm dev:website`
+- Build: `pnpm build:website`
 
 ## Getting Started
 
-For instructions on how to set up and run the project for development, please see the [Development Guide](./docs/DEVELOPMENT_GUIDE.md).
+From the repo root:
+
+- Dev (frontend + backend): `pnpm dev`
 
 ## Docker (recommended)
 

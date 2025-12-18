@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -17,14 +19,40 @@ type MewClient struct {
 	httpClient  *http.Client
 }
 
-func NewMewClient(apiBase, adminSecret string) *MewClient {
+// NewMewClient creates a client for calling MEW backend APIs.
+//
+// Proxy behavior:
+// - Default: no proxy (even if HTTP_PROXY / HTTPS_PROXY is set)
+// - Set MEW_API_PROXY to enable:
+//   - "env": use Go's ProxyFromEnvironment (HTTP_PROXY/HTTPS_PROXY/NO_PROXY)
+//   - URL / host:port: use a fixed proxy URL (http/https)
+func NewMewClient(apiBase, adminSecret string) (*MewClient, error) {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+
+	if raw := strings.TrimSpace(os.Getenv("MEW_API_PROXY")); raw != "" {
+		switch strings.ToLower(raw) {
+		case "0", "false", "off", "no", "none", "direct":
+			transport.Proxy = nil
+		case "env":
+			transport.Proxy = http.ProxyFromEnvironment
+		default:
+			proxyURL, err := parseProxyURL(raw)
+			if err != nil {
+				return nil, fmt.Errorf("invalid MEW_API_PROXY: %w", err)
+			}
+			transport.Proxy = http.ProxyURL(proxyURL)
+		}
+	}
+
 	return &MewClient{
 		apiBase:     strings.TrimRight(apiBase, "/"),
 		adminSecret: adminSecret,
 		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
+			Transport: transport,
+			Timeout:   15 * time.Second,
 		},
-	}
+	}, nil
 }
 
 type BootstrapBot struct {
@@ -95,3 +123,23 @@ func (c *MewClient) RegisterServiceType(ctx context.Context, serviceType string)
 	return nil
 }
 
+func parseProxyURL(raw string) (*url.URL, error) {
+	s := strings.TrimSpace(raw)
+	if s == "" {
+		return nil, fmt.Errorf("empty proxy url")
+	}
+	if !strings.Contains(s, "://") {
+		s = "http://" + s
+	}
+	u, err := url.Parse(s)
+	if err != nil {
+		return nil, err
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported scheme %q (only http/https)", u.Scheme)
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("missing host")
+	}
+	return u, nil
+}
