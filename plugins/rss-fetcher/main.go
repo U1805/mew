@@ -12,26 +12,25 @@ import (
 )
 
 func main() {
-	sdk.LoadDotEnv("[test-bot]")
+	sdk.LoadDotEnv("[rss-fetcher-bot]")
 
 	cfg, err := sdk.LoadRuntimeConfig(sdk.ServiceTypeFromCaller())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Printf("[test-bot] starting (serviceType=%s apiBase=%s syncInterval=%s)", cfg.ServiceType, cfg.APIBase, cfg.SyncInterval)
+	log.Printf("[rss-fetcher-bot] starting (serviceType=%s apiBase=%s syncInterval=%s)", cfg.ServiceType, cfg.APIBase, cfg.SyncInterval)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	client := sdk.NewMewClient(cfg.APIBase, cfg.AdminSecret)
-	manager := sdk.NewBotManager(client, cfg.ServiceType, "[test-bot]", func(botID, botName, rawConfig string) (sdk.Runner, error) {
-		return NewTestBotRunner(botID, botName, rawConfig)
+	manager := sdk.NewBotManager(client, cfg.ServiceType, "[rss-fetcher-bot]", func(botID, botName, rawConfig string) (sdk.Runner, error) {
+		return NewRSSFetcherBotRunner(botID, botName, rawConfig)
 	})
 
-	// Initial sync
 	if err := manager.SyncOnce(ctx); err != nil {
-		log.Printf("[test-bot] initial sync failed: %v", err)
+		log.Printf("[rss-fetcher-bot] initial sync failed: %v", err)
 	}
 
 	ticker := time.NewTicker(cfg.SyncInterval)
@@ -40,12 +39,12 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("[test-bot] shutting down...")
+			log.Printf("[rss-fetcher-bot] shutting down...")
 			manager.StopAll()
 			return
 		case <-ticker.C:
 			if err := manager.SyncOnce(ctx); err != nil {
-				log.Printf("[test-bot] sync failed: %v", err)
+				log.Printf("[rss-fetcher-bot] sync failed: %v", err)
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-package main
+package sdk
 
 import (
 	"bytes"
@@ -94,3 +94,4 @@ func (c *MewClient) RegisterServiceType(ctx context.Context, serviceType string)
 	}
 	return nil
 }
+

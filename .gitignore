@@ -40,3 +40,4 @@ Thumbs.db
 !/CLAUDE.md
 !/README.md
 backend/coverage/*
+plugins/**/*.exe

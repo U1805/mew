@@ -4,7 +4,10 @@ WORKDIR /src/plugins/test
 
 COPY plugins/test/go.mod ./
 COPY plugins/test/go.sum ./
+COPY plugins/sdk/go.mod ../sdk/go.mod
+COPY plugins/sdk/go.sum ../sdk/go.sum
 COPY plugins/test/*.go ./
+COPY plugins/sdk/*.go ../sdk/
 
 RUN go mod download
 RUN go build -o /out/mew-test-bot .
