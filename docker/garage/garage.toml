@@ -8,7 +8,8 @@ replication_factor = 1
 rpc_bind_addr = "[::]:3901"
 rpc_public_addr = "garage:3901"
 # Dev-only secret. For production, regenerate it (see docs).
-rpc_secret = "dev-dev-dev-dev-dev-dev-dev-dev-dev-dev-dev-dev-dev-dev-dev"
+# Must be 32 bytes of random hex (64 hex chars).
+rpc_secret = "5a9a8d0d6d85f9c22f9f8d60b6c6db62dfb02e2c8b7c3b5d6a6c340f8a5d7e3c"
 
 [s3_api]
 s3_region = "garage"

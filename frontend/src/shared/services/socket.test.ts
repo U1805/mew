@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 let token: string | null = null;
 const on = vi.fn();
 const disconnect = vi.fn();
-const io = vi.fn(() => ({ on, disconnect }));
+const io = vi.fn((..._args: any[]) => ({ on, disconnect }));
 
 vi.mock('socket.io-client', () => ({
   io: (...args: any[]) => io(...args),

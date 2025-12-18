@@ -7,7 +7,7 @@ export const channelApi = {
   update: (
     serverId: string,
     channelId: string,
-    data: { name?: string; categoryId?: string | null }
+    data: { name?: string; categoryId?: string | null; topic?: string }
   ) => api.patch(`/servers/${serverId}/channels/${channelId}`, data),
   createDM: (recipientId: string) => api.post(`/users/@me/channels`, { recipientId }),
   listDMs: () => api.get(`/users/@me/channels`),
