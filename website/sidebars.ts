@@ -47,7 +47,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Bot 生态',
           items: [
-            'bot-ecosystem/bot-ecosystem',
+            'bot-sdk/bot-ecosystem',
             {
               type: 'category',
               label: 'Bot SDK',

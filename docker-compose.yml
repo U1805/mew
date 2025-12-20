@@ -13,7 +13,7 @@ services:
       retries: 30
 
   garage:
-    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/dxflrs/garage:v2.1.0
+    image: dxflrs/garage:v2.1.0
     restart: unless-stopped
     volumes:
       - ./docker/garage/garage.toml:/etc/garage.toml:ro
@@ -79,6 +79,18 @@ services:
       S3_CREDENTIALS_FILE: /var/run/mew/s3-credentials.json
     ports:
       - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
     volumes:
       - garage_secrets:/var/run/mew:ro
 
@@ -94,18 +106,18 @@ services:
     ports:
       - "11451:80"
 
-  # test-bot:
-  #   build:
-  #     context: .
-  #     dockerfile: plugins/test/Dockerfile
-  #   restart: unless-stopped
-  #   depends_on:
-  #     - backend
-  #   environment:
-  #     MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
-  #     MEW_URL: http://backend:3000
-  #     MEW_SERVICE_TYPE: test
-  #     MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
+  test-bot:
+    build:
+      context: ./plugins
+      dockerfile: test/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
+      MEW_URL: http://backend:3000
+      MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
 
 volumes:
   mongo_data:

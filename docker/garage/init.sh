@@ -20,7 +20,7 @@ while [ $i -lt 300 ]; do
     break
   fi
   if [ $((i % 5)) -eq 0 ]; then
-     echo "[garage-init] Retrying connection..."
+    echo "[garage-init] Retrying connection..."
   fi
   i=$((i+1))
   sleep 1
@@ -52,26 +52,26 @@ if [ -f "$CREDS_FILE" ]; then
   # Extract Access Key from existing file
   EXISTING_KEY_ID=$(grep -o '"accessKeyId":"[^"]*' "$CREDS_FILE" | cut -d'"' -f4)
   echo "[garage-init] Found existing credentials file with Key ID: $EXISTING_KEY_ID"
-  
+
   # Verify if Key exists in Garage
   if $GARAGE_CMD key info "$EXISTING_KEY_ID" >/dev/null 2>&1; then
     echo "[garage-init] Key is valid in Garage."
     NEED_NEW_KEY=0
     ACCESS_KEY_ID="$EXISTING_KEY_ID"
   else
-    echo "[garage-init] ⚠️ Warning: Key in file does NOT exist in Garage. Deleting invalid credentials."
+    echo "[garage-init] Warning: Key in file does NOT exist in Garage. Deleting invalid credentials."
     rm "$CREDS_FILE"
   fi
 fi
 
 if [ "$NEED_NEW_KEY" -eq 1 ]; then
   echo "[garage-init] Creating new key: $KEY_NAME"
-  
+
   # Delete old key name to prevent conflicts
   $GARAGE_CMD key delete "$KEY_NAME" >/dev/null 2>&1 || true
 
   OUT="$($GARAGE_CMD key create "$KEY_NAME" 2>&1)"
-  
+
   ACCESS_KEY_ID="$(echo "$OUT" | awk -F':' '/Key ID/ {gsub(/^[ \t]+/, "", $2); print $2; exit}')"
   SECRET_ACCESS_KEY="$(echo "$OUT" | awk -F':' '/Secret key/ {gsub(/^[ \t]+/, "", $2); print $2; exit}')"
 

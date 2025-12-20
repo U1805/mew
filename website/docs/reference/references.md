@@ -1,14 +1,10 @@
 ---
-sidebar_label: '参考'
+sidebar_label: '常见问题'
 sidebar_position: 20
 slug: /guide/references
 ---
 
-# 📚 参考
-
-## 🧰 部署与基础设施
-
-- 基础设施部署（MongoDB / Garage）：[基础设施部署](./infrastructure-setup.md)
+# 📚 常见问题
 
 ## 🔧 故障排除 (Troubleshooting)
 
