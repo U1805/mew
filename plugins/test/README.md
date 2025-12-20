@@ -6,8 +6,8 @@
 
 ```json
 [
-  { "interval": 3600, "webhook": "http://mew-backend/api/webhooks/xxx", "content": "test_channel_1" },
-  { "interval": 7200, "webhook": "http://mew-backend/api/webhooks/yyy", "content": "xxx" }
+  { "interval": 3600, "webhook": "http://mew-server/api/webhooks/xxx", "content": "test_channel_1" },
+  { "interval": 7200, "webhook": "http://mew-server/api/webhooks/yyy", "content": "xxx" }
 ]
 ```
 

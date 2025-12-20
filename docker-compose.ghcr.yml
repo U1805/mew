@@ -50,8 +50,8 @@ services:
       - garage_meta:/var/lib/garage/meta
       - garage_data:/var/lib/garage/data
 
-  backend:
-    image: "ghcr.io/u1805/mew/backend:latest"
+  server:
+    image: "ghcr.io/u1805/mew/server:latest"
     restart: unless-stopped
     depends_on:
       mongo:
@@ -77,12 +77,7 @@ services:
       - "3000:3000"
     healthcheck:
       test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-        ]
+        ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -90,24 +85,24 @@ services:
     volumes:
       - garage_secrets:/var/run/mew:ro
 
-  frontend:
-    image: "ghcr.io/u1805/mew/frontend:latest"
+  client:
+    image: "ghcr.io/u1805/mew/client:latest"
     restart: unless-stopped
     depends_on:
-      - backend
+      - server
     ports:
       - "11451:80"
 
-  bot:
-    image: "ghcr.io/u1805/mew/bot:latest"
+  plugins:
+    image: "ghcr.io/u1805/mew/plugins:latest"
     restart: unless-stopped
     depends_on:
-      backend:
+      server:
         condition: service_healthy
     env_file:
       - ./docker-compose.env
     environment:
-      MEW_URL: http://backend:3000
+      MEW_URL: http://server:3000
 
 volumes:
   mongo_data:

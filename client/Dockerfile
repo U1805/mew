@@ -1,0 +1,27 @@
+FROM node:20-slim AS build
+
+WORKDIR /app
+
+# Ensure devDependencies (tsc, vite, etc.) are installed for the build step.
+ENV NODE_ENV=development
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY server/package.json server/package.json
+COPY client/package.json client/package.json
+COPY website/package.json website/package.json
+
+RUN corepack enable && pnpm install --frozen-lockfile --prod=false
+
+COPY client ./client
+
+ARG VITE_API_BASE_URL=/api
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
+RUN pnpm --filter client build
+
+FROM nginx:1.27-alpine
+
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/client/dist /usr/share/nginx/html
+
+EXPOSE 80

@@ -28,6 +28,6 @@ Mew 奉行 **"Code is Stateless, Config is State"** 的原则。
 ```json
 {
   "serviceType": "rss-fetcher",
-  "config": "[{\"rss_url\":\"https://news.ycombinator.com/rss\",\"interval_seconds\":300,\"webhook\":\"http://mew-backend/api/webhooks/<webhookId>/<token>\"}]"
+  "config": "[{\"rss_url\":\"https://news.ycombinator.com/rss\",\"interval_seconds\":300,\"webhook\":\"http://mew-server/api/webhooks/<webhookId>/<token>\"}]"
 }
 ```

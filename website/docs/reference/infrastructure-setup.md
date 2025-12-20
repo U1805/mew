@@ -25,8 +25,8 @@ slug: /reference/infrastructure-setup
 
 - MongoDB（数据库）
 - Garage（S3 对象存储）
-- Backend（API + Socket.IO）
-- Frontend（Nginx 托管 + 反代 `/api`、`/socket.io`）
+- Server（API + Socket.IO）
+- Client（Nginx 托管 + 反代 `/api`、`/socket.io`）
 - `plugins/test` Bot（示例 Bot Service）
 
 ```bash

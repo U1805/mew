@@ -58,7 +58,7 @@ graph TD
 
     subgraph Platform ["Mew Core (The Bus)"]
         Gateway["API Gateway (Socket.io / REST)"]:::core
-        Backend["Backend Logic (Node.js)"]:::core
+        Server["Server Logic (Node.js)"]:::core
         DB[("MongoDB + S3")]:::core
     end
 
@@ -71,7 +71,7 @@ graph TD
     GoBot -->|Push Data| Gateway
     PyBot <-->|Interactive| Gateway
     UI <-->|Realtime| Gateway
-    Gateway --> Backend --> DB
+    Gateway --> Server --> DB
 ````
 
 ### 1. Mew Platform (通信基础设施层)
@@ -99,8 +99,8 @@ graph TD
 
 | 领域                 | 技术栈                            | 选型考量                                       |
 | :----------------- | :----------------------------- | :----------------------------------------- |
-| **Frontend**       | React, TypeScript, Zustand | 强调类型安全与组件化，Zustand 提供比 Redux 更加轻量的状态管理方式。  |
-| **Backend**        | Express, Socket.io         | Node.js 在处理高并发 WebSocket 连接时的事件循环机制具有天然优势。 |
+| **Client**       | React, TypeScript, Zustand | 强调类型安全与组件化，Zustand 提供比 Redux 更加轻量的状态管理方式。  |
+| **Server**        | Express, Socket.io         | Node.js 在处理高并发 WebSocket 连接时的事件循环机制具有天然优势。 |
 | **Database**       | MongoDB                    | 消息数据天然呈现文档结构（非结构化/半结构化），且对 JSON 格式支持良好。    |
 | **Object Storage** | Garage (S3 Compatible)     | 自托管对象存储，用于处理图片、视频等大文件，实现数据与逻辑的分离。          |
 | **DevOps**         | Docker Compose             | 确保多语言微服务环境（Node + Go + Python）的一键启动与版本一致性。 |

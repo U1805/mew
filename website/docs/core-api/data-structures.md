@@ -17,7 +17,7 @@ sidebar_position: 10
 
 ## User
 
-来源：`backend/src/api/user/user.model.ts`
+来源：`server/src/api/user/user.model.ts`
 
 ```ts
 export interface User {
@@ -34,13 +34,13 @@ export interface User {
 说明：
 
 - `password` 不会出现在响应里（Mongoose `select: false`）。
-- `avatarUrl` 在服务端内部通常存储为对象存储的 `key`；多数对外响应会将其补全为公开 URL（见 `backend/src/utils/s3.ts#getS3PublicUrl`）。
+- `avatarUrl` 在服务端内部通常存储为对象存储的 `key`；多数对外响应会将其补全为公开 URL（见 `server/src/utils/s3.ts#getS3PublicUrl`）。
 
 ---
 
 ## Server
 
-来源：`backend/src/api/server/server.model.ts` 与 `backend/src/api/server/server.service.ts`
+来源：`server/src/api/server/server.model.ts` 与 `server/src/api/server/server.service.ts`
 
 ```ts
 export interface Server {
@@ -57,7 +57,7 @@ export interface Server {
 
 ## Role
 
-来源：`backend/src/api/role/role.model.ts`、`backend/src/constants/permissions.ts`
+来源：`server/src/api/role/role.model.ts`、`server/src/constants/permissions.ts`
 
 ```ts
 export type Permission =
@@ -91,7 +91,7 @@ export interface Role {
 
 ## ServerMember
 
-来源：`backend/src/api/member/member.model.ts` 与 `backend/src/api/member/member.service.ts`
+来源：`server/src/api/member/member.model.ts` 与 `server/src/api/member/member.service.ts`
 
 ```ts
 export interface ServerMember {
@@ -111,13 +111,13 @@ export interface ServerMember {
 
 说明：
 
-- 服务器成员列表接口会额外合并“Webhook 虚拟成员”（见 `backend/src/api/member/webhookMember.service.ts`），其 `userId` 会被伪造为 `{ isBot: true, username: <webhook name>, ... }`，并附带 `channelId` 以标识归属频道。
+- 服务器成员列表接口会额外合并“Webhook 虚拟成员”（见 `server/src/api/member/webhookMember.service.ts`），其 `userId` 会被伪造为 `{ isBot: true, username: <webhook name>, ... }`，并附带 `channelId` 以标识归属频道。
 
 ---
 
 ## Category
 
-来源：`backend/src/api/category/category.model.ts`
+来源：`server/src/api/category/category.model.ts`
 
 ```ts
 export interface Category {
@@ -134,7 +134,7 @@ export interface Category {
 
 ## Channel
 
-来源：`backend/src/api/channel/channel.model.ts` 与 `backend/src/api/channel/channel.repository.ts`
+来源：`server/src/api/channel/channel.model.ts` 与 `server/src/api/channel/channel.repository.ts`
 
 ```ts
 export type ChannelType = 'GUILD_TEXT' | 'DM';
@@ -179,7 +179,7 @@ export interface Channel {
 
 ## ChannelReadState（内部模型）
 
-来源：`backend/src/api/channel/readState.model.ts`
+来源：`server/src/api/channel/readState.model.ts`
 
 该模型不直接作为独立资源对外暴露，但其数据会影响频道列表中的 `lastReadMessageId`，并可通过 `ack` 接口更新。
 
@@ -198,7 +198,7 @@ export interface ChannelReadState {
 
 ## Message
 
-来源：`backend/src/api/message/message.model.ts` 与 `backend/src/api/message/message.service.ts`
+来源：`server/src/api/message/message.model.ts` 与 `server/src/api/message/message.service.ts`
 
 ```ts
 export interface Attachment {
@@ -238,14 +238,14 @@ export interface Message {
 
 说明：
 
-- 后端会对 `attachments[].key` 进行 URL 补全，写入 `attachments[].url`（见 `backend/src/api/message/message.service.ts`）。
-- Webhook 消息会在 `payload.overrides` 中携带“展示覆盖信息”（见 `backend/src/api/webhook/webhook.service.ts`），后端会在返回前应用覆盖（例如替换 `authorId.username/avatarUrl`）。
+- 后端会对 `attachments[].key` 进行 URL 补全，写入 `attachments[].url`（见 `server/src/api/message/message.service.ts`）。
+- Webhook 消息会在 `payload.overrides` 中携带“展示覆盖信息”（见 `server/src/api/webhook/webhook.service.ts`），后端会在返回前应用覆盖（例如替换 `authorId.username/avatarUrl`）。
 
 ---
 
 ## Invite（邀请预览响应）
 
-来源：`backend/src/api/invite/invite.service.ts#getInviteDetails`
+来源：`server/src/api/invite/invite.service.ts#getInviteDetails`
 
 ```ts
 export interface InvitePreview {
@@ -270,7 +270,7 @@ export interface InvitePreview {
 
 ## Webhook
 
-来源：`backend/src/api/webhook/webhook.model.ts`
+来源：`server/src/api/webhook/webhook.model.ts`
 
 ```ts
 export interface Webhook {

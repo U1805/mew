@@ -16,14 +16,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: backend
-            dockerfile: backend/Dockerfile
+          - name: server
+            dockerfile: server/Dockerfile
             context: .
-          - name: frontend
-            dockerfile: frontend/Dockerfile
+          - name: client
+            dockerfile: client/Dockerfile
             context: .
-          - name: bot
-            dockerfile: docker/bot/Dockerfile
+          - name: plugins
+            dockerfile: docker/plugins/Dockerfile
             context: .
           - name: garage-init
             dockerfile: docker/garage/Dockerfile.init

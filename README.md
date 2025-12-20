@@ -2,7 +2,7 @@
 
 Welcome to Mew, a highly extensible personal digital hub centered around an Instant Messaging (IM) platform.
 
-This project is a monorepo containing the frontend, backend, and bot services.
+This project is a monorepo containing the client, server, and plugin services.
 
 ## Documentation
 
@@ -23,8 +23,8 @@ From the repo root:
 docker compose up --build
 ```
 
-- Frontend: `http://localhost:11451`
-- Backend: `http://localhost:3000`
+- Client: `http://localhost:11451`
+- Server: `http://localhost:3000`
 
 Common env overrides (`docker-compose.env`):
 

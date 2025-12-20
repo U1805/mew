@@ -16,7 +16,7 @@ sidebar_position: 30
 
 认证方式：
 
-- 连接时通过 `auth.token` 传入 JWT（见 `backend/src/gateway/middleware.ts`）。
+- 连接时通过 `auth.token` 传入 JWT（见 `server/src/gateway/middleware.ts`）。
 
 数据结构参考：
 
@@ -43,13 +43,13 @@ socket.on('ready', () => {
 
 ## 房间（Rooms）与广播策略
 
-服务端会在连接后将用户加入以下房间（见 `backend/src/gateway/handlers.ts`）：
+服务端会在连接后将用户加入以下房间（见 `server/src/gateway/handlers.ts`）：
 
 - `channelId`：用户可达的所有频道（服务器频道与 DM）
 - `serverId`：用户加入的所有服务器
 - `userId`：个人房间（用于定向事件）
 
-业务层广播封装见 `backend/src/gateway/events.ts`：
+业务层广播封装见 `server/src/gateway/events.ts`：
 
 - `socketManager.broadcast(event, roomId, payload)`：向某个房间广播
 - `socketManager.broadcastToUser(userId, event, payload)`：向个人房间定向发送
@@ -60,7 +60,7 @@ socket.on('ready', () => {
 
 ### `message/create`
 
-用于通过 WebSocket 发送消息（见 `backend/src/gateway/handlers.ts`）。
+用于通过 WebSocket 发送消息（见 `server/src/gateway/handlers.ts`）。
 
 ```ts
 type MessageCreatePayload = {
@@ -96,7 +96,7 @@ type MessageCreatePayload = {
 | `PRESENCE_INITIAL_STATE` | `string[]`（userIds） | 连接后下发当前在线用户集合 |
 | `PRESENCE_UPDATE` | `{ userId: string, status: 'online' \| 'offline' }` | 有用户上下线 |
 
-> `PRESENCE_UPDATE` 是全局广播（`io.emit`），不按房间区分（见 `backend/src/gateway/handlers.ts`）。
+> `PRESENCE_UPDATE` 是全局广播（`io.emit`），不按房间区分（见 `server/src/gateway/handlers.ts`）。
 
 ### 消息事件（频道房间：`channelId`）
 
@@ -109,7 +109,7 @@ type MessageCreatePayload = {
 
 补充说明：
 
-- DM 场景下，`MESSAGE_CREATE` 除了广播到 `channelId` 房间外，还会定向发送到每个收件人的 `userId` 个人房间，以提高可靠性（见 `backend/src/api/message/message.service.ts`）。
+- DM 场景下，`MESSAGE_CREATE` 除了广播到 `channelId` 房间外，还会定向发送到每个收件人的 `userId` 个人房间，以提高可靠性（见 `server/src/api/message/message.service.ts`）。
 
 ### 频道与分组事件（服务器房间：`serverId`）
 

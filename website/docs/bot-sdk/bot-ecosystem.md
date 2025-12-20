@@ -124,7 +124,7 @@ Fetcher 服务是一个纯后台守护进程。
   {
     "rss_url": "https://hn.algolia.com/rss",
     "interval_seconds": 3600,
-    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>",
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "enabled": true,
     "send_history_on_start": false,
     "max_items_per_poll": 5
@@ -146,12 +146,12 @@ Fetcher 服务是一个纯后台守护进程。
   {
     "username": "elonmusk",
     "interval": 600,
-    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>"
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>"
   },
   {
     "username": "nasa",
     "interval": 1800,
-    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>"
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>"
   }
 ]
 ```

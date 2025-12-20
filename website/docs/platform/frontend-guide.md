@@ -1,12 +1,12 @@
 ---
 sidebar_label: '前端开发指南'
 sidebar_position: 60
-slug: /guide/frontend-guide
+slug: /guide/client-guide
 ---
 
 # 🎨 前端开发指南
 
-前端位于 `frontend/`，是一个基于 **React + Vite** 的 SPA，主要负责：
+前端位于 `client/`，是一个基于 **React + Vite** 的 SPA，主要负责：
 
 - 通过 **REST API** 拉取状态（服务器/频道/消息等）
 - 通过 **Socket.IO** 接收实时事件（新消息、频道更新、权限变化等）
@@ -24,13 +24,13 @@ slug: /guide/frontend-guide
 从仓库根目录：
 
 - 全栈开发：`pnpm dev`
-- 仅前端：`pnpm --filter frontend dev`
+- 仅前端：`pnpm --filter client dev`
 
-前端 API 基址由 `VITE_API_BASE_URL` 控制（见 `frontend/.env.development`）：
+前端 API 基址由 `VITE_API_BASE_URL` 控制（见 `client/.env.development`）：
 
 - 默认：`http://localhost:3000/api`
 
-WebSocket 网关目前在代码中固定为 `http://localhost:3000`（见 `frontend/src/shared/services/socket.ts`）。
+WebSocket 网关目前在代码中固定为 `http://localhost:3000`（见 `client/src/shared/services/socket.ts`）。
 
 ---
 
@@ -38,10 +38,10 @@ WebSocket 网关目前在代码中固定为 `http://localhost:3000`（见 `front
 
 前端采用“Feature-First”组织方式，常用入口：
 
-- `frontend/src/layout/Layout.tsx`：主布局与全局事件挂载
-- `frontend/src/shared/services/*`：HTTP API 与 Socket 客户端
-- `frontend/src/shared/hooks/*`：对 Query 缓存与 Socket 事件的封装
-- `frontend/src/shared/stores/*`：Zustand 状态（UI/未读/鉴权等）
+- `client/src/layout/Layout.tsx`：主布局与全局事件挂载
+- `client/src/shared/services/*`：HTTP API 与 Socket 客户端
+- `client/src/shared/hooks/*`：对 Query 缓存与 Socket 事件的封装
+- `client/src/shared/stores/*`：Zustand 状态（UI/未读/鉴权等）
 
 ---
 
@@ -58,7 +58,7 @@ WebSocket 网关目前在代码中固定为 `http://localhost:3000`（见 `front
 
 ## 🔌 Socket 事件接入（推荐模式）
 
-Socket 单例：`frontend/src/shared/services/socket.ts`。
+Socket 单例：`client/src/shared/services/socket.ts`。
 
 目前事件监听按“作用域”拆分为 hooks：
 
@@ -76,7 +76,7 @@ Socket 单例：`frontend/src/shared/services/socket.ts`。
 
 前端可以在消息渲染组件中基于 `type` 分发到自定义渲染器；当前实现示例位于：
 
-- `frontend/src/features/chat/messages/MessageContent.tsx`
+- `client/src/features/chat/messages/MessageContent.tsx`
 
 如果你要新增一种消息类型，推荐流程：
 
@@ -88,4 +88,4 @@ Socket 单例：`frontend/src/shared/services/socket.ts`。
 
 ## 🧪 测试与 Mock
 
-前端使用 Vitest；MSW 位于 `frontend/src/mocks/*`，用于在测试环境模拟后端接口。
+前端使用 Vitest；MSW 位于 `client/src/mocks/*`，用于在测试环境模拟后端接口。

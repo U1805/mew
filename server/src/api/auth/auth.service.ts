@@ -1,0 +1,68 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { IUser } from '../user/user.model';
+import config from '../../config';
+import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/errors';
+import { userRepository } from '../user/user.repository';
+import { getS3PublicUrl } from '../../utils/s3';
+
+export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
+  const { email, password } = loginData;
+
+  if (!password) {
+    throw new BadRequestError('Password is required');
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = await userRepository.findByEmailWithPassword(normalizedEmail);
+  if (!user) throw new UnauthorizedError('Invalid credentials');
+
+  const isMatch = await bcrypt.compare(password, user.password || '');
+  if (!isMatch) throw new UnauthorizedError('Invalid credentials');
+
+  const payload = { id: user._id, username: user.username };
+  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { password: _, ...userWithoutPassword } = user.toObject();
+  if (userWithoutPassword.avatarUrl) {
+    userWithoutPassword.avatarUrl = getS3PublicUrl(userWithoutPassword.avatarUrl);
+  }
+
+  return { user: userWithoutPassword, token };
+};
+
+export const register = async (userData: Partial<IUser>) => {
+  const { email, username, password } = userData;
+
+  if (!password) {
+    throw new BadRequestError('Password is required');
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newUser = await userRepository.create({
+      email: email?.trim().toLowerCase(),
+      username: username?.trim(),
+      password: hashedPassword,
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _, ...userWithoutPassword } = newUser.toObject();
+
+    const payload = { id: newUser._id, username: newUser.username };
+    const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+
+    if (userWithoutPassword.avatarUrl) {
+      userWithoutPassword.avatarUrl = getS3PublicUrl(userWithoutPassword.avatarUrl);
+    }
+
+    return { user: userWithoutPassword, token };
+  } catch (error: any) {
+    if (error.name === 'MongoServerError' && error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      throw new ConflictError(`${field.charAt(0).toUpperCase() + field.slice(1)} already exists.`);
+    }
+    throw error;
+  }
+};
