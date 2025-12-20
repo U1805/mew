@@ -1,13 +1,8 @@
 # Build & push Docker images to GitHub Container Registry (GHCR)
 
-name: Build & Push Docker Images (GHCR)
+name: Build Docker Images
 
 on:
-  push:
-    branches: [main, master]
-    tags: ['v*']
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 env:

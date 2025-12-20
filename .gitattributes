@@ -1,1 +1,6 @@
-*.sh text eol=lf
+*.mdx linguist-detectable=false
+
+*.sh text eol=lf linguist-detectable=false
+*.bash linguist-detectable=false
+*.zsh linguist-detectable=false
+*.ksh linguist-detectable=false

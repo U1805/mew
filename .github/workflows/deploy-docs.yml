@@ -1,11 +1,13 @@
 # GitHub Pages for Docusaurus
 
-name: Deploy Docusaurus Docs to GitHub Pages
+name: Deploy Docusaurus Docs
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'website/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:

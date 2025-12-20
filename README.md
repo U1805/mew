@@ -15,6 +15,8 @@ Project docs live in `website/docs` (Docusaurus).
 
 ## Docker (recommended)
 
+### Local build
+
 From the repo root:
 
 ```bash
@@ -24,12 +26,18 @@ docker compose up --build
 - Frontend: `http://localhost:11451`
 - Backend: `http://localhost:3000`
 
-Common env overrides (put into a local `.env` next to `docker-compose.yml`):
+Common env overrides (`docker-compose.env`):
 
 - `JWT_SECRET`
 - `MEW_ADMIN_SECRET`
 
-## Docker (GHCR, no local build)
+> Generate SECRET with `openssl rand -base64 32`
+
+```bash
+docker compose --env-file docker-compose.env up --build
+```
+
+### GHCR
 
 This repo ships a `docker-compose.ghcr.yml` that pulls prebuilt images from GHCR.
 
