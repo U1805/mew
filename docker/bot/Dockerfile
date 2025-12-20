@@ -4,6 +4,8 @@ WORKDIR /src
 
 COPY plugins ./plugins
 
+ARG GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
+
 RUN set -eux; \
     mkdir -p /out; \
     for d in /src/plugins/*; do \
@@ -17,7 +19,7 @@ RUN set -eux; \
       ( \
         cd "$d"; \
         CGO_ENABLED=0 go env -w GO111MODULE=on; \
-        CGO_ENABLED=0 go env -w GOPROXY=https://mirrors.aliyun.com/goproxy/,direct; \
+        CGO_ENABLED=0 go env -w GOPROXY="$GOPROXY"; \
         CGO_ENABLED=0 go mod download; \
         CGO_ENABLED=0 go build -o "/out/mew-${name}-bot" .; \
       ); \

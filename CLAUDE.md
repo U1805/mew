@@ -21,7 +21,7 @@ Mew 是一个以即时通讯（IM）平台为核心的个人数字中心，当�
 - `frontend/`：React + Vite，状态管理使用 Zustand，服务端状态使用 TanStack Query。
 - `backend/`：Express + Socket.IO + Mongoose（MongoDB），请求校验使用 Zod。
 - `website/`：Docusaurus 文档站（包名为 `docs`）。
-- `bots/`：当前仓库中不存在该目录；如需引入 Bot 包，请同时补齐目录与 `pnpm-workspace.yaml` 的配置。
+- `plugins/`：Bot Service 插件（Go）。每个插件是独立 Go module，插件目录名即 `serviceType`；运行时会从后端按 `serviceType` bootstrap 所有 Bot 实例配置，并支持定期同步/热重载（通用能力见 `plugins/sdk` 与 `plugins/README.md`）。
 
 ## 常用命令
 
@@ -36,6 +36,10 @@ Mew 是一个以即时通讯（IM）平台为核心的个人数字中心，当�
 - 后端：`pnpm --filter backend dev`、`pnpm --filter backend test`
 - 前端：`pnpm --filter frontend dev`、`pnpm --filter frontend build`、`pnpm --filter frontend lint`、`pnpm --filter frontend test`
 - 文档：`pnpm --dir website start`、`pnpm --dir website build`
+
+**Bot 插件（Go，位于 `plugins/`）**
+- 示例：`go run ./plugins/test`、`go run ./plugins/rss-fetcher`
+- 环境变量与 `.env.local/.env` 加载规则见 `plugins/README.md`；其中 `MEW_ADMIN_SECRET` 需与后端一致
 
 ## 运行配置与端口
 
@@ -52,6 +56,7 @@ Mew 是一个以即时通讯（IM）平台为核心的个人数字中心，当�
 - **校验**：Zod schema 定义于 `*.validation.ts`，通过 `backend/src/middleware/validate.ts` 统一解析 `body/query/params`。
 - **错误处理**：业务异常使用 `backend/src/utils/errors.ts` 的自定义错误类，统一由 `backend/src/utils/errorHandler.ts` 转换为 HTTP 响应。
 - **权限**：RBAC + Channel permission overrides；核心计算位于 `backend/src/utils/permission.service.ts`，鉴权中间件位于 `backend/src/middleware/checkPermission.ts`（`authorizeServer`/`authorizeChannel`）。层级逻辑位于 `backend/src/utils/hierarchy.utils.ts`。
+- **Bot/插件对接**：Bot CRUD 位于 `backend/src/api/bot/*`；供 `plugins/*` 使用的 bootstrap 接口位于 `backend/src/api/bot/bot.bootstrap.routes.ts`（受 `infraIpOnly` + `verifyAdminSecret` 保护）。
 - **实时事件**：通过 `backend/src/gateway/events.ts` 的 `socketManager` 广播事件；连接与事件绑定在 `backend/src/gateway/handlers.ts`，Socket 鉴权在 `backend/src/gateway/middleware.ts`。
 - **上传/S3**：S3 客户端与上传逻辑在 `backend/src/utils/s3.ts`；启动时会调用 `configureBucketCors()`（失败不会阻断启动）。
 

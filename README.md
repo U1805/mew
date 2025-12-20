@@ -13,10 +13,6 @@ Project docs live in `website/docs` (Docusaurus).
 
 ## Getting Started
 
-From the repo root:
-
-- Dev (frontend + backend): `pnpm dev`
-
 ## Docker (recommended)
 
 From the repo root:
@@ -25,11 +21,18 @@ From the repo root:
 docker compose up --build
 ```
 
-- Frontend: `http://localhost:8080`
+- Frontend: `http://localhost:11451`
 - Backend: `http://localhost:3000`
 
 Common env overrides (put into a local `.env` next to `docker-compose.yml`):
 
 - `JWT_SECRET`
 - `MEW_ADMIN_SECRET`
-- `VITE_API_BASE_URL` (default: `/api`)
+
+## Docker (GHCR, no local build)
+
+This repo ships a `docker-compose.ghcr.yml` that pulls prebuilt images from GHCR.
+
+```bash
+docker compose -f docker-compose.ghcr.yml up -d
+```
