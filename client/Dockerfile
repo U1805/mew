@@ -6,22 +6,22 @@ WORKDIR /app
 ENV NODE_ENV=development
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY backend/package.json backend/package.json
-COPY frontend/package.json frontend/package.json
+COPY server/package.json server/package.json
+COPY client/package.json client/package.json
 COPY website/package.json website/package.json
 
 RUN corepack enable && pnpm install --frozen-lockfile --prod=false
 
-COPY frontend ./frontend
+COPY client ./client
 
 ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
-RUN pnpm --filter frontend build
+RUN pnpm --filter client build
 
 FROM nginx:1.27-alpine
 
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/frontend/dist /usr/share/nginx/html
+COPY --from=build /app/client/dist /usr/share/nginx/html
 
 EXPOSE 80

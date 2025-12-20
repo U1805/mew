@@ -19,7 +19,7 @@ type MewClient struct {
 	httpClient  *http.Client
 }
 
-// NewMewClient creates a client for calling MEW backend APIs.
+// NewMewClient creates a client for calling MEW server APIs.
 //
 // Proxy behavior:
 // - Default: no proxy (even if HTTP_PROXY / HTTPS_PROXY is set)

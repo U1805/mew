@@ -12,7 +12,7 @@
 [
   {
     "interval_seconds": 3600,
-    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>",
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "rss_url": "https://example.com/feed.xml",
     "enabled": true,
     "send_history_on_start": false,
@@ -21,7 +21,7 @@
   },
   {
     "interval_seconds": 7200,
-    "webhook": "http://mew-backend/api/webhooks/<webhookId>/<token>",
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "rss_url": "https://another.example/rss",
     "enabled": true
   }

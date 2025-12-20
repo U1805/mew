@@ -30,7 +30,7 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tini
 
 COPY --from=build /out/ /usr/local/bin/
-COPY docker/bot/entrypoint.sh /usr/local/bin/mew-bot-entrypoint
+COPY docker/plugins/entrypoint.sh /usr/local/bin/mew-bot-entrypoint
 
 RUN chmod +x /usr/local/bin/mew-bot-entrypoint
 

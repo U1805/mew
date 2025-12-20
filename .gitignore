@@ -39,5 +39,5 @@ Thumbs.db
 /*.md
 !/CLAUDE.md
 !/README.md
-backend/coverage/*
+server/coverage/*
 plugins/**/*.exe

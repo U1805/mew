@@ -24,17 +24,17 @@ Mew 的“核心平台”负责三件事：
 
 ```mermaid
 flowchart LR
-  FE["Frontend: React + Vite"] -->|"REST /api"| BE["Backend: Express"]
+  FE["Client: React + Vite"] -->|"REST /api"| BE["Server: Express"]
   FE <-->|"Socket.IO"| GW["Gateway: Socket.IO"]
   BE --> DB[(MongoDB)]
   BE --> S3[(S3 Compatible Storage)]
   GW --> DB
 ```
 
-- **Frontend**：以 REST 拉取“资源状态”（服务器、频道、消息列表等），以 WebSocket 订阅“状态变化”（新消息、权限变化、频道更新等）。
-- **Backend**：Express 提供 REST API；Socket.IO 网关提供实时事件与少量上行写入（如 `message/create`）。
+- **Client**：以 REST 拉取“资源状态”（服务器、频道、消息列表等），以 WebSocket 订阅“状态变化”（新消息、权限变化、频道更新等）。
+- **Server**：Express 提供 REST API；Socket.IO 网关提供实时事件与少量上行写入（如 `message/create`）。
 - **MongoDB**：主存储（用户、服务器、角色、频道、消息、邀请等）。
-- **对象存储（可选）**：头像与附件上传；后端存储 `key`，对外返回时会补全为可访问的 `url`（见 `backend/src/utils/s3.ts`）。
+- **对象存储（可选）**：头像与附件上传；后端存储 `key`，对外返回时会补全为可访问的 `url`（见 `server/src/utils/s3.ts`）。
 
 ---
 
@@ -56,11 +56,11 @@ erDiagram
 
 一些实现细节（以代码为准）：
 
-- **User**：`isBot` 用于区分人类用户与 Bot 用户（见 `backend/src/api/user/user.model.ts`）。
-- **Channel**：`GUILD_TEXT`（服务器频道）与 `DM`（私信）共用一套模型（见 `backend/src/api/channel/channel.model.ts`）。
-- **ChannelReadState**：用于“已读/未读”能力，`ack` 接口会 upsert `lastReadMessageId`（见 `backend/src/api/channel/readState.*`）。
-- **Message**：支持 `type/content/payload/attachments/mentions/reactions` 等（见 `backend/src/api/message/message.model.ts`）。
-- **Webhook**：在某个频道下创建，公开执行端点使用 `webhookId + token`（见 `backend/src/api/webhook/*`）。
+- **User**：`isBot` 用于区分人类用户与 Bot 用户（见 `server/src/api/user/user.model.ts`）。
+- **Channel**：`GUILD_TEXT`（服务器频道）与 `DM`（私信）共用一套模型（见 `server/src/api/channel/channel.model.ts`）。
+- **ChannelReadState**：用于“已读/未读”能力，`ack` 接口会 upsert `lastReadMessageId`（见 `server/src/api/channel/readState.*`）。
+- **Message**：支持 `type/content/payload/attachments/mentions/reactions` 等（见 `server/src/api/message/message.model.ts`）。
+- **Webhook**：在某个频道下创建，公开执行端点使用 `webhookId + token`（见 `server/src/api/webhook/*`）。
 
 ---
 
@@ -68,21 +68,21 @@ erDiagram
 
 Mew 以“服务器角色 + 频道覆盖”的方式计算用户在某个频道的最终权限：
 
-- **角色（Role）**：属于某个 Server，包含一组权限字符串（见 `backend/src/constants/permissions.ts`）。
+- **角色（Role）**：属于某个 Server，包含一组权限字符串（见 `server/src/constants/permissions.ts`）。
 - **成员（ServerMember）**：在某个 Server 内拥有若干角色（`roleIds`）。
 - **频道覆盖（permissionOverrides）**：在 Channel 上对“某个角色”或“某个成员”设置 allow/deny。
-- **最终权限**：由后端计算并返回给客户端（例如频道列表会附带 `permissions` 数组），实现位于 `backend/src/utils/permission.service.ts`。
+- **最终权限**：由后端计算并返回给客户端（例如频道列表会附带 `permissions` 数组），实现位于 `server/src/utils/permission.service.ts`。
 
 实现上还有两点值得注意：
 
-- **自我锁定保护**：更新频道权限覆盖时，会阻止普通成员提交导致自己失去 `MANAGE_CHANNEL` 的配置（见 `backend/src/api/channel/channel.service.ts`）。
-- **权限变更事件**：角色更新、成员角色更新、频道覆盖更新都会广播 `PERMISSIONS_UPDATE`，客户端通常需要失效缓存并重拉（见 `backend/src/api/*/*.service.ts` 与 `backend/src/gateway/events.ts`）。
+- **自我锁定保护**：更新频道权限覆盖时，会阻止普通成员提交导致自己失去 `MANAGE_CHANNEL` 的配置（见 `server/src/api/channel/channel.service.ts`）。
+- **权限变更事件**：角色更新、成员角色更新、频道覆盖更新都会广播 `PERMISSIONS_UPDATE`，客户端通常需要失效缓存并重拉（见 `server/src/api/*/*.service.ts` 与 `server/src/gateway/events.ts`）。
 
 ---
 
 ## ⚡️ 实时模型（事件从哪来、发到哪）
 
-Socket.IO 的房间划分（见 `backend/src/gateway/handlers.ts`）：
+Socket.IO 的房间划分（见 `server/src/gateway/handlers.ts`）：
 
 - **频道房间**：用户会加入其可达的每个 `channelId`（DM 与服务器频道）。
 - **服务器房间**：用户会加入其所属的每个 `serverId`（用于服务器级事件广播）。

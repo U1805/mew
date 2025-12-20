@@ -91,8 +91,8 @@ const FeatureList: FeatureItem[] = [
           Mew 建立在现代、高性能的 Web 技术之上，旨在提供卓越的开发体验和用户体验：
         </p>
         <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-gray-500 dark:text-gray-400">
-          <div>🚀 <strong>Backend:</strong> Express + Socket.io 实现高并发实时通信，MongoDB 存储灵活的 JSON 数据。</div>
-          <div>✨ <strong>Frontend:</strong> React + Vite 构建极速响应式界面，配合 Tailwind CSS 打造优雅 UI。</div>
+          <div>🚀 <strong>Server:</strong> Express + Socket.io 实现高并发实时通信，MongoDB 存储灵活的 JSON 数据。</div>
+          <div>✨ <strong>Client:</strong> React + Vite 构建极速响应式界面，配合 Tailwind CSS 打造优雅 UI。</div>
           <div>📦 <strong>DevOps:</strong> 完整的 Docker 化支持，配合 GitHub Actions，一键部署属于你的私有云服务。</div>
         </div>
       </>

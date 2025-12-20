@@ -150,7 +150,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         const newAttachments = [...prev];
         if (newAttachments[index]) {
           newAttachments[index].isUploading = false;
-          // Store the object `key`; backend hydrates the final URL.
+          // Store the object `key`; server hydrates the final URL.
           newAttachments[index].key = response.data.key;
           newAttachments[index].progress = 100;
         }

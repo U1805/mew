@@ -46,7 +46,7 @@ Mew 遵循 **The Twelve-Factor App** 原则，通过环境变量管理配置。
   <TabItem value="bash" label="Bash" default>
     ```bash
     # 进入后端目录
-    cd backend
+    cd server
 
     # 复制示例配置文件
     cp .env.example .env
@@ -54,7 +54,7 @@ Mew 遵循 **The Twelve-Factor App** 原则，通过环境变量管理配置。
   </TabItem>
   <TabItem value="powershell" label="PowerShell">
     ```powershell
-    Set-Location backend
+    Set-Location server
     Copy-Item .env.example .env
     ```
   </TabItem>
@@ -63,7 +63,7 @@ Mew 遵循 **The Twelve-Factor App** 原则，通过环境变量管理配置。
 ### 2. 修改配置参数
 使用编辑器打开 `.env`。以下是关键参数说明：
 
-```ini title="backend/.env"
+```ini title="server/.env"
 # 💡 在终端运行 `openssl rand -base64 32` 可快速生成强密码
 
 # 🍃 MongoDB 连接字符串
@@ -95,7 +95,7 @@ S3_WEB_ENDPOINT=web.garage.localhost
 S3_WEB_PORT=3902
 ```
 
-```ini title="frontend/.env.development"
+```ini title="client/.env.development"
 VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
@@ -120,8 +120,8 @@ pnpm dev
 ```
 
 此命令将通过 `concurrently` 并行启动以下服务：
-*   🟢 **Backend**: 监听 `http://localhost:3000`
-*   🔵 **Frontend**: 监听 `http://localhost:5173` (Vite 默认端口)
+*   🟢 **Server**: 监听 `http://localhost:3000`
+*   🔵 **Client**: 监听 `http://localhost:5173` (Vite 默认端口)
 
 ### 步骤 3: 验证与调试
 *   **访问 UI**: 浏览器打开 [http://localhost:5173](http://localhost:5173) 即可看到登录界面。
@@ -135,7 +135,7 @@ pnpm dev
 首先编辑相关配置项：
 ```ini title="plugins/.env.local"
 # 请使用与后端配置文件中相同的 MEW_ADMIN_SECRET
-MEW_ADMIN_SECRET=replace-this-with-value-in-backend
+MEW_ADMIN_SECRET=replace-this-with-value-in-server
 # BOT 同步配置的间隔时间 (秒)
 MEW_CONFIG_SYNC_INTERVAL_SECONDS=10
 ```

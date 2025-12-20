@@ -25,18 +25,18 @@ normalize_list() {
     | sort -u
 }
 
-MEW_BOTS="${MEW_BOTS:-}"
+MEW_PLUGINS="${MEW_PLUGINS:-}"
 
-if [ -z "$(trim "$MEW_BOTS")" ]; then
+if [ -z "$(trim "$MEW_PLUGINS")" ]; then
   bots="$(list_installed_bots)"
   if [ -z "$bots" ]; then
     log "no bots found under /usr/local/bin (expected mew-*-bot)"
     exit 1
   fi
-  log "MEW_BOTS is empty; starting all bots:"
+  log "MEW_PLUGINS is empty; starting all bots:"
 else
-  bots="$(normalize_list "$MEW_BOTS")"
-  log "starting selected bots from MEW_BOTS:"
+  bots="$(normalize_list "$MEW_PLUGINS")"
+  log "starting selected bots from MEW_PLUGINS:"
 fi
 
 log "$(echo "$bots" | tr '\n' ' ' | sed 's/[[:space:]]*$//')"

@@ -30,7 +30,7 @@ Token 类型：
 { "message": "..." }
 ```
 
-部分输入问题（如 Zod 校验失败、Mongo CastError/ValidationError）会返回 `400`，并可能包含 `error` 字段（以实现为准，见 `backend/src/utils/errorHandler.ts`）。
+部分输入问题（如 Zod 校验失败、Mongo CastError/ValidationError）会返回 `400`，并可能包含 `error` 字段（以实现为准，见 `server/src/utils/errorHandler.ts`）。
 
 常见状态码：
 
@@ -175,13 +175,13 @@ Token 类型：
 
 - `POST /.../messages`
 - Body：`{ content?, attachments? }`
-  - `content` 与 `attachments` 至少提供其一（见 `backend/src/api/message/message.validation.ts`）
+  - `content` 与 `attachments` 至少提供其一（见 `server/src/api/message/message.validation.ts`）
 
 ### 编辑 / 撤回（删除）
 
 - `PATCH /.../messages/:messageId`：`{ content }`
 - `DELETE /.../messages/:messageId`
-  - 当前实现为“撤回”：会清空内容与附件并写入 `retractedAt`，并通过 `MESSAGE_UPDATE` 通知客户端（见 `backend/src/api/message/message.service.ts`）。
+  - 当前实现为“撤回”：会清空内容与附件并写入 `retractedAt`，并通过 `MESSAGE_UPDATE` 通知客户端（见 `server/src/api/message/message.service.ts`）。
 
 ---
 
@@ -232,4 +232,4 @@ Token 类型：
 ## Search（/servers/:serverId/search）
 
 - `GET /servers/:serverId/search?q=...&channelId?=...&limit?=...&page?=...`
-  - 具体响应结构取决于搜索实现（见 `backend/src/api/search/search.service.ts`）。
+  - 具体响应结构取决于搜索实现（见 `server/src/api/search/search.service.ts`）。

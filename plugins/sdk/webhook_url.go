@@ -11,7 +11,7 @@ import (
 // if rawURL points to a loopback address (localhost / 127.0.0.1 / ::1).
 //
 // This is useful in Docker where "localhost" inside a container refers to the
-// container itself, not the MEW backend service.
+// container itself, not the MEW server service.
 func RewriteLoopbackURL(rawURL, apiBase string) (string, error) {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {

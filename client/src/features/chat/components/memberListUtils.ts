@@ -3,7 +3,7 @@ import type { ServerMember } from '../../../shared/types';
 const getMemberUserKey = (member: ServerMember) => member.userId?._id ?? member._id;
 
 /**
- * The backend may return webhook bot users twice:
+ * The server may return webhook bot users twice:
  * - as a real server member (no `channelId`)
  * - as a virtual "webhook member" (with `channelId`)
  *

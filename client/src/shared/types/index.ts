@@ -31,7 +31,7 @@ export interface ServerMember {
   _id: string;
   serverId: string;
   userId: User; // Populated user object
-  roleIds?: string[]; // Corrected: The backend actually returns roleIds
+  roleIds?: string[]; // Corrected: The server actually returns roleIds
   channelId?: string; // Optional, primarily for virtual webhook members
   isOwner?: boolean; // Explicit owner flag
   nickname?: string;
@@ -130,7 +130,7 @@ export interface Message {
   _id: string;
   channelId: string;
   authorId: User | string; // Populated or ID
-  author?: User; // Helper for frontend if populated
+  author?: User; // Helper for client if populated
   type: string;
   content: string;
   payload?: MessagePayload;

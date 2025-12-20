@@ -3,7 +3,7 @@ import ServerList from '../features/servers/components/ServerList';
 import ChannelList from '../features/channels/components/ChannelList';
 import ChatArea from '../features/chat/components/ChatArea';
 import UserSettings from '../features/users/components/UserSettings';
-import ModalManager from '../layout/modals/ModalManager';
+import ModalManager from './modals/ModalManager';
 import { usePresenceEvents } from '../shared/hooks/usePresenceEvents';
 import { useGlobalSocketEvents } from '../shared/hooks/useGlobalSocketEvents';
 import useTabNotifier from '../shared/hooks/useTabNotifier';
