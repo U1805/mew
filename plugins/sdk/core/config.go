@@ -1,4 +1,4 @@
-package sdk
+package core
 
 import (
 	"fmt"
@@ -20,8 +20,13 @@ type RuntimeConfig struct {
 // ServiceTypeFromCaller returns the base name of the caller's source directory.
 // Example: plugins/test/main.go -> "test".
 func ServiceTypeFromCaller() string {
-	// 0: ServiceTypeFromCaller, 1: plugin main, so we want 1.
-	if _, file, _, ok := runtime.Caller(1); ok {
+	return ServiceTypeFromCallerSkip(1)
+}
+
+// ServiceTypeFromCallerSkip is the same as ServiceTypeFromCaller, but allows
+// specifying how many stack frames to skip when locating the caller file.
+func ServiceTypeFromCallerSkip(callerSkip int) string {
+	if _, file, _, ok := runtime.Caller(callerSkip); ok {
 		return filepath.Base(filepath.Dir(file))
 	}
 	return ""

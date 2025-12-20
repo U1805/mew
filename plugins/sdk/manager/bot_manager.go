@@ -1,4 +1,4 @@
-package sdk
+package manager
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"encoding/hex"
 	"log"
 	"sync"
+
+	"mew/plugins/sdk/mew"
 )
 
 type Runner interface {
@@ -15,7 +17,7 @@ type Runner interface {
 type RunnerFactory func(botID, botName, rawConfig string) (Runner, error)
 
 type BotManager struct {
-	client      *MewClient
+	client      *mew.Client
 	serviceType string
 	logPrefix   string
 	newRunner   RunnerFactory
@@ -29,7 +31,7 @@ type runningBot struct {
 	stop       func()
 }
 
-func NewBotManager(client *MewClient, serviceType, logPrefix string, factory RunnerFactory) *BotManager {
+func NewBotManager(client *mew.Client, serviceType, logPrefix string, factory RunnerFactory) *BotManager {
 	return &BotManager{
 		client:      client,
 		serviceType: serviceType,
@@ -41,12 +43,16 @@ func NewBotManager(client *MewClient, serviceType, logPrefix string, factory Run
 
 func (m *BotManager) StopAll() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
+	stops := make([]func(), 0, len(m.bots))
 	for id, rb := range m.bots {
 		log.Printf("%s stopping bot %s", m.logPrefix, id)
-		rb.stop()
+		stops = append(stops, rb.stop)
 		delete(m.bots, id)
+	}
+	m.mu.Unlock()
+
+	for _, stop := range stops {
+		stop()
 	}
 }
 
@@ -62,34 +68,41 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 
 	seen := make(map[string]struct{}, len(bots))
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	type startReq struct {
+		botID      string
+		botName    string
+		rawConfig  string
+		configHash string
+	}
 
+	var (
+		starts []startReq
+		stops  []func()
+	)
+
+	m.mu.Lock()
 	for _, bot := range bots {
 		botID := bot.ID
 		seen[botID] = struct{}{}
 
 		configHash := sha256String(bot.Config)
-		if existing, ok := m.bots[botID]; ok && existing.configHash == configHash {
-			continue
-		}
-
 		if existing, ok := m.bots[botID]; ok {
+			if existing.configHash == configHash {
+				continue
+			}
 			log.Printf("%s reloading bot %s (%s)", m.logPrefix, botID, bot.Name)
-			existing.stop()
+			stops = append(stops, existing.stop)
 			delete(m.bots, botID)
 		} else {
 			log.Printf("%s starting bot %s (%s)", m.logPrefix, botID, bot.Name)
 		}
 
-		runner, err := m.newRunner(botID, bot.Name, bot.Config)
-		if err != nil {
-			log.Printf("%s invalid config for bot %s (%s): %v", m.logPrefix, botID, bot.Name, err)
-			continue
-		}
-
-		stopFn := runner.Start()
-		m.bots[botID] = &runningBot{configHash: configHash, stop: stopFn}
+		starts = append(starts, startReq{
+			botID:      botID,
+			botName:    bot.Name,
+			rawConfig:  bot.Config,
+			configHash: configHash,
+		})
 	}
 
 	for botID, rb := range m.bots {
@@ -97,8 +110,27 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 			continue
 		}
 		log.Printf("%s stopping bot %s (no longer in bootstrap list)", m.logPrefix, botID)
-		rb.stop()
+		stops = append(stops, rb.stop)
 		delete(m.bots, botID)
+	}
+	m.mu.Unlock()
+
+	for _, stop := range stops {
+		stop()
+	}
+
+	for _, s := range starts {
+		runner, err := m.newRunner(s.botID, s.botName, s.rawConfig)
+		if err != nil {
+			log.Printf("%s invalid config for bot %s (%s): %v", m.logPrefix, s.botID, s.botName, err)
+			continue
+		}
+
+		stopFn := runner.Start()
+
+		m.mu.Lock()
+		m.bots[s.botID] = &runningBot{configHash: s.configHash, stop: stopFn}
+		m.mu.Unlock()
 	}
 
 	return nil

@@ -1,4 +1,4 @@
-package sdk
+package mew
 
 import (
 	"bytes"
@@ -13,20 +13,20 @@ import (
 	"time"
 )
 
-type MewClient struct {
+type Client struct {
 	apiBase     string
 	adminSecret string
 	httpClient  *http.Client
 }
 
-// NewMewClient creates a client for calling MEW server APIs.
+// NewClient creates a client for calling MEW server APIs.
 //
 // Proxy behavior:
 // - Default: no proxy (even if HTTP_PROXY / HTTPS_PROXY is set)
 // - Set MEW_API_PROXY to enable:
 //   - "env": use Go's ProxyFromEnvironment (HTTP_PROXY/HTTPS_PROXY/NO_PROXY)
 //   - URL / host:port: use a fixed proxy URL (http/https)
-func NewMewClient(apiBase, adminSecret string) (*MewClient, error) {
+func NewClient(apiBase, adminSecret string) (*Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
 
@@ -45,7 +45,7 @@ func NewMewClient(apiBase, adminSecret string) (*MewClient, error) {
 		}
 	}
 
-	return &MewClient{
+	return &Client{
 		apiBase:     strings.TrimRight(apiBase, "/"),
 		adminSecret: adminSecret,
 		httpClient: &http.Client{
@@ -64,7 +64,7 @@ type BootstrapBot struct {
 	DmEnabled   bool   `json:"dmEnabled"`
 }
 
-func (c *MewClient) BootstrapBots(ctx context.Context, serviceType string) ([]BootstrapBot, error) {
+func (c *Client) BootstrapBots(ctx context.Context, serviceType string) ([]BootstrapBot, error) {
 	reqBody, err := json.Marshal(map[string]string{"serviceType": serviceType})
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func (c *MewClient) BootstrapBots(ctx context.Context, serviceType string) ([]Bo
 	return parsed.Bots, nil
 }
 
-func (c *MewClient) RegisterServiceType(ctx context.Context, serviceType string) error {
+func (c *Client) RegisterServiceType(ctx context.Context, serviceType string) error {
 	reqBody, err := json.Marshal(map[string]string{"serviceType": serviceType})
 	if err != nil {
 		return err

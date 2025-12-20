@@ -1,4 +1,4 @@
-package sdk
+package webhook
 
 import (
 	"bytes"
@@ -10,18 +10,18 @@ import (
 	"time"
 )
 
-// PostWebhookJSONWithRetry posts JSON to webhookURL, automatically rewriting loopback
+// PostJSONWithRetry posts JSON to webhookURL, automatically rewriting loopback
 // URLs (localhost/127.0.0.1/::1) to match apiBase's origin (useful in Docker).
 //
 // If attempts <= 0, it defaults to 3.
-func PostWebhookJSONWithRetry(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, body []byte, attempts int) error {
+func PostJSONWithRetry(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, body []byte, attempts int) error {
 	if attempts <= 0 {
 		attempts = 3
 	}
 
 	var lastErr error
 	for attempt := 1; attempt <= attempts; attempt++ {
-		if err := PostWebhookJSON(ctx, httpClient, apiBase, webhookURL, body); err != nil {
+		if err := PostJSON(ctx, httpClient, apiBase, webhookURL, body); err != nil {
 			lastErr = err
 			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
 			select {
@@ -36,7 +36,7 @@ func PostWebhookJSONWithRetry(ctx context.Context, httpClient *http.Client, apiB
 	return lastErr
 }
 
-func PostWebhookJSON(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, body []byte) error {
+func PostJSON(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, body []byte) error {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 15 * time.Second}
 	}

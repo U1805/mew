@@ -1,4 +1,4 @@
-package sdk
+package webhook
 
 import (
 	"fmt"

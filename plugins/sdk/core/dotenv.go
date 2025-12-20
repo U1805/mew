@@ -1,4 +1,4 @@
-package sdk
+package core
 
 import (
 	"errors"
@@ -19,13 +19,19 @@ import (
 //
 // It only sets vars that are not already set, matching godotenv's behavior.
 func LoadDotEnv(logPrefix string) {
+	LoadDotEnvFromCaller(logPrefix, 1)
+}
+
+// LoadDotEnvFromCaller is the same as LoadDotEnv, but allows specifying how many
+// stack frames to skip when locating the caller file.
+func LoadDotEnvFromCaller(logPrefix string, callerSkip int) {
 	if IsDotEnvDisabled() {
 		return
 	}
 
 	paths := []string{".env.local", ".env"}
 
-	if _, file, _, ok := runtime.Caller(1); ok {
+	if _, file, _, ok := runtime.Caller(callerSkip); ok {
 		dir := filepath.Dir(file)
 		paths = append(
 			paths,
