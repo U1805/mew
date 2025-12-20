@@ -5,7 +5,7 @@ import validate from './validate';
 const makeRes = () => {
   const res: any = {};
   res.status = vi.fn().mockReturnValue(res);
-  res.send = vi.fn().mockReturnValue(res);
+  res.json = vi.fn().mockReturnValue(res);
   return res;
 };
 
@@ -41,7 +41,7 @@ describe('middleware/validate', () => {
     validate(schema as any)(req, res, next);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.send).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ message: expect.any(String), errors: expect.any(Array) }));
     expect(next).not.toHaveBeenCalled();
   });
 });

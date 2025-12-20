@@ -60,7 +60,7 @@ describe('user.repository', () => {
   it('updateById delegates to User.findByIdAndUpdate', async () => {
     vi.mocked((User as any).findByIdAndUpdate).mockResolvedValue({ _id: 'u1', username: 'y' });
     const result = await userRepository.updateById('u1', { username: 'y' } as any);
-    expect((User as any).findByIdAndUpdate).toHaveBeenCalledWith('u1', { username: 'y' }, { new: true });
+    expect((User as any).findByIdAndUpdate).toHaveBeenCalledWith('u1', { username: 'y' }, { new: true, runValidators: true, context: 'query' });
     expect(result).toEqual({ _id: 'u1', username: 'y' });
   });
 

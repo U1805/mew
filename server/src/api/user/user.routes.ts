@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { createDmChannelHandler, getDmChannelsHandler, getMeHandler, searchUsersHandler, getUserByIdHandler, updateMeHandler, changePasswordHandler } from './user.controller';
-import { changePasswordSchema } from './user.validation';
+import { changePasswordSchema, updateMeSchema } from './user.validation';
 import validate from '../../middleware/validate';
 import { getUserServersHandler } from '../server/server.controller';
 import { protect } from '../../middleware/auth';
@@ -12,7 +12,7 @@ const router = Router();
 // All routes in this file are protected
 router.use(protect);
 
-router.route('/@me').get(getMeHandler).patch(uploadImage.single('avatar'), updateMeHandler);
+router.route('/@me').get(getMeHandler).patch(uploadImage.single('avatar'), validate(updateMeSchema), updateMeHandler);
 router.get('/@me/servers', getUserServersHandler);
 router.get('/@me/channels', getDmChannelsHandler);
 router.post('/@me/channels', createDmChannelHandler);

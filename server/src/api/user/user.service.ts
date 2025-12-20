@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { NotFoundError, UnauthorizedError, BadRequestError } from '../../utils/errors';
+import { NotFoundError, UnauthorizedError, BadRequestError, ConflictError } from '../../utils/errors';
 import { getS3PublicUrl } from '../../utils/s3';
 import { userRepository } from './user.repository';
 
@@ -7,7 +7,7 @@ const userService = {
   async getMe(userId: string) {
     const user = await userRepository.findById(userId);
     if (!user) {
-      throw new Error('User not found');
+      throw new NotFoundError('User not found');
     }
     const userObject = user.toObject();
     if (userObject.avatarUrl) {
@@ -21,7 +21,15 @@ const userService = {
       username: { $regex: query, $options: 'i' },
       _id: { $ne: currentUserId },
     }, '_id username avatarUrl', 10);
-    return users;
+
+    return users.map((u) => {
+      const userObject = u.toObject() as any;
+      if (userObject.avatarUrl) {
+        userObject.avatarUrl = getS3PublicUrl(userObject.avatarUrl);
+      }
+      const { _id, username, avatarUrl } = userObject;
+      return { _id, username, avatarUrl };
+    });
   },
 
   async getUserById(userId: string) {
@@ -39,15 +47,23 @@ const userService = {
   },
 
   async updateMe(userId: string, updateData: { username?: string; avatarUrl?: string }) {
-    const user = await userRepository.updateById(userId, updateData);
-    if (!user) {
-      throw new NotFoundError('User not found');
+    try {
+      const user = await userRepository.updateById(userId, updateData);
+      if (!user) {
+        throw new NotFoundError('User not found');
+      }
+      const userObject = user.toObject();
+      if (userObject.avatarUrl) {
+          userObject.avatarUrl = getS3PublicUrl(userObject.avatarUrl);
+      }
+      return userObject;
+    } catch (error: any) {
+      if (error.name === 'MongoServerError' && error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+        throw new ConflictError(`${field.charAt(0).toUpperCase() + field.slice(1)} already exists.`);
+      }
+      throw error;
     }
-    const userObject = user.toObject();
-    if (userObject.avatarUrl) {
-        userObject.avatarUrl = getS3PublicUrl(userObject.avatarUrl);
-    }
-    return userObject;
   },
 
   async changePassword(userId: string, oldPassword: string, newPassword: string) {

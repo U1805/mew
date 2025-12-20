@@ -14,7 +14,11 @@ export const handlers = [
   http.post(`${API_URL}/auth/login`, async ({ request }) => {
     const { email } = await request.json() as { email: string };
     if (email === 'test@example.com') {
-      return HttpResponse.json({ token: 'fake-token' });
+      return HttpResponse.json({
+        message: 'Login successful',
+        token: 'fake-token',
+        user: { _id: 'user-1', username: 'Test User', email: 'test@example.com' },
+      });
     }
   }),
 

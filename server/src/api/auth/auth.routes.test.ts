@@ -13,6 +13,7 @@ describe('Auth Routes', () => {
       const res = await request(app).post('/api/auth/register').send(userData);
       expect(res.statusCode).toBe(201);
       expect(res.body.user.email).toBe(userData.email);
+      expect(res.body.token).toBeDefined();
     });
 
     it('should return 409 if email is already taken', async () => {
@@ -48,6 +49,7 @@ describe('Auth Routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body.token).toBeDefined();
+      expect(res.body.user.email).toBe(userData.email);
     });
 
     it('should return 401 for incorrect password', async () => {

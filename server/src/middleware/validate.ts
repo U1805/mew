@@ -1,17 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodObject } from 'zod';
+import { ZodTypeAny } from 'zod';
 
-const validate = (schema: ZodObject) => (req: Request, res: Response, next: NextFunction) => {
-  try {
-    schema.parse({
-      body: req.body,
-      query: req.query,
-      params: req.params,
+const validate = (schema: ZodTypeAny) => (req: Request, res: Response, next: NextFunction) => {
+  const parsed = schema.safeParse({
+    body: req.body,
+    query: req.query,
+    params: req.params,
+  });
+
+  if (!parsed.success) {
+    const errors = parsed.error.issues.map((issue) => {
+      const pathParts = issue.path[0] === 'body' ? issue.path.slice(1) : issue.path;
+      return { path: pathParts.join('.'), message: issue.message };
     });
-    next();
-  } catch (e: any) {
-    return res.status(400).send(e.errors);
+
+    return res.status(400).json({
+      message: errors[0]?.message || 'Validation error',
+      errors,
+    });
   }
+
+  const data: any = parsed.data as any;
+  if (Object.prototype.hasOwnProperty.call(data, 'body')) req.body = data.body;
+  next();
 };
 
 export default validate;

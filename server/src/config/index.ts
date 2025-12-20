@@ -1,9 +1,23 @@
 import dotenv from 'dotenv';
 import fs from 'fs';
+import type { SignOptions } from 'jsonwebtoken';
 
 dotenv.config();
 
 type S3Credentials = { accessKeyId: string; secretAccessKey: string };
+
+const parsePort = (raw: string | undefined, fallback: number): number => {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const parseJwtExpiresIn = (raw: string | undefined): NonNullable<SignOptions['expiresIn']> => {
+  if (!raw) return 86400;
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10);
+  return trimmed as NonNullable<SignOptions['expiresIn']>;
+};
 
 const readS3CredentialsFile = (): S3Credentials | null => {
   const p = process.env.S3_CREDENTIALS_FILE;
@@ -24,9 +38,9 @@ const fileCreds = readS3CredentialsFile();
 
 const config = {
   mongoUri: process.env.MONGO_URI || 'mongodb://localhost:27017/mew',
-  port: process.env.PORT || 3000,
+  port: parsePort(process.env.PORT, 3000),
   jwtSecret: process.env.JWT_SECRET || 'a-very-secret-key',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN || 86400,
+  jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
   adminSecret: process.env.MEW_ADMIN_SECRET || '',
   infraAllowedIps: (process.env.MEW_INFRA_ALLOWED_IPS || '')
     .split(',')

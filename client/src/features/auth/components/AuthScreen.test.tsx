@@ -32,7 +32,6 @@ describe('AuthScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => {
-        expect(setAuth).toHaveBeenCalledWith('fake-token', null, false);
         expect(setAuth).toHaveBeenCalledWith('fake-token', expect.objectContaining({ email: 'test@example.com' }), false);
     });
   });

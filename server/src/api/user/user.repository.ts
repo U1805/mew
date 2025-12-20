@@ -1,5 +1,4 @@
 import User, { IUser } from './user.model';
-import { NotFoundError } from '../../utils/errors';
 
 
 class UserRepository {
@@ -23,8 +22,8 @@ class UserRepository {
     return User.create(userData);
   }
 
-    public async updateById(userId: string, updateData: Partial<IUser>): Promise<IUser | null> {
-    return User.findByIdAndUpdate(userId, updateData, { new: true });
+  public async updateById(userId: string, updateData: Partial<IUser>): Promise<IUser | null> {
+    return User.findByIdAndUpdate(userId, updateData, { new: true, runValidators: true, context: 'query' });
   }
 
   public async find(query: any, projection: any = {}, limit = 0): Promise<IUser[]> {

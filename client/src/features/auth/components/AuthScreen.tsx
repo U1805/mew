@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
 import { useAuthStore } from '../../../shared/stores';
+import { getApiErrorMessage } from '../../../shared/utils/apiError';
 
 export const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -11,33 +12,44 @@ export const AuthScreen = () => {
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const setAuth = useAuthStore((state) => state.setAuth);
+  const logout = useAuthStore((state) => state.logout);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
+
+    const shouldRemember = isLogin ? rememberMe : true;
     try {
       if (isLogin) {
         const res = await authApi.login({ email, password });
-        const token = res.data.token;
-        setAuth(token, null, rememberMe);
+        const token = res.data.token as string;
+        const user = res.data.user ?? null;
+        setAuth(token, user, shouldRemember);
 
         try {
-            const userRes = await authApi.getMe();
-            setAuth(token, userRes.data, rememberMe);
+          const userRes = await authApi.getMe();
+          setAuth(token, userRes.data, shouldRemember);
         } catch (userErr) {
-            console.error("Failed to fetch user profile", userErr);
-            setAuth(token, { _id: 'temp', username: 'User', email, isBot: false, createdAt: new Date().toISOString() }, rememberMe);
+          console.error('Failed to fetch user profile', userErr);
         }
       } else {
-        await authApi.register({ email, username, password });
-        setIsLogin(true); // Switch to login
-        setError('');
-        alert('Registration successful! Please login.');
+        const res = await authApi.register({ email, username, password });
+        const token = res.data.token as string | undefined;
+        const user = res.data.user ?? null;
+
+        if (token) {
+          setAuth(token, user, shouldRemember);
+        } else {
+          setIsLogin(true);
+          setNotice('Registration successful. Please log in.');
+        }
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'An error occurred');
-      setAuth('', null);
+      setError(getApiErrorMessage(err, 'An error occurred'));
+      logout();
     }
   };
 
@@ -50,6 +62,7 @@ export const AuthScreen = () => {
         </div>
         
         {error && <div className="bg-red-500/10 border border-red-500 text-red-500 text-sm p-2 rounded mb-4">{error}</div>}
+        {notice && <div className="bg-green-500/10 border border-green-500 text-green-500 text-sm p-2 rounded mb-4">{notice}</div>}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
@@ -114,7 +127,12 @@ export const AuthScreen = () => {
         <div className="mt-4 text-sm text-mew-textMuted flex gap-1">
           {isLogin ? "Need an account?" : "Already have an account?"}
           <button
-            onClick={() => setIsLogin(!isLogin)}
+            type="button"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+              setNotice('');
+            }}
             className="text-mew-accent hover:underline"
           >
             {isLogin ? 'Register' : 'Log in'}

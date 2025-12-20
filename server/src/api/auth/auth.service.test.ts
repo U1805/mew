@@ -11,9 +11,10 @@ const userData = {
 describe('Auth Service', () => {
   describe('register', () => {
     it('should create a new user and return it without the password', async () => {
-      const newUser = await authService.register(userData);
+      const { user: newUser, token } = await authService.register(userData);
 
       expect(newUser).toBeDefined();
+      expect(token).toBeDefined();
       expect(newUser.email).toBe(userData.email);
       expect(newUser.username).toBe(userData.username);
       expect((newUser as any).password).toBeUndefined();

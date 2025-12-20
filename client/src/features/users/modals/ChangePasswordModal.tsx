@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast';
+import { getApiErrorMessage } from '../../../shared/utils/apiError';
 
 interface Props {
   isOpen: boolean;
@@ -13,6 +13,7 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitError, setSubmitError] = useState('');
 
   const validate = () => {
     if (newPassword && newPassword.length < 8) {
@@ -33,18 +34,28 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
     }
   }, [newPassword, confirmPassword, isOpen]);
 
+  useEffect(() => {
+    if (isOpen) setSubmitError('');
+  }, [isOpen]);
+
   const clearForm = () => {
     setOldPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setError('');
+    setSubmitError('');
   }
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (validate()) {
-      onSave({ oldPassword, newPassword });
+      setSubmitError('');
+      try {
+        await onSave({ oldPassword, newPassword });
+      } catch (e) {
+        setSubmitError(getApiErrorMessage(e, 'Failed to update password'));
+      }
     }
   };
 
@@ -91,6 +102,7 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
         </div>
 
         {error && <div className="text-red-400 text-sm mb-4">{error}</div>}
+        {submitError && <div className="text-red-400 text-sm mb-4">{submitError}</div>}
 
         <div className="flex justify-end gap-2 bg-[#2B2D31] p-4 -m-6 mt-6 rounded-b-md">
           <button

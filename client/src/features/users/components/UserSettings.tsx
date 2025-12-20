@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { useUIStore, useAuthStore } from '../../../shared/stores';
 import { userApi } from '../../../shared/services/api';
+import { getApiErrorMessage } from '../../../shared/utils/apiError';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
@@ -73,7 +74,7 @@ const UserSettings: React.FC = () => {
           cancelUpload();
       } catch (error) {
           console.error(error);
-          toast.error("Failed to update avatar");
+          toast.error(getApiErrorMessage(error, 'Failed to update avatar'));
       } finally {
           setIsUploading(false);
       }
@@ -92,7 +93,7 @@ const UserSettings: React.FC = () => {
       setIsEditUsernameModalOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update username");
+      toast.error(getApiErrorMessage(error, 'Failed to update username'));
     } finally {
       setIsUpdatingUsername(false);
     }
@@ -106,7 +107,9 @@ const UserSettings: React.FC = () => {
       setIsChangePasswordModalOpen(false);
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update password. Please check your old password.");
+      const message = getApiErrorMessage(error, 'Failed to update password');
+      toast.error(message);
+      throw new Error(message);
     } finally {
       setIsUpdatingPassword(false);
     }
