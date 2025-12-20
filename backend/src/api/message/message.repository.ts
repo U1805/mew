@@ -1,7 +1,7 @@
 import Message, { IMessage } from './message.model';
 
 class MessageRepository {
-    async findByChannel(options: { channelId: string; limit: number; before?: string; }) {
+  async findByChannel(options: { channelId: string; limit: number; before?: string }) {
     const { channelId, limit, before } = options;
     const query: any = { channelId };
 
@@ -12,7 +12,8 @@ class MessageRepository {
     return Message.find(query)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('authorId', 'username avatarUrl isBot');
+      .populate('authorId', 'username avatarUrl isBot')
+      .lean();
   }
 
   async findById(id: string): Promise<IMessage | null> {

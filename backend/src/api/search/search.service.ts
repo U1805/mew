@@ -19,7 +19,7 @@ export const searchMessagesInServer = async ({
   page = 1,
 }: SearchMessagesParams) => {
   // 1. Find all channels belonging to the server
-  const channelsInServer = await Channel.find({ serverId }).select('_id');
+  const channelsInServer = await Channel.find({ serverId }).select('_id').lean();
   if (!channelsInServer.length) {
     throw new NotFoundError('Server not found or has no channels');
   }
@@ -35,16 +35,15 @@ export const searchMessagesInServer = async ({
     matchQuery.channelId = channelId;
   }
 
-  // 3. Perform the search and get the total count
-  const total = await Message.countDocuments(matchQuery);
-
-  // 4. Perform the paginated search
-  const messages = await Message.find(matchQuery)
-    .populate('authorId', 'username avatarUrl')
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip((page - 1) * limit)
-    .lean();
+  const [total, messages] = await Promise.all([
+    Message.countDocuments(matchQuery),
+    Message.find(matchQuery)
+      .populate('authorId', 'username avatarUrl')
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .skip((page - 1) * limit)
+      .lean(),
+  ]);
 
   return {
     messages: messages.map((message: any) => {

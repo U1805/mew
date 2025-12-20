@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import asyncHandler from '../../utils/asyncHandler';
-import { uploadFile } from '../../utils/s3';
 import { BadRequestError } from '../../utils/errors';
 
 export const uploadFileHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -8,13 +7,18 @@ export const uploadFileHandler = asyncHandler(async (req: Request, res: Response
     throw new BadRequestError('No file uploaded.');
   }
 
-  const result = await uploadFile(req.file);
+  const uploaded: any = req.file as any;
+  // In production, uploads are streamed to S3 by Multer storage; keep a fallback for tests/legacy paths.
+  if (!uploaded.key) {
+    const { uploadFile } = await import('../../utils/s3');
+    Object.assign(uploaded, await uploadFile(req.file));
+  }
 
   const attachment = {
     filename: req.file.originalname, // The original filename from the user's machine
-    contentType: result.mimetype,
-    key: result.key, // [修正] 返回 key 而不是 url
-    size: result.size,
+    contentType: uploaded.mimetype,
+    key: uploaded.key, // [修正] 返回 key 而不是 url
+    size: uploaded.size,
   };
 
   res.status(201).json(attachment);

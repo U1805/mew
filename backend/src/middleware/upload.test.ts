@@ -1,8 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { uploadAttachment, uploadImage } from './upload';
 import { errorHandler } from '../utils/errorHandler';
+
+vi.mock('../utils/s3', () => ({
+  uploadStream: vi.fn(),
+}));
+
+import { uploadStream } from '../utils/s3';
+import { uploadAttachment, uploadImage } from './upload';
 
 const makeApp = (middleware: any, field: string) => {
   const app = express();
@@ -14,6 +20,18 @@ const makeApp = (middleware: any, field: string) => {
 };
 
 describe('middleware/upload', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(uploadStream).mockImplementation(async (opts: any) => {
+      await new Promise<void>((resolve, reject) => {
+        opts.stream.on('data', () => {});
+        opts.stream.on('end', () => resolve());
+        opts.stream.on('error', reject);
+      });
+      return { key: 'mock-key', mimetype: opts.mimetype, size: 3 } as any;
+    });
+  });
+
   it('uploadImage accepts allowed image mimetypes', async () => {
     const app = makeApp(uploadImage, 'avatar');
     const res = await request(app).post('/upload').attach('avatar', Buffer.from('img'), {

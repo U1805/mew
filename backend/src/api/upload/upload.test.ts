@@ -8,10 +8,10 @@ import Role from '../role/role.model';
 
 // Mock the S3 utility to prevent actual file uploads during tests
 vi.mock('../../utils/s3', () => ({
-  uploadFile: vi.fn(),
+  uploadStream: vi.fn(),
 }));
 
-import { uploadFile } from '../../utils/s3';
+import { uploadStream } from '../../utils/s3';
 
 describe('Upload Routes: POST /api/channels/:channelId/uploads', () => {
   let serverId: string;
@@ -27,11 +27,14 @@ describe('Upload Routes: POST /api/channels/:channelId/uploads', () => {
     // 1. Clear mocks
     vi.clearAllMocks();
 
-    // 2. Setup a default mock implementation for the uploadFile utility
-    vi.mocked(uploadFile).mockResolvedValue({
-      key: 'mock-file.png',
-      mimetype: 'image/png',
-      size: 12345,
+    // 2. Setup a default mock implementation for the uploadStream utility (must drain stream to avoid hanging busboy)
+    vi.mocked(uploadStream).mockImplementation(async (opts: any) => {
+      await new Promise<void>((resolve, reject) => {
+        opts.stream.on('data', () => {});
+        opts.stream.on('end', () => resolve());
+        opts.stream.on('error', reject);
+      });
+      return { key: 'mock-file.png', mimetype: 'image/png', size: 12345 } as any;
     });
 
     // 3. Register and login the user who will have upload permissions
@@ -115,7 +118,7 @@ describe('Upload Routes: POST /api/channels/:channelId/uploads', () => {
       .attach('file', filePath, 'test-upload.txt');
 
     expect(res.status).toBe(201);
-    expect(uploadFile).toHaveBeenCalledOnce();
+    expect(uploadStream).toHaveBeenCalledOnce();
     expect(res.body).toEqual({
       filename: 'test-upload.txt',
       contentType: 'image/png', // from our mock

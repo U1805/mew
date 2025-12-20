@@ -5,7 +5,7 @@ import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { checkRoleHierarchy } from '../../utils/hierarchy.utils';
 import { Permission } from '../../constants/permissions';
 import { socketManager } from '../../gateway/events';
-import { syncUserChannelPermissions } from '../../utils/permission.service';
+import { syncUsersPermissionsForServerChannels } from '../../utils/permission.service';
 
 const roleService = {
   async createRole(serverId: string, requesterId: string, data: { name: string; permissions?: Permission[]; color?: string; position?: number }) {
@@ -50,13 +50,10 @@ const roleService = {
       try {
         if (data.permissions) {
           const affectedMembers = await ServerMember.find({ serverId, roleIds: role._id });
-          const serverChannels = await Channel.find({ serverId });
-
-          for (const member of affectedMembers) {
-            for (const channel of serverChannels) {
-              syncUserChannelPermissions(member.userId.toString(), channel._id.toString());
-            }
-          }
+          await syncUsersPermissionsForServerChannels({
+            serverId,
+            userIds: affectedMembers.map((m) => m.userId.toString()),
+          });
         }
       } catch (error) {
         console.error('Error during background permission sync after role update:', error);
@@ -109,7 +106,6 @@ const roleService = {
     }
 
     const affectedMembers = await ServerMember.find({ serverId, roleIds: role._id });
-    const serverChannels = await Channel.find({ serverId });
 
     await ServerMember.updateMany({ serverId }, { $pull: { roleIds: role._id } });
     await Channel.updateMany({ serverId }, { $pull: { permissionOverrides: { targetType: 'role', targetId: role._id } } });
@@ -120,11 +116,10 @@ const roleService = {
 
     (async () => {
       try {
-        for (const member of affectedMembers) {
-          for (const channel of serverChannels) {
-            syncUserChannelPermissions(member.userId.toString(), channel._id.toString());
-          }
-        }
+        await syncUsersPermissionsForServerChannels({
+          serverId,
+          userIds: affectedMembers.map((m) => m.userId.toString()),
+        });
       } catch (error) {
         console.error('Error during background permission sync after role deletion:', error);
       }

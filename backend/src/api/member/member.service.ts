@@ -5,7 +5,7 @@ import { getS3PublicUrl } from '../../utils/s3';
 import { checkMemberHierarchy } from '../../utils/hierarchy.utils';
 import { socketManager } from '../../gateway/events';
 import mongoose from 'mongoose';
-import { syncUserChannelPermissions } from '../../utils/permission.service';
+import { syncUserPermissionsForServerChannels } from '../../utils/permission.service';
 import webhookMemberService from './webhookMember.service';
 import { memberRepository } from './member.repository';
 
@@ -21,12 +21,12 @@ const memberService = {
     const allMembers = [...members, ...webhookMembers];
 
     // Hydrate avatar URLs before sending to the client
-    return allMembers.map(member => {
-        const memberObject = member.toObject ? member.toObject() : { ...member }; // Handle both Mongoose docs and plain objects
-        if (memberObject.userId && typeof memberObject.userId === 'object' && memberObject.userId.avatarUrl) {
-            memberObject.userId.avatarUrl = getS3PublicUrl(memberObject.userId.avatarUrl);
-        }
-        return memberObject;
+    return allMembers.map((member) => {
+      const memberObject = member?.toObject ? member.toObject() : member;
+      if (memberObject?.userId && typeof memberObject.userId === 'object' && memberObject.userId.avatarUrl) {
+        memberObject.userId.avatarUrl = getS3PublicUrl(memberObject.userId.avatarUrl);
+      }
+      return memberObject;
     });
   },
 
@@ -95,10 +95,7 @@ const memberService = {
     // Recompute per-channel permissions in background.
     (async () => {
       try {
-        const serverChannels = await Channel.find({ serverId });
-        for (const channel of serverChannels) {
-          await syncUserChannelPermissions(userIdToUpdate, channel._id.toString());
-        }
+        await syncUserPermissionsForServerChannels(userIdToUpdate, serverId);
       } catch (error) {
         console.error('Error during background permission sync after member role update:', error);
       }

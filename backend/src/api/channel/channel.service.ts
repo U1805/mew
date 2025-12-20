@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { IChannel, IChannelUpdate } from './channel.model';
 import Server, { IServer } from '../server/server.model';
 import Role, { IRole } from '../role/role.model';
-import { calculateEffectivePermissions, syncUserChannelPermissions } from '../../utils/permission.service';
+import { calculateEffectivePermissions, syncUsersPermissionsForChannel } from '../../utils/permission.service';
 import Category from '../category/category.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
@@ -230,10 +230,11 @@ const channelService = {
         // Asynchronously re-evaluate permissions for all server members for this specific channel.
         (async () => {
             try {
-                const members = await ServerMember.find({ serverId: serverIdStr });
-                for (const member of members) {
-                    await syncUserChannelPermissions(member.userId.toString(), channelId);
-                }
+                const members = await ServerMember.find({ serverId: serverIdStr }).select('userId').lean();
+                await syncUsersPermissionsForChannel({
+                  channelId,
+                  userIds: members.map((m: any) => m.userId.toString()),
+                });
             } catch (error) {
                 console.error('Error during background permission sync after override update:', error);
             }

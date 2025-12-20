@@ -31,7 +31,9 @@ async function checkMessagePermissions(messageId: string, userId: string) {
     return;
   }
 
-  const channel = await Channel.findById(message.channelId).lean();
+  const channel = await Channel.findById(message.channelId)
+    .select('type serverId recipients permissionOverrides')
+    .lean();
   if (!channel || channel.type === 'DM' || !channel.serverId) {
     throw new ForbiddenError('Permission check failed: Invalid channel.');
   }
@@ -40,7 +42,9 @@ async function checkMessagePermissions(messageId: string, userId: string) {
 
   const [member, roles, server] = await Promise.all([
     Member.findOne({ userId, serverId }).lean(),
-    Role.find({ serverId: serverId as any }).lean(),
+    Role.find({ serverId: serverId as any })
+      .select('_id permissions position')
+      .lean(),
     Server.findById(serverId).select('everyoneRoleId').lean(),
   ]);
 
@@ -78,8 +82,8 @@ function applyAuthorOverride<T extends { payload?: any; authorId?: any }>(messag
   return messageObject;
 }
 
-function processMessageForClient<T extends IMessage>(message: T): object {
-  let messageObject = message.toObject();
+function processMessageForClient(message: any): object {
+  let messageObject = typeof message?.toObject === 'function' ? message.toObject() : message;
 
   // Apply webhook overrides first, as they might change author data
   messageObject = applyAuthorOverride(messageObject);
@@ -248,13 +252,15 @@ export const getMessageById = async (messageId: string) => {
     return messageForClient as IMessage;
   };
 
-  export const addReaction = async (
+export const addReaction = async (
       messageId: string,
       userId: string,
       emoji: string
     ) => {
       const message = await getMessageById(messageId);
-      const existingReaction = (message.reactions || []).find(r => r.userIds.map(id => id.toString()).includes(userId));
+      const existingReaction = (message.reactions || []).find((reaction) =>
+        (reaction.userIds || []).some((id) => id.toString() === userId)
+      );
 
       if (existingReaction && existingReaction.emoji === emoji) {
         return processMessageForClient(await message.populate('authorId', 'username avatarUrl isBot'));

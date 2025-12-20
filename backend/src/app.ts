@@ -12,6 +12,7 @@ import uploadRoutes from './api/upload/upload.routes';
 import publicWebhookRoutes from './api/webhook/public.routes';
 import infraRoutes from './api/infra/infra.routes';
 import botBootstrapRoutes from './api/bot/bot.bootstrap.routes';
+import healthRoutes from './api/health/health.routes';
 import { errorHandler } from './utils/errorHandler';
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/invites', invitePublicRoutes);
 app.use('/api/webhooks', publicWebhookRoutes);
 app.use('/api/bots', botBootstrapRoutes);
 app.use('/api/infra', infraRoutes);
+app.use('/api/health', healthRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

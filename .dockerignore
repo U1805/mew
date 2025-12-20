@@ -13,3 +13,9 @@ npm-debug.log*
 pnpm-debug.log*
 **/*.tsbuildinfo
 
+# Environments
+**/.env
+**/.env.*
+!**/.env.example
+
+

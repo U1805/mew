@@ -2,7 +2,6 @@ import { Request, Response } from 'express';
 import userService from './user.service';
 import channelService from '../channel/channel.service';
 import { UnauthorizedError, BadRequestError } from '../../utils/errors';
-import { uploadFile } from '../../utils/s3';
 import asyncHandler from '../../utils/asyncHandler';
 
 export const getMeHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -76,8 +75,14 @@ export const updateMeHandler = asyncHandler(async (req: Request, res: Response) 
   if (username) updateData.username = username;
 
   if (req.file) {
-    const result = await uploadFile(req.file);
-    updateData.avatarUrl = result.key; // Store the S3 key
+    const uploaded: any = req.file as any;
+    if (uploaded.key) {
+      updateData.avatarUrl = uploaded.key; // Store the S3 key
+    } else {
+      const { uploadFile } = await import('../../utils/s3');
+      const result = await uploadFile(req.file);
+      updateData.avatarUrl = result.key;
+    }
   }
 
   if (Object.keys(updateData).length === 0) {

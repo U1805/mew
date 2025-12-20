@@ -29,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 	manager := sdk.NewBotManager(client, cfg.ServiceType, "[rss-fetcher-bot]", func(botID, botName, rawConfig string) (sdk.Runner, error) {
-		return NewRSSFetcherBotRunner(botID, botName, rawConfig)
+		return NewRSSFetcherBotRunner(botID, botName, rawConfig, cfg.APIBase)
 	})
 
 	if err := manager.SyncOnce(ctx); err != nil {

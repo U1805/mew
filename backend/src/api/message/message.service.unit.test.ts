@@ -79,6 +79,22 @@ const mkId = (id: string) => ({
   equals: (other: any) => other === id || other?.toString?.() === id,
 });
 
+const makeFindByIdQuery = (leanValue: any) => {
+  const query: any = {
+    select: vi.fn().mockReturnThis(),
+    lean: vi.fn().mockResolvedValue(leanValue),
+  };
+  return query;
+};
+
+const makeFindQuery = (leanValue: any) => {
+  const query: any = {
+    select: vi.fn().mockReturnThis(),
+    lean: vi.fn().mockResolvedValue(leanValue),
+  };
+  return query;
+};
+
 const makeMessageDoc = (overrides: Partial<any> = {}) => {
   const doc: any = {
     _id: mkId('m1'),
@@ -131,18 +147,18 @@ describe('message.service (unit)', () => {
   });
 
   it('createMessage throws NotFoundError when channel does not exist', async () => {
-    vi.mocked((Channel as any).findById).mockReturnValue({ lean: vi.fn().mockResolvedValue(null) });
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery(null));
     await expect(createMessage({ channelId: 'c1', authorId: 'u1' } as any)).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('createMessage throws BadRequestError when missing channel/author', async () => {
-    vi.mocked((Channel as any).findById).mockReturnValue({ lean: vi.fn().mockResolvedValue({ type: 'DM' }) });
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM' }));
     await expect(createMessage({ channelId: 'c1' } as any)).rejects.toBeInstanceOf(BadRequestError);
   });
 
   it('createMessage broadcasts MESSAGE_CREATE and to DM recipients', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue({
-      lean: vi.fn().mockResolvedValue({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] }),
+      ...makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] }),
     });
     vi.mocked(mentionService.processMentions).mockResolvedValue([mkId('u2')] as any);
     vi.mocked(extractFirstUrl).mockReturnValue(null);
@@ -165,7 +181,7 @@ describe('message.service (unit)', () => {
 
   it('createMessage triggers async metadata embed update and MESSAGE_UPDATE', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue({
-      lean: vi.fn().mockResolvedValue({ type: 'DM', recipients: [mkId('u2')] }),
+      ...makeFindByIdQuery({ type: 'DM', recipients: [mkId('u2')] }),
     });
     vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);
     vi.mocked(extractFirstUrl).mockReturnValue('https://example.com');
@@ -200,7 +216,7 @@ describe('message.service (unit)', () => {
 
   it('createMessage swallows metadata errors', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.mocked((Channel as any).findById).mockReturnValue({ lean: vi.fn().mockResolvedValue({ type: 'GUILD_TEXT' }) });
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'GUILD_TEXT' }));
     vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);
     vi.mocked(extractFirstUrl).mockReturnValue('https://example.com');
     vi.mocked(getLinkPreviewWithSafety).mockRejectedValue(new Error('fail'));
@@ -227,7 +243,7 @@ describe('message.service (unit)', () => {
     });
     doc.populate = vi.fn().mockResolvedValue(doc);
     vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
-    vi.mocked((Channel as any).findById).mockReturnValue({ lean: vi.fn().mockResolvedValue({ type: 'GUILD_TEXT' }) });
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'GUILD_TEXT' }));
     vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);
     vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
 
@@ -240,7 +256,7 @@ describe('message.service (unit)', () => {
   it('updateMessage rejects non-author edits on invalid channel', async () => {
     const doc = makeMessageDoc({ authorId: mkId('u2'), channelId: mkId('c1') });
     vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
-    vi.mocked((Channel as any).findById).mockReturnValue({ lean: vi.fn().mockResolvedValue({ type: 'DM' }) });
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM' }));
 
     await expect(updateMessage('m1', 'u1', 'x')).rejects.toBeInstanceOf(ForbiddenError);
   });
@@ -248,9 +264,9 @@ describe('message.service (unit)', () => {
   it('updateMessage allows MANAGE_MESSAGES permission for non-author', async () => {
     const doc = makeMessageDoc({ authorId: mkId('u2'), channelId: mkId('c1') });
     vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
-    vi.mocked((Channel as any).findById).mockReturnValue({ lean: vi.fn().mockResolvedValue({ type: 'GUILD_TEXT', serverId: mkId('s1') }) });
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'GUILD_TEXT', serverId: mkId('s1') }));
     vi.mocked((Member as any).findOne).mockReturnValue({ lean: vi.fn().mockResolvedValue({ isOwner: false, roleIds: [mkId('r0')] }) });
-    vi.mocked((Role as any).find).mockReturnValue({ lean: vi.fn().mockResolvedValue([{ _id: mkId('r0'), permissions: [] }]) });
+    vi.mocked((Role as any).find).mockReturnValue(makeFindQuery([{ _id: mkId('r0'), permissions: [], position: 0 }]));
     vi.mocked((Server as any).findById).mockReturnValue({ select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue({ everyoneRoleId: mkId('r0') }) }) });
     vi.mocked(calculateEffectivePermissions as any).mockReturnValue(new Set(['MANAGE_MESSAGES']));
     vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);

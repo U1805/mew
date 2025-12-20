@@ -29,14 +29,18 @@ describe('search.service searchMessagesInServer', () => {
 
   it('throws NotFoundError when server has no channels', async () => {
     vi.mocked((Channel as any).find).mockReturnValue({
-      select: vi.fn().mockResolvedValue([]),
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([]),
+      }),
     } as any);
     await expect(searchMessagesInServer({ serverId: 's1', query: 'q' })).rejects.toBeInstanceOf(NotFoundError);
   });
 
   it('builds query across server channels and paginates', async () => {
     vi.mocked((Channel as any).find).mockReturnValue({
-      select: vi.fn().mockResolvedValue([{ _id: 'c1' }, { _id: 'c2' }]),
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([{ _id: 'c1' }, { _id: 'c2' }]),
+      }),
     } as any);
 
     vi.mocked((Message as any).countDocuments).mockResolvedValue(12);
@@ -61,7 +65,9 @@ describe('search.service searchMessagesInServer', () => {
 
   it('restricts query to a specific channel when channelId is provided', async () => {
     vi.mocked((Channel as any).find).mockReturnValue({
-      select: vi.fn().mockResolvedValue([{ _id: 'c1' }]),
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([{ _id: 'c1' }]),
+      }),
     } as any);
     vi.mocked((Message as any).countDocuments).mockResolvedValue(1);
     vi.mocked((Message as any).find).mockReturnValue({
@@ -83,7 +89,9 @@ describe('search.service searchMessagesInServer', () => {
 
   it('applies webhook overrides and hydrates author avatar and attachment urls', async () => {
     vi.mocked((Channel as any).find).mockReturnValue({
-      select: vi.fn().mockResolvedValue([{ _id: 'c1' }]),
+      select: vi.fn().mockReturnValue({
+        lean: vi.fn().mockResolvedValue([{ _id: 'c1' }]),
+      }),
     } as any);
 
     vi.mocked((Message as any).countDocuments).mockResolvedValue(1);

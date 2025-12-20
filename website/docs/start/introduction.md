@@ -112,5 +112,5 @@ graph TD
 Mew 不仅仅是一个工具，更是一个可编程的个人环境。
 如果你准备好掌控你的数据流，接下来请继续阅读：
 
-* [快速开始](/guide/getting-started) - 只需 5 分钟，轻松部署你的 Mew 实例。
-* [API 参考](/api/intro) - 学习如何编写你的第一个 Bot。
+* [快速开始](./getting-started) - 只需 5 分钟，轻松部署你的 Mew 实例。
+* [API 参考](../core-api/rest-api) - 学习如何编写你的第一个 Bot。

@@ -1,16 +1,20 @@
 services:
   mongo:
-    image: mongo:7
+    image: mongodb/mongodb-community-server:8.2.2-ubuntu2204
     restart: unless-stopped
     volumes:
       - mongo_data:/data/db
     ports:
       - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "mongodb://localhost:27017/admin", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   garage:
     image: dxflrs/garage:v2.1.0
     restart: unless-stopped
-    command: ["garage", "server", "--config", "/etc/garage.toml"]
     volumes:
       - ./docker/garage/garage.toml:/etc/garage.toml:ro
       - garage_meta:/var/lib/garage/meta
@@ -22,22 +26,31 @@ services:
       - "3902:3902" # S3 Web (public)
       - "3903:3903" # Admin API
     healthcheck:
-      test: ["CMD", "garage", "status", "--config", "/etc/garage.toml"]
+      test: ["CMD", "/garage", "--config", "/etc/garage.toml", "status"]
+      start_period: 20s
       interval: 5s
       timeout: 5s
       retries: 30
 
   garage-init:
-    image: dxflrs/garage:v2.1.0
+    build:
+      context: .
+      dockerfile: docker/garage/Dockerfile.init
     restart: "no"
+    network_mode: service:garage 
     depends_on:
       garage:
-        condition: service_healthy
+        condition: service_started
     entrypoint: ["/bin/sh", "/init.sh"]
+    environment:
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-mew-bucket}
+      S3_KEY_NAME: ${S3_KEY_NAME:-mew-app-key}
     volumes:
       - ./docker/garage/init.sh:/init.sh:ro
       - ./docker/garage/garage.toml:/etc/garage.toml:ro
       - garage_secrets:/var/lib/garage/secrets
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
 
   backend:
     build:
@@ -46,7 +59,7 @@ services:
     restart: unless-stopped
     depends_on:
       mongo:
-        condition: service_started
+        condition: service_healthy
       garage-init:
         condition: service_completed_successfully
     environment:
@@ -66,6 +79,18 @@ services:
       S3_CREDENTIALS_FILE: /var/run/mew/s3-credentials.json
     ports:
       - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
     volumes:
       - garage_secrets:/var/run/mew:ro
 
@@ -79,20 +104,22 @@ services:
     depends_on:
       - backend
     ports:
-      - "8080:80"
+      - "11451:80"
 
-  test-bot:
+  bot:
     build:
       context: .
-      dockerfile: plugins/test/Dockerfile
+      dockerfile: docker/bot/Dockerfile
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
       MEW_URL: http://backend:3000
-      MEW_SERVICE_TYPE: test
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
+      # Comma/space/semicolon separated list of plugin folder names. Example: "test,rss-fetcher"
+      MEW_BOTS: ${MEW_BOTS:-test}
 
 volumes:
   mongo_data:
