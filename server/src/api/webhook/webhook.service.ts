@@ -6,11 +6,19 @@ import UserModel from '../user/user.model';
 import ServerModel from '../server/server.model';
 import * as MessageService from '../message/message.service';
 import { BadRequestError, NotFoundError, UnauthorizedError } from '../../utils/errors';
+import { getS3PublicUrl, uploadFile } from '../../utils/s3';
 
 interface WebhookCreationData {
   name: string;
   avatarUrl?: string;
 }
+
+const getUploadedAvatarUrl = async (avatarFile?: Express.Multer.File) => {
+  if (!avatarFile) return undefined;
+  const existingKey = (avatarFile as any).key as string | undefined;
+  const { key } = existingKey ? { key: existingKey } : await uploadFile(avatarFile);
+  return getS3PublicUrl(key);
+};
 
 const findOrCreateBotUserForServer = async (serverId: string) => {
   const server = await ServerModel.findById(serverId);
@@ -35,12 +43,23 @@ const findOrCreateBotUserForServer = async (serverId: string) => {
   return botUser;
 };
 
-export const createWebhook = async (channelId: string, serverId: string, data: WebhookCreationData): Promise<IWebhook> => {
+export const createWebhook = async (
+  channelId: string,
+  serverId: string,
+  data: WebhookCreationData,
+  avatarFile?: Express.Multer.File
+): Promise<IWebhook> => {
+    if (!data?.name || typeof data.name !== 'string' || data.name.trim() === '') {
+      throw new BadRequestError('name is required');
+    }
+
     const botUser = await findOrCreateBotUserForServer(serverId);
     const token = crypto.randomBytes(32).toString('hex');
+    const avatarUrl = (await getUploadedAvatarUrl(avatarFile)) ?? data.avatarUrl;
 
     const webhook = await webhookRepository.create({
       ...data,
+      avatarUrl,
       channelId: new mongoose.Types.ObjectId(channelId),
       serverId: new mongoose.Types.ObjectId(serverId),
       botUserId: botUser._id,
@@ -53,8 +72,18 @@ export const getWebhooksByChannel = async (channelId: string): Promise<IWebhook[
   return webhookRepository.findByChannel(channelId);
 };
 
-export const updateWebhook = async (webhookId: string, data: Partial<WebhookCreationData>): Promise<IWebhook> => {
-  const webhook = await webhookRepository.findByIdAndUpdate(webhookId, data);
+export const updateWebhook = async (
+  webhookId: string,
+  data: Partial<WebhookCreationData>,
+  avatarFile?: Express.Multer.File
+): Promise<IWebhook> => {
+  const avatarUrl = await getUploadedAvatarUrl(avatarFile);
+  const finalData = { ...data };
+  if (avatarUrl) {
+    finalData.avatarUrl = avatarUrl;
+  }
+
+  const webhook = await webhookRepository.findByIdAndUpdate(webhookId, finalData);
   if (!webhook) {
     throw new NotFoundError('Webhook not found');
   }

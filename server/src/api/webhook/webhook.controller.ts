@@ -10,13 +10,13 @@ export const getWebhooks = asyncHandler(async (req: Request, res: Response) => {
 
 export const createWebhook = asyncHandler(async (req: Request, res: Response) => {
   const { channelId, serverId } = req.params;
-  const webhook = await WebhookService.createWebhook(channelId, serverId, req.body);
+  const webhook = await WebhookService.createWebhook(channelId, serverId, req.body, req.file);
   res.status(201).json(webhook);
 });
 
 export const updateWebhook = asyncHandler(async (req: Request, res: Response) => {
   const { webhookId } = req.params;
-  const webhook = await WebhookService.updateWebhook(webhookId, req.body);
+  const webhook = await WebhookService.updateWebhook(webhookId, req.body, req.file);
   res.status(200).json(webhook);
 });
 

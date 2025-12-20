@@ -6,17 +6,20 @@ export const webhookApi = {
   create: (
     serverId: string,
     channelId: string,
-    data: { name: string; avatarUrl?: string }
-  ) => api.post(`/servers/${serverId}/channels/${channelId}/webhooks`, data),
+    data: FormData
+  ) => api.post(`/servers/${serverId}/channels/${channelId}/webhooks`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   update: (
     serverId: string,
     channelId: string,
     webhookId: string,
-    data: { name?: string; avatarUrl?: string }
+    data: FormData
   ) =>
     api.patch(
       `/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}`,
-      data
+      data,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
     ),
   delete: (serverId: string, channelId: string, webhookId: string) =>
     api.delete(`/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}`),

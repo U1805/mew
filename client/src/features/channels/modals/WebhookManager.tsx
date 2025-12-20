@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhookApi, API_URL } from '../../../shared/services/api';
 import { Webhook, Channel, ServerMember } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useWebhooks } from '../hooks/useWebhooks';
+import toast from 'react-hot-toast';
 
 interface WebhookManagerProps {
   serverId: string;
@@ -17,14 +18,24 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
   const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
   
   const [name, setName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.startsWith('blob:')) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+    };
+  }, [avatarPreview]);
 
   const queryClient = useQueryClient();
 
   const { data: webhooks, isLoading } = useWebhooks(serverId, channel._id);
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; avatarUrl?: string }) => 
+    mutationFn: (data: FormData) => 
       webhookApi.create(serverId, channel._id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks', channel._id] });
@@ -35,8 +46,8 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string; name?: string; avatarUrl?: string }) => 
-      webhookApi.update(serverId, channel._id, data.id, { name: data.name, avatarUrl: data.avatarUrl }),
+    mutationFn: (data: { id: string; formData: FormData }) => 
+      webhookApi.update(serverId, channel._id, data.id, data.formData),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks', channel._id] });
       queryClient.invalidateQueries({ queryKey: ['members', serverId] });
@@ -76,25 +87,55 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
 
   const resetForm = () => {
     setName('');
-    setAvatarUrl('');
+    setAvatarFile(null);
+    setAvatarPreview(null);
     setSelectedWebhook(null);
   };
 
   const handleEdit = (webhook: Webhook) => {
     setSelectedWebhook(webhook);
     setName(webhook.name);
-    setAvatarUrl(webhook.avatarUrl || '');
+    setAvatarFile(null);
+    setAvatarPreview(webhook.avatarUrl || null);
     setView('edit');
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ['image/jpeg', 'image/png', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      toast.error('Only JPG, PNG, and GIF are allowed.');
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size must be less than 2MB.');
+      e.target.value = '';
+      return;
+    }
+
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
+    e.target.value = '';
   };
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const formData = new FormData();
+    formData.append('name', name);
+    if (avatarFile) {
+      formData.append('avatar', avatarFile);
+    }
+
     if (view === 'create') {
-      createMutation.mutate({ name, avatarUrl });
+      createMutation.mutate(formData);
     } else if (view === 'edit' && selectedWebhook) {
-      updateMutation.mutate({ id: selectedWebhook._id, name, avatarUrl });
+      updateMutation.mutate({ id: selectedWebhook._id, formData });
     }
   };
 
@@ -196,14 +237,29 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
            </div>
            
            <div>
-              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Avatar URL</label>
-              <input
-                  type="text"
-                  value={avatarUrl}
-                  onChange={(e) => setAvatarUrl(e.target.value)}
-                  className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
-                  placeholder="https://..."
-              />
+              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Avatar</label>
+              <div className="flex items-center gap-4">
+                <div
+                  className="w-16 h-16 rounded-full bg-[#1E1F22] border-dashed border-2 border-[#4E5058] flex items-center justify-center cursor-pointer hover:border-mew-textMuted transition-colors relative overflow-hidden"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/png, image/jpeg, image/gif"
+                    onChange={handleFileChange}
+                  />
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Icon icon="mdi:camera-plus" className="text-mew-textMuted" width="22" />
+                  )}
+                </div>
+                <div className="text-sm text-mew-textMuted">
+                  JPG/PNG/GIF, up to 2MB.
+                </div>
+              </div>
            </div>
 
            {view === 'edit' && selectedWebhook && (
