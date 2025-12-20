@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type MouseEvent } from 'react';
+import { useMemo, type MouseEvent } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
@@ -21,16 +21,6 @@ export const DMChannelList = () => {
     if (!dmChannels) return [];
     return dmChannels.filter(channel => !hiddenDmChannelIds.has(channel._id));
   }, [dmChannels, hiddenDmChannelIds]);
-
-  useEffect(() => {
-    if (dmChannels && isSuccess) {
-      dmChannels.forEach((channel) => {
-        if (channel.lastMessage && channel.lastMessage._id !== channel.lastReadMessageId) {
-          addUnreadChannel(channel._id);
-        }
-      });
-    }
-  }, [dmChannels, isSuccess, addUnreadChannel]);
 
   const handleRemoveDm = (e: MouseEvent, channelId: string) => {
     e.stopPropagation();

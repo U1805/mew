@@ -32,9 +32,6 @@ export const useSocketMessages = (channelId: string | null) => {
           return [...old, newMessage];
         });
       }
-
-      const currentChannelId = useUIStore.getState().currentChannelId;
-      if (newMessage.channelId !== currentChannelId) useUnreadStore.getState().addUnreadChannel(newMessage.channelId);
     };
 
     const handleUpdateMessage = (updatedMessage: Message) => {

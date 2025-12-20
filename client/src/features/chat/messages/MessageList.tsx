@@ -5,7 +5,7 @@ import TimestampDivider from './TimestampDivider';
 import { formatDividerTimestamp } from '../../../shared/utils/date';
 import { isSameDay } from 'date-fns';
 import { Message, Channel, ChannelType, User } from '../../../shared/types';
-import { useAuthStore, useUIStore } from '../../../shared/stores';
+import { useAuthStore, useUIStore, useUnreadStore } from '../../../shared/stores';
 import { channelApi } from '../../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -22,6 +22,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const { currentServerId, targetMessageId, setTargetMessageId } = useUIStore();
+  const removeUnreadChannel = useUnreadStore(s => s.removeUnreadChannel);
 
   // 本地 ACK 熔断：避免 setQueryData + effect 互相触发导致死循环。
   const lastAckedMessageIdRef = useRef<string | null>(null);
@@ -75,6 +76,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
 
     if (isValidObjectId && !alreadyAckedLocally && serverNeedsAck) {
       lastAckedMessageIdRef.current = lastMessage._id;
+      removeUnreadChannel(channelId);
 
       const updateChannelCache = (c: Channel) =>
         c._id === channelId ? { ...c, lastReadMessageId: lastMessage._id } : c;

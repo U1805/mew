@@ -1,4 +1,4 @@
-import { useEffect, type SVGProps } from 'react';
+import { type SVGProps } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
@@ -19,22 +19,7 @@ const ServerList = () => {
   const { currentServerId, setCurrentServer } = useUIStore();
   const { openModal } = useModalStore();
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
-  const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
-
   const { servers, channelQueries: serverQueries } = useServersWithChannels();
-
-  useEffect(() => {
-    serverQueries.forEach(queryResult => {
-      if (queryResult.isSuccess && queryResult.data) {
-        const channels = queryResult.data;
-        channels.forEach(channel => {
-          if (channel.lastMessage && channel.lastMessage._id !== channel.lastReadMessageId) {
-            addUnreadChannel(channel._id);
-          }
-        });
-      }
-    });
-  }, [serverQueries, addUnreadChannel]);
 
   const hasUnread = (serverId: string, index: number) => {
     const channels = serverQueries[index].data;

@@ -129,13 +129,14 @@ export interface MessagePayload {
 export interface Message {
   _id: string;
   channelId: string;
+  serverId?: string;
   authorId: User | string; // Populated or ID
   author?: User; // Helper for client if populated
   type: string;
   content: string;
   payload?: MessagePayload;
   attachments?: Attachment[];
-  mentions?: string[];
+  mentions?: (string | User)[];
   referencedMessageId?: string;
   reactions?: Reaction[];
   editedAt?: string;

@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Channel, Message } from '../types';
-import { useHiddenStore, useUnreadStore, useAuthStore } from '../stores';
+import { useHiddenStore, useUnreadStore, useAuthStore, useUIStore } from '../stores';
 
 export const useGlobalSocketEvents = () => {
   const queryClient = useQueryClient();
@@ -23,17 +23,49 @@ export const useGlobalSocketEvents = () => {
     };
 
     const handleMessageCreate = (message: Message) => {
-      const dmChannels: Channel[] | undefined = queryClient.getQueryData(['dmChannels']);
-      const isDmMessage = dmChannels?.some(c => c._id === message.channelId);
+      const { currentChannelId } = useUIStore.getState();
+      const { user } = useAuthStore.getState();
+      const { addUnreadChannel, addUnreadMention } = useUnreadStore.getState();
 
-      if (isDmMessage) useHiddenStore.getState().removeHiddenChannel(message.channelId);
+      const isViewingChannel = message.channelId === currentChannelId && document.hasFocus();
 
-      const currentUser = useAuthStore.getState().user;
-      const isMentioned = currentUser && ((message.mentions?.includes(currentUser._id)) || message.content.includes('@everyone') || message.content.includes('@here'));
+      // If user is viewing the channel, do nothing, as the message will be handled by useSocketMessages
+      if (isViewingChannel) {
+        return;
+      }
+
+      // If not viewing, add to unread
+      addUnreadChannel(message.channelId);
+
+      // Handle mentions
+      const isMentioned = user &&
+        (message.mentions?.some(m => typeof m === 'string' ? m === user._id : m._id === user._id) ||
+         message.content.includes('@everyone') ||
+         message.content.includes('@here'));
 
       if (isMentioned) {
-        useUnreadStore.getState().addUnreadMention(message._id);
-        useUnreadStore.getState().addUnreadChannel(message.channelId);
+        addUnreadMention(message._id);
+      }
+
+      // Update the last message in the channel list cache
+      const updateChannelCache = (queryKey: string[], newMessage: Message) => {
+        queryClient.setQueryData<Channel[]>(queryKey, (oldChannels) => {
+          if (!oldChannels) return oldChannels;
+          return oldChannels.map(channel =>
+            channel._id === newMessage.channelId
+              ? { ...channel, lastMessage: newMessage }
+              : channel
+          );
+        });
+      };
+
+      // Bring back hidden DM channel on new message and update cache
+      const dmChannels: Channel[] | undefined = queryClient.getQueryData(['dmChannels']);
+      if (dmChannels?.some(c => c._id === message.channelId)) {
+        useHiddenStore.getState().removeHiddenChannel(message.channelId);
+        updateChannelCache(['dmChannels'], message);
+      } else if (message.serverId) {
+        updateChannelCache(['channels', message.serverId], message);
       }
     };
 

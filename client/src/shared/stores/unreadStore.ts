@@ -8,6 +8,7 @@ interface UnreadState {
   removeUnreadChannel: (channelId: string) => void;
   addUnreadMention: (messageId: string) => void;
   removeUnreadMention: (messageId: string) => void;
+  setUnreadChannels: (channelIds: Set<string>) => void;
 }
 
 export const useUnreadStore = create<UnreadState>((set, get) => ({
@@ -50,6 +51,15 @@ export const useUnreadStore = create<UnreadState>((set, get) => ({
       newSet.delete(messageId);
       return { unreadMentionMessageIds: newSet };
     });
+  },
+
+  setUnreadChannels: (channelIds) => {
+    set({ unreadChannelIds: new Set(channelIds) });
+    const notifier = getNotifyServerStore();
+    if (notifier) {
+      // This is a bulk update, we can choose to notify all at once if needed
+      // For now, we assume the initial load doesn't need granular notification.
+    }
   },
 }));
 
