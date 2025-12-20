@@ -1,18 +1,17 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
+
+	"mew/plugins/sdk"
 )
 
 type TestTaskConfig struct {
@@ -24,10 +23,11 @@ type TestTaskConfig struct {
 type TestBotRunner struct {
 	botID   string
 	botName string
+	apiBase string
 	tasks   []TestTaskConfig
 }
 
-func NewTestBotRunner(botID, botName, rawConfig string) (*TestBotRunner, error) {
+func NewTestBotRunner(botID, botName, rawConfig, apiBase string) (*TestBotRunner, error) {
 	tasks, err := parseTasks(rawConfig)
 	if err != nil {
 		return nil, err
@@ -36,6 +36,7 @@ func NewTestBotRunner(botID, botName, rawConfig string) (*TestBotRunner, error) 
 	return &TestBotRunner{
 		botID:   botID,
 		botName: botName,
+		apiBase: apiBase,
 		tasks:   tasks,
 	}, nil
 }
@@ -52,7 +53,7 @@ func (r *TestBotRunner) Start() (stop func()) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runTestTask(ctx, httpClient, r.botID, r.botName, taskIndex, taskCopy)
+			runTestTask(ctx, httpClient, r.apiBase, r.botID, r.botName, taskIndex, taskCopy)
 		}()
 	}
 
@@ -94,12 +95,12 @@ func parseTasks(rawConfig string) ([]TestTaskConfig, error) {
 	return validated, nil
 }
 
-func runTestTask(ctx context.Context, httpClient *http.Client, botID, botName string, idx int, task TestTaskConfig) {
+func runTestTask(ctx context.Context, httpClient *http.Client, apiBase, botID, botName string, idx int, task TestTaskConfig) {
 	interval := time.Duration(task.Interval) * time.Second
 	logPrefix := fmt.Sprintf("[test-bot] bot=%s name=%q task=%d interval=%s", botID, botName, idx, interval)
 
 	// Fire once immediately, then on every tick.
-	postOnce(ctx, httpClient, logPrefix, task.Webhook, task.Content)
+	postOnce(ctx, httpClient, apiBase, logPrefix, task.Webhook, task.Content)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -109,57 +110,15 @@ func runTestTask(ctx context.Context, httpClient *http.Client, botID, botName st
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			postOnce(ctx, httpClient, logPrefix, task.Webhook, task.Content)
+			postOnce(ctx, httpClient, apiBase, logPrefix, task.Webhook, task.Content)
 		}
 	}
 }
 
-func postOnce(ctx context.Context, httpClient *http.Client, logPrefix, webhookURL, content string) {
+func postOnce(ctx context.Context, httpClient *http.Client, apiBase, logPrefix, webhookURL, content string) {
 	payload, _ := json.Marshal(map[string]any{"content": content})
-	err := postJSONWithRetry(ctx, httpClient, webhookURL, payload, 3)
+	err := sdk.PostWebhookJSONWithRetry(ctx, httpClient, apiBase, webhookURL, payload, 3)
 	if err != nil {
 		log.Printf("%s post failed: %v", logPrefix, err)
 	}
-}
-
-func postJSONWithRetry(ctx context.Context, httpClient *http.Client, webhookURL string, body []byte, attempts int) error {
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		if err := postJSON(ctx, httpClient, webhookURL, body); err != nil {
-			lastErr = err
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(backoff):
-				continue
-			}
-		}
-		return nil
-	}
-	return lastErr
-}
-
-func postJSON(ctx context.Context, httpClient *http.Client, webhookURL string, body []byte) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(respBody))
-		if msg == "" {
-			msg = http.StatusText(resp.StatusCode)
-		}
-		return errors.New(msg)
-	}
-	return nil
 }

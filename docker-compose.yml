@@ -106,10 +106,10 @@ services:
     ports:
       - "11451:80"
 
-  test-bot:
+  bot:
     build:
-      context: ./plugins
-      dockerfile: test/Dockerfile
+      context: .
+      dockerfile: docker/bot/Dockerfile
     restart: unless-stopped
     depends_on:
       backend:
@@ -118,6 +118,8 @@ services:
       MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
       MEW_URL: http://backend:3000
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
+      # Comma/space/semicolon separated list of plugin folder names. Example: "test,rss-fetcher"
+      MEW_BOTS: ${MEW_BOTS:-test}
 
 volumes:
   mongo_data:

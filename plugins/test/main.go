@@ -29,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 	manager := sdk.NewBotManager(client, cfg.ServiceType, "[test-bot]", func(botID, botName, rawConfig string) (sdk.Runner, error) {
-		return NewTestBotRunner(botID, botName, rawConfig)
+		return NewTestBotRunner(botID, botName, rawConfig, cfg.APIBase)
 	})
 
 	// Initial sync

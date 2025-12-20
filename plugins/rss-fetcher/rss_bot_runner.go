@@ -6,7 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"html"
 	"io"
@@ -22,6 +21,7 @@ import (
 	"time"
 
 	"github.com/mmcdole/gofeed"
+	"mew/plugins/sdk"
 )
 
 type rssTaskRaw struct {
@@ -53,10 +53,11 @@ type RSSFetchTaskConfig struct {
 type RSSFetcherBotRunner struct {
 	botID   string
 	botName string
+	apiBase string
 	tasks   []RSSFetchTaskConfig
 }
 
-func NewRSSFetcherBotRunner(botID, botName, rawConfig string) (*RSSFetcherBotRunner, error) {
+func NewRSSFetcherBotRunner(botID, botName, rawConfig, apiBase string) (*RSSFetcherBotRunner, error) {
 	tasks, err := parseRSSTasks(rawConfig)
 	if err != nil {
 		return nil, err
@@ -64,6 +65,7 @@ func NewRSSFetcherBotRunner(botID, botName, rawConfig string) (*RSSFetcherBotRun
 	return &RSSFetcherBotRunner{
 		botID:   botID,
 		botName: botName,
+		apiBase: apiBase,
 		tasks:   tasks,
 	}, nil
 }
@@ -85,7 +87,7 @@ func (r *RSSFetcherBotRunner) Start() (stop func()) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			runRSSTask(ctx, rssHTTPClient, webhookHTTPClient, r.botID, r.botName, taskIndex, taskCopy)
+			runRSSTask(ctx, rssHTTPClient, webhookHTTPClient, r.apiBase, r.botID, r.botName, taskIndex, taskCopy)
 		}()
 	}
 
@@ -259,6 +261,7 @@ func runRSSTask(
 	ctx context.Context,
 	rssHTTPClient *http.Client,
 	webhookHTTPClient *http.Client,
+	apiBase string,
 	botID, botName string,
 	idx int,
 	task RSSFetchTaskConfig,
@@ -361,7 +364,7 @@ func runRSSTask(
 				Username:  feedTitle,
 				AvatarURL: feedImageURL,
 			}
-			if err := postWebhookMessage(ctx, webhookHTTPClient, task.Webhook, msg); err != nil {
+			if err := postWebhookMessage(ctx, webhookHTTPClient, apiBase, task.Webhook, msg); err != nil {
 				log.Printf("%s post failed: %v", logPrefix, err)
 			}
 		}
@@ -712,51 +715,9 @@ func itemIdentity(it *gofeed.Item) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func postWebhookMessage(ctx context.Context, httpClient *http.Client, webhookURL string, msg webhookMessage) error {
+func postWebhookMessage(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, msg webhookMessage) error {
 	payload, _ := json.Marshal(msg)
-	return postJSONWithRetry(ctx, httpClient, webhookURL, payload, 3)
-}
-
-func postJSONWithRetry(ctx context.Context, httpClient *http.Client, webhookURL string, body []byte, attempts int) error {
-	var lastErr error
-	for attempt := 1; attempt <= attempts; attempt++ {
-		if err := postJSON(ctx, httpClient, webhookURL, body); err != nil {
-			lastErr = err
-			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(backoff):
-				continue
-			}
-		}
-		return nil
-	}
-	return lastErr
-}
-
-func postJSON(ctx context.Context, httpClient *http.Client, webhookURL string, body []byte) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, webhookURL, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		msg := strings.TrimSpace(string(respBody))
-		if msg == "" {
-			msg = http.StatusText(resp.StatusCode)
-		}
-		return errors.New(msg)
-	}
-	return nil
+	return sdk.PostWebhookJSONWithRetry(ctx, httpClient, apiBase, webhookURL, payload, 3)
 }
 
 type seenSet struct {
