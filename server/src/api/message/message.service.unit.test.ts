@@ -146,6 +146,41 @@ describe('message.service (unit)', () => {
     expect(result[0].attachments[0].url).toBe('http://cdn.local/a.png');
   });
 
+  it('getMessagesByChannel does not leak overrides across messages sharing the same author object', async () => {
+    const sharedAuthor: any = { username: 'orig', avatarUrl: 'orig.png', isBot: true };
+
+    const msg1: any = {
+      _id: 'm1',
+      channelId: 'c1',
+      authorId: sharedAuthor,
+      payload: { overrides: { username: 'A', avatarUrl: 'a.png' } },
+      attachments: [],
+    };
+
+    const msg2: any = {
+      _id: 'm2',
+      channelId: 'c1',
+      authorId: sharedAuthor,
+      payload: { overrides: { username: 'B', avatarUrl: 'b.png' } },
+      attachments: [],
+    };
+
+    vi.mocked(messageRepository.findByChannel).mockResolvedValue([msg1, msg2] as any);
+
+    const result: any = await getMessagesByChannel({ channelId: 'c1', limit: 20 });
+
+    expect(sharedAuthor.username).toBe('orig');
+    expect(sharedAuthor.avatarUrl).toBe('orig.png');
+
+    expect(result[0].authorId.username).toBe('A');
+    expect(result[0].authorId.avatarUrl).toBe('http://cdn.local/a.png');
+
+    expect(result[1].authorId.username).toBe('B');
+    expect(result[1].authorId.avatarUrl).toBe('http://cdn.local/b.png');
+
+    expect(result[0].authorId).not.toBe(result[1].authorId);
+  });
+
   it('createMessage throws NotFoundError when channel does not exist', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery(null));
     await expect(createMessage({ channelId: 'c1', authorId: 'u1' } as any)).rejects.toBeInstanceOf(NotFoundError);

@@ -58,26 +58,22 @@ const getUploadedAvatarUrl = async (avatarFile?: Express.Multer.File) => {
   return getS3PublicUrl(key);
 };
 
-const findOrCreateBotUserForServer = async (serverId: string) => {
+const createBotUserForWebhook = async (serverId: string, avatarUrl?: string) => {
   const server = await ServerModel.findById(serverId);
   if (!server) {
     throw new NotFoundError('Server not found');
   }
 
-  const botUsername = `webhook-bot-${serverId}`;
-  let botUser = await UserModel.findOne({ username: botUsername, isBot: true });
-
-  if (!botUser) {
-    botUser = new UserModel({
-        email: `${botUsername}@mew.com`,
-        username: botUsername,
-        password: crypto.randomBytes(32).toString('hex'),
-        isBot: true,
-        avatarUrl: '',
-    });
-    await botUser.save();
-  }
-
+  const suffix = crypto.randomBytes(8).toString('hex');
+  const botUsername = `webhook-${suffix}`;
+  const botUser = new UserModel({
+    email: `${botUsername}@internal.mew`,
+    username: botUsername,
+    password: crypto.randomBytes(32).toString('hex'),
+    isBot: true,
+    avatarUrl: avatarUrl || '',
+  });
+  await botUser.save();
   return botUser;
 };
 
@@ -91,9 +87,9 @@ export const createWebhook = async (
       throw new BadRequestError('name is required');
     }
 
-    const botUser = await findOrCreateBotUserForServer(serverId);
     const token = crypto.randomBytes(32).toString('hex');
     const avatarUrl = (await getUploadedAvatarUrl(avatarFile)) ?? data.avatarUrl;
+    const botUser = await createBotUserForWebhook(serverId, avatarUrl);
 
     const webhook = await webhookRepository.create({
       ...data,
@@ -153,6 +149,25 @@ interface ExecuteWebhookPayload {
 
 export const executeWebhook = async (webhookId: string, token: string, payload: ExecuteWebhookPayload) => {
     const webhook = await assertValidWebhookToken(webhookId, token);
+
+    // Lazy-migrate existing data: historically, webhooks shared a per-server bot user.
+    // If this webhook's botUserId is also used by other webhooks, split it by creating
+    // a dedicated bot user for this webhook and updating the webhook record.
+    const sharedCount = await webhookRepository.countOtherWebhooksByBotUserId(
+      webhook._id.toString(),
+      webhook.botUserId.toString()
+    );
+    if (sharedCount > 0) {
+      const newBotUser = await createBotUserForWebhook(webhook.serverId.toString(), webhook.avatarUrl);
+      const updated = await webhookRepository.findByIdAndUpdate(webhook._id.toString(), {
+        botUserId: newBotUser._id,
+      } as any);
+      if (updated) {
+        (webhook as any).botUserId = updated.botUserId;
+      } else {
+        (webhook as any).botUserId = newBotUser._id;
+      }
+    }
 
     const botUser = await UserModel.findById(webhook.botUserId);
     if (!botUser) {

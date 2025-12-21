@@ -4,6 +4,8 @@ import { NotFoundError, UnauthorizedError } from '../../utils/errors';
 vi.mock('./webhook.repository', () => ({
   webhookRepository: {
     findByIdAndToken: vi.fn(),
+    countOtherWebhooksByBotUserId: vi.fn(),
+    findByIdAndUpdate: vi.fn(),
   },
 }));
 
@@ -40,7 +42,9 @@ describe('webhook.service executeWebhook', () => {
       avatarUrl: 'hook.png',
       channelId: 'c1',
       botUserId: 'u-bot',
+      serverId: 's1',
     } as any);
+    vi.mocked(webhookRepository.countOtherWebhooksByBotUserId).mockResolvedValue(0 as any);
     vi.mocked((UserModel as any).findById).mockResolvedValue(null);
 
     await expect(executeWebhook('w1', 't1', { content: 'hi' })).rejects.toBeInstanceOf(NotFoundError);
@@ -53,7 +57,9 @@ describe('webhook.service executeWebhook', () => {
       avatarUrl: 'hook.png',
       channelId: 'c1',
       botUserId: 'u-bot',
+      serverId: 's1',
     } as any);
+    vi.mocked(webhookRepository.countOtherWebhooksByBotUserId).mockResolvedValue(0 as any);
     vi.mocked((UserModel as any).findById).mockResolvedValue({ _id: 'u-bot' } as any);
     vi.mocked(MessageService.createMessage).mockResolvedValue({ _id: 'm1' } as any);
 

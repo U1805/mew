@@ -74,11 +74,20 @@ async function checkMessagePermissions(messageId: string, userId: string) {
 
 
 function applyAuthorOverride<T extends { payload?: any; authorId?: any }>(messageObject: T): T {
-  if (messageObject.payload && messageObject.payload.overrides && messageObject.authorId && typeof messageObject.authorId === 'object') {
-    const author = messageObject.authorId as any;
-    author.username = messageObject.payload.overrides.username || author.username;
-    author.avatarUrl = messageObject.payload.overrides.avatarUrl || author.avatarUrl;
-  }
+  const overrides = messageObject.payload?.overrides;
+  const author = messageObject.authorId as any;
+
+  if (!overrides || !author || typeof author !== 'object') return messageObject;
+
+  // When multiple messages share the same populated author object (e.g. lean+populate),
+  // mutating it in-place causes the last override to "leak" into other messages.
+  if (typeof author.username !== 'string' && typeof author.avatarUrl !== 'string') return messageObject;
+
+  messageObject.authorId = {
+    ...author,
+    username: overrides.username ?? author.username,
+    avatarUrl: overrides.avatarUrl ?? author.avatarUrl,
+  };
   return messageObject;
 }
 

@@ -117,6 +117,24 @@ describe('Webhook Routes', () => {
 
       expect(res.statusCode).toBe(204);
     });
+
+    it('should create distinct bot users per webhook', async () => {
+      const w1 = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Hook 1' });
+
+      const w2 = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Hook 2' });
+
+      expect(w1.statusCode).toBe(201);
+      expect(w2.statusCode).toBe(201);
+      expect(w1.body.botUserId).toBeDefined();
+      expect(w2.body.botUserId).toBeDefined();
+      expect(w1.body.botUserId).not.toBe(w2.body.botUserId);
+    });
   });
 
   describe('Webhook Execution API', () => {
