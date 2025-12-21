@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/mmcdole/gofeed"
+	"mew/plugins/sdk"
 )
 
 func fetchRSS(
@@ -16,16 +17,13 @@ func fetchRSS(
 	httpClient *http.Client,
 	parser *gofeed.Parser,
 	feedURL string,
-	userAgent string,
 	state *taskState,
 ) ([]*gofeed.Item, string, string, string, bool, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
 	if err != nil {
 		return nil, "", "", "", false, err
 	}
-	if userAgent != "" {
-		req.Header.Set("User-Agent", userAgent)
-	}
+	req.Header.Set("User-Agent", sdk.RandomBrowserUserAgent())
 	if state != nil && state.ETag != "" {
 		req.Header.Set("If-None-Match", state.ETag)
 	}

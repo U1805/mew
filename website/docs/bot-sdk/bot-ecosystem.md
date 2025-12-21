@@ -123,7 +123,7 @@ Fetcher 服务是一个纯后台守护进程。
 [
   {
     "rss_url": "https://hn.algolia.com/rss",
-    "interval_seconds": 3600,
+    "interval": 3600,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "enabled": true,
     "send_history_on_start": false,
@@ -135,7 +135,7 @@ Fetcher 服务是一个纯后台守护进程。
 说明：
 
 - `rss_url`：RSS/Atom 地址（兼容 `url` 别名）
-- `interval_seconds`（或 `interval`）：轮询间隔（秒）
+- `interval`：轮询间隔（秒）
 - `webhook`：频道 Webhook 投递地址（后端路由：`POST /api/webhooks/:webhookId/:token`）
 - 推送消息类型默认为 `app/x-rss-card`（前端会渲染为 RSS 卡片）
 

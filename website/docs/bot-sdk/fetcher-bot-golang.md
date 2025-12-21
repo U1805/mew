@@ -69,7 +69,7 @@ import (
 
 type RssConfig struct {
     RSSURL          string `json:"rss_url"`
-    IntervalSeconds int    `json:"interval_seconds"`
+    Interval        int    `json:"interval"`
     Webhook         string `json:"webhook"`
 }
 
@@ -96,7 +96,7 @@ func startRssWorker(bot BotData) {
         http.Post(config.Webhook, "application/json", bytes.NewBuffer(jsonBody))
 
         // 等待下一次抓取
-        time.Sleep(time.Duration(config.IntervalSeconds) * time.Second)
+        time.Sleep(time.Duration(config.Interval) * time.Second)
     }
 }
 ```

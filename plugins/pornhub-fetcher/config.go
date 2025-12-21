@@ -8,9 +8,9 @@ import (
 )
 
 type PHTaskConfig struct {
-	Username           string `json:"username"`             // 对应 model username
+	Username           string `json:"username"` // 对应 model username
 	Webhook            string `json:"webhook"`
-	Interval           int    `json:"interval"`             // 轮询间隔(秒)
+	Interval           int    `json:"interval"` // 轮询间隔(秒)
 	Enabled            *bool  `json:"enabled"`
 	SendHistoryOnStart *bool  `json:"send_history_on_start"` // 启动时是否推送历史数据
 }
@@ -37,9 +37,9 @@ func parsePHTasks(rawConfig string) ([]PHTaskConfig, error) {
 		if strings.TrimSpace(t.Username) == "" {
 			return nil, fmt.Errorf("tasks[%d].username is required", i)
 		}
-		
+
 		if t.Interval <= 0 {
-			t.Interval = 300 // 默认 5 分钟
+			t.Interval = 12 * 60 * 60 // 默认 12 小时
 		}
 
 		if strings.TrimSpace(t.Webhook) == "" {

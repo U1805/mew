@@ -42,6 +42,9 @@ func LoadRuntimeConfig(serviceType string) (RuntimeConfig, error) {
 	if serviceType == "" {
 		return RuntimeConfig{}, fmt.Errorf("serviceType is required (derived from plugin folder name)")
 	}
+	if serviceType == "sdk" {
+		return RuntimeConfig{}, fmt.Errorf("invalid serviceType %q: reserved for internal use", serviceType)
+	}
 
 	apiBase := strings.TrimRight(strings.TrimSpace(os.Getenv("MEW_API_BASE")), "/")
 	if apiBase == "" {

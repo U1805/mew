@@ -11,19 +11,16 @@
 ```json
 [
   {
-    "interval_seconds": 3600,
+    "interval": 3600,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "rss_url": "https://example.com/feed.xml",
     "enabled": true,
     "send_history_on_start": false,
-    "max_items_per_poll": 5,
-    "user_agent": "mew-rss-fetcher-bot/1.0"
+    "max_items_per_poll": 5
   },
   {
-    "interval_seconds": 7200,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
-    "rss_url": "https://another.example/rss",
-    "enabled": true
+    "rss_url": "https://another.example/rss"
   }
 ]
 ```
@@ -38,15 +35,15 @@
 
 字段说明：
 
-- `interval_seconds` / `interval`：轮询间隔（秒）
+- `interval`：轮询间隔（秒），默认 `300`（5 分钟）
 - `enabled`：可选，默认为 `true`；为 `false` 时该任务不运行
 - `send_history_on_start`：可选，默认为 `false`；为 `true` 时首次启动会推送当前 feed 的历史条目（谨慎开启避免刷屏）
 - `max_items_per_poll`：可选，单次最多推送多少条新内容（默认 `5`，上限 `20`）
-- `user_agent`：可选，自定义抓取 UA（默认 `mew-rss-fetcher-bot/1.0`）
 
 ## 去重与缓存
 
 - 支持 `ETag` / `Last-Modified` 条件请求，减少重复流量
+- 抓取端会随机使用常见浏览器 `User-Agent` 以降低被拦截风险
 - 支持本地持久化去重 state（默认写到系统临时目录的 `mew/rss-fetcher/<botId>/...`），避免重启后重复推送
 
 ## 运行

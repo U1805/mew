@@ -9,14 +9,12 @@ import (
 
 type rssTaskRaw struct {
 	Interval           int    `json:"interval"`
-	IntervalSeconds    int    `json:"interval_seconds"`
 	Webhook            string `json:"webhook"`
 	RSSURL             string `json:"rss_url"`
 	URL                string `json:"url"`
 	Enabled            *bool  `json:"enabled"`
 	SendHistoryOnStart *bool  `json:"send_history_on_start"`
 	MaxItemsPerPoll    int    `json:"max_items_per_poll"`
-	UserAgent          string `json:"user_agent"`
 }
 
 type rssConfigWrapper struct {
@@ -24,13 +22,12 @@ type rssConfigWrapper struct {
 }
 
 type RSSFetchTaskConfig struct {
-	IntervalSeconds    int
+	Interval    int
 	Webhook            string
 	RSSURL             string
 	Enabled            *bool
 	SendHistoryOnStart *bool
 	MaxItemsPerPoll    int
-	UserAgent          string
 }
 
 func parseRSSTasks(rawConfig string) ([]RSSFetchTaskConfig, error) {
@@ -70,12 +67,9 @@ func parseRSSTasks(rawConfig string) ([]RSSFetchTaskConfig, error) {
 
 	validated := make([]RSSFetchTaskConfig, 0, len(rawTasks))
 	for i, t := range rawTasks {
-		interval := t.IntervalSeconds
+		interval := t.Interval
 		if interval <= 0 {
-			interval = t.Interval
-		}
-		if interval <= 0 {
-			return nil, fmt.Errorf("tasks[%d].interval(_seconds) must be > 0", i)
+			interval = 5 * 60 // 默认 5 分钟
 		}
 		if strings.TrimSpace(t.Webhook) == "" {
 			return nil, fmt.Errorf("tasks[%d].webhook is required", i)
@@ -111,19 +105,13 @@ func parseRSSTasks(rawConfig string) ([]RSSFetchTaskConfig, error) {
 			maxItems = 20
 		}
 
-		userAgent := strings.TrimSpace(t.UserAgent)
-		if userAgent == "" {
-			userAgent = "mew-rss-fetcher-bot/1.0"
-		}
-
 		validated = append(validated, RSSFetchTaskConfig{
-			IntervalSeconds:    interval,
+			Interval:           interval,
 			Webhook:            t.Webhook,
 			RSSURL:             rssURLStr,
 			Enabled:            t.Enabled,
 			SendHistoryOnStart: t.SendHistoryOnStart,
 			MaxItemsPerPoll:    maxItems,
-			UserAgent:          userAgent,
 		})
 	}
 

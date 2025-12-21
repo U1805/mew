@@ -27,5 +27,14 @@ describe('Infra routes (/api/infra)', () => {
       ])
     );
   });
+
+  it('rejects reserved service types', async () => {
+    const registerRes = await request(app)
+      .post('/api/infra/service-types/register')
+      .set('X-Mew-Admin-Secret', process.env.MEW_ADMIN_SECRET!)
+      .send({ serviceType: 'sdk' });
+
+    expect(registerRes.statusCode).toBe(400);
+  });
 });
 

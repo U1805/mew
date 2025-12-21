@@ -34,7 +34,7 @@ func parseTasks(rawConfig string) ([]TestTaskConfig, error) {
 	validated := make([]TestTaskConfig, 0, len(tasks))
 	for i, t := range tasks {
 		if t.Interval <= 0 {
-			return nil, fmt.Errorf("tasks[%d].interval must be > 0", i)
+			t.Interval = 30 // 默认 30 秒
 		}
 		if strings.TrimSpace(t.Webhook) == "" {
 			return nil, fmt.Errorf("tasks[%d].webhook is required", i)

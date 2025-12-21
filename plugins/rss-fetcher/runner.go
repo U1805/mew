@@ -84,7 +84,7 @@ func runRSSTask(
 	idx int,
 	task RSSFetchTaskConfig,
 ) {
-	interval := time.Duration(task.IntervalSeconds) * time.Second
+	interval := time.Duration(task.Interval) * time.Second
 	logPrefix := fmt.Sprintf("[rss-fetcher-bot] bot=%s name=%q task=%d interval=%s", botID, botName, idx, interval)
 
 	parser := gofeed.NewParser()
@@ -104,7 +104,7 @@ func runRSSTask(
 	sendHistoryOnStart := boolOrDefault(task.SendHistoryOnStart, false)
 
 	fetchAndPost := func() {
-		items, feedTitle, feedImageURL, feedSiteURL, notModified, err := fetchRSS(ctx, rssHTTPClient, parser, task.RSSURL, task.UserAgent, &state)
+		items, feedTitle, feedImageURL, feedSiteURL, notModified, err := fetchRSS(ctx, rssHTTPClient, parser, task.RSSURL, &state)
 		if err != nil {
 			log.Printf("%s fetch failed (rss_url=%s): %v", logPrefix, task.RSSURL, err)
 			return

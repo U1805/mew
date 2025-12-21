@@ -3,6 +3,8 @@ import config from '../config';
 import { infraRegistry } from './infraRegistry';
 import ServiceTypeModel from '../api/infra/serviceType.model';
 
+const RESERVED_SERVICE_TYPES = new Set(['sdk']);
+
 const getHandshakeValue = (socket: Socket, key: string): string | undefined => {
   const authVal = (socket.handshake.auth as any)?.[key];
   if (typeof authVal === 'string') return authVal;
@@ -31,6 +33,9 @@ export const registerInfraNamespace = (io: SocketIOServer) => {
     const serviceType = getHandshakeValue(socket, 'serviceType');
     if (!serviceType) {
       return next(new Error('Authentication error: Missing serviceType'));
+    }
+    if (RESERVED_SERVICE_TYPES.has(serviceType.trim())) {
+      return next(new Error(`Authentication error: Reserved serviceType: ${serviceType}`));
     }
 
     (socket.data as any).serviceType = serviceType;
