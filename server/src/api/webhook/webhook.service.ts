@@ -97,6 +97,14 @@ export const deleteWebhook = async (webhookId: string): Promise<void> => {
   }
 };
 
+export const assertValidWebhookToken = async (webhookId: string, token: string) => {
+  const webhook = await webhookRepository.findByIdAndToken(webhookId, token);
+  if (!webhook) {
+    throw new UnauthorizedError('Invalid webhook token');
+  }
+  return webhook;
+};
+
 interface ExecuteWebhookPayload {
     content?: string;
     username?: string;
@@ -106,11 +114,7 @@ interface ExecuteWebhookPayload {
 }
 
 export const executeWebhook = async (webhookId: string, token: string, payload: ExecuteWebhookPayload) => {
-    const webhook = await webhookRepository.findByIdAndToken(webhookId, token);
-
-    if (!webhook) {
-      throw new UnauthorizedError('Invalid webhook token');
-    }
+    const webhook = await assertValidWebhookToken(webhookId, token);
 
     const botUser = await UserModel.findById(webhook.botUserId);
     if (!botUser) {

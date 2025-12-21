@@ -11,23 +11,25 @@ import (
 )
 
 type TestBotRunner struct {
-	botID   string
-	botName string
-	apiBase string
-	tasks   []TestTaskConfig
+	botID       string
+	botName     string
+	accessToken string
+	apiBase     string
+	tasks       []TestTaskConfig
 }
 
-func NewTestBotRunner(botID, botName, rawConfig, apiBase string) (*TestBotRunner, error) {
+func NewTestBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*TestBotRunner, error) {
 	tasks, err := parseTasks(rawConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TestBotRunner{
-		botID:   botID,
-		botName: botName,
-		apiBase: apiBase,
-		tasks:   tasks,
+		botID:       botID,
+		botName:     botName,
+		accessToken: accessToken,
+		apiBase:     apiBase,
+		tasks:       tasks,
 	}, nil
 }
 

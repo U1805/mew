@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"context"
+	"io"
 	"net/http"
 
 	"mew/plugins/sdk/core"
@@ -73,6 +74,7 @@ func NewBotManager(client *MewClient, serviceType, logPrefix string, factory Run
 // ---- webhook ----
 
 type WebhookPayload = webhook.Payload
+type WebhookAttachment = webhook.Attachment
 
 func PostWebhook(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, payload WebhookPayload, maxRetries int) error {
 	return webhook.Post(ctx, httpClient, apiBase, webhookURL, payload, maxRetries)
@@ -84,4 +86,12 @@ func PostWebhookJSONWithRetry(ctx context.Context, httpClient *http.Client, apiB
 
 func RewriteLoopbackURL(rawURL, apiBase string) (string, error) {
 	return webhook.RewriteLoopbackURL(rawURL, apiBase)
+}
+
+func UploadWebhookBytes(ctx context.Context, httpClient *http.Client, apiBase, webhookURL, filename, contentType string, data []byte) (WebhookAttachment, error) {
+	return webhook.UploadBytes(ctx, httpClient, apiBase, webhookURL, filename, contentType, data)
+}
+
+func UploadWebhookReader(ctx context.Context, httpClient *http.Client, apiBase, webhookURL, filename, contentType string, r io.Reader) (WebhookAttachment, error) {
+	return webhook.UploadReader(ctx, httpClient, apiBase, webhookURL, filename, contentType, r)
 }

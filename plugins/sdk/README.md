@@ -10,6 +10,7 @@
 - 通用 BotManager（热重载）：`sdk.NewBotManager(client, serviceType, logPrefix, factory)`
 - 标准 Service 主循环（可选）：`sdk.RunServiceWithSignals(sdk.ServiceOptions{...})`
 - goroutine 组管理（可选）：`g := sdk.NewGroup(ctx); g.Go(...); g.Stop()`
+- 基于 webhook url 的文件上传（S3 存储）：`sdk.UploadWebhookReader(...)` / `sdk.UploadWebhookBytes(...)`
 
 ## 包结构
 
@@ -17,7 +18,7 @@
 - `mew/plugins/sdk/core`：dotenv、运行时配置、service 主循环、Group
 - `mew/plugins/sdk/mew`：后端 API client
 - `mew/plugins/sdk/manager`：BotManager（热重载）
-- `mew/plugins/sdk/webhook`：webhook payload + post + URL rewrite
+- `mew/plugins/sdk/webhook`：webhook post（含 loopback rewrite）+ 基于 webhook url 的文件上传（S3 存储）
 
 ## Runner 接口
 
@@ -27,7 +28,7 @@
 
 并提供 `RunnerFactory`：
 
-- `func(botID, botName, rawConfig string) (sdk.Runner, error)`
+- `func(botID, botName, accessToken, rawConfig string) (sdk.Runner, error)`
 
 `BotManager` 会按 `bot.Config` 的 hash 判断是否需要重载，并在配置变更/删除时调用 stop 释放资源。
 
@@ -37,8 +38,8 @@
 func main() {
   _ = sdk.RunServiceWithSignals(sdk.ServiceOptions{
     LogPrefix: "[my-bot]",
-    NewRunner: func(botID, botName, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
-      return NewMyRunner(botID, botName, rawConfig, cfg.APIBase)
+    NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
+      return NewMyRunner(botID, botName, accessToken, rawConfig, cfg.APIBase)
     },
   })
 }

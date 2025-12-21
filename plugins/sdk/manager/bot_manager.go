@@ -14,7 +14,7 @@ type Runner interface {
 	Start() (stop func())
 }
 
-type RunnerFactory func(botID, botName, rawConfig string) (Runner, error)
+type RunnerFactory func(botID, botName, accessToken, rawConfig string) (Runner, error)
 
 type BotManager struct {
 	client      *mew.Client
@@ -69,10 +69,11 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 	seen := make(map[string]struct{}, len(bots))
 
 	type startReq struct {
-		botID      string
-		botName    string
-		rawConfig  string
-		configHash string
+		botID       string
+		botName     string
+		accessToken string
+		rawConfig   string
+		configHash  string
 	}
 
 	var (
@@ -98,10 +99,11 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 		}
 
 		starts = append(starts, startReq{
-			botID:      botID,
-			botName:    bot.Name,
-			rawConfig:  bot.Config,
-			configHash: configHash,
+			botID:       botID,
+			botName:     bot.Name,
+			accessToken: bot.AccessToken,
+			rawConfig:   bot.Config,
+			configHash:  configHash,
 		})
 	}
 
@@ -120,7 +122,7 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 	}
 
 	for _, s := range starts {
-		runner, err := m.newRunner(s.botID, s.botName, s.rawConfig)
+		runner, err := m.newRunner(s.botID, s.botName, s.accessToken, s.rawConfig)
 		if err != nil {
 			log.Printf("%s invalid config for bot %s (%s): %v", m.logPrefix, s.botID, s.botName, err)
 			continue

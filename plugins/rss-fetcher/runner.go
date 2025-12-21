@@ -14,23 +14,25 @@ import (
 )
 
 type RSSFetcherBotRunner struct {
-	botID   string
-	botName string
-	apiBase string
-	tasks   []RSSFetchTaskConfig
+	botID       string
+	botName     string
+	accessToken string
+	apiBase     string
+	tasks       []RSSFetchTaskConfig
 }
 
-func NewRSSFetcherBotRunner(botID, botName, rawConfig, apiBase string) (*RSSFetcherBotRunner, error) {
+func NewRSSFetcherBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*RSSFetcherBotRunner, error) {
 	tasks, err := parseRSSTasks(rawConfig)
 	if err != nil {
 		return nil, err
 	}
 
 	return &RSSFetcherBotRunner{
-		botID:   botID,
-		botName: botName,
-		apiBase: apiBase,
-		tasks:   tasks,
+		botID:       botID,
+		botName:     botName,
+		accessToken: accessToken,
+		apiBase:     apiBase,
+		tasks:       tasks,
 	}, nil
 }
 

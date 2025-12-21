@@ -17,7 +17,7 @@ type ServiceOptions struct {
 	ServiceType string
 
 	// NewRunner builds a Runner for a single bot instance.
-	NewRunner func(botID, botName, rawConfig string, cfg RuntimeConfig) (manager.Runner, error)
+	NewRunner func(botID, botName, accessToken, rawConfig string, cfg RuntimeConfig) (manager.Runner, error)
 
 	// DisableDotEnv disables `.env` loading (MEW_DOTENV also disables it).
 	DisableDotEnv bool
@@ -61,8 +61,8 @@ func RunService(ctx context.Context, opts ServiceOptions) error {
 		return ErrInvalidRunnerFactory
 	}
 
-	mgr := manager.NewBotManager(client, cfg.ServiceType, opts.LogPrefix, func(botID, botName, rawConfig string) (manager.Runner, error) {
-		return opts.NewRunner(botID, botName, rawConfig, cfg)
+	mgr := manager.NewBotManager(client, cfg.ServiceType, opts.LogPrefix, func(botID, botName, accessToken, rawConfig string) (manager.Runner, error) {
+		return opts.NewRunner(botID, botName, accessToken, rawConfig, cfg)
 	})
 
 	log.Printf("%s starting (serviceType=%s apiBase=%s syncInterval=%s)", opts.LogPrefix, cfg.ServiceType, cfg.APIBase, cfg.SyncInterval)

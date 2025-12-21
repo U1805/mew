@@ -1,6 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
+
+// Mock the S3 utility to prevent actual file uploads during tests
+vi.mock('../../utils/s3', () => ({
+  uploadStream: vi.fn(),
+  getS3PublicUrl: (key: string) => `http://cdn.local/${key}`,
+  uploadFile: vi.fn(),
+}));
+
+import { uploadStream } from '../../utils/s3';
 
 describe('Webhook Routes', () => {
   let token: string;
@@ -8,6 +17,17 @@ describe('Webhook Routes', () => {
   let channelId: string;
 
   beforeEach(async () => {
+    vi.clearAllMocks();
+    // Default mock for streaming uploads (must drain stream to avoid hanging busboy)
+    vi.mocked(uploadStream).mockImplementation(async (opts: any) => {
+      await new Promise<void>((resolve, reject) => {
+        opts.stream.on('data', () => {});
+        opts.stream.on('end', () => resolve());
+        opts.stream.on('error', reject);
+      });
+      return { key: 'mock-file.txt', mimetype: 'text/plain', size: 42 } as any;
+    });
+
     // 1. Create a user and get token
     const userData = {
       email: `testuser-${Date.now()}@example.com`,
@@ -161,6 +181,35 @@ describe('Webhook Routes', () => {
         .send(payload);
 
       expect(res.statusCode).toBe(401);
+    });
+
+    it('should upload a file via webhook token and return attachment metadata', async () => {
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}/upload`)
+        .attach('file', Buffer.from('hello'), 'hello.txt');
+
+      expect(res.status).toBe(201);
+      expect(uploadStream).toHaveBeenCalledOnce();
+      expect(res.body).toEqual({
+        filename: 'hello.txt',
+        contentType: 'text/plain',
+        key: 'mock-file.txt',
+        size: 42,
+      });
+    });
+
+    it('should return 400 if no file is uploaded via webhook upload endpoint', async () => {
+      const res = await request(app).post(`/api/webhooks/${webhook._id}/${webhook.token}/upload`);
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('No file uploaded.');
+    });
+
+    it('should return 401 on webhook upload with invalid token', async () => {
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/invalidtoken/upload`)
+        .attach('file', Buffer.from('hello'), 'hello.txt');
+
+      expect(res.status).toBe(401);
     });
 
     it('should override username and avatar on execution', async () => {
