@@ -118,6 +118,9 @@ export interface MessagePayload {
   summary?: string;
   url?: string;
   thumbnail_url?: string;
+  s3_thumbnail_url?: string;
+  preview_url?: string;
+  s3_preview_url?: string;
   overrides?: {
     username?: string;
     avatarUrl?: string;

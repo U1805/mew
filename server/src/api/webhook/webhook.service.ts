@@ -13,6 +13,44 @@ interface WebhookCreationData {
   avatarUrl?: string;
 }
 
+const RESERVED_PAYLOAD_KEYS = new Set(['webhookName', 'overrides']);
+
+const PAYLOAD_ALLOWLIST_BY_TYPE: Record<string, Set<string>> = {
+  'app/x-rss-card': new Set(['title', 'summary', 'url', 'thumbnail_url', 's3_thumbnail_url', 'feed_title', 'published_at']),
+  'app/x-pornhub-card': new Set(['title', 'url', 'thumbnail_url', 's3_thumbnail_url', 'preview_url', 's3_preview_url']),
+};
+
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value);
+}
+
+function hydrateS3PrefixedFields(input: Record<string, any>): Record<string, any> {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (RESERVED_PAYLOAD_KEYS.has(k)) continue;
+
+    if (k.startsWith('s3_') && typeof v === 'string') {
+      const trimmed = v.trim();
+      out[k] = trimmed && !isHttpUrl(trimmed) ? getS3PublicUrl(trimmed) : trimmed;
+      continue;
+    }
+
+    out[k] = v;
+  }
+  return out;
+}
+
+function sanitizeCustomPayload(messageType: string, input: Record<string, any>): Record<string, any> {
+  const allowlist = PAYLOAD_ALLOWLIST_BY_TYPE[messageType];
+  if (!allowlist) return input;
+
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(input)) {
+    if (allowlist.has(k)) out[k] = v;
+  }
+  return out;
+}
+
 const getUploadedAvatarUrl = async (avatarFile?: Express.Multer.File) => {
   if (!avatarFile) return undefined;
   const existingKey = (avatarFile as any).key as string | undefined;
@@ -122,30 +160,29 @@ export const executeWebhook = async (webhookId: string, token: string, payload: 
     }
 
     const content = typeof payload.content === 'string' ? payload.content : '';
-    const requestedType = typeof payload.type === 'string' ? payload.type : '';
-    const isRssCard = requestedType === 'app/x-rss-card';
+    
+    const messageType = (typeof payload.type === 'string' && payload.type.trim() !== '') 
+        ? payload.type 
+        : 'message/default';
 
-    if (!isRssCard && content.trim() === '') {
+    if (messageType === 'message/default' && content.trim() === '') {
       throw new BadRequestError('content is required');
     }
 
-    const rssPayload = isRssCard && payload.payload && typeof payload.payload === 'object'
-      ? {
-          title: payload.payload.title,
-          summary: payload.payload.summary,
-          url: payload.payload.url,
-          thumbnail_url: payload.payload.thumbnail_url,
-          feed_title: payload.payload.feed_title,
-          published_at: payload.payload.published_at,
-        }
-      : undefined;
+    const customPayload = (payload.payload && typeof payload.payload === 'object') 
+        ? payload.payload 
+        : {};
+
+    const hydratedPayload = hydrateS3PrefixedFields(customPayload);
+    const sanitizedPayload = sanitizeCustomPayload(messageType, hydratedPayload);
 
     const messageData: any = {
       channelId: webhook.channelId,
       authorId: webhook.botUserId,
-      type: isRssCard ? 'app/x-rss-card' : 'message/default',
+      type: messageType,
       content,
       payload: {
+        ...sanitizedPayload,
         webhookName: webhook.name,
         overrides: {
             username: payload.username || webhook.name,
@@ -153,10 +190,6 @@ export const executeWebhook = async (webhookId: string, token: string, payload: 
         }
       },
     };
-
-    if (rssPayload) {
-      messageData.payload = { ...messageData.payload, ...rssPayload };
-    }
 
     const createdMessage = await MessageService.createMessage(messageData);
 

@@ -151,6 +151,7 @@ describe('Webhook Routes', () => {
           summary: 'Example summary',
           url: 'https://example.com/post',
           thumbnail_url: 'https://example.com/img.png',
+          s3_thumbnail_url: 'mock-file.txt',
           feed_title: 'Example Feed',
           published_at: '2025-01-01T00:00:00Z',
           ignored_field: 'should not be persisted',
@@ -168,6 +169,7 @@ describe('Webhook Routes', () => {
         summary: payload.payload.summary,
         url: payload.payload.url,
         thumbnail_url: payload.payload.thumbnail_url,
+        s3_thumbnail_url: 'http://cdn.local/mock-file.txt',
         feed_title: payload.payload.feed_title,
         published_at: payload.payload.published_at,
       });
