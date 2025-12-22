@@ -88,3 +88,48 @@ func TestUploadReader_InvalidURL(t *testing.T) {
 		t.Fatalf("expected error")
 	}
 }
+
+func TestUploadReader_RequiresFilenameAndReader(t *testing.T) {
+	t.Parallel()
+
+	_, err := UploadReader(context.Background(), nil, "", "https://example.com/webhook", "", "text/plain", strings.NewReader(""))
+	if err == nil {
+		t.Fatalf("expected error for empty filename")
+	}
+
+	_, err = UploadReader(context.Background(), nil, "", "https://example.com/webhook", "f.txt", "text/plain", nil)
+	if err == nil {
+		t.Fatalf("expected error for nil reader")
+	}
+}
+
+func TestUploadReader_ErrorDecoding(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"message":"bad"}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := UploadReader(context.Background(), srv.Client(), "", srv.URL, "f.txt", "text/plain", strings.NewReader("x"))
+	if err == nil || err.Error() != "bad" {
+		t.Fatalf("expected error %q, got %v", "bad", err)
+	}
+}
+
+func TestUploadReader_ResponseMissingKey(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"filename":"f","contentType":"c","key":"","size":1}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, err := UploadReader(context.Background(), srv.Client(), "", srv.URL, "f.txt", "text/plain", strings.NewReader("x"))
+	if err == nil || !strings.Contains(err.Error(), "missing key") {
+		t.Fatalf("expected missing key error, got %v", err)
+	}
+}

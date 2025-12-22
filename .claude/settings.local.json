@@ -16,7 +16,8 @@
       "mcp__exa__crawling_exa",
       "Bash(npx kill-port:*)",
       "Skill(gitmoji)",
-      "Skill(gitmoji_tag)"
+      "Skill(gitmoji_tag)",
+      "Bash(go test:*)"
     ],
     "deny": [],
     "ask": []

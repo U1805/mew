@@ -6,7 +6,7 @@ const disconnect = vi.fn();
 const io = vi.fn(() => ({ on, disconnect }));
 
 vi.mock('socket.io-client', () => ({
-  io: (...args: any[]) => io(...args),
+  io: (...args: any[]) => (io as any)(...args),
 }));
 
 vi.mock('../stores', () => ({
