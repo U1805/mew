@@ -6,6 +6,7 @@ import { AttachmentList } from './AttachmentList';
 import { UrlEmbed } from './UrlEmbed';
 import { RssCard } from './RssCard';
 import { PornhubCard } from './PornhubCard';
+import { TwitterCard } from './TwitterCard';
 
 interface MessageContentProps {
     message: Message;
@@ -16,6 +17,7 @@ interface MessageContentProps {
 const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, channelId }) => {
     const isRssCard = message.type === 'app/x-rss-card';
     const isPornhubCard = message.type === 'app/x-pornhub-card';
+    const isTwitterCard = message.type === 'app/x-twitter-card';
 
     if (isRssCard && message.payload) {
         return <RssCard payload={message.payload} fallbackTimestamp={message.createdAt} />;
@@ -23,6 +25,10 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
 
     if (isPornhubCard && message.payload) {
         return <PornhubCard payload={message.payload} />;
+    }
+
+    if (isTwitterCard && message.payload) {
+        return <TwitterCard payload={message.payload} />;
     }
 
     return (

@@ -18,6 +18,29 @@ const RESERVED_PAYLOAD_KEYS = new Set(['webhookName', 'overrides']);
 const PAYLOAD_ALLOWLIST_BY_TYPE: Record<string, Set<string>> = {
   'app/x-rss-card': new Set(['title', 'summary', 'url', 'thumbnail_url', 's3_thumbnail_url', 'feed_title', 'published_at']),
   'app/x-pornhub-card': new Set(['title', 'url', 'thumbnail_url', 's3_thumbnail_url', 'preview_url', 's3_preview_url']),
+  'app/x-twitter-card': new Set([
+    'id',
+    'url',
+    'text',
+    'created_at',
+    'is_retweet',
+    'author_name',
+    'author_handle',
+    'author_avatar',
+    'images',
+    's3_images',
+    'quoted_tweet',
+    'video_url',
+    's3_video_url',
+    'video_content_type',
+    'cover_url',
+    's3_cover_url',
+    'like_count',
+    'retweet_count',
+    'reply_count',
+    'quote_count',
+    'view_count',
+  ]),
 };
 
 function isHttpUrl(value: string): boolean {
@@ -25,17 +48,41 @@ function isHttpUrl(value: string): boolean {
 }
 
 function hydrateS3PrefixedFields(input: Record<string, any>): Record<string, any> {
+  const hydrateValue = (key: string | null, value: any): any => {
+    if (key && key.startsWith('s3_')) {
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed && !isHttpUrl(trimmed) ? getS3PublicUrl(trimmed) : trimmed;
+      }
+      if (Array.isArray(value)) {
+        return value.map((item) => {
+          if (typeof item === 'string') {
+            const trimmed = item.trim();
+            return trimmed && !isHttpUrl(trimmed) ? getS3PublicUrl(trimmed) : trimmed;
+          }
+          return hydrateValue(null, item);
+        });
+      }
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => hydrateValue(null, item));
+    }
+    if (value && typeof value === 'object') {
+      const objOut: Record<string, any> = {};
+      for (const [k, v] of Object.entries(value)) {
+        objOut[k] = hydrateValue(k, v);
+      }
+      return objOut;
+    }
+
+    return value;
+  };
+
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(input)) {
     if (RESERVED_PAYLOAD_KEYS.has(k)) continue;
-
-    if (k.startsWith('s3_') && typeof v === 'string') {
-      const trimmed = v.trim();
-      out[k] = trimmed && !isHttpUrl(trimmed) ? getS3PublicUrl(trimmed) : trimmed;
-      continue;
-    }
-
-    out[k] = v;
+    out[k] = hydrateValue(k, v);
   }
   return out;
 }
@@ -46,7 +93,18 @@ function sanitizeCustomPayload(messageType: string, input: Record<string, any>):
 
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(input)) {
-    if (allowlist.has(k)) out[k] = v;
+    if (!allowlist.has(k)) continue;
+
+    if (messageType === 'app/x-twitter-card' && k === 'quoted_tweet' && v && typeof v === 'object' && !Array.isArray(v)) {
+      const nestedOut: Record<string, any> = {};
+      for (const [nk, nv] of Object.entries(v as Record<string, any>)) {
+        if (allowlist.has(nk) && nk !== 'quoted_tweet') nestedOut[nk] = nv;
+      }
+      out[k] = nestedOut;
+      continue;
+    }
+
+    out[k] = v;
   }
   return out;
 }

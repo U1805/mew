@@ -194,6 +194,98 @@ describe('Webhook Routes', () => {
       expect(res.body.payload.ignored_field).toBeUndefined();
     });
 
+    it('should execute a webhook and post a Twitter card message (with s3 array hydration)', async () => {
+      const payload = {
+        type: 'app/x-twitter-card',
+        content: 'Example tweet',
+        payload: {
+          id: '2000000000000000000',
+          url: 'https://x.com/example/status/2000000000000000000',
+          text: 'Hello twitter',
+          created_at: 'Sun Dec 21 04:08:49 +0000 2025',
+          author_name: 'Example',
+          author_handle: 'example',
+          s3_images: ['mock-file.txt', 'mock2.png'],
+          s3_cover_url: 'cover.jpg',
+          s3_video_url: 'video.mp4',
+          video_content_type: 'video/mp4',
+          ignored_field: 'should not be persisted',
+        },
+      };
+
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}`)
+        .send(payload);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.type).toBe('app/x-twitter-card');
+      expect(res.body.payload).toMatchObject({
+        id: payload.payload.id,
+        url: payload.payload.url,
+        text: payload.payload.text,
+        created_at: payload.payload.created_at,
+        author_name: payload.payload.author_name,
+        author_handle: payload.payload.author_handle,
+        s3_images: ['http://cdn.local/mock-file.txt', 'http://cdn.local/mock2.png'],
+        s3_cover_url: 'http://cdn.local/cover.jpg',
+        s3_video_url: 'http://cdn.local/video.mp4',
+        video_content_type: payload.payload.video_content_type,
+      });
+      expect(res.body.payload.ignored_field).toBeUndefined();
+    });
+
+    it('should execute a webhook and post a Twitter card message (with quoted_tweet hydration)', async () => {
+      const payload = {
+        type: 'app/x-twitter-card',
+        content: 'Example tweet with quoted',
+        payload: {
+          id: '2000000000000000001',
+          url: 'https://x.com/example/status/2000000000000000001',
+          text: 'Hello twitter',
+          created_at: 'Sun Dec 21 04:08:49 +0000 2025',
+          author_name: 'Example',
+          author_handle: 'example',
+          quoted_tweet: {
+            id: '1999999999999999999',
+            url: 'https://x.com/other/status/1999999999999999999',
+            text: 'Original tweet',
+            created_at: 'Sun Dec 21 03:08:49 +0000 2025',
+            author_name: 'Other',
+            author_handle: 'other',
+            s3_images: ['nested1.png', 'nested2.png'],
+            ignored_field: 'should not be persisted',
+          },
+          ignored_field: 'should not be persisted',
+        },
+      };
+
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}`)
+        .send(payload);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.type).toBe('app/x-twitter-card');
+      expect(res.body.payload).toMatchObject({
+        id: payload.payload.id,
+        url: payload.payload.url,
+        text: payload.payload.text,
+        created_at: payload.payload.created_at,
+        author_name: payload.payload.author_name,
+        author_handle: payload.payload.author_handle,
+        quoted_tweet: {
+          id: payload.payload.quoted_tweet.id,
+          url: payload.payload.quoted_tweet.url,
+          text: payload.payload.quoted_tweet.text,
+          created_at: payload.payload.quoted_tweet.created_at,
+          author_name: payload.payload.quoted_tweet.author_name,
+          author_handle: payload.payload.quoted_tweet.author_handle,
+          s3_images: ['http://cdn.local/nested1.png', 'http://cdn.local/nested2.png'],
+        },
+      });
+      expect(res.body.payload.ignored_field).toBeUndefined();
+      expect(res.body.payload.quoted_tweet.ignored_field).toBeUndefined();
+    });
+
     it('should fail with an invalid token', async () => {
       const payload = { content: 'This should fail' };
       const res = await request(app)
