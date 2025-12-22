@@ -32,9 +32,11 @@ describe('useMessages', () => {
     vi.clearAllMocks();
   });
 
-  it('should not fetch messages if serverId is null', () => {
-    renderHook(() => useMessages(null, 'channel-1'), { wrapper: createWrapper() });
-    expect(messageApi.list).toHaveBeenCalledWith(undefined, 'channel-1');
+  it('should fetch messages for DM when serverId is null', async () => {
+    (messageApi.list as Mock).mockResolvedValue({ data: [] });
+    const { result } = renderHook(() => useMessages(null, 'channel-1'), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(messageApi.list).toHaveBeenCalledWith(undefined, 'channel-1', { limit: 50 });
   });
 
   it('should not fetch messages if channelId is null', () => {
@@ -53,7 +55,7 @@ describe('useMessages', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    expect(messageApi.list).toHaveBeenCalledWith('server-1', 'channel-1');
+    expect(messageApi.list).toHaveBeenCalledWith('server-1', 'channel-1', { limit: 50 });
     expect(result.current.data).toEqual([
       { _id: '2', content: 'World', createdAt: new Date('2023-01-01T09:00:00Z').toISOString() },
       { _id: '1', content: 'Hello', createdAt: new Date('2023-01-01T10:00:00Z').toISOString() },

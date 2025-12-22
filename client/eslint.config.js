@@ -20,6 +20,7 @@ export default [
     rules: {
         "react/react-in-jsx-scope": "off",
         "react/jsx-uses-react": "off",
+        "react/prop-types": "off",
         "@typescript-eslint/no-explicit-any": "off"
     }
   }

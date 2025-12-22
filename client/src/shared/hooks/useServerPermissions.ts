@@ -1,5 +1,4 @@
 import { useAuthStore, useUIStore } from '../stores';
-import { ServerMember, Role } from '../types';
 import { useMemo } from 'react';
 import { ALL_PERMISSIONS } from '../constants/permissions';
 import { useMembers } from './useMembers';

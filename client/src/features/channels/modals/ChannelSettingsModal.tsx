@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { channelApi } from '../../../shared/services/api';
-import { PermissionOverride, Role, ServerMember } from '../../../shared/types';
+import { PermissionOverride } from '../../../shared/types';
 import { WebhookManager } from './WebhookManager';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { usePermissions } from '../../../shared/hooks/usePermissions';

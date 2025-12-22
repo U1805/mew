@@ -51,7 +51,7 @@ export const ServerSettingsModal = () => {
   const [pendingIconFile, setPendingIconFile] = useState<File | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
 
-  const { data: server, isLoading: isLoadingServer } = useQuery({
+  const { data: server } = useQuery({
     queryKey: ['server', currentServerId],
     queryFn: () => serverApi.get(currentServerId!).then((res) => res.data),
     enabled: !!currentServerId,
@@ -523,7 +523,7 @@ export const ServerSettingsModal = () => {
                           <div className="space-y-8 animate-fade-in">
                             <div className="text-sm text-mew-textMuted bg-[#404249] p-3 rounded flex items-start">
                               <Icon icon="mdi:information-outline" className="mr-2 mt-0.5 flex-shrink-0" width="18" />
-                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who don't have a specific role assignment.</span>
+                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who do not have a specific role assignment.</span>
                             </div>
 
                             {PERMISSION_GROUPS.map(group => (

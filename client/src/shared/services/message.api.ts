@@ -2,9 +2,13 @@ import api from './http';
 import { Attachment } from '../types';
 
 export const messageApi = {
-  list: (serverId: string | undefined, channelId: string) => {
+  list: (
+    serverId: string | undefined,
+    channelId: string,
+    options?: { limit?: number; before?: string }
+  ) => {
     const prefix = serverId ? `/servers/${serverId}` : '';
-    return api.get(`${prefix}/channels/${channelId}/messages`);
+    return api.get(`${prefix}/channels/${channelId}/messages`, { params: options });
   },
   send: (
     serverId: string | undefined,

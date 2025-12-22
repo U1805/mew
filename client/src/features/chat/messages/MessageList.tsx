@@ -1,4 +1,4 @@
-import { Fragment, useRef, useEffect, useLayoutEffect } from 'react';
+import { Fragment, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { Icon } from '@iconify/react';
 import MessageItem from './MessageItem';
 import TimestampDivider from './TimestampDivider';
@@ -12,11 +12,24 @@ import { useQueryClient } from '@tanstack/react-query';
 interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
+  isFetchingOlder?: boolean;
+  hasMoreOlder?: boolean;
+  onLoadOlder?: () => Promise<void> | void;
   channel: Channel | null;
   channelId: string | null;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel, channelId }) => {
+const SCROLL_TOP_THRESHOLD_PX = 80;
+
+const MessageList: React.FC<MessageListProps> = ({
+  messages,
+  isLoading,
+  isFetchingOlder = false,
+  hasMoreOlder = false,
+  onLoadOlder,
+  channel,
+  channelId,
+}) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
@@ -28,6 +41,10 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
   const lastAckedMessageIdRef = useRef<string | null>(null);
 
   const didInitialScrollRef = useRef<string | null>(null);
+
+  const pendingPrependRef = useRef(false);
+  const beforePrependScrollHeightRef = useRef(0);
+  const beforePrependScrollTopRef = useRef(0);
 
   const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
     const el = scrollContainerRef.current;
@@ -49,6 +66,17 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
 
     didInitialScrollRef.current = channelId;
   }, [channelId, isLoading, messages.length, targetMessageId]);
+
+  useLayoutEffect(() => {
+    if (!pendingPrependRef.current) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    const delta = el.scrollHeight - beforePrependScrollHeightRef.current;
+    el.scrollTop = beforePrependScrollTopRef.current + delta;
+
+    pendingPrependRef.current = false;
+  }, [messages.length]);
 
   useEffect(() => {
     if (targetMessageId && messages.length && !isLoading) {
@@ -101,34 +129,58 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isLoading, channel,
     ? (channel?.recipients?.find((r: any) => typeof r === 'object' && r._id !== user?._id) as User | undefined)
     : null;
 
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (!onLoadOlder || isLoading || isFetchingOlder || !hasMoreOlder) return;
+
+    if (el.scrollTop <= SCROLL_TOP_THRESHOLD_PX) {
+      pendingPrependRef.current = true;
+      beforePrependScrollHeightRef.current = el.scrollHeight;
+      beforePrependScrollTopRef.current = el.scrollTop;
+      void onLoadOlder();
+    }
+  }, [hasMoreOlder, isFetchingOlder, isLoading, onLoadOlder]);
+
   return (
-    <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar">
+    <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
+      className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar"
+    >
       {!isLoading ? (
         <div className="flex flex-col mt-auto">
           <div className="flex flex-col pb-4">
-            <div className="p-4 mt-4 mb-4 border-b border-[#3F4147]">
-              {isDM && otherUser ? (
-                  <>
-                    <div className="w-[80px] h-[80px] rounded-full bg-mew-accent flex items-center justify-center mb-4 overflow-hidden">
-                        {otherUser.avatarUrl ? (
-                             <img src={otherUser.avatarUrl} alt={otherUser.username} className="w-full h-full object-cover" />
-                        ) : (
-                             <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 1).toUpperCase()}</span>
-                        )}
-                    </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>
-                    <p className="text-mew-textMuted">This is the beginning of your direct message history with <span className="font-semibold text-white">@{otherUser.username}</span>.</p>
-                  </>
-              ) : (
-                  <>
-                    <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
-                        <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
-                    </div>
-                    <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
-                    <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
-                  </>
-              )}
-            </div>
+            {isFetchingOlder && (
+              <div className="flex items-center justify-center py-3">
+                <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="18" height="18" />
+              </div>
+            )}
+            {!hasMoreOlder && (
+              <div className="p-4 mt-4 mb-4 border-b border-[#3F4147]">
+                {isDM && otherUser ? (
+                    <>
+                      <div className="w-[80px] h-[80px] rounded-full bg-mew-accent flex items-center justify-center mb-4 overflow-hidden">
+                          {otherUser.avatarUrl ? (
+                               <img src={otherUser.avatarUrl} alt={otherUser.username} className="w-full h-full object-cover" />
+                          ) : (
+                               <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 1).toUpperCase()}</span>
+                          )}
+                      </div>
+                      <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>
+                      <p className="text-mew-textMuted">This is the beginning of your direct message history with <span className="font-semibold text-white">@{otherUser.username}</span>.</p>
+                    </>
+                ) : (
+                    <>
+                      <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
+                          <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
+                      </div>
+                      <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
+                      <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
+                    </>
+                )}
+              </div>
+            )}
             {messages.map((msg, index) => {
               const prevMsg = messages[index - 1];
 

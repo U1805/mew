@@ -12,10 +12,9 @@ export const DMChannelList = () => {
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
-  const addUnreadChannel = useUnreadStore(state => state.addUnreadChannel);
   const { hiddenDmChannelIds, addHiddenChannel } = useHiddenStore();
 
-  const { data: dmChannels, isSuccess } = useDmChannels();
+  const { data: dmChannels } = useDmChannels();
 
   const visibleDmChannels = useMemo(() => {
     if (!dmChannels) return [];

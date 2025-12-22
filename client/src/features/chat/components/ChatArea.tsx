@@ -5,7 +5,6 @@ import ChatHeader from './ChatHeader';
 import MessageList from '../messages/MessageList';
 import MessageInput from '../messages/MessageInput';
 import { SearchResultsPanel } from '../../search/components/SearchResultsPanel';
-import { Channel } from '../../../shared/types';
 import { useUIStore } from '../../../shared/stores';
 import { useSocketMessages } from '../../../shared/hooks/useSocketMessages';
 import { useMessages } from '../../../shared/hooks/useMessages';
@@ -16,7 +15,13 @@ const ChatArea: React.FC = () => {
 
   const { data: channel } = useChannel(currentServerId, currentChannelId);
 
-  const { data: messages = [], isLoading } = useMessages(currentServerId, currentChannelId);
+  const {
+    data: messages = [],
+    isLoading,
+    fetchOlder,
+    isFetchingOlder,
+    hasMoreOlder,
+  } = useMessages(currentServerId, currentChannelId);
   useSocketMessages(currentChannelId);
 
   if (!currentChannelId) {
@@ -35,7 +40,15 @@ const ChatArea: React.FC = () => {
       <ChatHeader channel={channel || null} isMemberListOpen={isMemberListOpen} toggleMemberList={toggleMemberList} />
       <div className="flex flex-1 overflow-hidden relative">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          <MessageList messages={messages} isLoading={isLoading} channel={channel || null} channelId={currentChannelId} />
+          <MessageList
+            messages={messages}
+            isLoading={isLoading}
+            isFetchingOlder={isFetchingOlder}
+            hasMoreOlder={hasMoreOlder}
+            onLoadOlder={fetchOlder}
+            channel={channel || null}
+            channelId={currentChannelId}
+          />
           <MessageInput channel={channel || null} serverId={currentServerId} channelId={currentChannelId} />
         </div>
         {/* Search Results Panel - Overlays or sits next to content, but here using absolute positioning within the container managed by itself or container */}
