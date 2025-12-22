@@ -13,15 +13,25 @@ import (
 	"mew/plugins/sdk"
 )
 
+type taskState struct {
+	ETag         string   `json:"etag,omitempty"`
+	LastModified string   `json:"last_modified,omitempty"`
+	FeedTitle    string   `json:"feed_title,omitempty"`
+	FeedImageURL string   `json:"feed_image_url,omitempty"`
+	FeedSiteURL  string   `json:"feed_site_url,omitempty"`
+	Seen         []string `json:"seen,omitempty"`
+}
+
 type RSSFetcherBotRunner struct {
 	botID       string
 	botName     string
 	accessToken string
 	apiBase     string
+	serviceType string
 	tasks       []RSSFetchTaskConfig
 }
 
-func NewRSSFetcherBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*RSSFetcherBotRunner, error) {
+func NewRSSFetcherBotRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*RSSFetcherBotRunner, error) {
 	tasks, err := parseRSSTasks(rawConfig)
 	if err != nil {
 		return nil, err
@@ -31,48 +41,43 @@ func NewRSSFetcherBotRunner(botID, botName, accessToken, rawConfig, apiBase stri
 		botID:       botID,
 		botName:     botName,
 		accessToken: accessToken,
-		apiBase:     apiBase,
+		apiBase:     cfg.APIBase,
+		serviceType: cfg.ServiceType,
 		tasks:       tasks,
 	}, nil
 }
 
-func (r *RSSFetcherBotRunner) Start() (stop func()) {
-	g := sdk.NewGroup(context.Background())
+func (r *RSSFetcherBotRunner) Run(ctx context.Context) error {
+	g := sdk.NewGroup(ctx)
 
-	rssHTTPClient := &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
-		Timeout: 20 * time.Second,
+	rssHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout:     20 * time.Second,
+		UseMEWProxy: true,
+	})
+	if err != nil {
+		return err
 	}
-	webhookHTTPClient := &http.Client{Timeout: 15 * time.Second}
+	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 15 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
 
 	for i, task := range r.tasks {
-		if !isTaskEnabled(task.Enabled) {
+		if !sdk.IsEnabled(task.Enabled) {
 			continue
 		}
 		taskIndex := i
 		taskCopy := task
 		g.Go(func(ctx context.Context) {
-			runRSSTask(ctx, rssHTTPClient, webhookHTTPClient, r.apiBase, r.botID, r.botName, taskIndex, taskCopy)
+			runRSSTask(ctx, rssHTTPClient, webhookHTTPClient, r.apiBase, r.serviceType, r.botID, r.botName, taskIndex, taskCopy)
 		})
 	}
 
-	return g.Stop
-}
-
-func isTaskEnabled(v *bool) bool {
-	if v == nil {
-		return true
-	}
-	return *v
-}
-
-func boolOrDefault(v *bool, def bool) bool {
-	if v == nil {
-		return def
-	}
-	return *v
+	<-g.Context().Done()
+	g.Wait()
+	return nil
 }
 
 func runRSSTask(
@@ -80,6 +85,7 @@ func runRSSTask(
 	rssHTTPClient *http.Client,
 	webhookHTTPClient *http.Client,
 	apiBase string,
+	serviceType string,
 	botID, botName string,
 	idx int,
 	task RSSFetchTaskConfig,
@@ -89,19 +95,19 @@ func runRSSTask(
 
 	parser := gofeed.NewParser()
 
-	statePath := taskStateFile(botID, idx, task.RSSURL)
-	state, err := loadTaskState(statePath)
+	store := sdk.OpenTaskState[taskState](serviceType, botID, idx, task.RSSURL)
+	state, err := store.Load()
 	if err != nil {
 		log.Printf("%s failed to load state: %v", logPrefix, err)
 	}
 
-	seen := newSeenSet(1000)
+	seen := sdk.NewSeenSet(1000)
 	for _, id := range state.Seen {
 		seen.Add(id)
 	}
 
 	first := true
-	sendHistoryOnStart := boolOrDefault(task.SendHistoryOnStart, false)
+	sendHistoryOnStart := sdk.BoolOrDefault(task.SendHistoryOnStart, false)
 
 	fetchAndPost := func() {
 		items, feedTitle, feedImageURL, feedSiteURL, notModified, err := fetchRSS(ctx, rssHTTPClient, parser, task.RSSURL, &state)
@@ -121,7 +127,7 @@ func runRSSTask(
 					seen.Add(itemIdentity(it))
 				}
 				state.Seen = seen.Snapshot()
-				_ = saveTaskState(statePath, state)
+				_ = store.Save(state)
 				log.Printf("%s initialized (feed=%q items=%d)", logPrefix, feedTitle, len(items))
 				return
 			}
@@ -188,20 +194,8 @@ func runRSSTask(
 		}
 
 		state.Seen = seen.Snapshot()
-		_ = saveTaskState(statePath, state)
+		_ = store.Save(state)
 	}
 
-	fetchAndPost()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			fetchAndPost()
-		}
-	}
+	sdk.RunInterval(ctx, interval, true, func(ctx context.Context) { fetchAndPost() })
 }

@@ -15,22 +15,26 @@
 ## 包结构
 
 - `mew/plugins/sdk`：门面（对外稳定 API）
-- `mew/plugins/sdk/core`：dotenv、运行时配置、service 主循环、Group
+- `mew/plugins/sdk/core`：dotenv、运行时配置、service 主循环、Group、RunInterval
+- `mew/plugins/sdk/config`：Bot.config JSON 解码 + 常用校验
+- `mew/plugins/sdk/httpx`：统一的 HTTP client/代理行为 + User-Agent 工具
 - `mew/plugins/sdk/mew`：后端 API client
 - `mew/plugins/sdk/manager`：BotManager（热重载）
+- `mew/plugins/sdk/state`：本地 state 文件路径 + JSON 读写
+- `mew/plugins/sdk/collections`：SeenSet 等小工具
 - `mew/plugins/sdk/webhook`：webhook post（含 loopback rewrite）+ 基于 webhook url 的文件上传（S3 存储）
 
 ## Runner 接口
 
 每个插件只需要实现：
 
-- `type Runner interface { Start() (stop func()) }`
+- `type Runner interface { Run(ctx context.Context) error }`
 
 并提供 `RunnerFactory`：
 
 - `func(botID, botName, accessToken, rawConfig string) (sdk.Runner, error)`
 
-`BotManager` 会按 `bot.Config` 的 hash 判断是否需要重载，并在配置变更/删除时调用 stop 释放资源。
+`BotManager` 会按 `bot.Config` 的 hash 判断是否需要重载，并在配置变更/删除时取消 `ctx` 触发优雅退出。
 
 ## 推荐写法（main）
 
@@ -39,7 +43,7 @@ func main() {
   _ = sdk.RunServiceWithSignals(sdk.ServiceOptions{
     LogPrefix: "[my-bot]",
     NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
-      return NewMyRunner(botID, botName, accessToken, rawConfig, cfg.APIBase)
+      return NewMyRunner(botID, botName, accessToken, rawConfig, cfg)
     },
   })
 }
@@ -51,9 +55,22 @@ func main() {
 
 ## 请求代理（可选）
 
-SDK 默认**不使用代理**（即使系统设置了 `HTTP_PROXY/HTTPS_PROXY`）。
+SDK 默认**不使用代理**（即使系统设置了 `HTTP_PROXY/HTTPS_PROXY`），除非你通过 `UseMEWProxy`/`MEW_API_PROXY` 显式启用。
 
 如需开启，请设置：
 
 - `MEW_API_PROXY=env`：使用 Go 的 ProxyFromEnvironment（`HTTP_PROXY/HTTPS_PROXY/NO_PROXY`）
 - `MEW_API_PROXY=http://127.0.0.1:7890`：固定代理（也支持直接写 `127.0.0.1:7890`，会自动补 `http://`）
+
+推荐通过 `sdk.NewHTTPClient(sdk.HTTPClientOptions{ UseMEWProxy: true, ... })` 创建抓取用的 HTTP client：
+
+- 若设置了 `MEW_API_PROXY`：按其配置生效（`env` / 固定代理 / `direct` 等）
+- 若未设置 `MEW_API_PROXY`：使用 Go 的默认行为（即 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`，若未设置则为直连）
+
+## State（持久化）
+
+SDK 提供了一个简单的 JSON 文件持久化工具，默认写到系统用户缓存目录（可用 `MEW_STATE_DIR` 覆盖）：
+
+- `sdk.OpenTaskState[T](serviceType, botID, idx, identity)`：打开一个 task 的 state（`store.Path` + `store.Load()` / `store.Save(v)`）
+- `sdk.TaskStateFile(serviceType, botID, idx, identity)`：底层路径生成（不推荐插件层重复封装）
+- `sdk.LoadJSONFile[T](path)` / `sdk.SaveJSONFile(path, v)`：底层 JSON 读写（原子写入，适配 Windows）

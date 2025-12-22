@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
+
+	"mew/plugins/sdk/httpx"
 )
 
 type Client struct {
@@ -28,21 +29,14 @@ type Client struct {
 //   - URL / host:port: use a fixed proxy URL (http/https)
 func NewClient(apiBase, adminSecret string) (*Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil
+	transport.Proxy = nil // default: no proxy
 
 	if raw := strings.TrimSpace(os.Getenv("MEW_API_PROXY")); raw != "" {
-		switch strings.ToLower(raw) {
-		case "0", "false", "off", "no", "none", "direct":
-			transport.Proxy = nil
-		case "env":
-			transport.Proxy = http.ProxyFromEnvironment
-		default:
-			proxyURL, err := parseProxyURL(raw)
-			if err != nil {
-				return nil, fmt.Errorf("invalid MEW_API_PROXY: %w", err)
-			}
-			transport.Proxy = http.ProxyURL(proxyURL)
+		proxyFunc, err := httpx.ProxyFuncFromString(raw)
+		if err != nil {
+			return nil, fmt.Errorf("invalid MEW_API_PROXY: %w", err)
 		}
+		transport.Proxy = proxyFunc
 	}
 
 	return &Client{
@@ -123,23 +117,4 @@ func (c *Client) RegisterServiceType(ctx context.Context, serviceType string) er
 	return nil
 }
 
-func parseProxyURL(raw string) (*url.URL, error) {
-	s := strings.TrimSpace(raw)
-	if s == "" {
-		return nil, fmt.Errorf("empty proxy url")
-	}
-	if !strings.Contains(s, "://") {
-		s = "http://" + s
-	}
-	u, err := url.Parse(s)
-	if err != nil {
-		return nil, err
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("unsupported scheme %q (only http/https)", u.Scheme)
-	}
-	if u.Host == "" {
-		return nil, fmt.Errorf("missing host")
-	}
-	return u, nil
-}
+// parseProxyURL moved to httpx.ParseProxyURL.

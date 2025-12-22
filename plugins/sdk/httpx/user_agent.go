@@ -1,4 +1,4 @@
-package sdk
+package httpx
 
 import (
 	"crypto/rand"

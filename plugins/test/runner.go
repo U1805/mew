@@ -15,10 +15,11 @@ type TestBotRunner struct {
 	botName     string
 	accessToken string
 	apiBase     string
+	serviceType string
 	tasks       []TestTaskConfig
 }
 
-func NewTestBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*TestBotRunner, error) {
+func NewTestBotRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*TestBotRunner, error) {
 	tasks, err := parseTasks(rawConfig)
 	if err != nil {
 		return nil, err
@@ -28,18 +29,22 @@ func NewTestBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*
 		botID:       botID,
 		botName:     botName,
 		accessToken: accessToken,
-		apiBase:     apiBase,
+		apiBase:     cfg.APIBase,
+		serviceType: cfg.ServiceType,
 		tasks:       tasks,
 	}, nil
 }
 
-func (r *TestBotRunner) Start() (stop func()) {
-	g := sdk.NewGroup(context.Background())
+func (r *TestBotRunner) Run(ctx context.Context) error {
+	g := sdk.NewGroup(ctx)
 
-	webhookHTTPClient := &http.Client{Timeout: 15 * time.Second}
+	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	if err != nil {
+		return err
+	}
 
 	for i, task := range r.tasks {
-		if !isTaskEnabled(task.Enabled) {
+		if !sdk.IsEnabled(task.Enabled) {
 			continue
 		}
 		taskIndex := i
@@ -49,14 +54,9 @@ func (r *TestBotRunner) Start() (stop func()) {
 		})
 	}
 
-	return g.Stop
-}
-
-func isTaskEnabled(v *bool) bool {
-	if v == nil {
-		return true
-	}
-	return *v
+	<-g.Context().Done()
+	g.Wait()
+	return nil
 }
 
 func runTestTask(ctx context.Context, webhookHTTPClient *http.Client, apiBase, botID, botName string, idx int, task TestTaskConfig) {
@@ -70,18 +70,5 @@ func runTestTask(ctx context.Context, webhookHTTPClient *http.Client, apiBase, b
 		}
 	}
 
-	// Fire once immediately, then on every tick.
-	post()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			post()
-		}
-	}
+	sdk.RunInterval(ctx, interval, true, func(ctx context.Context) { post() })
 }

@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"mime"
 	"net/http"
-	"net/http/cookiejar"
-	"net/url"
 	"path"
 	"sort"
 	"strings"
@@ -16,15 +13,22 @@ import (
 	"mew/plugins/sdk"
 )
 
+type taskState struct {
+	Seen       []string          `json:"seen,omitempty"`
+	MediaCache map[string]string `json:"media_cache,omitempty"`
+	MediaOrder []string          `json:"media_order,omitempty"`
+}
+
 type TwitterFetcherRunner struct {
 	botID       string
 	botName     string
 	accessToken string
 	apiBase     string
+	serviceType string
 	tasks       []TwitterTaskConfig
 }
 
-func NewTwitterFetcherRunner(botID, botName, accessToken, rawConfig, apiBase string) (*TwitterFetcherRunner, error) {
+func NewTwitterFetcherRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*TwitterFetcherRunner, error) {
 	tasks, err := parseTwitterTasks(rawConfig)
 	if err != nil {
 		return nil, err
@@ -33,48 +37,53 @@ func NewTwitterFetcherRunner(botID, botName, accessToken, rawConfig, apiBase str
 		botID:       botID,
 		botName:     botName,
 		accessToken: accessToken,
-		apiBase:     apiBase,
+		apiBase:     cfg.APIBase,
+		serviceType: cfg.ServiceType,
 		tasks:       tasks,
 	}, nil
 }
 
-func (r *TwitterFetcherRunner) Start() (stop func()) {
-	g := sdk.NewGroup(context.Background())
+func (r *TwitterFetcherRunner) Run(ctx context.Context) error {
+	g := sdk.NewGroup(ctx)
 
-	jar, _ := cookiejar.New(nil)
-	twitterClient := &http.Client{
-		Timeout: 25 * time.Second,
-		Jar:     jar,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
+	twitterClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout:     25 * time.Second,
+		CookieJar:   true,
+		UseMEWProxy: true,
+	})
+	if err != nil {
+		return err
 	}
-	webhookClient := &http.Client{Timeout: 15 * time.Second}
-	downloadClient := &http.Client{
-		Timeout: 45 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
+	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	if err != nil {
+		return err
 	}
-	uploadClient := &http.Client{
-		Timeout: 90 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
+	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout:     45 * time.Second,
+		UseMEWProxy: true,
+	})
+	if err != nil {
+		return err
+	}
+	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 90 * time.Second})
+	if err != nil {
+		return err
 	}
 
 	for i, task := range r.tasks {
-		if task.Enabled != nil && !*task.Enabled {
+		if !sdk.IsEnabled(task.Enabled) {
 			continue
 		}
 		idx := i
 		taskCopy := task
 		g.Go(func(ctx context.Context) {
-			runTwitterTask(ctx, twitterClient, webhookClient, downloadClient, uploadClient, r.apiBase, r.botID, idx, taskCopy)
+			runTwitterTask(ctx, twitterClient, webhookClient, downloadClient, uploadClient, r.apiBase, r.serviceType, r.botID, idx, taskCopy)
 		})
 	}
 
-	return g.Stop
+	<-g.Context().Done()
+	g.Wait()
+	return nil
 }
 
 func runTwitterTask(
@@ -84,6 +93,7 @@ func runTwitterTask(
 	downloadClient *http.Client,
 	uploadClient *http.Client,
 	apiBase string,
+	serviceType string,
 	botID string,
 	idx int,
 	task TwitterTaskConfig,
@@ -91,13 +101,16 @@ func runTwitterTask(
 	interval := time.Duration(task.Interval) * time.Second
 	logPrefix := fmt.Sprintf("[tw-bot] bot=%s task=%d user=%s", botID, idx, task.Username)
 
-	statePath := taskStateFile(botID, idx, task.Username)
-	state, err := loadTaskState(statePath)
+	store := sdk.OpenTaskState[taskState](serviceType, botID, idx, task.Username)
+	state, err := store.Load()
 	if err != nil {
 		log.Printf("%s load state failed: %v", logPrefix, err)
 	}
+	if state.MediaCache == nil {
+		state.MediaCache = map[string]string{}
+	}
 
-	seen := newSeenSet(2000)
+	seen := sdk.NewSeenSet(2000)
 	for _, id := range state.Seen {
 		seen.Add(id)
 	}
@@ -106,9 +119,6 @@ func runTwitterTask(
 	sendHistory := false
 	if task.SendHistoryOnStart != nil && *task.SendHistoryOnStart {
 		sendHistory = true
-	}
-	if state.MediaCache == nil {
-		state.MediaCache = map[string]string{}
 	}
 
 	mediaCachePut := func(remoteURL, key string) {
@@ -141,13 +151,13 @@ func runTwitterTask(
 		if key, ok := state.MediaCache[src]; ok && strings.TrimSpace(key) != "" {
 			return key
 		}
-		key, err := uploadRemoteFileToWebhook(ctx, downloadClient, uploadClient, apiBase, task.Webhook, src, fallbackFilename)
+		att, err := sdk.UploadRemoteToWebhook(ctx, downloadClient, uploadClient, apiBase, task.Webhook, src, fallbackFilename)
 		if err != nil {
 			log.Printf("%s upload media failed: url=%s err=%v", logPrefix, src, err)
 			return ""
 		}
-		mediaCachePut(src, key)
-		return key
+		mediaCachePut(src, att.Key)
+		return att.Key
 	}
 
 	work := func() {
@@ -205,7 +215,7 @@ func runTwitterTask(
 				seen.Add(d.it.Tweet.RestID)
 			}
 			state.Seen = seen.Snapshot()
-			_ = saveTaskState(statePath, state)
+			_ = store.Save(state)
 			firstRun = false
 			log.Printf("%s init done, cached %d items", logPrefix, len(datedItems))
 			return
@@ -388,87 +398,8 @@ func runTwitterTask(
 		}
 
 		state.Seen = seen.Snapshot()
-		_ = saveTaskState(statePath, state)
+		_ = store.Save(state)
 	}
 
-	work()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			work()
-		}
-	}
-}
-
-func uploadRemoteFileToWebhook(
-	ctx context.Context,
-	downloadClient *http.Client,
-	uploadClient *http.Client,
-	apiBase, webhookURL, remoteURL, fallbackFilename string,
-) (string, error) {
-	src := strings.TrimSpace(remoteURL)
-	if src == "" {
-		return "", nil
-	}
-	if !strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://") {
-		return "", fmt.Errorf("unsupported url: %q", src)
-	}
-
-	if downloadClient == nil {
-		downloadClient = &http.Client{Timeout: 30 * time.Second}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("User-Agent", sdk.RandomBrowserUserAgent())
-	req.Header.Set("Accept", "*/*")
-
-	resp, err := downloadClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("download failed: %s", resp.Status)
-	}
-
-	filename := filenameFromURL(src, fallbackFilename)
-	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
-	if contentType == "" {
-		contentType = mime.TypeByExtension(path.Ext(filename))
-	}
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	att, err := sdk.UploadWebhookReader(ctx, uploadClient, apiBase, webhookURL, filename, contentType, resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return att.Key, nil
-}
-
-func filenameFromURL(rawURL, fallback string) string {
-	fb := strings.TrimSpace(fallback)
-	if fb == "" {
-		fb = "file"
-	}
-	u, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || u == nil {
-		return fb
-	}
-	base := path.Base(u.Path)
-	if base == "." || base == "/" || strings.TrimSpace(base) == "" {
-		return fb
-	}
-	return base
+	sdk.RunInterval(ctx, interval, true, func(ctx context.Context) { work() })
 }

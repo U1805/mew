@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"log"
 	"sync"
 
@@ -11,7 +12,7 @@ import (
 )
 
 type Runner interface {
-	Start() (stop func())
+	Run(ctx context.Context) error
 }
 
 type RunnerFactory func(botID, botName, accessToken, rawConfig string) (Runner, error)
@@ -28,7 +29,8 @@ type BotManager struct {
 
 type runningBot struct {
 	configHash string
-	stop       func()
+	cancel     context.CancelFunc
+	done       chan struct{}
 }
 
 func NewBotManager(client *mew.Client, serviceType, logPrefix string, factory RunnerFactory) *BotManager {
@@ -43,16 +45,17 @@ func NewBotManager(client *mew.Client, serviceType, logPrefix string, factory Ru
 
 func (m *BotManager) StopAll() {
 	m.mu.Lock()
-	stops := make([]func(), 0, len(m.bots))
+	toStop := make([]*runningBot, 0, len(m.bots))
 	for id, rb := range m.bots {
 		log.Printf("%s stopping bot %s", m.logPrefix, id)
-		stops = append(stops, rb.stop)
+		toStop = append(toStop, rb)
 		delete(m.bots, id)
 	}
 	m.mu.Unlock()
 
-	for _, stop := range stops {
-		stop()
+	for _, rb := range toStop {
+		rb.cancel()
+		<-rb.done
 	}
 }
 
@@ -78,7 +81,7 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 
 	var (
 		starts []startReq
-		stops  []func()
+		stops  []*runningBot
 	)
 
 	m.mu.Lock()
@@ -92,7 +95,7 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 				continue
 			}
 			log.Printf("%s reloading bot %s (%s)", m.logPrefix, botID, bot.Name)
-			stops = append(stops, existing.stop)
+			stops = append(stops, existing)
 			delete(m.bots, botID)
 		} else {
 			log.Printf("%s starting bot %s (%s)", m.logPrefix, botID, bot.Name)
@@ -112,13 +115,14 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 			continue
 		}
 		log.Printf("%s stopping bot %s (no longer in bootstrap list)", m.logPrefix, botID)
-		stops = append(stops, rb.stop)
+		stops = append(stops, rb)
 		delete(m.bots, botID)
 	}
 	m.mu.Unlock()
 
-	for _, stop := range stops {
-		stop()
+	for _, rb := range stops {
+		rb.cancel()
+		<-rb.done
 	}
 
 	for _, s := range starts {
@@ -128,10 +132,17 @@ func (m *BotManager) SyncOnce(ctx context.Context) error {
 			continue
 		}
 
-		stopFn := runner.Start()
+		botCtx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		go func(botID, botName string) {
+			defer close(done)
+			if err := runner.Run(botCtx); err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("%s bot crashed: bot=%s name=%q err=%v", m.logPrefix, botID, botName, err)
+			}
+		}(s.botID, s.botName)
 
 		m.mu.Lock()
-		m.bots[s.botID] = &runningBot{configHash: s.configHash, stop: stopFn}
+		m.bots[s.botID] = &runningBot{configHash: s.configHash, cancel: cancel, done: done}
 		m.mu.Unlock()
 	}
 

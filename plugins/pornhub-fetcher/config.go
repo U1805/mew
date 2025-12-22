@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
+
+	"mew/plugins/sdk"
 )
 
 type PHTaskConfig struct {
@@ -16,20 +16,9 @@ type PHTaskConfig struct {
 }
 
 func parsePHTasks(rawConfig string) ([]PHTaskConfig, error) {
-	rawConfig = strings.TrimSpace(rawConfig)
-	if rawConfig == "" || rawConfig == "null" || rawConfig == "{}" {
-		return nil, nil
-	}
-
-	// 兼容数组或单对象配置
-	var tasks []PHTaskConfig
-	if err := json.Unmarshal([]byte(rawConfig), &tasks); err != nil {
-		var single PHTaskConfig
-		if err2 := json.Unmarshal([]byte(rawConfig), &single); err2 == nil {
-			tasks = []PHTaskConfig{single}
-		} else {
-			return nil, fmt.Errorf("config must be JSON array or object: %w", err)
-		}
+	tasks, err := sdk.DecodeTasks[PHTaskConfig](rawConfig)
+	if err != nil {
+		return nil, err
 	}
 
 	validated := make([]PHTaskConfig, 0, len(tasks))
@@ -45,8 +34,8 @@ func parsePHTasks(rawConfig string) ([]PHTaskConfig, error) {
 		if strings.TrimSpace(t.Webhook) == "" {
 			return nil, fmt.Errorf("tasks[%d].webhook is required", i)
 		}
-		if _, err := url.Parse(t.Webhook); err != nil {
-			return nil, fmt.Errorf("tasks[%d].webhook invalid", i)
+		if err := sdk.ValidateHTTPURL(t.Webhook); err != nil {
+			return nil, fmt.Errorf("tasks[%d].webhook invalid: %w", i, err)
 		}
 
 		validated = append(validated, t)

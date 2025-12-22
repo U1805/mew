@@ -31,6 +31,10 @@ func (g *Group) Go(fn func(ctx context.Context)) {
 	}()
 }
 
+func (g *Group) Wait() {
+	g.wg.Wait()
+}
+
 func (g *Group) Stop() {
 	g.cancel()
 	g.wg.Wait()

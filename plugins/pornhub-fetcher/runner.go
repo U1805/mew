@@ -4,25 +4,27 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"mime"
 	"net/http"
-	"net/url"
-	"path"
 	"strings"
 	"time"
 
 	"mew/plugins/sdk"
 )
 
+type taskState struct {
+	Seen []string `json:"seen,omitempty"`
+}
+
 type PHBotRunner struct {
 	botID       string
 	botName     string
 	accessToken string
 	apiBase     string
+	serviceType string
 	tasks       []PHTaskConfig
 }
 
-func NewPHBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*PHBotRunner, error) {
+func NewPHBotRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*PHBotRunner, error) {
 	tasks, err := parsePHTasks(rawConfig)
 	if err != nil {
 		return nil, err
@@ -31,41 +33,45 @@ func NewPHBotRunner(botID, botName, accessToken, rawConfig, apiBase string) (*PH
 		botID:       botID,
 		botName:     botName,
 		accessToken: accessToken,
-		apiBase:     apiBase,
+		apiBase:     cfg.APIBase,
+		serviceType: cfg.ServiceType,
 		tasks:       tasks,
 	}, nil
 }
 
-func (r *PHBotRunner) Start() (stop func()) {
-	g := sdk.NewGroup(context.Background())
+func (r *PHBotRunner) Run(ctx context.Context) error {
+	g := sdk.NewGroup(ctx)
 
-	// 设置一个较长的超时，因为抓取可能较慢
-	phClient := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
+	phClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout:     30 * time.Second,
+		UseMEWProxy: true,
+	})
+	if err != nil {
+		return err
 	}
-	webhookClient := &http.Client{Timeout: 15 * time.Second}
-	uploadClient := &http.Client{
-		Timeout: 90 * time.Second,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
+	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	if err != nil {
+		return err
+	}
+	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 90 * time.Second})
+	if err != nil {
+		return err
 	}
 
 	for i, task := range r.tasks {
-		if task.Enabled != nil && !*task.Enabled {
+		if !sdk.IsEnabled(task.Enabled) {
 			continue
 		}
 		idx := i
 		taskCopy := task
 		g.Go(func(ctx context.Context) {
-			runTask(ctx, phClient, webhookClient, uploadClient, r.apiBase, r.botID, r.botName, idx, taskCopy)
+			runTask(ctx, phClient, webhookClient, uploadClient, r.apiBase, r.serviceType, r.botID, r.botName, idx, taskCopy)
 		})
 	}
 
-	return g.Stop
+	<-g.Context().Done()
+	g.Wait()
+	return nil
 }
 
 func runTask(
@@ -73,20 +79,20 @@ func runTask(
 	phClient *http.Client,
 	webhookClient *http.Client,
 	uploadClient *http.Client,
-	apiBase, botID, botName string,
+	apiBase, serviceType, botID, botName string,
 	idx int,
 	task PHTaskConfig,
 ) {
 	interval := time.Duration(task.Interval) * time.Second
 	logPrefix := fmt.Sprintf("[ph-bot] bot=%s task=%d user=%s", botID, idx, task.Username)
 
-	statePath := taskStateFile(botID, idx, task.Username)
-	state, err := loadTaskState(statePath)
+	store := sdk.OpenTaskState[taskState](serviceType, botID, idx, task.Username)
+	state, err := store.Load()
 	if err != nil {
 		log.Printf("%s load state failed: %v", logPrefix, err)
 	}
 
-	seen := newSeenSet(1000)
+	seen := sdk.NewSeenSet(1000)
 	for _, id := range state.Seen {
 		seen.Add(id)
 	}
@@ -137,21 +143,21 @@ func runTask(
 
 			s3ThumbKey := ""
 			if strings.TrimSpace(item.ThumbnailURL) != "" {
-				key, err := uploadRemoteFileToWebhook(ctx, phClient, uploadClient, apiBase, task.Webhook, item.ThumbnailURL, "thumbnail.jpg")
+				att, err := sdk.UploadRemoteToWebhook(ctx, phClient, uploadClient, apiBase, task.Webhook, item.ThumbnailURL, "thumbnail.jpg")
 				if err != nil {
 					log.Printf("%s upload thumbnail failed: %v", logPrefix, err)
 				} else {
-					s3ThumbKey = key
+					s3ThumbKey = att.Key
 				}
 			}
 
 			s3PreviewKey := ""
 			if strings.TrimSpace(item.PreviewURL) != "" {
-				key, err := uploadRemoteFileToWebhook(ctx, phClient, uploadClient, apiBase, task.Webhook, item.PreviewURL, "preview.mp4")
+				att, err := sdk.UploadRemoteToWebhook(ctx, phClient, uploadClient, apiBase, task.Webhook, item.PreviewURL, "preview.mp4")
 				if err != nil {
 					log.Printf("%s upload preview failed: %v", logPrefix, err)
 				} else {
-					s3PreviewKey = key
+					s3PreviewKey = att.Key
 				}
 			}
 
@@ -185,85 +191,8 @@ func runTask(
 
 		// 保存状态
 		state.Seen = seen.Snapshot()
-		_ = saveTaskState(statePath, state)
+		_ = store.Save(state)
 	}
 
-	// 立即执行一次
-	work()
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			work()
-		}
-	}
-}
-
-func uploadRemoteFileToWebhook(
-	ctx context.Context,
-	downloadClient *http.Client,
-	uploadClient *http.Client,
-	apiBase, webhookURL, remoteURL, fallbackFilename string,
-) (string, error) {
-	src := strings.TrimSpace(remoteURL)
-	if src == "" {
-		return "", nil
-	}
-	if !strings.HasPrefix(src, "http://") && !strings.HasPrefix(src, "https://") {
-		return "", fmt.Errorf("unsupported url: %q", src)
-	}
-
-	if downloadClient == nil {
-		downloadClient = &http.Client{Timeout: 30 * time.Second}
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
-	if err != nil {
-		return "", err
-	}
-	resp, err := downloadClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("download failed: %s", resp.Status)
-	}
-
-	filename := filenameFromURL(src, fallbackFilename)
-	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
-	if contentType == "" {
-		contentType = mime.TypeByExtension(path.Ext(filename))
-	}
-	if contentType == "" {
-		contentType = "application/octet-stream"
-	}
-
-	att, err := sdk.UploadWebhookReader(ctx, uploadClient, apiBase, webhookURL, filename, contentType, resp.Body)
-	if err != nil {
-		return "", err
-	}
-	return att.Key, nil
-}
-
-func filenameFromURL(rawURL, fallback string) string {
-	fb := strings.TrimSpace(fallback)
-	if fb == "" {
-		fb = "file"
-	}
-	u, err := url.Parse(strings.TrimSpace(rawURL))
-	if err != nil || u == nil {
-		return fb
-	}
-	base := path.Base(u.Path)
-	if base == "." || base == "/" || strings.TrimSpace(base) == "" {
-		return fb
-	}
-	return base
+	sdk.RunInterval(ctx, interval, true, func(ctx context.Context) { work() })
 }

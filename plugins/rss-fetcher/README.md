@@ -44,7 +44,7 @@
 
 - 支持 `ETag` / `Last-Modified` 条件请求，减少重复流量
 - 抓取端会随机使用常见浏览器 `User-Agent` 以降低被拦截风险
-- 支持本地持久化去重 state（默认写到系统临时目录的 `mew/rss-fetcher/<botId>/...`），避免重启后重复推送
+- 支持本地持久化去重 state（默认写到系统用户缓存目录的 `mew/plugins/rss-fetcher/<botId>/...`；可用 `MEW_STATE_DIR` 覆盖），避免重启后重复推送
 
 ## 运行
 
