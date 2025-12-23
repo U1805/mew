@@ -5,6 +5,8 @@ import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
 import { AttachmentLightbox } from './AttachmentLightbox';
 
+// --- Utility Functions (无变化) ---
+
 function safeHostname(url: string | undefined): string | null {
   if (!url) return null;
   try {
@@ -35,55 +37,16 @@ function safeDateLabel(value: unknown): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     const ms = value > 1e12 ? value : value * 1000;
     const d = new Date(ms);
-    if (Number.isNaN(d.getTime())) return null;
-    return format(d, 'yyyy-MM-dd HH:mm');
-  }
-  if (typeof value === 'string') {
-    const s = value.trim();
-    if (!s) return null;
-    const asNum = Number(s);
-    if (Number.isFinite(asNum)) {
-      const ms = asNum > 1e12 ? asNum : asNum * 1000;
-      const d = new Date(ms);
-      if (Number.isNaN(d.getTime())) return null;
-      return format(d, 'yyyy-MM-dd HH:mm');
-    }
-    const d = new Date(s);
-    if (Number.isNaN(d.getTime())) return null;
-    return format(d, 'yyyy-MM-dd HH:mm');
+    return Number.isNaN(d.getTime()) ? null : format(d, 'yyyy-MM-dd HH:mm');
   }
   return null;
-}
-
-function guessImageContentTypeFromUrl(url: string): string {
-  try {
-    const pathname = new URL(url).pathname.toLowerCase();
-    if (pathname.endsWith('.png')) return 'image/png';
-    if (pathname.endsWith('.webp')) return 'image/webp';
-    if (pathname.endsWith('.gif')) return 'image/gif';
-    if (pathname.endsWith('.svg')) return 'image/svg+xml';
-    if (pathname.endsWith('.jpg') || pathname.endsWith('.jpeg')) return 'image/jpeg';
-  } catch {
-    // ignore
-  }
-  return 'image/jpeg';
-}
-
-function filenameFromUrl(url: string, fallback: string): string {
-  try {
-    const pathname = new URL(url).pathname;
-    const last = pathname.split('/').filter(Boolean).pop();
-    return last || fallback;
-  } catch {
-    return fallback;
-  }
 }
 
 function makeImageAttachment(url: string): Attachment {
   const normalized = normalizeUrl(url);
   return {
-    filename: filenameFromUrl(normalized, 'image.jpg'),
-    contentType: guessImageContentTypeFromUrl(normalized),
+    filename: 'image.jpg',
+    contentType: 'image/jpeg',
     url: normalized,
     size: 0,
   };
@@ -98,10 +61,7 @@ function pickPrimaryUrl(payload: MessagePayload): string {
     payload.music_url,
     payload.url,
     payload.dynamic_url,
-  ]
-    .filter((v): v is string => typeof v === 'string')
-    .map((v) => normalizeUrl(v))
-    .filter(Boolean);
+  ].filter((v): v is string => typeof v === 'string').map(normalizeUrl).filter(Boolean);
   return candidates[0] ?? '';
 }
 
@@ -111,27 +71,26 @@ function pickCoverUrl(payload: MessagePayload): string {
   return normalizeUrl((s3 || raw || '').trim());
 }
 
-function typeBadge(type: string): { label: string; tone: string } {
+function getEmbedColorClass(type: string): string {
   switch (type) {
-    case 'video':
-      return { label: '视频', tone: 'bg-blue-500/15 text-blue-300 border-blue-500/25' };
-    case 'article':
-      return { label: '文章', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
-    case 'post':
-      return { label: '动态', tone: 'bg-violet-500/15 text-violet-300 border-violet-500/25' };
-    case 'forward':
-      return { label: '转发', tone: 'bg-amber-500/15 text-amber-300 border-amber-500/25' };
+    case 'video': return 'border-blue-500';
+    case 'article': return 'border-emerald-500';
+    case 'forward': return 'border-amber-500';
     case 'live':
-      return { label: '直播', tone: 'bg-rose-500/15 text-rose-300 border-rose-500/25' };
-    case 'live_share':
-      return { label: '直播间', tone: 'bg-rose-500/15 text-rose-300 border-rose-500/25' };
-    case 'pgc':
-      return { label: '剧集', tone: 'bg-pink-500/15 text-pink-300 border-pink-500/25' };
-    case 'music':
-      return { label: '音频', tone: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25' };
-    default:
-      return { label: 'Bilibili', tone: 'bg-mew-dark/30 text-mew-textMuted border-mew-darkest/60' };
+    case 'live_share': return 'border-rose-500';
+    case 'pgc': return 'border-pink-500';
+    case 'music': return 'border-cyan-500';
+    case 'post': return 'border-violet-500';
+    default: return 'border-gray-500';
   }
+}
+
+function getTypeLabel(type: string): string {
+  const map: Record<string, string> = {
+    video: '视频', article: '专栏', post: '动态', forward: '转发',
+    live: '直播', live_share: '直播间', pgc: '番剧', music: '音频',
+  };
+  return map[type] || 'Bilibili';
 }
 
 function escapeRegExp(input: string): string {
@@ -156,9 +115,7 @@ function renderTextWithEmojis(text: string, emojis: InlineEmoji[]): React.ReactN
   if (!emojis || emojis.length === 0) return text;
 
   const emojiByToken = new Map<string, InlineEmoji>();
-  for (const e of emojis) {
-    if (!emojiByToken.has(e.text)) emojiByToken.set(e.text, e);
-  }
+  for (const e of emojis) if (!emojiByToken.has(e.text)) emojiByToken.set(e.text, e);
   const tokens = Array.from(emojiByToken.keys());
   if (tokens.length === 0) return text;
 
@@ -175,143 +132,106 @@ function renderTextWithEmojis(text: string, emojis: InlineEmoji[]): React.ReactN
         title={emoji.text || undefined}
         alt={emoji.text || ''}
         loading="lazy"
-        referrerPolicy="no-referrer"
-        className="inline-block h-5 w-5 align-[-0.2em] mx-0.5 rounded bg-mew-darkest/40"
+        className="inline-block h-5 w-5 align-[-0.2em] mx-0.5"
       />
     );
   });
 }
 
+// --- Components ---
+
+const MediaGrid = ({ images, onPreview }: { images: string[]; onPreview: (index: number) => void }) => {
+  if (images.length === 0) return null;
+  if (images.length === 1) {
+    return (
+      <div className="mt-3 overflow-hidden rounded-lg bg-black/10 max-w-full">
+        <img
+          src={images[0]} alt="" loading="lazy"
+          className="max-h-[350px] max-w-full object-contain cursor-pointer hover:opacity-95 transition-opacity"
+          onClick={(e) => { e.stopPropagation(); onPreview(0); }}
+        />
+      </div>
+    );
+  }
+  const displayImages = images.slice(0, 4);
+  const remaining = images.length - 4;
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-1 w-full max-w-[400px] overflow-hidden rounded-lg">
+      {displayImages.map((src, idx) => (
+        <div
+          key={src}
+          className="relative aspect-square overflow-hidden cursor-pointer bg-black/10 hover:brightness-110 transition-[filter]"
+          onClick={(e) => { e.stopPropagation(); onPreview(idx); }}
+        >
+          <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+          {remaining > 0 && idx === 3 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-white font-medium text-lg">
+              +{remaining}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// 转发内容的内部卡片
 function BilibiliQuotedCard({ payload, authorHint }: { payload: Record<string, any>; authorHint?: string }) {
   const type = typeof payload.type === 'string' ? payload.type : '';
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
-  const text =
-    (typeof payload.text === 'string' ? payload.text.trim() : '') ||
-    (typeof payload.summary === 'string' ? payload.summary.trim() : '') ||
-    (typeof payload.description === 'string' ? payload.description.trim() : '');
+  const text = (typeof payload.text === 'string' ? payload.text : typeof payload.summary === 'string' ? payload.summary : '').trim();
   const url = typeof payload.dynamic_url === 'string' ? normalizeUrl(payload.dynamic_url) : '';
+  
   const emojis = useMemo(() => readInlineEmojis(payload), [payload]);
   const textNode = useMemo(() => renderTextWithEmojis(text, emojis), [text, emojis]);
-  const images = toStringArray(payload.s3_image_urls).length > 0 ? toStringArray(payload.s3_image_urls) : toStringArray(payload.image_urls);
-  const coverUrl = typeof payload.s3_cover_url === 'string' ? normalizeUrl(payload.s3_cover_url) : (typeof payload.cover_url === 'string' ? normalizeUrl(payload.cover_url) : '');
-  const badge = typeBadge(type);
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
+  const images = toStringArray(payload.s3_image_urls).length > 0 ? toStringArray(payload.s3_image_urls) : toStringArray(payload.image_urls);
+  const coverUrl = typeof payload.s3_cover_url === 'string' ? normalizeUrl(payload.s3_cover_url) : '';
+  
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  
   const media = images.length > 0 ? images : coverUrl ? [coverUrl] : [];
-  const mediaShown = media.slice(0, 4);
-  const remaining = media.length - mediaShown.length;
   const mediaAttachments = media.map(makeImageAttachment);
   const previewAttachment = previewIndex === null ? null : (mediaAttachments[previewIndex] ?? null);
 
   return (
-    <div
-      className={clsx(
-        'mt-2 rounded-lg border border-mew-darkest/70 bg-mew-dark/20 p-2',
-        url ? 'cursor-pointer hover:bg-mew-dark/30 transition-colors' : ''
-      )}
-      role={url ? 'button' : undefined}
-      tabIndex={url ? 0 : undefined}
-      onClick={(e) => {
-        if (!url) return;
-        if (previewIndex !== null) return;
-        e.preventDefault();
-        e.stopPropagation();
-        window.open(url, '_blank', 'noopener,noreferrer');
-      }}
-      onKeyDown={(e) => {
-        if (!url) return;
-        if (previewIndex !== null) return;
-        if (e.key !== 'Enter' && e.key !== ' ') return;
-        e.preventDefault();
-        e.stopPropagation();
-        window.open(url, '_blank', 'noopener,noreferrer');
-      }}
-    >
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0 flex items-center gap-2">
-          <span className={clsx('shrink-0 text-[11px] px-1.5 py-0.5 rounded border', badge.tone)}>{badge.label}</span>
-          <span className="text-xs text-mew-textMuted truncate">{authorHint || '原动态'}</span>
-        </div>
-        {url && (
-          <span
-            role="button"
-            tabIndex={0}
-            className="shrink-0 text-mew-textMuted/70 hover:text-primary transition-colors"
-            aria-label="Open original post"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              window.open(url, '_blank', 'noopener,noreferrer');
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter' && e.key !== ' ') return;
-              e.preventDefault();
-              e.stopPropagation();
-              window.open(url, '_blank', 'noopener,noreferrer');
-            }}
-          >
-            <Icon icon="mdi:open-in-new" width="16" height="16" />
-          </span>
-        )}
+    <div className="mt-3 flex flex-col gap-1 rounded bg-mew-dark/30 p-3 border border-mew-darkest/50 text-sm">
+      <div className="flex items-center justify-between gap-2 text-mew-textMuted text-xs font-medium">
+         <div className="flex items-center gap-2 min-w-0">
+            <Icon icon="mdi:format-quote-close" className="shrink-0 opacity-50" />
+            <a href={url || undefined} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">
+              {authorHint || '原动态'}
+            </a>
+            <span className="shrink-0 text-[10px] text-mew-textMuted px-1.5 py-0.5 bg-mew-dark/50 rounded">{getTypeLabel(type)}</span>
+         </div>
+         {url && (
+            <a href={url} target="_blank" rel="noopener noreferrer" className="shrink-0 hover:text-mew-text transition-colors" title="打开原动态">
+              <Icon icon="mdi:open-in-new" width={14} />
+            </a>
+         )}
       </div>
 
-      {title && <div className="mt-2 text-sm font-semibold text-mew-text leading-snug break-words">{title}</div>}
-      {text && <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-5 text-mew-textMuted">{textNode}</p>}
-
-      {mediaShown.length > 0 && (
-        <div className="mt-2 grid grid-cols-2 gap-1 overflow-hidden rounded-md">
-          {mediaShown.map((src, idx) => (
-            <button
-              key={`${src}-${idx}`}
-              type="button"
-              className="relative overflow-hidden bg-mew-darkest/40"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const found = media.findIndex((v) => v === src);
-                setPreviewIndex(found >= 0 ? found : idx);
-              }}
-            >
-              <img
-                src={src}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                className="h-20 w-full object-cover bg-mew-darkest/40"
-              />
-              {remaining > 0 && idx === mediaShown.length - 1 && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm font-semibold">
-                  +{remaining}
-                </div>
-              )}
-            </button>
-          ))}
+      {title && (
+        <a href={url || undefined} target="_blank" rel="noopener noreferrer" className="font-bold text-mew-text hover:underline line-clamp-2">
+          {title}
+        </a>
+      )}
+      
+      {text && (
+        <div className="text-mew-textMuted/90 whitespace-pre-wrap break-words leading-relaxed line-clamp-3">
+          {textNode}
         </div>
       )}
 
+      <MediaGrid images={media} onPreview={setPreviewIndex} />
+
       {previewAttachment && (
-        <div
-          role="presentation"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          onKeyDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-        >
-          <AttachmentLightbox
-            attachment={previewAttachment}
-            attachments={mediaAttachments}
-            initialIndex={previewIndex ?? 0}
-            onClose={() => setPreviewIndex(null)}
-          />
-        </div>
+        <AttachmentLightbox
+          attachment={previewAttachment}
+          attachments={mediaAttachments}
+          initialIndex={previewIndex ?? 0}
+          onClose={() => setPreviewIndex(null)}
+        />
       )}
     </div>
   );
@@ -324,162 +244,84 @@ interface BilibiliCardProps {
 export const BilibiliCard: React.FC<BilibiliCardProps> = ({ payload }) => {
   const type = typeof payload.type === 'string' ? payload.type : '';
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
-  const text =
-    (typeof payload.text === 'string' ? payload.text.trim() : '') ||
-    (typeof payload.summary === 'string' ? payload.summary.trim() : '') ||
-    (typeof payload.description === 'string' ? payload.description.trim() : '');
+  const text = ((typeof payload.text === 'string' ? payload.text : '') ||
+    (typeof payload.summary === 'string' ? payload.summary : '') ||
+    (typeof payload.description === 'string' ? payload.description : '')
+  ).trim();
 
   const authorName = typeof payload.author_name === 'string' ? payload.author_name.trim() : '';
   const authorFace = typeof payload.author_face === 'string' ? normalizeUrl(payload.author_face) : '';
-
+  
   const primaryUrl = pickPrimaryUrl(payload);
   const hostname = useMemo(() => safeHostname(primaryUrl), [primaryUrl]);
   const publishedAt = safeDateLabel(payload.published_at);
-  const badge = typeBadge(type);
+  const typeLabel = getTypeLabel(type);
+  const borderClass = getEmbedColorClass(type);
 
   const images = toStringArray(payload.s3_image_urls).length > 0 ? toStringArray(payload.s3_image_urls) : toStringArray(payload.image_urls);
   const coverUrl = pickCoverUrl(payload);
+  const media = images.length > 0 ? images : coverUrl ? [coverUrl] : [];
 
   const emojis = useMemo(() => readInlineEmojis(payload), [payload]);
   const textNode = useMemo(() => renderTextWithEmojis(text, emojis), [text, emojis]);
 
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-
   const quoted = useMemo(() => toRecord((payload as any).original_post), [payload]);
   const quotedAuthor = typeof (payload as any).original_author === 'string' ? (payload as any).original_author.trim() : '';
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  if (!primaryUrl && !title && !text) return null;
+  if (!primaryUrl && !title && !text && media.length === 0) return null;
 
-  const media = images.length > 0 ? images : coverUrl ? [coverUrl] : [];
-  const mediaShown = media.slice(0, 4);
-  const remaining = media.length - mediaShown.length;
   const mediaAttachments = media.map(makeImageAttachment);
   const previewAttachment = previewIndex === null ? null : (mediaAttachments[previewIndex] ?? null);
 
   return (
     <>
-      <div
-        className="group mt-1 max-w-[560px] rounded-xl border border-mew-darkest bg-mew-darker overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <a
-          href={primaryUrl || undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block hover:bg-mew-dark/20 transition-colors"
-          aria-label={title ? `Open Bilibili: ${title}` : 'Open Bilibili'}
-          onClick={(e) => {
-            if (!primaryUrl) {
-              e.preventDefault();
-              e.stopPropagation();
-            }
-          }}
-        >
-          <div className="p-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex items-center gap-2">
-                {authorFace ? (
-                  <img
-                    src={authorFace}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    className="h-9 w-9 rounded-full object-cover bg-mew-darkest"
-                  />
-                ) : (
-                  <div className="h-9 w-9 rounded-full bg-mew-darkest" />
-                )}
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="font-semibold text-mew-text truncate">{authorName || payload.webhookName || 'Bilibili'}</span>
-                    <span className={clsx('shrink-0 text-[11px] px-1.5 py-0.5 rounded border', badge.tone)}>{badge.label}</span>
-                  </div>
-                  <div className="mt-0.5 text-xs text-mew-textMuted truncate">
-                    {hostname && <span className="truncate">{hostname}</span>}
-                    {publishedAt && (
-                      <>
-                        <span className="opacity-60 select-none"> • </span>
-                        <span className="truncate">{publishedAt}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <Icon
-                icon="mdi:open-in-new"
-                width="18"
-                height="18"
-                className="shrink-0 text-mew-textMuted/60 group-hover:text-primary transition-colors mt-1"
-              />
-            </div>
-
-            {title && <div className="mt-2 text-mew-text font-semibold leading-5 break-words">{title}</div>}
-
-            {text && (
-              <p className="mt-1 whitespace-pre-wrap break-words text-[0.95rem] leading-[1.375rem] text-mew-textMuted">
-                {textNode}
-              </p>
+      <div className={clsx(
+        "flex flex-col max-w-[520px] rounded bg-mew-darker overflow-hidden",
+        "border-l-4", borderClass
+      )}>
+        <div className="p-4 flex flex-col gap-1.5">
+          
+          <div className="flex items-center gap-2 mb-1">
+            {authorFace ? (
+               <img src={authorFace} alt="" className="w-5 h-5 rounded-full bg-mew-darkest object-cover" />
+            ) : (
+               <div className="w-5 h-5 rounded-full bg-mew-darkest" />
             )}
-
-            {mediaShown.length > 0 && (
-              <div className={clsx('mt-2 overflow-hidden rounded-lg', mediaShown.length === 1 ? 'bg-mew-darkest/40' : '')}>
-                {mediaShown.length === 1 ? (
-                  <div
-                    className={clsx(
-                      'relative w-full overflow-hidden',
-                      type === 'video' || type === 'live' || type === 'live_share' || type === 'pgc' ? 'aspect-video' : 'aspect-[4/3]'
-                    )}
-                  >
-                    <img
-                      src={mediaShown[0]}
-                      alt=""
-                      loading="lazy"
-                      referrerPolicy="no-referrer"
-                      className="absolute inset-0 h-full w-full object-cover"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setPreviewIndex(0);
-                      }}
-                    />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-1">
-                    {mediaShown.map((src, idx) => (
-                      <button
-                        key={`${src}-${idx}`}
-                        type="button"
-                        className="relative overflow-hidden bg-mew-darkest/40"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const found = media.findIndex((v) => v === src);
-                          setPreviewIndex(found >= 0 ? found : idx);
-                        }}
-                      >
-                        <img
-                          src={src}
-                          alt=""
-                          loading="lazy"
-                          referrerPolicy="no-referrer"
-                          className="h-28 w-full object-cover"
-                        />
-                        {remaining > 0 && idx === mediaShown.length - 1 && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white text-sm font-semibold">
-                            +{remaining}
-                          </div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {quoted && <BilibiliQuotedCard payload={quoted} authorHint={quotedAuthor} />}
+            <span className="text-sm font-semibold text-mew-text">{authorName || payload.webhookName || 'Bilibili'}</span>
+            <span className="text-xs text-mew-textMuted px-1.5 py-0.5 bg-mew-dark/50 rounded">{typeLabel}</span>
           </div>
-        </a>
+
+          {title && (
+            <a href={primaryUrl || '#'} target="_blank" rel="noopener noreferrer"
+              className="text-base font-bold text-blue-400 hover:underline leading-snug break-words">
+              {title}
+            </a>
+          )}
+
+          {text && (
+            <div className="text-sm text-mew-textMuted/90 whitespace-pre-wrap break-words leading-relaxed">
+              {textNode}
+            </div>
+          )}
+
+          <MediaGrid images={media} onPreview={setPreviewIndex} />
+
+          {quoted && <BilibiliQuotedCard payload={quoted} authorHint={quotedAuthor} />}
+          
+          <div className="mt-2 flex items-center gap-2 text-[11px] text-mew-textMuted opacity-70 font-medium">
+             {hostname && <span>{hostname}</span>}
+             {hostname && publishedAt && <span>•</span>}
+             {publishedAt && <span>{publishedAt}</span>}
+             {primaryUrl && (
+                <a href={primaryUrl} target="_blank" rel="noreferrer"
+                   className="ml-auto hover:text-mew-text transition-colors" title="打开原链接">
+                   <Icon icon="mdi:open-in-new" width={14} />
+                </a>
+             )}
+          </div>
+
+        </div>
       </div>
 
       {previewAttachment && (

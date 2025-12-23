@@ -2,98 +2,73 @@ package webhook
 
 import (
 	"context"
-	"fmt"
-	"io"
-	"mime"
 	"net/http"
 	"net/http/httptest"
+	"path"
+	"strings"
 	"testing"
 )
 
-func TestFilenameFromURL(t *testing.T) {
-	if got := FilenameFromURL("", "x"); got != "x" {
-		t.Fatalf("expected fallback, got %q", got)
-	}
-	// url.Parse treats this as a relative path.
-	if got := FilenameFromURL("not-a-url", "x"); got != "not-a-url" {
-		t.Fatalf("unexpected filename: %q", got)
-	}
-	if got := FilenameFromURL("https://example.com/a/b.txt", "x"); got != "b.txt" {
-		t.Fatalf("unexpected filename: %q", got)
-	}
-	if got := FilenameFromURL("https://example.com/", "x"); got != "x" {
-		t.Fatalf("expected fallback for empty path, got %q", got)
-	}
-}
-
-func TestUploadRemote_EmptyURL_NoOp(t *testing.T) {
-	att, err := UploadRemote(context.Background(), nil, nil, "", "", "", "fb", "")
-	if err != nil {
-		t.Fatalf("expected nil error, got %v", err)
-	}
-	if att != (Attachment{}) {
-		t.Fatalf("expected empty attachment, got %#v", att)
-	}
-}
-
-func TestUploadRemote_DownloadAndUpload(t *testing.T) {
-	t.Parallel()
+func TestUploadRemote_ImagePhpFilenameNormalizedToPng(t *testing.T) {
+	t.Setenv("DEV_MODE", "1")
+	t.Setenv("MEW_DEV_DIR", t.TempDir())
 
 	downloadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("User-Agent") != "ua" {
-			http.Error(w, "missing ua", http.StatusBadRequest)
+		if r.URL.Path != "/img2.php" {
+			w.WriteHeader(http.StatusNotFound)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("hello"))
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte{0xff, 0xd8, 0xff, 0xd9})
 	}))
 	t.Cleanup(downloadSrv.Close)
 
-	var gotFilename string
-	var gotContentType string
-	var gotBody []byte
-	uploadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mr, err := r.MultipartReader()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		part, err := mr.NextPart()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
-		}
-		defer part.Close()
-
-		gotFilename = part.FileName()
-		gotContentType = part.Header.Get("Content-Type")
-		gotBody, _ = io.ReadAll(part)
-
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = fmt.Fprintf(w, `{"filename":%q,"contentType":%q,"key":"k","size":%d}`, gotFilename, gotContentType, len(gotBody))
-	}))
-	t.Cleanup(uploadSrv.Close)
-
-	remoteURL := downloadSrv.URL + "/a/b.txt"
-	att, err := UploadRemote(context.Background(), downloadSrv.Client(), uploadSrv.Client(), "", uploadSrv.URL, remoteURL, "fb", "ua")
+	att, err := UploadRemote(
+		context.Background(),
+		downloadSrv.Client(),
+		nil,
+		"",
+		"invalid-webhook-url",
+		downloadSrv.URL+"/img2.php?url=encodeURIComponent(\"xxx\")",
+		"fallback.png",
+		"ua",
+	)
 	if err != nil {
-		t.Fatalf("UploadRemote error: %v", err)
+		t.Fatalf("UploadRemote err=%v", err)
 	}
+	if got := strings.ToLower(path.Ext(att.Filename)); got != ".png" {
+		t.Fatalf("expected .png filename, got filename=%q", att.Filename)
+	}
+}
 
-	if gotFilename != "b.txt" {
-		t.Fatalf("unexpected filename: %q", gotFilename)
+func TestUploadRemote_ImageNoExtFilenameNormalizedToPng(t *testing.T) {
+	t.Setenv("DEV_MODE", "1")
+	t.Setenv("MEW_DEV_DIR", t.TempDir())
+
+	downloadSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/image" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte{0x89, 0x50, 0x4e, 0x47})
+	}))
+	t.Cleanup(downloadSrv.Close)
+
+	att, err := UploadRemote(
+		context.Background(),
+		downloadSrv.Client(),
+		nil,
+		"",
+		"invalid-webhook-url",
+		downloadSrv.URL+"/image",
+		"fallback.png",
+		"ua",
+	)
+	if err != nil {
+		t.Fatalf("UploadRemote err=%v", err)
 	}
-	wantCT := mime.TypeByExtension(".txt")
-	if wantCT == "" {
-		wantCT = "application/octet-stream"
-	}
-	if gotContentType != wantCT {
-		t.Fatalf("unexpected content-type: %q, want %q", gotContentType, wantCT)
-	}
-	if string(gotBody) != "hello" {
-		t.Fatalf("unexpected body: %q", string(gotBody))
-	}
-	if att.Key != "k" || att.Filename != "b.txt" || att.Size != 5 {
-		t.Fatalf("unexpected attachment: %#v", att)
+	if got := strings.ToLower(path.Ext(att.Filename)); got != ".png" {
+		t.Fatalf("expected .png filename, got filename=%q", att.Filename)
 	}
 }

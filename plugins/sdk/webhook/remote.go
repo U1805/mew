@@ -11,6 +11,33 @@ import (
 	"time"
 )
 
+func forceFilenameExt(filename, ext string) string {
+	name := strings.TrimSpace(filename)
+	if name == "" {
+		name = "file"
+	}
+	e := strings.TrimSpace(ext)
+	if e == "" {
+		return name
+	}
+	if !strings.HasPrefix(e, ".") {
+		e = "." + e
+	}
+	if cur := path.Ext(name); cur != "" {
+		name = strings.TrimSuffix(name, cur)
+	}
+	return name + e
+}
+
+func isNonFileURLExt(ext string) bool {
+	switch strings.ToLower(strings.TrimSpace(ext)) {
+	case ".php", ".asp", ".aspx", ".cgi", ".jsp":
+		return true
+	default:
+		return false
+	}
+}
+
 // UploadRemote downloads a remote file and uploads it to the webhook /upload endpoint.
 // It returns the uploaded Attachment (its Key can be used in later messages).
 func UploadRemote(
@@ -54,6 +81,12 @@ func UploadRemote(
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 	if contentType == "" {
 		contentType = mime.TypeByExtension(path.Ext(filename))
+	}
+	if strings.HasPrefix(contentType, "image/") {
+		ext := path.Ext(filename)
+		if ext == "" || isNonFileURLExt(ext) {
+			filename = forceFilenameExt(filename, ".png")
+		}
 	}
 	if contentType == "" {
 		contentType = "application/octet-stream"
