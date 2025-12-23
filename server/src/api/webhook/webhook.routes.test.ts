@@ -172,7 +172,7 @@ describe('Webhook Routes', () => {
           s3_thumbnail_url: 'mock-file.txt',
           feed_title: 'Example Feed',
           published_at: '2025-01-01T00:00:00Z',
-          ignored_field: 'should not be persisted',
+          ignored_field: 'should be preserved',
         },
       };
 
@@ -191,7 +191,7 @@ describe('Webhook Routes', () => {
         feed_title: payload.payload.feed_title,
         published_at: payload.payload.published_at,
       });
-      expect(res.body.payload.ignored_field).toBeUndefined();
+      expect(res.body.payload.ignored_field).toBe(payload.payload.ignored_field);
     });
 
     it('should execute a webhook and post a Twitter card message (with s3 array hydration)', async () => {
@@ -209,7 +209,7 @@ describe('Webhook Routes', () => {
           s3_cover_url: 'cover.jpg',
           s3_video_url: 'video.mp4',
           video_content_type: 'video/mp4',
-          ignored_field: 'should not be persisted',
+          ignored_field: 'should be preserved',
         },
       };
 
@@ -231,7 +231,7 @@ describe('Webhook Routes', () => {
         s3_video_url: 'http://cdn.local/video.mp4',
         video_content_type: payload.payload.video_content_type,
       });
-      expect(res.body.payload.ignored_field).toBeUndefined();
+      expect(res.body.payload.ignored_field).toBe(payload.payload.ignored_field);
     });
 
     it('should execute a webhook and post a Twitter card message (with quoted_tweet hydration)', async () => {
@@ -250,14 +250,14 @@ describe('Webhook Routes', () => {
             url: 'https://x.com/other/status/1999999999999999999',
             text: 'Original tweet',
             created_at: 'Sun Dec 21 03:08:49 +0000 2025',
-            author_name: 'Other',
-            author_handle: 'other',
-            s3_images: ['nested1.png', 'nested2.png'],
-            ignored_field: 'should not be persisted',
+              author_name: 'Other',
+              author_handle: 'other',
+              s3_images: ['nested1.png', 'nested2.png'],
+              ignored_field: 'should be preserved',
+            },
+            ignored_field: 'should be preserved',
           },
-          ignored_field: 'should not be persisted',
-        },
-      };
+        };
 
       const res = await request(app)
         .post(`/api/webhooks/${webhook._id}/${webhook.token}`)
@@ -282,8 +282,8 @@ describe('Webhook Routes', () => {
           s3_images: ['http://cdn.local/nested1.png', 'http://cdn.local/nested2.png'],
         },
       });
-      expect(res.body.payload.ignored_field).toBeUndefined();
-      expect(res.body.payload.quoted_tweet.ignored_field).toBeUndefined();
+      expect(res.body.payload.ignored_field).toBe(payload.payload.ignored_field);
+      expect(res.body.payload.quoted_tweet.ignored_field).toBe(payload.payload.quoted_tweet.ignored_field);
     });
 
     it('should execute a webhook and post a Bilibili card message (with nested payload hydration)', async () => {
@@ -310,9 +310,9 @@ describe('Webhook Routes', () => {
             type: 'post',
             text: 'Nested text',
             s3_image_urls: ['nested1.png'],
-            ignored_field: 'should not be persisted',
+            ignored_field: 'should be preserved',
           },
-          ignored_field: 'should not be persisted',
+          ignored_field: 'should be preserved',
         },
       };
 
@@ -344,8 +344,8 @@ describe('Webhook Routes', () => {
           s3_image_urls: ['http://cdn.local/nested1.png'],
         },
       });
-      expect(res.body.payload.ignored_field).toBeUndefined();
-      expect(res.body.payload.original_post.ignored_field).toBeUndefined();
+      expect(res.body.payload.ignored_field).toBe(payload.payload.ignored_field);
+      expect(res.body.payload.original_post.ignored_field).toBe(payload.payload.original_post.ignored_field);
     });
 
     it('should fail with an invalid token', async () => {
