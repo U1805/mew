@@ -29,4 +29,8 @@ export const handlers = [
       email: 'test@example.com',
     });
   }),
+
+  http.get(`${API_URL}/auth/config`, () => {
+    return HttpResponse.json({ allowUserRegistration: true });
+  }),
 ];

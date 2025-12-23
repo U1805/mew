@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import clsx from 'clsx';
 import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../../../shared/utils/apiError';
 
 export const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
+  const [allowRegistration, setAllowRegistration] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,6 +16,33 @@ export const AuthScreen = () => {
   const [notice, setNotice] = useState('');
   const setAuth = useAuthStore((state) => state.setAuth);
   const logout = useAuthStore((state) => state.logout);
+
+  useEffect(() => {
+    let mounted = true;
+
+    authApi
+      .getConfig()
+      .then((res) => {
+        if (!mounted) return;
+        const raw = res.data?.allowUserRegistration;
+        if (typeof raw === 'boolean') setAllowRegistration(raw);
+        else setAllowRegistration(true);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setAllowRegistration(true);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (allowRegistration === false && !isLogin) {
+      setIsLogin(true);
+    }
+  }, [allowRegistration, isLogin]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -36,6 +64,11 @@ export const AuthScreen = () => {
           console.error('Failed to fetch user profile', userErr);
         }
       } else {
+        if (allowRegistration === false) {
+          setIsLogin(true);
+          setError('Registration is disabled. Please contact an admin.');
+          return;
+        }
         const res = await authApi.register({ email, username, password });
         const token = res.data.token as string | undefined;
         const user = res.data.user ?? null;
@@ -48,8 +81,17 @@ export const AuthScreen = () => {
         }
       }
     } catch (err: any) {
-      setError(getApiErrorMessage(err, 'An error occurred'));
-      logout();
+      const message = getApiErrorMessage(err, 'An error occurred');
+      const status = err?.response?.status as number | undefined;
+
+      if (!isLogin && status === 403) {
+        setIsLogin(true);
+        setError(message || 'Registration is disabled. Please contact an admin.');
+        return;
+      }
+
+      setError(message);
+      if (isLogin) logout();
     }
   };
 
@@ -125,18 +167,26 @@ export const AuthScreen = () => {
         </form>
 
         <div className="mt-4 text-sm text-mew-textMuted flex gap-1">
-          {isLogin ? "Need an account?" : "Already have an account?"}
-          <button
-            type="button"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError('');
-              setNotice('');
-            }}
-            className="text-mew-accent hover:underline"
-          >
-            {isLogin ? 'Register' : 'Log in'}
-          </button>
+          {allowRegistration ? (
+            <>
+              {isLogin ? "Need an account?" : "Already have an account?"}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError('');
+                  setNotice('');
+                }}
+                className="text-mew-accent hover:underline"
+              >
+                {isLogin ? 'Register' : 'Log in'}
+              </button>
+            </>
+          ) : allowRegistration === false ? (
+            <span></span>
+          ) : (
+            <span />
+          )}
         </div>
       </div>
     </div>
