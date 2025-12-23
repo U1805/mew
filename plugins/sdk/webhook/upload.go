@@ -11,8 +11,11 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"mew/plugins/sdk/devmode"
 )
 
 type Attachment struct {
@@ -36,9 +39,12 @@ func UploadReader(ctx context.Context, httpClient *http.Client, apiBase, webhook
 
 	target, err := buildUploadURL(webhookURL)
 	if err != nil {
-		return Attachment{}, err
+		if !devmode.Enabled() {
+			return Attachment{}, err
+		}
+		target = ""
 	}
-	if strings.TrimSpace(apiBase) != "" {
+	if strings.TrimSpace(apiBase) != "" && strings.TrimSpace(target) != "" {
 		rewritten, err := RewriteLoopbackURL(target, apiBase)
 		if err != nil {
 			return Attachment{}, err
@@ -53,6 +59,23 @@ func UploadReader(ctx context.Context, httpClient *http.Client, apiBase, webhook
 	ct := strings.TrimSpace(contentType)
 	if ct == "" {
 		ct = "application/octet-stream"
+	}
+
+	if devmode.Enabled() {
+		id := devmode.TimestampID()
+		st := devmode.ServiceTypeFromCaller()
+		safeName := devmode.SanitizeFilename(filename)
+		base := st + "-" + id + "-" + safeName
+		dataPath := filepath.Join(devmode.Dir(), "webhook", "upload", base)
+		size, err := saveReaderAtomic(dataPath, r, 0o644)
+		if err != nil {
+			return Attachment{}, err
+		}
+		key := filepath.ToSlash(filepath.Join("dev", "webhook", "upload", filepath.Base(dataPath)))
+		if err := recordUpload(apiBase, webhookURL, target, filename, ct, dataPath, size, key); err != nil {
+			return Attachment{}, err
+		}
+		return Attachment{Filename: filename, ContentType: ct, Key: key, Size: size}, nil
 	}
 
 	pr, pw := io.Pipe()

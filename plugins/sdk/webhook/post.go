@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"mew/plugins/sdk/devmode"
 )
 
 // PostJSONWithRetry posts JSON to webhookURL, automatically rewriting loopback
@@ -42,12 +44,16 @@ func PostJSON(ctx context.Context, httpClient *http.Client, apiBase, webhookURL 
 	}
 
 	target := strings.TrimSpace(webhookURL)
-	if strings.TrimSpace(apiBase) != "" {
+	if strings.TrimSpace(apiBase) != "" && strings.TrimSpace(target) != "" {
 		rewritten, err := RewriteLoopbackURL(target, apiBase)
 		if err != nil {
 			return err
 		}
 		target = rewritten
+	}
+
+	if devmode.Enabled() {
+		return recordWebhookJSON(apiBase, webhookURL, target, body)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(body))

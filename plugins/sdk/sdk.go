@@ -10,6 +10,7 @@ import (
 	"mew/plugins/sdk/collections"
 	"mew/plugins/sdk/config"
 	"mew/plugins/sdk/core"
+	"mew/plugins/sdk/devmode"
 	"mew/plugins/sdk/httpx"
 	"mew/plugins/sdk/manager"
 	"mew/plugins/sdk/mew"
@@ -38,6 +39,12 @@ func LoadDotEnvFromCaller(logPrefix string, callerSkip int) {
 }
 
 func IsDotEnvDisabled() bool { return core.IsDotEnvDisabled() }
+
+// ---- dev mode ----
+
+func DevModeEnabled() bool { return devmode.Enabled() }
+
+func DevModeDir() string { return devmode.Dir() }
 
 // ---- service runtime ----
 

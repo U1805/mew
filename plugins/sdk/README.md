@@ -11,6 +11,7 @@
 - 标准 Service 主循环（可选）：`sdk.RunServiceWithSignals(sdk.ServiceOptions{...})`
 - goroutine 组管理（可选）：`g := sdk.NewGroup(ctx); g.Go(...); g.Stop()`
 - 基于 webhook url 的文件上传（S3 存储）：`sdk.UploadWebhookReader(...)` / `sdk.UploadWebhookBytes(...)`
+- 测试模式（DEV_MODE）：不发 webhook、不上传文件，保存所有请求到本地目录（见下）
 
 ## 包结构
 
@@ -52,6 +53,20 @@ func main() {
 ## `.env` 约定
 
 见 `plugins/README.md` 的“通用环境变量”和“.env.local/.env 加载规则”。
+
+## 测试模式（DEV_MODE）
+
+当 `DEV_MODE=true`（也支持 `1/yes/on`）时：
+
+- `sdk.PostWebhook(...)` / `sdk.PostWebhookJSONWithRetry(...)` 不会真的发送 HTTP 请求，而是把请求内容保存为 JSON 文件
+- `sdk.UploadWebhookReader(...)` / `sdk.UploadWebhookBytes(...)` 不会真的上传（S3），而是把文件内容保存到本地，并返回一个 `Attachment.Key`（用于插件侧查看结果）
+
+保存目录：
+
+- 默认：`sdk.DevModeDir()`（即 `MEW_DEV_DIR` 或 `MEW_STATE_DIR/dev`）
+- webhook 记录：`{DevModeDir}/webhook/post/<serviceType>-<timestamp>-<rand>.json`
+- upload 记录：`{DevModeDir}/webhook/upload/<serviceType>-<timestamp>-<rand>.json`
+- upload 数据：`{DevModeDir}/webhook/upload/<serviceType>-<timestamp>-<rand>-<filename>`
 
 ## 请求代理（可选）
 
