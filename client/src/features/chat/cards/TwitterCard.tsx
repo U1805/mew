@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
-import { AttachmentLightbox } from './AttachmentLightbox';
+import { AttachmentLightbox } from '../messages/AttachmentLightbox';
 
 function safeHostname(url: string | undefined): string | null {
   if (!url) return null;
@@ -238,7 +238,7 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                       alt=""
                       loading="lazy"
                       referrerPolicy="no-referrer"
-                      className="w-full max-h-[260px] rounded-md object-contain bg-black/20 cursor-zoom-in"
+                      className="w-full max-h-[260px] rounded-md object-cover bg-black/20 cursor-zoom-in"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -306,7 +306,7 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                     alt=""
                     loading="lazy"
                     referrerPolicy="no-referrer"
-                    className="w-full max-h-[420px] rounded-lg object-contain bg-black/30 cursor-zoom-in"
+                    className="w-full max-h-[420px] rounded-lg object-cover bg-black/30 cursor-zoom-in"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();

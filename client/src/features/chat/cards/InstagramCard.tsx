@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { format } from 'date-fns';
 import type { Attachment, MessagePayload } from '../../../shared/types';
-import { AttachmentLightbox } from './AttachmentLightbox';
+import { AttachmentLightbox } from '../messages/AttachmentLightbox';
 
 function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -206,7 +206,7 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
                 alt=""
                 loading="lazy"
                 referrerPolicy="no-referrer"
-                className="w-full max-h-[520px] rounded-lg object-contain bg-black/30 cursor-zoom-in"
+                className="w-full max-h-[520px] rounded-lg object-cover bg-black/30 cursor-zoom-in"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

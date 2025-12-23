@@ -4,11 +4,7 @@ import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { AttachmentList } from './AttachmentList';
 import { UrlEmbed } from './UrlEmbed';
-import { RssCard } from './RssCard';
-import { PornhubCard } from './PornhubCard';
-import { TwitterCard } from './TwitterCard';
-import { BilibiliCard } from './BilibiliCard';
-import { InstagramCard } from './InstagramCard';
+import { RssCard, PornhubCard, TwitterCard, BilibiliCard, InstagramCard } from '../cards';
 
 interface MessageContentProps {
     message: Message;

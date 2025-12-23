@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
-import { AttachmentLightbox } from './AttachmentLightbox';
+import { AttachmentLightbox } from '../messages/AttachmentLightbox';
 
 // --- Utility Functions (无变化) ---
 
@@ -147,7 +147,7 @@ const MediaGrid = ({ images, onPreview }: { images: string[]; onPreview: (index:
       <div className="mt-3 overflow-hidden rounded-lg bg-black/10 max-w-full">
         <img
           src={images[0]} alt="" loading="lazy"
-          className="max-h-[350px] max-w-full object-contain cursor-pointer hover:opacity-95 transition-opacity"
+          className="max-h-[350px] w-full max-w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
           onClick={(e) => { e.stopPropagation(); onPreview(0); }}
         />
       </div>
