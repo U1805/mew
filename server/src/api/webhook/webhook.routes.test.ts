@@ -286,6 +286,68 @@ describe('Webhook Routes', () => {
       expect(res.body.payload.quoted_tweet.ignored_field).toBeUndefined();
     });
 
+    it('should execute a webhook and post a Bilibili card message (with nested payload hydration)', async () => {
+      const payload = {
+        type: 'app/x-bilibili-card',
+        content: 'Example bilibili',
+        payload: {
+          type: 'video',
+          title: 'Example Title',
+          description: 'Example desc',
+          dynamic_id: '123456',
+          dynamic_url: 'https://t.bilibili.com/123456',
+          author_name: 'UP 主',
+          author_face: 'https://i0.hdslb.com/bfs/face/example.jpg',
+          published_at: 1700000000,
+          s3_cover_url: 'cover.jpg',
+          s3_image_urls: ['img1.png', 'img2.png'],
+          emojis: [
+            { text: '[dog]', s3_icon_url: 'emoji1.png' },
+            { text: '[cat]', icon_url: 'https://example.com/cat.png' },
+          ],
+          original_author: 'Other',
+          original_post: {
+            type: 'post',
+            text: 'Nested text',
+            s3_image_urls: ['nested1.png'],
+            ignored_field: 'should not be persisted',
+          },
+          ignored_field: 'should not be persisted',
+        },
+      };
+
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}`)
+        .send(payload);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.type).toBe('app/x-bilibili-card');
+      expect(res.body.payload).toMatchObject({
+        type: payload.payload.type,
+        title: payload.payload.title,
+        description: payload.payload.description,
+        dynamic_id: payload.payload.dynamic_id,
+        dynamic_url: payload.payload.dynamic_url,
+        author_name: payload.payload.author_name,
+        author_face: payload.payload.author_face,
+        published_at: payload.payload.published_at,
+        s3_cover_url: 'http://cdn.local/cover.jpg',
+        s3_image_urls: ['http://cdn.local/img1.png', 'http://cdn.local/img2.png'],
+        emojis: [
+          { text: '[dog]', s3_icon_url: 'http://cdn.local/emoji1.png' },
+          { text: '[cat]', icon_url: 'https://example.com/cat.png' },
+        ],
+        original_author: payload.payload.original_author,
+        original_post: {
+          type: payload.payload.original_post.type,
+          text: payload.payload.original_post.text,
+          s3_image_urls: ['http://cdn.local/nested1.png'],
+        },
+      });
+      expect(res.body.payload.ignored_field).toBeUndefined();
+      expect(res.body.payload.original_post.ignored_field).toBeUndefined();
+    });
+
     it('should fail with an invalid token', async () => {
       const payload = { content: 'This should fail' };
       const res = await request(app)

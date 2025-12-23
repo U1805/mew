@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { uploadApi, messageApi } from '../../../shared/services/api';
@@ -8,25 +9,48 @@ import { AttachmentImageViewer } from './AttachmentImageViewer';
 
 interface LightboxProps {
   attachment: Attachment;
+  attachments?: Attachment[];
+  initialIndex?: number;
   onClose: () => void;
   serverId?: string;
   channelId?: string;
 }
 
-export const AttachmentLightbox = ({ attachment, onClose, serverId, channelId }: LightboxProps) => {
+export const AttachmentLightbox = ({ attachment, attachments, initialIndex, onClose, serverId, channelId }: LightboxProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
 
+  const resolvedAttachments = (attachments && attachments.length > 0) ? attachments : [attachment];
+  const safeInitialIndex = (() => {
+    if (typeof initialIndex === 'number' && Number.isFinite(initialIndex)) {
+      const idx = Math.floor(initialIndex);
+      return Math.min(Math.max(0, idx), resolvedAttachments.length - 1);
+    }
+    const found = resolvedAttachments.findIndex((a) => a.url === attachment.url);
+    return found >= 0 ? found : 0;
+  })();
+
+  const [currentIndex, setCurrentIndex] = useState(safeInitialIndex);
+  const currentAttachment = resolvedAttachments[currentIndex] ?? resolvedAttachments[0];
+
   useEffect(() => {
-    requestAnimationFrame(() => setIsVisible(true));
+    setCurrentIndex((prev) => Math.min(Math.max(0, prev), resolvedAttachments.length - 1));
+  }, [resolvedAttachments.length]);
+
+  useEffect(() => {
+    // 稍微延后设置可见性以触发过渡动画
+    const timer = requestAnimationFrame(() => setIsVisible(true));
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isEditing) handleClose();
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      cancelAnimationFrame(timer);
+    };
   }, [isEditing]);
 
   const handleClose = () => {
@@ -70,13 +94,35 @@ export const AttachmentLightbox = ({ attachment, onClose, serverId, channelId }:
     }
   };
 
-  return (
+  const canNavigate = resolvedAttachments.length > 1;
+  const goPrev = () => {
+    if (!canNavigate || isEditing) return;
+    setRotation(0);
+    setCurrentIndex((i) => (i - 1 + resolvedAttachments.length) % resolvedAttachments.length);
+  };
+
+  const goNext = () => {
+    if (!canNavigate || isEditing) return;
+    setRotation(0);
+    setCurrentIndex((i) => (i + 1) % resolvedAttachments.length);
+  };
+
+  // 2. 将 JSX 包裹在 createPortal 中，渲染到 document.body
+  // 确保在客户端执行 (SSR 保护)
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
       className={clsx(
         "fixed inset-0 z-[100] flex flex-col items-center justify-center select-none transition-opacity duration-300 ease-out",
         isVisible ? "opacity-100" : "opacity-0"
       )}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       onClick={(e) => {
+        e.preventDefault();
         e.stopPropagation();
         if (!isEditing) handleClose();
       }}
@@ -91,23 +137,25 @@ export const AttachmentLightbox = ({ attachment, onClose, serverId, channelId }:
       >
         {isEditing ? (
           <AttachmentImageEditor
-            src={attachment.url}
+            src={currentAttachment.url}
             initialRotation={rotation}
             onCancel={() => setIsEditing(false)}
             onSend={handleSend}
           />
         ) : (
           <AttachmentImageViewer
-            src={attachment.url}
+            src={currentAttachment.url}
             rotation={rotation}
             setRotation={setRotation}
             onEdit={() => setIsEditing(true)}
-            attachmentUrl={attachment.url}
+            attachmentUrl={currentAttachment.url}
+            onPrev={canNavigate ? goPrev : undefined}
+            onNext={canNavigate ? goNext : undefined}
             onClose={handleClose}
           />
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
-

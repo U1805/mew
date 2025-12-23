@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"mew/plugins/sdk/collections"
@@ -171,8 +172,16 @@ func UploadRemoteToWebhook(
 	downloadClient *http.Client,
 	uploadClient *http.Client,
 	apiBase, webhookURL, remoteURL, fallbackFilename string,
+	userAgent ...string,
 ) (WebhookAttachment, error) {
-	return webhook.UploadRemote(ctx, downloadClient, uploadClient, apiBase, webhookURL, remoteURL, fallbackFilename, RandomBrowserUserAgent())
+	ua := ""
+	if len(userAgent) > 0 {
+		ua = strings.TrimSpace(userAgent[0])
+	}
+	if ua == "" {
+		ua = RandomBrowserUserAgent()
+	}
+	return webhook.UploadRemote(ctx, downloadClient, uploadClient, apiBase, webhookURL, remoteURL, fallbackFilename, ua)
 }
 
 func FilenameFromURL(rawURL, fallback string) string {
