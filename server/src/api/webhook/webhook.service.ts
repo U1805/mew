@@ -15,34 +15,6 @@ interface WebhookCreationData {
 
 const RESERVED_PAYLOAD_KEYS = new Set(['webhookName', 'overrides']);
 
-const PAYLOAD_ALLOWLIST_BY_TYPE: Record<string, Set<string>> = {
-  'app/x-rss-card': new Set(['title', 'summary', 'url', 'thumbnail_url', 's3_thumbnail_url', 'feed_title', 'published_at']),
-  'app/x-pornhub-card': new Set(['title', 'url', 'thumbnail_url', 's3_thumbnail_url', 'preview_url', 's3_preview_url']),
-  'app/x-twitter-card': new Set([
-    'id',
-    'url',
-    'text',
-    'created_at',
-    'is_retweet',
-    'author_name',
-    'author_handle',
-    'author_avatar',
-    'images',
-    's3_images',
-    'quoted_tweet',
-    'video_url',
-    's3_video_url',
-    'video_content_type',
-    'cover_url',
-    's3_cover_url',
-    'like_count',
-    'retweet_count',
-    'reply_count',
-    'quote_count',
-    'view_count',
-  ]),
-};
-
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
 }
@@ -88,19 +60,31 @@ function hydrateS3PrefixedFields(input: Record<string, any>): Record<string, any
 }
 
 function sanitizeCustomPayload(messageType: string, input: Record<string, any>): Record<string, any> {
-  const allowlist = PAYLOAD_ALLOWLIST_BY_TYPE[messageType];
-  if (!allowlist) return input;
-
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(input)) {
-    if (!allowlist.has(k)) continue;
 
     if (messageType === 'app/x-twitter-card' && k === 'quoted_tweet' && v && typeof v === 'object' && !Array.isArray(v)) {
       const nestedOut: Record<string, any> = {};
       for (const [nk, nv] of Object.entries(v as Record<string, any>)) {
-        if (allowlist.has(nk) && nk !== 'quoted_tweet') nestedOut[nk] = nv;
+        if (nk !== 'quoted_tweet') nestedOut[nk] = nv;
       }
       out[k] = nestedOut;
+      continue;
+    }
+
+    if (messageType === 'app/x-bilibili-card' && k === 'original_post' && v && typeof v === 'object' && !Array.isArray(v)) {
+      const sanitizeNested = (obj: Record<string, any>, depth: number): Record<string, any> => {
+        const nestedOut: Record<string, any> = {};
+        for (const [nk, nv] of Object.entries(obj)) {
+          if (nk === 'original_post' && nv && typeof nv === 'object' && !Array.isArray(nv) && depth < 2) {
+            nestedOut[nk] = sanitizeNested(nv as Record<string, any>, depth + 1);
+            continue;
+          }
+          nestedOut[nk] = nv;
+        }
+        return nestedOut;
+      };
+      out[k] = sanitizeNested(v as Record<string, any>, 1);
       continue;
     }
 

@@ -7,10 +7,18 @@ interface ImageViewerProps {
   setRotation: (r: number | ((prev: number) => number)) => void;
   onEdit: () => void;
   attachmentUrl: string;
+  onPrev?: () => void;
+  onNext?: () => void;
   onClose: () => void;
 }
 
-export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, attachmentUrl, onClose }: ImageViewerProps) => {
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return target.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, attachmentUrl, onPrev, onNext, onClose }: ImageViewerProps) => {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -26,13 +34,25 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.key === 'Alt') setIsAltPressed(true);
       if (e.code === 'Space') {
         e.preventDefault();
         setIsSpacePressed(true);
       }
+      if (e.key === 'ArrowLeft' && onPrev) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPrev();
+      }
+      if (e.key === 'ArrowRight' && onNext) {
+        e.preventDefault();
+        e.stopPropagation();
+        onNext();
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
       if (e.key === 'Alt') setIsAltPressed(false);
       if (e.code === 'Space') setIsSpacePressed(false);
     };
@@ -55,7 +75,14 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
       window.removeEventListener('keyup', handleKeyUp);
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [onNext, onPrev]);
+
+  useEffect(() => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+    setIsDragging(false);
+    setDragStart({ x: 0, y: 0 });
+  }, [src]);
 
   let fitScale = 1;
   if (naturalSize.width > 0 && containerSize.width > 0) {
@@ -116,6 +143,36 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
         style={{ cursor: cursorStyle }}
         ref={containerRef}
       >
+        {onPrev && (
+          <button
+            type="button"
+            aria-label="Previous image"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-[1] h-11 w-11 rounded-full bg-black/40 hover:bg-black/60 text-white/80 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-colors pointer-events-auto"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onPrev();
+            }}
+          >
+            <Icon icon="mdi:chevron-left" width="26" />
+          </button>
+        )}
+
+        {onNext && (
+          <button
+            type="button"
+            aria-label="Next image"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-[1] h-11 w-11 rounded-full bg-black/40 hover:bg-black/60 text-white/80 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-colors pointer-events-auto"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onNext();
+            }}
+          >
+            <Icon icon="mdi:chevron-right" width="26" />
+          </button>
+        )}
+
         <img
           ref={imageRef}
           src={src}
