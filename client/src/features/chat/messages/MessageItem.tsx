@@ -38,7 +38,8 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   const isPornhubCard = message.type === 'app/x-pornhub-card';
   const isTwitterCard = message.type === 'app/x-twitter-card';
   const isBilibiliCard = message.type === 'app/x-bilibili-card';
-  const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard;
+  const isInstagramCard = message.type === 'app/x-instagram-card';
+  const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard;
   const isAuthor = user?._id?.toString() === author._id?.toString();
   const isRetracted = !!message.retractedAt;
 
