@@ -64,6 +64,7 @@ services:
       PORT: 3000
       MONGO_URI: mongodb://mongo:27017/mew
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
+      MEW_ALLOW_USER_REGISTRATION: ${MEW_ALLOW_USER_REGISTRATION:-true}
       MEW_INFRA_ALLOWED_IPS: ${MEW_INFRA_ALLOWED_IPS:-}
       # Garage (S3-compatible storage)
       S3_ENDPOINT: garage

@@ -19,6 +19,14 @@ const parseJwtExpiresIn = (raw: string | undefined): NonNullable<SignOptions['ex
   return trimmed as NonNullable<SignOptions['expiresIn']>;
 };
 
+const parseBoolean = (raw: string | undefined, fallback: boolean): boolean => {
+  if (raw === undefined) return fallback;
+  const normalized = raw.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'y', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
+  return fallback;
+};
+
 const readS3CredentialsFile = (): S3Credentials | null => {
   const p = process.env.S3_CREDENTIALS_FILE;
   if (!p) return null;
@@ -41,6 +49,7 @@ const config = {
   port: parsePort(process.env.PORT, 3000),
   jwtSecret: process.env.JWT_SECRET || 'a-very-secret-key',
   jwtExpiresIn: parseJwtExpiresIn(process.env.JWT_EXPIRES_IN),
+  allowUserRegistration: parseBoolean(process.env.MEW_ALLOW_USER_REGISTRATION, true),
   adminSecret: process.env.MEW_ADMIN_SECRET || '',
   infraAllowedIps: (process.env.MEW_INFRA_ALLOWED_IPS || '')
     .split(',')
