@@ -9,6 +9,11 @@ export const loginHandler = asyncHandler(async (req: Request, res: Response, nex
   res.status(200).json({ message: 'Login successful', user, token });
 });
 
+export const botLoginHandler = asyncHandler(async (req: Request, res: Response) => {
+  const { user, token } = await authService.loginBot(req.body);
+  res.status(200).json({ message: 'Bot login successful', user, token });
+});
+
 export const registerHandler = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
   if (!config.allowUserRegistration) {
     throw new ForbiddenError('User registration is disabled.');

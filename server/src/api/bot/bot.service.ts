@@ -67,7 +67,7 @@ const createBotUser = async (bot: IBot, avatarKey?: string) => {
   return botUser;
 };
 
-const ensureBotUserExists = async (bot: IBot, avatarKey?: string) => {
+export const ensureBotUserExists = async (bot: IBot, avatarKey?: string) => {
   if (bot.botUserId) {
     const existing = await UserModel.findById(bot.botUserId).select('_id');
     if (existing) return;

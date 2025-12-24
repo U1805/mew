@@ -80,3 +80,10 @@ export const findByServiceTypeWithToken = async (serviceType: string): Promise<I
 export const findByIdWithTokenUnscoped = async (botId: string): Promise<IBot | null> => {
   return Bot.findById(botId).select('+accessToken');
 };
+
+/**
+ * Finds a bot by its access token (used by interactive bots to authenticate).
+ */
+export const findByAccessToken = async (accessToken: string): Promise<IBot | null> => {
+  return Bot.findOne({ accessToken }).select('+accessToken');
+};

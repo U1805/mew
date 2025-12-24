@@ -167,7 +167,9 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
             {u.username}
           </div>
           {u.isBot && (
-            <div className="ml-1.5 text-[10px] font-bold text-white bg-[#5865F2] inline-block px-1 rounded-[3px] leading-3 shrink-0">BOT</div>
+            <div className="ml-1.5 text-[10px] font-bold text-white bg-[#5865F2] inline-block px-1 rounded-[3px] leading-3 shrink-0">
+              {isWebhookMember ? 'HOOK' : 'BOT'}
+            </div>
           )}
         </div>
       </div>
