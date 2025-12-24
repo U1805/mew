@@ -14,7 +14,7 @@ import { useServerChannels } from '../hooks/useServerChannels';
 export const ServerChannelList: React.FC = () => {
   const { currentServerId, currentChannelId, setCurrentChannel } = useUIStore();
   const { openModal } = useModalStore();
-    const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +82,16 @@ export const ServerChannelList: React.FC = () => {
                     >
                         <span className="text-sm font-medium">Invite People</span>
                         <Icon icon="mdi:account-plus" />
+                    </div>
+                )}
+
+                {isOwner && (
+                    <div
+                        className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group mb-1"
+                        onClick={() => openModal('inviteBot')}
+                    >
+                        <span className="text-sm font-medium">Add App</span>
+                        <Icon icon="mdi:robot" />
                     </div>
                 )}
 

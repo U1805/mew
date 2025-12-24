@@ -42,14 +42,28 @@ export const useServerEvents = (serverId: string | null) => {
       }
     };
 
+    const handleMemberJoin = (data: { serverId: string; userId: string }) => {
+      if (data.serverId !== serverId) return;
+      queryClient.invalidateQueries({ queryKey: ['members', serverId] });
+    };
+
+    const handleMemberLeave = (data: { serverId: string; userId: string }) => {
+      if (data.serverId !== serverId) return;
+      queryClient.invalidateQueries({ queryKey: ['members', serverId] });
+    };
+
     socket.on('CATEGORY_UPDATE', handleCategoryUpdate);
     socket.on('CATEGORY_DELETE', handleCategoryDelete);
     socket.on('PERMISSIONS_UPDATE', handlePermissionsUpdate);
+    socket.on('MEMBER_JOIN', handleMemberJoin);
+    socket.on('MEMBER_LEAVE', handleMemberLeave);
 
     return () => {
       socket.off('CATEGORY_UPDATE', handleCategoryUpdate);
       socket.off('CATEGORY_DELETE', handleCategoryDelete);
       socket.off('PERMISSIONS_UPDATE', handlePermissionsUpdate);
+      socket.off('MEMBER_JOIN', handleMemberJoin);
+      socket.off('MEMBER_LEAVE', handleMemberLeave);
     };
   }, [serverId, queryClient]);
 };

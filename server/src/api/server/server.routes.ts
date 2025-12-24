@@ -10,6 +10,7 @@ import channelRoutes from '../channel/channel.routes';
 import inviteRoutes from '../invite/invite.routes';
 import memberRoutes from '../member/member.routes';
 import searchRoutes from '../search/search.routes';
+import botInviteRoutes from '../botInvite/botInvite.routes';
 
 import { protect } from '../../middleware/auth';
 import { authorizeServer } from '../../middleware/checkPermission';
@@ -48,5 +49,6 @@ router.use('/:serverId/channels', channelRoutes);
 router.use('/:serverId/invites', inviteRoutes);
 router.use('/:serverId/members', memberRoutes);
 router.use('/:serverId/search', checkServerMembership, searchRoutes);
+router.use('/:serverId/bots', botInviteRoutes);
 
 export default router;

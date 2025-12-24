@@ -15,6 +15,7 @@ type ModalType =
   | 'findUser'
   | 'userProfile'
   | 'createInvite'
+  | 'inviteBot'
   | 'joinServer'
   | 'kickUser'
   | 'addPermissionOverride'

@@ -12,6 +12,7 @@ export { searchApi } from './search.api';
 export { webhookApi } from './webhook.api';
 export { uploadApi } from './upload.api';
 export { botApi } from './bot.api';
+export { serverBotApi } from './serverBot.api';
 export { infraApi } from './infra.api';
 export type { LoginResponse } from './auth.api';
 

@@ -143,6 +143,7 @@ interface MemberItemProps {
 const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
     const u = member.userId;
     if (!u) return null;
+    const isWebhookMember = !!member.channelId;
 
     const content = (
       <div
@@ -172,7 +173,8 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
       </div>
     );
 
-    if (u.isBot) {
+    // Webhook "members" are virtual and can't be managed (kick/roles).
+    if (isWebhookMember) {
       return content;
     }
 
