@@ -13,6 +13,8 @@ import ServerMember from '../member/member.model';
 import { DM_PERMISSIONS } from '../../constants/permissions';
 import { Webhook } from '../webhook/webhook.model';
 import { getS3PublicUrl } from '../../utils/s3';
+import UserModel from '../user/user.model';
+import BotModel from '../bot/bot.model';
 
 function hydrateUserAvatarUrl<T extends { avatarUrl?: string }>(user: T): T {
   if (user.avatarUrl) {
@@ -126,10 +128,23 @@ const channelService = {
     if (userId === recipientId) {
       throw new BadRequestError('You cannot create a DM with yourself');
     }
+
     let channel = await channelRepository.findOne({ type: 'DM', recipients: { $all: [userId, recipientId], $size: 2 } });
 
     if (channel) {
       return channel;
+    }
+
+    const recipient = await UserModel.findById(recipientId).select('_id isBot').lean();
+    if (!recipient) {
+      throw new NotFoundError('Recipient not found');
+    }
+
+    if ((recipient as any).isBot) {
+      const bot = await BotModel.findOne({ botUserId: recipient._id }).select('dmEnabled').lean();
+      if (!bot || !(bot as any).dmEnabled) {
+        throw new ForbiddenError('This bot does not accept DMs.');
+      }
     }
 
     let newDmChannel = await channelRepository.createDmChannel(userId, recipientId);

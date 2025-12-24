@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
+import toast from 'react-hot-toast';
 import { User } from '../../../shared/types';
 import { channelApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore } from '../../../shared/stores';
@@ -23,6 +24,10 @@ export const FindUserModal: React.FC = () => {
 
   const handleCreateDM = async (user: User) => {
     if (loadingUserId) return;
+    if (user.isBot && user.dmEnabled === false) {
+      toast.error('This bot does not accept DMs.');
+      return;
+    }
     setLoadingUserId(user._id);
 
     try {

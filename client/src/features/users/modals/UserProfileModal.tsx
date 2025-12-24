@@ -24,6 +24,7 @@ export const UserProfileModal: React.FC = () => {
 
   const isOnline = onlineStatus[user._id] === 'online';
   const isSelf = currentUser?._id === user._id;
+  const dmBlockedByBot = user.isBot && user.dmEnabled === false;
 
   const handleCreateDM = async (recipientId: string) => {
     if (!recipientId) return;
@@ -66,7 +67,7 @@ export const UserProfileModal: React.FC = () => {
                  </div>
 
                  <div className="flex justify-end pt-3 mb-2">
-                      {!isSelf && (
+                      {!isSelf && !dmBlockedByBot && (
                         <button
                           onClick={() => handleCreateDM(user._id)}
                           disabled={isLoading}

@@ -1,10 +1,12 @@
 import { nanoid } from 'nanoid';
+import bcrypt from 'bcryptjs';
 import * as botRepository from './bot.repository';
 import { IBot } from './bot.model';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
 import { uploadFile, getS3PublicUrl } from '../../utils/s3';
 import ServiceTypeModel from '../infra/serviceType.model';
 import { socketManager } from '../../gateway/events';
+import UserModel from '../user/user.model';
 
 const generateAccessToken = () => nanoid(32);
 
@@ -25,6 +27,72 @@ const broadcastBotConfigUpdate = (serviceType: string, botId: string) => {
   }
 };
 
+const normalizeBotUsernameBase = (name?: string) => {
+  const trimmed = (name || 'bot').trim();
+  return (trimmed || 'bot').slice(0, 50);
+};
+
+const generateUniqueBotUsername = async (baseName?: string, excludeUserId?: string) => {
+  const base = normalizeBotUsernameBase(baseName);
+
+  const isTaken = async (username: string) => {
+    const query: any = { username };
+    if (excludeUserId) query._id = { $ne: excludeUserId };
+    return !!(await UserModel.exists(query));
+  };
+
+  if (!(await isTaken(base))) return base;
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = `${base}-${nanoid(6)}`.slice(0, 50);
+    if (!(await isTaken(candidate))) return candidate;
+  }
+
+  return `${base}-${nanoid(10)}`.slice(0, 50);
+};
+
+const createBotUser = async (bot: IBot, avatarKey?: string) => {
+  const username = await generateUniqueBotUsername(bot.name);
+  const hashedPassword = await bcrypt.hash(nanoid(32), 10);
+
+  const botUser = new UserModel({
+    email: `bot-${bot._id.toString()}@internal.mew`,
+    username,
+    password: hashedPassword,
+    isBot: true,
+    avatarUrl: avatarKey,
+  });
+
+  await botUser.save();
+  return botUser;
+};
+
+const ensureBotUserExists = async (bot: IBot, avatarKey?: string) => {
+  if (bot.botUserId) {
+    const existing = await UserModel.findById(bot.botUserId).select('_id');
+    if (existing) return;
+  }
+
+  const botUser = await createBotUser(bot, avatarKey);
+  (bot as any).botUserId = botUser._id;
+  await (bot as any).save();
+};
+
+const syncBotUserProfile = async (bot: IBot, opts: { name?: string; avatarKey?: string }) => {
+  await ensureBotUserExists(bot, opts.avatarKey);
+  if (!bot.botUserId) return;
+
+  const botUser = await UserModel.findById(bot.botUserId).select('username avatarUrl');
+  if (!botUser) return;
+
+  if (opts.name && opts.name.trim() && botUser.username !== opts.name.trim()) {
+    botUser.username = await generateUniqueBotUsername(opts.name, botUser._id.toString());
+  }
+  if (opts.avatarKey) botUser.avatarUrl = opts.avatarKey;
+
+  await botUser.save();
+};
+
 export const createBot = async (
   ownerId: string,
   botData: Partial<IBot>,
@@ -36,11 +104,13 @@ export const createBot = async (
   await assertServiceTypeAllowed(botData.serviceType);
 
   const accessToken = generateAccessToken();
+  let avatarKey: string | undefined;
   let avatarUrl: string | undefined;
 
   if (avatarFile) {
     const existingKey = (avatarFile as any).key as string | undefined;
     const { key } = existingKey ? { key: existingKey } : await uploadFile(avatarFile);
+    avatarKey = key;
     avatarUrl = getS3PublicUrl(key);
   }
 
@@ -50,6 +120,8 @@ export const createBot = async (
     accessToken,
     avatarUrl,
   });
+
+  await ensureBotUserExists(newBot, avatarKey);
 
   broadcastBotConfigUpdate(newBot.serviceType, newBot._id.toString());
 
@@ -62,6 +134,7 @@ export const createBot = async (
 
 export const getBotsByOwner = async (ownerId: string): Promise<IBot[]> => {
   const bots = await botRepository.findByOwnerId(ownerId);
+  await Promise.all(bots.map((b) => ensureBotUserExists(b)));
   return bots.map((b: any) => {
     const obj = b.toObject ? b.toObject() : b;
     obj.serviceType = normalizeServiceType(obj.serviceType);
@@ -77,6 +150,7 @@ export const getBotById = async (
   if (!bot) {
     throw new NotFoundError('Bot not found or you do not have permission to view it.');
   }
+  await ensureBotUserExists(bot);
   const obj: any = bot.toObject ? bot.toObject() : bot;
   obj.serviceType = normalizeServiceType(obj.serviceType);
   return obj;
@@ -94,10 +168,12 @@ export const updateBot = async (
     await assertServiceTypeAllowed(updateData.serviceType);
   }
 
+  let avatarKey: string | undefined;
   let avatarUrl: string | undefined;
   if (avatarFile) {
     const existingKey = (avatarFile as any).key as string | undefined;
     const { key } = existingKey ? { key: existingKey } : await uploadFile(avatarFile);
+    avatarKey = key;
     avatarUrl = getS3PublicUrl(key);
   }
 
@@ -113,6 +189,8 @@ export const updateBot = async (
   if (!updatedBot) {
     throw new NotFoundError('Bot not found.'); // Should not happen due to getBotById check
   }
+
+  await syncBotUserProfile(updatedBot, { name: updateData.name, avatarKey });
 
   broadcastBotConfigUpdate(normalizeServiceType(updatedBot.serviceType), updatedBot._id.toString());
 

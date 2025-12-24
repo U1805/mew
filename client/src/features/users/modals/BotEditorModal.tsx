@@ -366,11 +366,7 @@ export const BotEditorModal: React.FC = () => {
             </button>
           ) : <div></div>}
           <div className="flex gap-4">
-            {isEditing ? (
-                 <button type="button" onClick={closeModal} className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors">Done</button>
-            ) : (
-                <button type="button" onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
-            )}
+            <button type="button" onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
             <button
               type="button"
               onClick={handleSubmit}
