@@ -63,13 +63,13 @@ graph TD
     end
 
     subgraph Services ["Bot Microservices"]
-        GoBot["Fetcher Bot (Golang)"]:::ext
-        PyBot["AI Bot (Python)"]:::ext
+        FetcherBot["Fetcher Bot"]:::ext
+        AgentBot["Agent Bot"]:::ext
     end
 
     %% Flow
-    GoBot -->|Push Data| Gateway
-    PyBot <-->|Agent| Gateway
+    FetcherBot -->|Push Data| Gateway
+    AgentBot <-->|Agent| Gateway
     UI <-->|Realtime| Gateway
     Gateway --> Server --> DB
 ````
@@ -89,8 +89,8 @@ graph TD
 这是系统的“微服务集合”。所有的具体业务功能——从数据抓取到智能对话——都由独立运行的 Bot 进程来执行。
 
 * **核心职责**：
-  * **I/O 密集型任务（Go Fetcher）**：作为生产者，Go 进程负责高并发地轮询 X、RSS、Bilibili 等接口，将非结构化数据清洗成 Mew 消息协议后推送至总线。
-  * **计算密集型任务（Python AI）**：作为消费者与生产者，Python 进程监听总线上的特定事件，通过 LLM 进行推理、上下文管理（Memory）和 RAG 检索，并将结果回写到总线。
+  * **I/O 密集型任务（Fetcher Bot）**：作为生产者，Go 服务负责高并发地轮询 X、RSS、Bilibili 等接口，将非结构化数据清洗成 Mew 消息协议后推送至总线。
+  * **交互与推理任务（Agent Bot）**：作为消费者与生产者，Go 服务监听总线上的事件（如 `MESSAGE_CREATE`），按需调用 LLM 完成推理/工具调用，并将结果回写到总线。
 * **设计原则**：添加一个新的功能（例如“股票监控”或“每日摘要”）只需要部署一个新的 Bot，而不需要停机或修改核心平台。
 
 ---
@@ -103,7 +103,7 @@ graph TD
 | **Server**        | Express, Socket.io         | Node.js 在处理高并发 WebSocket 连接时的事件循环机制具有天然优势。 |
 | **Database**       | MongoDB                    | 消息数据天然呈现文档结构（非结构化/半结构化），且对 JSON 格式支持良好。    |
 | **Object Storage** | Garage (S3 Compatible)     | 自托管对象存储，用于处理图片、视频等大文件，实现数据与逻辑的分离。          |
-| **DevOps**         | Docker Compose             | 确保多语言微服务环境（Node + Go + Python）的一键启动与版本一致性。 |
+| **DevOps**         | Docker Compose             | 确保多服务环境（Node + Go）的启动一致性与版本一致性。 |
 
 ---
 

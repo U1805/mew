@@ -152,6 +152,7 @@ export interface Channel {
 
   // GUILD_TEXT
   name?: string;
+  topic?: string;
   serverId?: string;
   categoryId?: string | null;
   position?: number;
@@ -264,7 +265,7 @@ export interface InvitePreview {
 
 说明：
 
-- 该预览响应当前不会对 `server.avatarUrl` 做 URL 补全（以实现为准）。
+- `server.avatarUrl` 会在返回前按需补全为公开 URL（见 `server/src/api/invite/invite.service.ts`）。
 
 ---
 
@@ -283,5 +284,49 @@ export interface Webhook {
   botUserId: string;
   createdAt: string;
   updatedAt: string;
+}
+```
+
+---
+
+## Bot
+
+来源：`server/src/api/bot/bot.model.ts`、`server/src/api/bot/bot.service.ts`
+
+Bot 由用户创建并归属到某个 `serviceType`，供对应的 Bot Service 托管运行。
+
+```ts
+export interface Bot {
+  _id: string;
+  ownerId: string;
+  botUserId?: string;
+  name: string;
+  avatarUrl?: string;
+  serviceType: string;
+  dmEnabled: boolean;
+  config: string; // JSON string
+  createdAt: string;
+  updatedAt: string;
+
+  // 仅在“创建”与“重新生成 token”时返回
+  accessToken?: string;
+}
+```
+
+---
+
+## ServiceType（/api/infra/available-services 响应）
+
+来源：`server/src/api/infra/infra.controller.ts`
+
+```ts
+export interface ServiceStatus {
+  serviceType: string;
+  online: boolean;
+  connections: number;
+}
+
+export interface AvailableServicesResponse {
+  services: ServiceStatus[];
 }
 ```

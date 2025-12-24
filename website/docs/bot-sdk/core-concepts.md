@@ -14,7 +14,7 @@ sidebar_label: '核心概念'
 | **通信模式** | **单向**: 外部源 -> Bot -> Webhook | **双向**: Bot \<-> WebSocket \<-> User |
 | **触发机制** | 定时器 (Cron / Ticker) | 事件 (Event) |
 | **典型场景** | RSS 订阅, Twitter 监控, 股价提醒 | AI 聊天, 游戏机器人, 运维指令 |
-| **推荐语言** | **Golang** (高并发, 适合 I/O 密集) | **Python** (AI 生态丰富, 适合逻辑密集) |
+| **参考实现** | **Go**（`plugins/fetchers/*`） | **Go**（`plugins/agents/*`） |
 
 ### 配置驱动开发
 

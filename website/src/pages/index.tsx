@@ -34,13 +34,18 @@ function HomepageHeader() {
         <div className={styles.buttons}>
           <Link
             className="button button--primary button--lg"
-            to="/docs/guide/introduction">
-            教程
+            to="/docs/guide/getting-started">
+            快速开始
           </Link>
           <Link
             className="button button--secondary button--lg"
             to="/docs/core-api">
-            了解更多
+            核心 API
+          </Link>
+          <Link
+            className="button button--secondary button--lg"
+            to="https://github.com/u1805/mew">
+            GitHub
           </Link>
         </div>
 
