@@ -17,9 +17,14 @@ type MentionSuggestionParams = {
 };
 
 function getItems(queryClient: QueryClient, serverId: string, query: string): MentionSuggestionItem[] {
-  const members = (queryClient.getQueryData<ServerMember[]>(['members', serverId]) ?? []).filter(
-    (m) => m.userId && !m.userId.isBot,
-  );
+  const members = (queryClient.getQueryData<ServerMember[]>(['members', serverId]) ?? []).filter((m) => {
+    if (!m.userId) return false;
+    // Exclude webhook "virtual members" from mention suggestions.
+    if (m.channelId) return false;
+    // Back-compat guard: webhook members include a synthetic email like `webhook-<id>@internal.mew`.
+    if (m.userId.isBot && typeof m.userId.email === 'string' && m.userId.email.startsWith('webhook-')) return false;
+    return true;
+  });
 
   const lowerQuery = query.toLowerCase();
   const memberSuggestions: MentionSuggestionItem[] = members

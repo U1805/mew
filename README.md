@@ -13,29 +13,35 @@ Project docs live in `website/docs` (Docusaurus).
 
 ## Getting Started
 
-## Docker (recommended)
-
-### Local build
+### Docker (recommended)
 
 From the repo root:
 
-```bash
-docker compose up --build
-```
-
-- Client: `http://localhost:11451`
-- Server: `http://localhost:3000`
+> Before starting, update the dev-only secrets/tokens in `docker/garage/garage.toml` (at least `rpc_secret`, `admin_token`, `metrics_token`) for any non-local deployment.
+>
+> - RPC secret: `openssl rand -hex 32`
+> - Tokens: `openssl rand -base64 32`
 
 Common env overrides (`docker-compose.env`):
 
 - `JWT_SECRET`
 - `MEW_ADMIN_SECRET`
+- `MEW_PLUGINS` (default: `test-fetcher,test-agent`)
 
-> Generate SECRET with `openssl rand -base64 32`
+> Generate secrets with `openssl rand -base64 32`
+
 
 ```bash
 docker compose --env-file docker-compose.env up --build
 ```
+
+Endpoints (default `docker-compose.yml`):
+
+- Client: `http://localhost:80`
+- Server: `http://localhost:3000/api`
+- MongoDB: `mongodb://localhost:27017`
+- Garage (S3 API): `http://localhost:3900`
+- Garage (Public Web): `http://localhost:3902`
 
 ### GHCR
 

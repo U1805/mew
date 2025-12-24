@@ -23,7 +23,7 @@ Mew 采用了**微服务架构**的极致形式：平台本身（The Bus）只�
 Mew 的 Bot 生态被划分为两个平行的世界，分别对应两种截然不同的数据流向。
 
 ### 📡 1. 广播模式：消息推送 Bot
-> **关键词**: 单向、无状态、高并发、Go
+> **关键词**: 单向、无状态、高并发、Webhook
 
 这类 Bot 是不知疲倦的**信息搬运工**。它们运行在后台，定期从外部世界抓取数据，并通过 Webhook 单向投递到 Mew。
 
@@ -33,7 +33,7 @@ Mew 的 Bot 生态被划分为两个平行的世界，分别对应两种截然�
 ```mermaid
 sequenceDiagram
     participant Web as 🌍 External Web
-    participant Bot as 🐹 Fetcher Bot (Go)
+    participant Bot as 🐹 Fetcher Bot
     participant Mew as 🚌 Mew Platform
     participant User as 👤 User
 
@@ -46,19 +46,19 @@ sequenceDiagram
     Mew->>User: 4. 推送消息
 ```
 
-### 💬 2. 会话模式：交互式 Bot
-> **关键词**: 双向、有状态、事件驱动、Python
+### 💬 2. 会话模式：Agent Bot
+> **关键词**: 双向、有状态、事件驱动、WebSocket
 
 这类 Bot 是聪明的**对话伙伴**。它们通过 WebSocket 接入平台，能够“听懂”用户的话，并经过思考（LLM 推理）后做出回应。
 
 *   **典型场景**: AI 女友/男友、RPG 游戏主持人、智能客服、运维助手。
-*   **通信流向**: `User` \<-> `Mew Platform` \<-> `WebSocket` \<-> `Interactive Bot` \<-> `LLM`
+*   **通信流向**: `User` \<-> `Mew Platform` \<-> `WebSocket` \<-> `Agent Bot` \<-> `LLM`
 
 ```mermaid
 sequenceDiagram
     participant User as 👤 User
     participant Mew as 🚌 Mew Platform
-    participant Bot as 🐍 AI Bot (Python)
+    participant Bot as 💬 Agent Bot
     participant LLM as 🧠 OpenAI/Claude
 
     User->>Mew: 1. 发送 "你好"
@@ -90,7 +90,7 @@ interface Bot {
   accessToken: string; // 🔑 身份令牌 (用于 Bot API/WebSocket 鉴权)
   
   // 核心字段
-  serviceType: string; // 🏷️ 托管服务类型 (e.g., 'rss-fetcher', 'openai-chat')
+  serviceType: string; // 🏷️ 托管服务类型 (e.g., 'rss-fetcher', 'test-fetcher', 'test-agent')
   config: any;         // ⚙️ 动态配置对象 (Schema 由 type 决定)
   
   dm_enabled: boolean; // 是否允许私聊
@@ -108,10 +108,9 @@ interface Bot {
 
 ---
 
-## 3.3 实现：Fetcher Bots (Golang)
+## 3.3 实现：Fetcher Bots
 
-> **为什么选择 Go?**
-> 信息抓取通常涉及大量的网络 I/O 和定时任务。Go 语言的 `Goroutine` 机制能让我们以极低的资源消耗同时监控成百上千个数据源。
+> **参考实现**：`plugins/fetchers/*`（例如 `plugins/fetchers/test-fetcher`）
 
 Fetcher 服务是一个纯后台守护进程。
 
@@ -126,8 +125,7 @@ Fetcher 服务是一个纯后台守护进程。
     "interval": 3600,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "enabled": true,
-    "send_history_on_start": false,
-    "max_items_per_poll": 5
+    "send_history_on_start": false
   }
 ]
 ```
@@ -158,35 +156,19 @@ Fetcher 服务是一个纯后台守护进程。
 
 ---
 
-## 3.4 实现：Interactive Bots (Python)
+## 3.4 实现：Agent Bots
 
-> **为什么选择 Python?**
-> Python 是 AI 领域的通用语。拥有 `LangChain`, `OpenAI SDK`, `PyTorch` 等无与伦比的生态支持。
+> **参考实现**：`plugins/agents/*`（例如 `plugins/agents/test-agent`）
 
-Interactive 服务是一个长连接客户端。它通过 WebSocket 保持在线，随时准备响应用户的 `@提及` 或私聊。
+Agent 服务是一个长连接客户端。它通过 WebSocket 保持在线，随时准备响应用户的 `@提及` 或私聊。
 
 ### 配置示例
-在 Mew UI 中，你可以为 AI Bot 定义它的人格和大脑。
+`bot.config` 的 Schema 完全由你的 Agent 插件决定。
 
-#### 🧠 基础对话模型 (`type: 'simple_chat'`)
-```json
-{
-  // 模型提供商配置
-  "llm_provider": "openai",
-  "model": "gpt-4o",
-  "api_key": "sk-proj-...", // ⚠️ 注意：生产环境建议使用环境变量注入，而非明文存储
-  
-  // 模型参数
-  "temperature": 0.7,
-  "max_tokens": 500,
-  
-  // 🎭 人格设定 (System Prompt)
-  "system_prompt": "你是一只名叫 Mew酱 的猫娘，性格傲娇但内心善良。请用可爱的口吻回答问题，并在句末加上'喵~'。"
-}
-```
+例如 `test-agent` 不需要任务配置，因此 `config` 可以是任意值（不会解析/校验）。
 
 ### 开发流程
 1.  **监听**: 接收 `MESSAGE_CREATE` 事件。
 2.  **过滤**: 忽略自己发送的消息，忽略无关频道的消息。
-3.  **思考**: 将历史聊天记录和当前消息打包发给 LLM。
-4.  **回复**: 调用 `POST /api/channels/{id}/messages` 接口发送回复。
+3.  **处理**: 命中触发条件后执行业务逻辑（可选：调用 LLM / 工具 / 查询数据库）。
+4.  **回复**: 发送消息回平台（参考 `plugins/agents/test-agent` 的 `message/create` 上行事件）。

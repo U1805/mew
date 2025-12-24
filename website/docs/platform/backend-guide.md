@@ -42,10 +42,13 @@ slug: /guide/server-guide
 
 路由注册入口：`server/src/app.ts`，主要挂载点：
 
+- `/api/health`：健康检查
 - `/api/auth`：注册/登录
-- `/api/users`：`/@me`、DM 列表、用户搜索
-- `/api/servers`：服务器 CRUD，并在 `/:serverId/*` 下继续挂载频道/成员/邀请/搜索
-- `/api/channels/:channelId/uploads`：上传
+- `/api/users`：`/@me` 相关接口（个人信息、服务器列表、DM 频道列表）、用户搜索
+- `/api/servers`：服务器 CRUD，并在 `/:serverId/*` 下挂载子资源：频道、分类、角色、成员、邀请、搜索等
+- `/api/categories`：分类详情操作（如修改、删除）
+- `/api/channels`：DM 频道相关操作（如消息、ACK）
+- `/api/channels/:channelId/uploads`：上传文件
 - `/api/invites`：邀请详情与接受邀请
 - `/api/webhooks`：公开执行 Webhook
 - `/api/infra`：服务类型在线状态（供前端下拉框/高亮）
@@ -99,14 +102,20 @@ slug: /guide/server-guide
 
 - 前端创建/编辑 Bot 时必须选择 `serviceType`（来源：`GET /api/infra/available-services`）。
 - Bot Service 通过内网接口批量拉取配置：`POST /api/bots/bootstrap`（Header: `X-Mew-Admin-Secret`，Body: `{ serviceType }`）。
-- 后端在 Bot 创建/更新后会向 `/infra` 命名空间的对应房间广播 `SYSTEM_BOT_CONFIG_UPDATE`（payload: `{ serviceType, botId }`），Bot Service 可用 `GET /api/bots/:botId/bootstrap` 热更新单个 Bot。
+- 后端在 Bot 创建/更新后会向 `/infra` 命名空间的对应房间广播 `SYSTEM_BOT_CONFIG_UPDATE`（payload: `{ serviceType, botId }`）。
+
+补充：
+
+- `plugins/sdk` 目前采用 **轮询同步**（`MEW_CONFIG_SYNC_INTERVAL_SECONDS`）+ `POST /api/infra/service-types/register` 上报在线；并未默认接入 `/infra` Socket.IO 推送。
+- 如需“推送触发热更新”，可让 Bot Service 连接 `/infra` 并在收到 `SYSTEM_BOT_CONFIG_UPDATE` 后调用 `GET /api/bots/:botId/bootstrap` 拉取单个 Bot 配置。
 
 ## 📎 文件上传（S3 兼容）
 
 上传路由：`server/src/api/upload/upload.routes.ts`（挂载于 `/api/channels/:channelId/uploads`）：
 
-- `multer` 接收单文件字段 `file`（见 `server/src/middleware/upload.ts`）
-- 上传到 S3：`server/src/utils/s3.ts#uploadFile`
-- 返回 `attachments` 需要的元数据：`{ filename, contentType, key, size }`
+- `multer` 中间件（`server/src/middleware/upload.ts`）接收单文件字段 `file`。
+- **流式上传**：通过自定义的 `S3StreamingStorage` 存储引擎（`server/src/middleware/s3Storage.ts`），文件流被直接传输到 S3，避免了在服务器上进行内存或磁盘缓冲，效率更高。
+- 上传逻辑封装在 `server/src/utils/s3.ts#uploadStream`。
+- 返回 `attachments` 需要的元数据：`{ filename, contentType, key, size }`。
 
 后端在“对外返回消息”时会把 `key` 补全成 `attachments[].url`（见 `server/src/api/message/message.service.ts`）。

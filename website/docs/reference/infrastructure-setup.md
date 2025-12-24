@@ -11,10 +11,10 @@ slug: /reference/infrastructure-setup
 ## 📋 前置准备 (Prerequisites)
 
 在开始之前，请确保您的环境满足以下要求：
-*   **操作系统**：Linux 或 macOS
+*   **操作系统**：Linux / macOS / Windows（Docker Desktop/WSL2）
 *   **依赖工具**：
     *   `docker` (>= 20.10)
-    *   `openssl` (用于生成安全密钥)
+    *   `openssl` (用于生成安全密钥，可选)
     *   `curl` 或 `wget` (用于测试，可选)
 
 ---
@@ -27,15 +27,15 @@ slug: /reference/infrastructure-setup
 - Garage（S3 对象存储）
 - Server（API + Socket.IO）
 - Client（Nginx 托管 + 反代 `/api`、`/socket.io`）
-- `plugins/test` Bot（示例 Bot Service）
+- Plugins（Bot Service 运行器，默认启动 `test-fetcher,test-agent`，由 `MEW_PLUGINS` 控制）
 
 ```bash
-docker compose up --build
+docker compose --env-file docker-compose.env up --build
 ```
 
 默认端口：
 
-- 前端：`http://localhost:8080`
+- 前端：`http://localhost`
 - 后端：`http://localhost:3000`
 - Garage S3 API：`http://localhost:3900`
 - Garage Web（公共读）：`http://localhost:3902`

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
+import ServiceTypeModel from '../infra/serviceType.model';
+import BotModel from '../bot/bot.model';
 
 // Mock the socketManager to prevent errors in tests that indirectly trigger socket events
 vi.mock('../../gateway/events', () => ({
@@ -104,6 +106,42 @@ describe('User Routes', () => {
       expect(res.statusCode).toBe(400);
       expect(res.body.message).toContain('You cannot create a DM with yourself');
     });
+
+    it('should reject DMs to bots when dmEnabled is false, and allow when true', async () => {
+      await ServiceTypeModel.create({ name: 'rss-fetcher' });
+
+      const botCreateRes = await request(app)
+        .post('/api/users/@me/bots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'DmGateBot', serviceType: 'rss-fetcher', dmEnabled: false });
+      expect(botCreateRes.statusCode).toBe(201);
+
+      const botDoc = await BotModel.findById(botCreateRes.body._id).lean();
+      expect(botDoc).toBeTruthy();
+      const botUserId = (botDoc as any).botUserId?.toString();
+      expect(botUserId).toBeTypeOf('string');
+
+      const blockedRes = await request(app)
+        .post('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ recipientId: botUserId });
+      expect(blockedRes.statusCode).toBe(403);
+
+      const botUpdateRes = await request(app)
+        .patch(`/api/users/@me/bots/${botCreateRes.body._id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ dmEnabled: true });
+      expect(botUpdateRes.statusCode).toBe(200);
+      expect(botUpdateRes.body.dmEnabled).toBe(true);
+
+      const allowedRes = await request(app)
+        .post('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ recipientId: botUserId });
+      expect(allowedRes.statusCode).toBe(201);
+      expect(allowedRes.body.type).toBe('DM');
+      expect(allowedRes.body.recipients.map((r: any) => r._id)).toContain(botUserId);
+    });
   });
 
   describe('GET /api/users/search', () => {
@@ -171,6 +209,41 @@ describe('User Routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body).toEqual([]);
+    });
+
+    it('should not return bot users when dmEnabled is false', async () => {
+      await ServiceTypeModel.create({ name: 'rss-fetcher' });
+
+      const botCreateRes = await request(app)
+        .post('/api/users/@me/bots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'NoDmBot', serviceType: 'rss-fetcher', dmEnabled: false });
+      expect(botCreateRes.statusCode).toBe(201);
+
+      const botDoc = await BotModel.findById(botCreateRes.body._id).lean();
+      const botUserId = (botDoc as any).botUserId?.toString();
+      expect(botUserId).toBeTypeOf('string');
+
+      const res = await request(app)
+        .get('/api/users/search?q=NoDmBot')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toBeInstanceOf(Array);
+      expect(res.body.some((u: any) => u._id === botUserId)).toBe(false);
+
+      const botUpdateRes = await request(app)
+        .patch(`/api/users/@me/bots/${botCreateRes.body._id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ dmEnabled: true });
+      expect(botUpdateRes.statusCode).toBe(200);
+
+      const res2 = await request(app)
+        .get('/api/users/search?q=NoDmBot')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res2.statusCode).toBe(200);
+      expect(res2.body.some((u: any) => u._id === botUserId)).toBe(true);
     });
   });
 

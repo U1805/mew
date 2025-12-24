@@ -38,7 +38,7 @@ Mew 是一个以即时通讯（IM）平台为核心的个人数字中心，当�
 - 文档：`pnpm --dir website start`、`pnpm --dir website build`
 
 **Bot 插件（Go，位于 `plugins/`）**
-- 示例：`go run ./plugins/test`、`go run ./plugins/rss-fetcher`
+- 示例：`go run ./plugins/fetchers/test`、`go run ./plugins/agents/test-agent`
 - 环境变量与 `.env.local/.env` 加载规则见 `plugins/README.md`；其中 `MEW_ADMIN_SECRET` 需与后端一致
 
 ## 运行配置与端口

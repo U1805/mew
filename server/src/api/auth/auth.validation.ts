@@ -14,3 +14,9 @@ export const loginSchema = z.object({
     password: z.string().min(1, 'Password is required'),
   }),
 });
+
+export const botLoginSchema = z.object({
+  body: z.object({
+    accessToken: z.string().trim().min(1, 'accessToken is required'),
+  }),
+});

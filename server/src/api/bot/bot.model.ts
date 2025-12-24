@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IBot extends Document {
   ownerId: mongoose.Types.ObjectId;
+  botUserId?: mongoose.Types.ObjectId;
   name: string;
   avatarUrl?: string;
   accessToken: string;
@@ -31,6 +32,13 @@ const BotSchema: Schema = new Schema(
     serviceType: {
       type: String,
       required: true,
+      index: true,
+    },
+    botUserId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      unique: true,
+      sparse: true,
       index: true,
     },
     dmEnabled: { type: Boolean, default: false },

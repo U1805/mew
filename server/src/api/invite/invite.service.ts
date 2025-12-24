@@ -5,6 +5,8 @@ import ServerMember from '../member/member.model';
 import Server from '../server/server.model';
 import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { Types } from 'mongoose';
+import { socketManager } from '../../gateway/events';
+import { getS3PublicUrl } from '../../utils/s3';
 
 // This internal function gets and validates an invite, returning a Mongoose document.
 async function _getAndValidateInvite(inviteCode: string): Promise<IInvite & import('mongoose').Document> {
@@ -77,7 +79,7 @@ const inviteService = {
       server: {
         _id: server._id,
         name: server.name,
-        avatarUrl: server.avatarUrl,
+        avatarUrl: server.avatarUrl ? getS3PublicUrl(server.avatarUrl) : undefined,
         memberCount,
       },
     };
@@ -102,6 +104,11 @@ const inviteService = {
       serverId: invite.serverId,
       userId,
       roleIds: [server.everyoneRoleId],
+    });
+
+    socketManager.broadcast('MEMBER_JOIN', invite.serverId.toString(), {
+      serverId: invite.serverId.toString(),
+      userId,
     });
 
     invite.uses += 1;

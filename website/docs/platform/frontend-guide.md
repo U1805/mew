@@ -26,11 +26,16 @@ slug: /guide/client-guide
 - 全栈开发：`pnpm dev`
 - 仅前端：`pnpm --filter client dev`
 
-前端 API 基址由 `VITE_API_BASE_URL` 控制（见 `client/.env.development`）：
+前端 API 基址由 `VITE_API_BASE_URL` 控制：
 
 - 默认：`http://localhost:3000/api`
 
-WebSocket 网关目前在代码中固定为 `http://localhost:3000`（见 `client/src/shared/services/socket.ts`）。
+WebSocket 网关目前在代码中固定为 `http://localhost:3000`。
+
+补充：
+
+- Docker Compose 部署下，`client` 容器会通过 Nginx 反代 `/api` 与 `/socket.io`，并在构建时将 `VITE_API_BASE_URL` 设置为 `/api`。
+- 但当前前端 WebSocket 仍直连 `http://localhost:3000`，因此 Nginx 的 `/socket.io` 反代不会被使用；如需同源 WebSocket，请按需调整 `client/src/shared/services/socket.ts`。
 
 ---
 
@@ -62,9 +67,10 @@ Socket 单例：`client/src/shared/services/socket.ts`。
 
 目前事件监听按“作用域”拆分为 hooks：
 
-- `useGlobalSocketEvents`：全局事件（例如 `DM_CHANNEL_CREATE`、全局的 `MESSAGE_CREATE` 衍生未读/提及逻辑）
-- `useSocketMessages(channelId)`：当前频道消息流（`MESSAGE_CREATE/MESSAGE_UPDATE/*REACTION*`）
-- `usePresenceEvents`：在线状态（`PRESENCE_INITIAL_STATE`、`PRESENCE_UPDATE`）
+- `useGlobalSocketEvents`：全局事件，例如 `DM_CHANNEL_CREATE`、以及用于触发未读/提及逻辑的全局 `MESSAGE_CREATE`。
+- `useSocketMessages(channelId)`：当前频道内的消息流，处理 `MESSAGE_CREATE`、`MESSAGE_UPDATE`、`MESSAGE_DELETE` 和 `MESSAGE_REACTION_*` 事件。
+- `usePresenceEvents`：在线状态，处理 `PRESENCE_INITIAL_STATE` 和 `PRESENCE_UPDATE`。
+- `useServerEvents(serverId)`：当前服务器内的事件，处理 `CATEGORY_*`、`MEMBER_*` 和 `PERMISSIONS_UPDATE`。
 
 这些 hooks 会在 `Layout.tsx` 顶层被调用，保证登录后持续订阅。
 
@@ -72,15 +78,22 @@ Socket 单例：`client/src/shared/services/socket.ts`。
 
 ## 🧩 消息渲染扩展点
 
-后端的消息包含 `type/content/payload/attachments` 等字段（见 [`core-api/data-structures`](../core-api/data-structures.md)）。
+后端的消息包含 `type/content/payload/attachments` 等字段）。
 
 前端可以在消息渲染组件中基于 `type` 分发到自定义渲染器；当前实现示例位于：
 
 - `client/src/features/chat/messages/MessageContent.tsx`
 
+***目前已支持的自定义卡片类型包括：***
+- `app/x-rss-card`
+- `app/x-pornhub-card`
+- `app/x-twitter-card`
+- `app/x-bilibili-card`
+- `app/x-instagram-card`
+
 如果你要新增一种消息类型，推荐流程：
 
-1. 明确 `type` 命名（例如 `app/x-rss-card`）
+1. 明确 `type` 命名（例如 `app/x-your-card`）
 2. 约定 `payload` 结构（写在对应 Bot/服务端逻辑与文档中）
 3. 在前端注册/分发到对应渲染组件，并确保 `content` 仍可作为纯文本降级
 

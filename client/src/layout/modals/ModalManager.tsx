@@ -17,6 +17,7 @@ import { DeleteCategoryModal } from '../../features/channels/modals/DeleteCatego
 import { DeleteServerModal } from '../../features/servers/modals/DeleteServerModal';
 import { LeaveServerModal } from '../../features/servers/modals/LeaveServerModal';
 import { BotEditorModal } from '../../features/users/modals/BotEditorModal';
+import { InviteBotModal } from '../../features/servers/modals/InviteBotModal';
 
 const ModalManager = () => {
   const { activeModal } = useModalStore();
@@ -42,6 +43,8 @@ const ModalManager = () => {
       return <LeaveServerModal />;
     case 'createInvite':
       return <CreateInviteModal />;
+    case 'inviteBot':
+      return <InviteBotModal />;
     case 'joinServer':
       return <JoinServerModal />;
     case 'serverSettings':

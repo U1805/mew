@@ -103,7 +103,7 @@ type MessageCreatePayload = {
 | 事件名 | Payload |
 |---|---|
 | `MESSAGE_CREATE` | `Message` |
-| `MESSAGE_UPDATE` | `Message`（编辑/撤回后） |
+| `MESSAGE_UPDATE` | `Message`（编辑/撤回/链接预览生成后） |
 | `MESSAGE_REACTION_ADD` | `Message`（更新后的完整对象） |
 | `MESSAGE_REACTION_REMOVE` | `Message`（更新后的完整对象） |
 
@@ -133,5 +133,37 @@ type MessageCreatePayload = {
 | `SERVER_UPDATE` | `Server` | `serverId` 房间 |
 | `SERVER_DELETE` | `{ serverId: string }` | `serverId` 房间 |
 | `SERVER_KICK` | `{ serverId: string }` | 被踢用户的 `userId` 房间 |
+| `MEMBER_JOIN` | `{ serverId: string, userId: string }` | `serverId` 房间 |
 | `MEMBER_LEAVE` | `{ serverId: string, userId: string }` | `serverId` 房间 |
 | `PERMISSIONS_UPDATE` | `{ serverId: string, channelId?: string, userId?: string }` | `serverId` 房间；部分场景也会定向发给 `userId` |
+
+---
+
+## Infra 命名空间（/infra，Bot Service 可选）
+
+`/infra` 是一个面向 Bot Service 的 Socket.IO namespace，用于：
+
+- 让后端感知某个 `serviceType` 是否在线（`GET /api/infra/available-services` 会返回在线状态）。
+- 推送配置变更提示，以便 Bot Service 重新拉取配置。
+
+### Infra 事件
+
+| 事件名                      | Payload                                  | 广播范围        | 触发                           |
+| --------------------------- | ---------------------------------------- | --------------- | ------------------------------ |
+| `SYSTEM_BOT_CONFIG_UPDATE`  | `{ serviceType: string, botId: string }` | `serviceType` 房 | 创建或更新 Bot 配置时          |
+
+### 鉴权方式
+
+连接到 `/infra` 命名空间需要提供以下参数（见 `server/src/infra/infraSocket.ts`）：
+
+1.  **`adminSecret`**: 与环境变量 `MEW_ADMIN_SECRET` 相同的值。
+2.  **`serviceType`**: Bot Service 的类型，例如 `rss-fetcher`。
+
+支持通过以下三种方式传递：
+
+- **HTTP Header**:
+  - `X-Mew-Admin-Secret: <MEW_ADMIN_SECRET>`
+- **Socket.IO `auth` 对象**:
+  - `auth: { adminSecret: '...', serviceType: '...' }`
+- **Query String**:
+  - `?adminSecret=...&serviceType=...`

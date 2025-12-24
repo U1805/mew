@@ -54,8 +54,8 @@ const sidebars: SidebarsConfig = {
               items: [
                 'bot-sdk/index',
                 'bot-sdk/core-concepts',
-                'bot-sdk/fetcher-bot-golang',
-                'bot-sdk/interactive-bot-python',
+                'bot-sdk/fetcher-bot',
+                'bot-sdk/agent-bot',
                 'bot-sdk/best-practices',
               ],
             },

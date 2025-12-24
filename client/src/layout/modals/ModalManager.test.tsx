@@ -58,6 +58,9 @@ vi.mock('../../features/servers/modals/LeaveServerModal', () => ({
 vi.mock('../../features/users/modals/BotEditorModal', () => ({
   BotEditorModal: () => <div data-testid="manageBot" />,
 }));
+vi.mock('../../features/servers/modals/InviteBotModal', () => ({
+  InviteBotModal: () => <div data-testid="inviteBot" />,
+}));
 
 describe('ModalManager', () => {
   beforeEach(() => {

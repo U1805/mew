@@ -5,6 +5,8 @@ import config from '../../config';
 import { BadRequestError, ConflictError, UnauthorizedError } from '../../utils/errors';
 import { userRepository } from '../user/user.repository';
 import { getS3PublicUrl } from '../../utils/s3';
+import * as botRepository from '../bot/bot.repository';
+import { ensureBotUserExists } from '../bot/bot.service';
 
 export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const { email, password } = loginData;
@@ -30,6 +32,38 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   }
 
   return { user: userWithoutPassword, token };
+};
+
+export const loginBot = async (data: { accessToken?: string }) => {
+  const accessToken = (data?.accessToken || '').trim();
+  if (!accessToken) {
+    throw new BadRequestError('accessToken is required');
+  }
+
+  const bot = await botRepository.findByAccessToken(accessToken);
+  if (!bot) {
+    throw new UnauthorizedError('Invalid bot token');
+  }
+
+  await ensureBotUserExists(bot);
+  if (!bot.botUserId) {
+    throw new UnauthorizedError('Bot user not found');
+  }
+
+  const user = await userRepository.findById(bot.botUserId.toString());
+  if (!user) {
+    throw new UnauthorizedError('Bot user not found');
+  }
+
+  const payload = { id: user._id, username: user.username };
+  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+
+  const userObj: any = user.toObject ? user.toObject() : user;
+  if (userObj.avatarUrl) {
+    userObj.avatarUrl = getS3PublicUrl(userObj.avatarUrl);
+  }
+
+  return { user: userObj, token };
 };
 
 export const register = async (userData: Partial<IUser>) => {

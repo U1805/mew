@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
+import User from '../user/user.model';
+import Bot from '../bot/bot.model';
+import mongoose from 'mongoose';
 
 describe('Auth Routes', () => {
   describe('POST /api/auth/register', () => {
@@ -64,6 +67,38 @@ describe('Auth Routes', () => {
         password: 'wrongpassword',
       });
 
+      expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe('POST /api/auth/bot', () => {
+    it('should exchange bot accessToken for a JWT', async () => {
+      const botUser = await User.create({
+        email: 'bot-login-1@internal.mew',
+        username: 'bot-login-1',
+        password: 'x'.repeat(20),
+        isBot: true,
+      });
+
+      const accessToken = 't'.repeat(32);
+      await Bot.create({
+        ownerId: new mongoose.Types.ObjectId(),
+        name: 'echo-bot',
+        accessToken,
+        serviceType: 'rss-fetcher',
+        dmEnabled: true,
+        config: '{}',
+        botUserId: botUser._id,
+      });
+
+      const res = await request(app).post('/api/auth/bot').send({ accessToken });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.user?._id).toBe(botUser._id.toString());
+    });
+
+    it('should return 401 for invalid bot accessToken', async () => {
+      const res = await request(app).post('/api/auth/bot').send({ accessToken: 'nope' });
       expect(res.statusCode).toBe(401);
     });
   });

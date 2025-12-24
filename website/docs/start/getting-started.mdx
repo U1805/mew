@@ -64,7 +64,7 @@ Mew 遵循 **The Twelve-Factor App** 原则，通过环境变量管理配置。
 使用编辑器打开 `.env`。以下是关键参数说明：
 
 ```ini title="server/.env"
-# 💡 在终端运行 `openssl rand -base64 32` 可快速生成强密码
+# 💡 在终端运行 `openssl rand -base64 32` 可快速生成强密钥
 
 # 🍃 MongoDB 连接字符串
 # 格式: mongodb://[username:password@]host[:port]/[database]
@@ -77,8 +77,14 @@ PORT=3000
 JWT_SECRET=replace-this-with-a-super-secret-key
 JWT_EXPIRES_IN=1d
 
-# Bot 权限密钥
+# Auth：是否允许公开注册（/api/auth/register）
+MEW_ALLOW_USER_REGISTRATION=true
+
+# Infra：Bot Service bootstrap + /infra 命名空间鉴权使用的共享密钥
 MEW_ADMIN_SECRET=replace-this-with-another-super-secret-key
+
+# 可选：Infra IP 白名单（逗号分隔）。为空时默认允许内网 + loopback。
+MEW_INFRA_ALLOWED_IPS=
 
 # S3 兼容对象存储：头像与附件上传需要
 # 桶相关配置
@@ -93,6 +99,9 @@ S3_PORT=3900
 # 访问端点 (Client-side)
 S3_WEB_ENDPOINT=web.garage.localhost
 S3_WEB_PORT=3902
+
+# 可选：从文件读取 {accessKeyId,secretAccessKey}（docker-compose 的 garage-init 会生成并挂载该文件）
+S3_CREDENTIALS_FILE=
 ```
 
 ```ini title="client/.env.development"
@@ -130,7 +139,7 @@ pnpm dev
 > 🛑 **停止服务**: 在终端按 `Ctrl + C` 即可终止所有进程。
 
 ### 步骤 4: 启动测试 Bot 服务
-为了验证机器人生态，我们提供了一个简单的 Go 语言 Bot 示例。
+为了验证机器人生态，我们提供了一个简单的 Bot 示例：`plugins/fetchers/test-fetcher`。
 
 首先编辑相关配置项：
 ```ini title="plugins/.env.local"
@@ -142,21 +151,23 @@ MEW_CONFIG_SYNC_INTERVAL_SECONDS=10
 
 进入测试 Bot 文件夹运行服务：
 ```bash
-cd plugins/test
+cd plugins/fetchers/test-fetcher
 go run .
 ```
+
+> `serviceType` 默认由插件目录名推导：例如 `plugins/fetchers/test-fetcher` 的 `serviceType=test-fetcher`。
 
 ### 步骤 5: 配置并运行 Bot
 服务启动后，需要在前端进行配置以联通 Bot 与频道。
 
 1.  **创建 Webhook**:
     *   在网页中新建一个服务器 (Server) 和频道 (Channel)。
-    *   进入频道设置，创建一个 Webhook，并复制其 URL（例如 `http://localhost:3000/api/webhooks/xxx`）。
+    *   进入频道设置，创建一个 Webhook，并复制其 URL（例如 `http://localhost:3000/api/webhooks/<webhookId>/<token>`）。
     *   *注：Bot 将通过此 Webhook 获得向该频道发送消息的权限。*
 
 2.  **注册 Bot**:
     *   进入“用户设置” -> “Bot” 标签页。
-    *   点击注册新 Bot，`Service Type` 选择 **`test`**。
+    *   点击注册新 Bot，`Service Type` 选择 **`test-fetcher`**。
 
 3.  **配置参数**:
     *   在 `Config` 区域填入以下 JSON 配置：
@@ -164,7 +175,7 @@ go run .
     [
       {
         "interval": 60,
-        "webhook": "http://localhost:3000/api/webhooks/xxx",
+        "webhook": "http://localhost:3000/api/webhooks/<webhookId>/<token>",
         "content": "Hello World from Test Bot!"
       }
     ]
@@ -182,7 +193,9 @@ go run .
 适合快速部署完整的生产或演示环境。
 
 ### 1. 基础设施配置
-编辑 `docker/garage/garage.toml` 文件，填入必要的安全凭证。你可以使用 `openssl` 生成随机密钥：
+仓库已提供可直接启动的 `docker/garage/garage.toml`（内含 dev-only 密钥/Token）。
+
+如果你要部署到生产环境，建议自行生成并替换 `rpc_secret` / `admin_token` / `metrics_token`：
 
 **生成 RPC Secret:**
 ```bash
@@ -200,7 +213,7 @@ openssl rand -base64 32
 在项目根目录下执行：
 
 ```bash
-docker-compose --env-file docker-compose.env up --build
+docker compose --env-file docker-compose.env up --build
 ```
 
 > **💡 提示**：默认配置将自动启动 MongoDB 和 Garage 容器。若需连接外部数据库或对象存储，请修改 `docker-compose.yml` 中的相关配置。

@@ -27,6 +27,13 @@ export const findByOwnerId = async (ownerId: string): Promise<IBot[]> => {
 };
 
 /**
+ * Finds a bot by its associated bot user ID.
+ */
+export const findByBotUserId = async (botUserId: string): Promise<IBot | null> => {
+  return Bot.findOne({ botUserId: new mongoose.Types.ObjectId(botUserId) as any });
+};
+
+/**
  * Updates a bot by its ID, ensuring it belongs to the specified owner.
  */
 export const updateById = async (
@@ -72,4 +79,11 @@ export const findByServiceTypeWithToken = async (serviceType: string): Promise<I
  */
 export const findByIdWithTokenUnscoped = async (botId: string): Promise<IBot | null> => {
   return Bot.findById(botId).select('+accessToken');
+};
+
+/**
+ * Finds a bot by its access token (used by interactive bots to authenticate).
+ */
+export const findByAccessToken = async (accessToken: string): Promise<IBot | null> => {
+  return Bot.findOne({ accessToken }).select('+accessToken');
 };

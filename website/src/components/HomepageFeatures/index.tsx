@@ -41,7 +41,7 @@ const FeatureList: FeatureItem[] = [
     description: (
       <>
         <p>
-          这是 Mew 的灵魂所在。我们将业务逻辑从核心平台彻底解耦，转化为一个个独立的 Bot 服务。机器人可以通过 Webhooks（用于推送交互）或 WebSockets（用于交互式服务）进行集成。
+          这是 Mew 的灵魂所在。我们将业务逻辑从核心平台彻底解耦，转化为一个个独立的 Bot 服务。Bot 可以通过 Webhook（单向推送）或 Socket.IO（双向会话）接入平台。
         </p>
         <p>
           这允许从简单的通知集成到复杂的交互式应用的无限扩展。例如：
@@ -49,10 +49,10 @@ const FeatureList: FeatureItem[] = [
 
         <ul className="list-disc list-inside my-2 space-y-1 text-gray-500 dark:text-gray-400">
           <li>
-            <strong>Fetcher Bots</strong>：聚合来自 RSS、Twitter、Bilibili 的外部信息流。
+            <strong>Fetcher Bots</strong>：聚合来自 RSS、X、Bilibili 等外部信息流，并通过 Webhook 投递到频道。
           </li>
           <li>
-            <strong>Interactive Bots</strong>：接入 LLM 的 AI 伴侣，提供有记忆、有温度的深度对话与情感陪伴。
+            <strong>Agent Bots</strong>：作为长连接客户端监听事件（如 <code>MESSAGE_CREATE</code>），实现指令、对话、运维自动化（可选：接入 LLM）。
           </li>
         </ul>
       </>
@@ -91,16 +91,16 @@ const FeatureList: FeatureItem[] = [
           Mew 建立在现代、高性能的 Web 技术之上，旨在提供卓越的开发体验和用户体验：
         </p>
         <div className="grid grid-cols-2 gap-2 mt-2 text-sm text-gray-500 dark:text-gray-400">
-          <div>🚀 <strong>Server:</strong> Express + Socket.io 实现高并发实时通信，MongoDB 存储灵活的 JSON 数据。</div>
-          <div>✨ <strong>Client:</strong> React + Vite 构建极速响应式界面，配合 Tailwind CSS 打造优雅 UI。</div>
-          <div>📦 <strong>DevOps:</strong> 完整的 Docker 化支持，配合 GitHub Actions，一键部署属于你的私有云服务。</div>
+          <div>🚀 <strong>Server:</strong> Express + Socket.IO + MongoDB（附件使用 S3 兼容存储，例如 Garage）。</div>
+          <div>✨ <strong>Client:</strong> React + Vite + TanStack Query + Zustand + TipTap。</div>
+          <div>📦 <strong>DevOps:</strong> Docker Compose 一键启动（可选 GHCR 预构建镜像）。</div>
         </div>
       </>
     ),
     buttons: [
       {
         label: '在 GitHub 上查看',
-        to: 'https://github.com/your-username/Mew',
+        to: 'https://github.com/u1805/mew',
         type: 'primary',
       },
     ],

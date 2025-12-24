@@ -16,13 +16,14 @@ sidebar_position: 20
 
 认证：
 
-- 除 `POST /auth/*` 与 `POST /webhooks/:webhookId/:token` 外，接口普遍需要 JWT。
+- 除 `/auth/*` 与 `/webhooks/:webhookId/:token*` 外，接口普遍需要 JWT。
 - 请求头：`Authorization: Bearer <token>`
 
 Token 类型：
 
 - **User Token**：通过 `POST /auth/login` 获取，具有可配置过期时间（`JWT_EXPIRES_IN`）。
 - **Webhook Token**：嵌入在 Webhook URL 中（`/webhooks/:webhookId/:token`），仅用于公开执行 Webhook 发消息。
+- **Infra Admin Secret**：用于基础设施接口鉴权（Header：`X-Mew-Admin-Secret`），对应后端环境变量 `MEW_ADMIN_SECRET`。
 
 错误响应（常见）：
 
@@ -51,8 +52,15 @@ Token 类型：
 
 | Method | Path | Body | Response |
 |---|---|---|---|
-| POST | `/auth/register` | `{ email, username, password }` | `{ user, token }` |
-| POST | `/auth/login` | `{ email, password }` | `{ user, token }` |
+| GET | `/auth/config` | - | `{ allowUserRegistration }` |
+| POST | `/auth/register` | `{ email, username, password }` | `{ message, user, token }` |
+| POST | `/auth/login` | `{ email, password }` | `{ message, user, token }` |
+| POST | `/auth/bot` | `{ accessToken }` | `{ message, user, token }` |
+
+说明：
+
+- 当 `MEW_ALLOW_USER_REGISTRATION=false` 时，`POST /auth/register` 会返回 `403`。
+- `POST /auth/bot` 用于 Bot Service：用 Bot 的 `accessToken` 换取可连接网关/调用 API 的 JWT。
 
 ---
 
@@ -61,17 +69,43 @@ Token 类型：
 | Method | Path | 描述 |
 |---|---|---|
 | GET | `/users/@me` | 获取当前用户 |
-| PATCH | `/users/@me` | 更新当前用户（目前支持头像上传） |
+| PATCH | `/users/@me` | 更新当前用户（支持用户名和头像） |
 | GET | `/users/@me/servers` | 我加入的服务器列表 |
 | GET | `/users/@me/channels` | 我所有 DM 频道列表 |
 | POST | `/users/@me/channels` | 创建/获取 DM：`{ recipientId }` |
+| POST | `/users/@me/password` | 修改密码：`{ oldPassword, newPassword }` |
+| GET | `/users/@me/bots` | 获取我创建的 Bot 列表 |
+| POST | `/users/@me/bots` | 创建 Bot（支持头像上传） |
+| GET | `/users/@me/bots/:botId` | 获取 Bot 详情 |
+| PATCH | `/users/@me/bots/:botId` | 更新 Bot（支持头像上传） |
+| DELETE | `/users/@me/bots/:botId` | 删除 Bot |
+| POST | `/users/@me/bots/:botId/token` | 重新生成 `accessToken` |
 | GET | `/users/search?q=...` | 按用户名模糊搜索（排除自己） |
 | GET | `/users/:userId` | 获取用户公开信息 |
 
-### PATCH /users/@me（头像）
+### PATCH /users/@me（用户名/头像）
+
+用于更新当前用户的个人资料。
+
+- 请求格式：`multipart/form-data`
+- 字段：
+  - `avatar`（`file`）：可选，新的头像文件。
+  - `username`（`string`）：可选，新的用户名。
+
+---
+
+## Bots（/users/@me/bots）
+
+说明：
+
+- Bot 的 `config` 在后端以 **JSON 字符串** 存储（由 Bot 插件自行约定其 schema）。
+- `accessToken` 默认不会出现在查询响应里；仅在「创建」与「重新生成 token」时返回（见 `server/src/api/bot/bot.model.ts` 的 `select: false`）。
+
+创建/更新头像：
 
 - `multipart/form-data`
 - 字段名：`avatar`（单文件）
+- 其它字段（如 `name/serviceType/config`）按表单字段传入
 
 ---
 
@@ -89,6 +123,22 @@ Token 类型：
 
 - `multipart/form-data`
 - 字段名：`icon`（单文件）
+
+---
+
+## Server Bots（/servers/:serverId/bots）
+
+用于将“用户创建的 Bot（BotUser）”邀请进某个服务器（仅 server owner 可操作）。
+
+| Method | Path | 描述 |
+|---|---|---|
+| GET | `/servers/:serverId/bots/search?q=...` | 按用户名搜索可邀请的 Bot 用户（仅返回确实绑定了 Bot 的用户，且不在该服务器内） |
+| POST | `/servers/:serverId/bots/:botUserId` | 邀请 Bot 加入服务器（无响应 body，`204`） |
+
+说明：
+
+- 路由要求：已是该服务器成员 + server owner（见 `server/src/api/botInvite/botInvite.routes.ts`）。
+- 邀请成功后会向服务器房间广播 `MEMBER_JOIN`。
 
 ---
 
@@ -181,7 +231,8 @@ Token 类型：
 
 - `PATCH /.../messages/:messageId`：`{ content }`
 - `DELETE /.../messages/:messageId`
-  - 当前实现为“撤回”：会清空内容与附件并写入 `retractedAt`，并通过 `MESSAGE_UPDATE` 通知客户端（见 `server/src/api/message/message.service.ts`）。
+  - 权限：操作者需要是消息的作者，或拥有 `MANAGE_MESSAGES` 权限。
+  - 实现：`DELETE` 当前实现为“撤回”，会清空内容与附件并写入 `retractedAt`，并通过 `MESSAGE_UPDATE` 通知客户端（见 `server/src/api/message/message.service.ts`）。
 
 ---
 
@@ -194,7 +245,7 @@ Token 类型：
 
 说明：
 
-- 当前实现未在路由层显式校验 `ADD_REACTIONS`，仅要求认证（以实现为准）。
+- 权限：当前实现仅要求用户已认证，并未校验 `ADD_REACTIONS` 权限。任何能看到消息的认证用户都可以添加/删除回应。
 
 ---
 
@@ -224,8 +275,15 @@ Token 类型：
 公开执行（无需 JWT）：
 
 - `POST /webhooks/:webhookId/:token`
-  - Body：`{ content, username?, avatar_url? }`
+  - Body：`{ content, username?, avatar_url?, type?, payload? }`
   - 返回：创建后的 `Message`
+
+公开上传（无需 JWT）：
+
+- `POST /webhooks/:webhookId/:token/upload`
+  - `multipart/form-data`
+  - 字段名：`file`（单文件）
+  - 返回：`Attachment`（`{ filename, contentType, key, size }`）
 
 ---
 
@@ -233,3 +291,35 @@ Token 类型：
 
 - `GET /servers/:serverId/search?q=...&channelId?=...&limit?=...&page?=...`
   - 具体响应结构取决于搜索实现（见 `server/src/api/search/search.service.ts`）。
+
+---
+
+## Health（/health）
+
+- `GET /health`：健康检查（用于 docker-compose healthcheck，见 `server/src/api/health/health.routes.ts`）。
+
+---
+
+## Bot Bootstrap（/bots，infra-only）
+
+这组接口用于 Bot Service 按 `serviceType` 拉取托管配置：
+
+- `POST /bots/bootstrap`
+  - Header：`X-Mew-Admin-Secret: <MEW_ADMIN_SECRET>`
+  - Body：`{ serviceType }`
+- `GET /bots/:botId/bootstrap`
+  - Header：`X-Mew-Admin-Secret: <MEW_ADMIN_SECRET>`
+
+说明：
+
+- 路由同时受 `infraIpOnly`（内网/白名单）与 `verifyAdminSecret` 保护（见 `server/src/api/bot/bot.bootstrap.routes.ts`）。
+
+---
+
+## Infra（/infra）
+
+- `POST /infra/service-types/register`（infra-only）
+  - Header：`X-Mew-Admin-Secret: <MEW_ADMIN_SECRET>`
+  - Body：`{ serviceType }`（也支持 query）
+- `GET /infra/available-services`（需要 JWT）
+  - 返回：`{ services: Array<{ serviceType, online, connections }> }`

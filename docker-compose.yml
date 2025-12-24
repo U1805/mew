@@ -100,7 +100,7 @@ services:
     depends_on:
       - server
     ports:
-      - "11451:80"
+      - "80:80"
 
   plugins:
     build:
@@ -114,8 +114,8 @@ services:
       MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
       MEW_URL: http://server:3000
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
-      # Comma/space/semicolon separated list of plugin folder names. Example: "test,rss-fetcher" (do not include "sdk")
-      MEW_PLUGINS: ${MEW_PLUGINS:-test}
+      # Comma/space/semicolon separated list of plugin serviceType names. Example: "test-fetcher,test-agent"
+      MEW_PLUGINS: ${MEW_PLUGINS:-test-fetcher,test-agent}
 
 volumes:
   mongo_data:

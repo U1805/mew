@@ -244,7 +244,9 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
                         )}
                     </div>
                     {author.isBot && (
-                        <span className="bg-[#5865F2] text-white text-[10px] font-bold px-1 rounded-[3px] leading-3 shrink-0">BOT</span>
+                        <span className="bg-[#5865F2] text-white text-[10px] font-bold px-1 rounded-[3px] leading-3 shrink-0">
+                          {message.payload?.webhookName ? 'HOOK' : 'BOT'}
+                        </span>
                     )}
                     <span className="text-xs text-mew-textMuted ml-2">{fullDateString}</span>
                 </div>

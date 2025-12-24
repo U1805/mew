@@ -6,6 +6,7 @@ export interface User {
   email: string;
   avatarUrl?: string;
   isBot: boolean;
+  dmEnabled?: boolean;
   createdAt: string;
 }
 

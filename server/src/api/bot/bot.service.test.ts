@@ -6,6 +6,12 @@ vi.mock('nanoid', () => ({
   nanoid: vi.fn(),
 }));
 
+vi.mock('bcryptjs', () => ({
+  default: {
+    hash: vi.fn().mockResolvedValue('hashed-password'),
+  },
+}));
+
 vi.mock('./bot.repository', () => ({
   create: vi.fn(),
   findByOwnerId: vi.fn(),
@@ -27,6 +33,32 @@ vi.mock('../infra/serviceType.model', () => ({
   },
 }));
 
+vi.mock('../user/user.model', () => {
+  const userSave = vi.fn().mockResolvedValue({ _id: 'u-bot' });
+
+  const UserModelMock: any = vi.fn(function (this: any, data: any) {
+    Object.assign(this, data);
+    this._id = 'u-bot';
+    this.save = userSave;
+  });
+
+  UserModelMock.exists = vi.fn().mockResolvedValue(false);
+  UserModelMock.findById = vi.fn((id: string) => ({
+    select: vi.fn().mockResolvedValue(
+      id
+        ? {
+            _id: id,
+            username: 'OldBotName',
+            avatarUrl: null,
+            save: vi.fn().mockResolvedValue({}),
+          }
+        : null
+    ),
+  }));
+
+  return { default: UserModelMock };
+});
+
 import * as botService from './bot.service';
 import * as botRepository from './bot.repository';
 import { uploadFile } from '../../utils/s3';
@@ -44,6 +76,7 @@ describe('bot.service', () => {
       accessToken: 't'.repeat(32),
       serviceType: 'rss-fetcher',
       _id: 'b1',
+      save: vi.fn().mockResolvedValue({}),
       toObject: () => ({ _id: 'b1', name: 'MyBot', ownerId: 'u1', serviceType: 'rss-fetcher' }),
     };
     vi.mocked(botRepository.create).mockResolvedValue(savedBot);
@@ -66,6 +99,7 @@ describe('bot.service', () => {
       accessToken: 't'.repeat(32),
       serviceType: 'rss-fetcher',
       _id: 'b1',
+      save: vi.fn().mockResolvedValue({}),
       toObject: () => ({ _id: 'b1', name: 'MyBot', ownerId: 'u1', serviceType: 'rss-fetcher', avatarUrl: 'http://cdn.local/avatar.png' }),
     };
     vi.mocked(botRepository.create).mockResolvedValue(savedBot);
@@ -83,8 +117,8 @@ describe('bot.service', () => {
   });
 
   it('updateBot strips accessToken from updates', async () => {
-    vi.mocked(botRepository.findById).mockResolvedValue({ _id: 'b1', serviceType: 'rss-fetcher' } as any);
-    vi.mocked(botRepository.updateById).mockResolvedValue({ _id: 'b1', name: 'New', serviceType: 'rss-fetcher' } as any);
+    vi.mocked(botRepository.findById).mockResolvedValue({ _id: 'b1', serviceType: 'rss-fetcher', botUserId: 'u-bot' } as any);
+    vi.mocked(botRepository.updateById).mockResolvedValue({ _id: 'b1', name: 'New', serviceType: 'rss-fetcher', botUserId: 'u-bot', save: vi.fn().mockResolvedValue({}) } as any);
 
     await botService.updateBot('b1', 'u1', { name: 'New', accessToken: 'hacked', serviceType: 'rss-fetcher' } as any);
 
