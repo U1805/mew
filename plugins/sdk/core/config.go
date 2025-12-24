@@ -18,7 +18,7 @@ type RuntimeConfig struct {
 }
 
 // ServiceTypeFromCaller returns the base name of the caller's source directory.
-// Example: plugins/test/main.go -> "test".
+// Example: plugins/fetchers/test/main.go -> "test".
 func ServiceTypeFromCaller() string {
 	return ServiceTypeFromCallerSkip(1)
 }

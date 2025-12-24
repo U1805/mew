@@ -6,6 +6,6 @@ require (
 	mew/plugins/sdk v0.0.0
 )
 
-replace mew/plugins/sdk => ../sdk
+replace mew/plugins/sdk => ../../sdk
 
 require github.com/joho/godotenv v1.5.1 // indirect

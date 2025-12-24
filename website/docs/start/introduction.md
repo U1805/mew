@@ -69,7 +69,7 @@ graph TD
 
     %% Flow
     GoBot -->|Push Data| Gateway
-    PyBot <-->|Interactive| Gateway
+    PyBot <-->|Agent| Gateway
     UI <-->|Realtime| Gateway
     Gateway --> Server --> DB
 ````

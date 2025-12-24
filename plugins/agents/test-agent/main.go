@@ -8,9 +8,9 @@ import (
 
 func main() {
 	if err := sdk.RunServiceWithSignals(sdk.ServiceOptions{
-		LogPrefix: "[test-interactive]",
+		LogPrefix: "[test-agent]",
 		NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
-			return NewTestInteractiveRunner(botID, botName, accessToken, rawConfig, cfg)
+			return NewTestAgentRunner(botID, botName, accessToken, rawConfig, cfg)
 		},
 	}); err != nil {
 		log.Fatal(err)

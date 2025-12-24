@@ -46,13 +46,13 @@ sequenceDiagram
     Mew->>User: 4. 推送消息
 ```
 
-### 💬 2. 会话模式：交互式 Bot
+### 💬 2. 会话模式：Agent Bot
 > **关键词**: 双向、有状态、事件驱动、Python
 
 这类 Bot 是聪明的**对话伙伴**。它们通过 WebSocket 接入平台，能够“听懂”用户的话，并经过思考（LLM 推理）后做出回应。
 
 *   **典型场景**: AI 女友/男友、RPG 游戏主持人、智能客服、运维助手。
-*   **通信流向**: `User` \<-> `Mew Platform` \<-> `WebSocket` \<-> `Interactive Bot` \<-> `LLM`
+*   **通信流向**: `User` \<-> `Mew Platform` \<-> `WebSocket` \<-> `Agent Bot` \<-> `LLM`
 
 ```mermaid
 sequenceDiagram
@@ -158,12 +158,12 @@ Fetcher 服务是一个纯后台守护进程。
 
 ---
 
-## 3.4 实现：Interactive Bots (Python)
+## 3.4 实现：Agent Bots (Python)
 
 > **为什么选择 Python?**
 > Python 是 AI 领域的通用语。拥有 `LangChain`, `OpenAI SDK`, `PyTorch` 等无与伦比的生态支持。
 
-Interactive 服务是一个长连接客户端。它通过 WebSocket 保持在线，随时准备响应用户的 `@提及` 或私聊。
+Agent 服务是一个长连接客户端。它通过 WebSocket 保持在线，随时准备响应用户的 `@提及` 或私聊。
 
 ### 配置示例
 在 Mew UI 中，你可以为 AI Bot 定义它的人格和大脑。

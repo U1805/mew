@@ -15,7 +15,8 @@ import (
 // LoadDotEnv tries to load env vars from:
 // - .env.local, .env (cwd)
 // - .env.local, .env (caller file dir)
-// - .env.local, .env (caller file dir parent, e.g. plugins/)
+// - .env.local, .env (caller file dir parent, e.g. plugins/fetchers/)
+// - .env.local, .env (caller file dir grandparent, e.g. plugins/)
 //
 // It only sets vars that are not already set, matching godotenv's behavior.
 func LoadDotEnv(logPrefix string) {
@@ -39,6 +40,8 @@ func LoadDotEnvFromCaller(logPrefix string, callerSkip int) {
 			filepath.Join(dir, ".env"),
 			filepath.Clean(filepath.Join(dir, "..", ".env.local")),
 			filepath.Clean(filepath.Join(dir, "..", ".env")),
+			filepath.Clean(filepath.Join(dir, "..", "..", ".env.local")),
+			filepath.Clean(filepath.Join(dir, "..", "..", ".env")),
 		)
 	}
 

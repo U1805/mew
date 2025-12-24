@@ -9,8 +9,11 @@
 ## 目录结构
 
 - `plugins/sdk`：Bot SDK（通用代码：dotenv、环境变量解析、bootstrap client、通用 manager）
-- `plugins/test`：示例 Bot（serviceType=`test`）
-- `plugins/rss-fetcher`：RSS 抓取 Bot（serviceType=`rss-fetcher`）
+- `plugins/fetchers/*`：Fetcher 类 Bot（Go）
+  - `plugins/fetchers/test-fetcher`：示例 Fetcher（serviceType=`test-fetcher`）
+  - `plugins/fetchers/rss-fetcher`：RSS 抓取（serviceType=`rss-fetcher`）
+- `plugins/agents/*`：Agent 类 Bot（Go）
+  - `plugins/agents/test-agent`：示例 Agent（serviceType=`test-agent`）
 
 ## 通用环境变量
 
@@ -24,7 +27,7 @@
 - `MEW_DOTENV`：可选，设置为 `0/false/off/no` 可禁用 `.env` 加载（默认启用）
 - `MEW_STATE_DIR`：可选，插件本地 state 的根目录（默认使用系统用户缓存目录；fallback 到临时目录）
 
-`serviceType` 不通过环境变量设置，而是自动使用插件目录名（例如 `plugins/test` 的 `serviceType` 为 `test`）。
+`serviceType` 不通过环境变量设置，而是自动使用插件目录名（例如 `plugins/fetchers/test-fetcher` 的 `serviceType` 为 `test-fetcher`）。
 
 ## `.env.local` / `.env` 加载规则
 
@@ -32,6 +35,7 @@
 
 - 当前工作目录：`.env.local`（优先）→ `.env`
 - 插件源码目录：`.env.local`（优先）→ `.env`
+- 插件分组目录（如 `plugins/fetchers/`）：`.env.local`（优先）→ `.env`
 - `plugins/` 目录：`.env.local`（优先）→ `.env`（建议把通用变量放这里）
 
 ## 本地运行
@@ -39,6 +43,7 @@
 示例：
 
 ```bash
-go run ./plugins/test
-go run ./plugins/rss-fetcher
+go run ./plugins/fetchers/test-fetcher
+go run ./plugins/fetchers/rss-fetcher
+go run ./plugins/agents/test-agent
 ```

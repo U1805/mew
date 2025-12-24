@@ -27,7 +27,7 @@ slug: /reference/infrastructure-setup
 - Garage（S3 对象存储）
 - Server（API + Socket.IO）
 - Client（Nginx 托管 + 反代 `/api`、`/socket.io`）
-- `plugins/test` Bot（示例 Bot Service）
+- `plugins/fetchers/test` Bot（示例 Bot Service）
 
 ```bash
 docker compose up --build

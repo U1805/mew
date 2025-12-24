@@ -1,8 +1,8 @@
 ---
-sidebar_label: 'Interactive Bot'
+sidebar_label: 'Agent Bot'
 ---
 
-## 💬 构建 Interactive Bot
+## 💬 构建 Agent Bot
 
 **目标**: 一个简单的 AI 聊天机器人。它监听 WebSocket，当有人 `@` 它时，调用 LLM 生成回复。
 

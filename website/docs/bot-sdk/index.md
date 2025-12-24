@@ -12,7 +12,7 @@ sidebar_label: '简介'
 
 *   [**核心概念**](/docs/bot-sdk/core-concepts): 了解不同类型的机器人及其工作原理。
 *   [**构建 Fetcher Bot (Golang)**](/docs/bot-sdk/fetcher-bot-golang): 学习如何创建一个自动从外部源抓取内容的机器人。
-*   [**构建 Interactive Bot (Python)**](/docs/bot-sdk/interactive-bot-python): 学习如何构建一个可以与用户实时交互的机器人。
+*   [**构建 Agent Bot (Python)**](/docs/bot-sdk/interactive-bot-python): 学习如何构建一个可以与用户实时交互的机器人。
 *   [**最佳实践**](/docs/bot-sdk/best-practices): 了解在生产环境中开发可靠、可扩展的机器人的高级技巧。
 
 ---

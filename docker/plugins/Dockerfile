@@ -8,11 +8,11 @@ ARG GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 
 RUN set -eux; \
     mkdir -p /out; \
-    for d in /src/plugins/*; do \
-      name="$(basename "$d")"; \
-      if [ "$name" = "sdk" ]; then \
+    for d in /src/plugins/fetchers/* /src/plugins/agents/*; do \
+      if [ ! -d "$d" ]; then \
         continue; \
       fi; \
+      name="$(basename "$d")"; \
       if [ ! -f "$d/go.mod" ]; then \
         continue; \
       fi; \

@@ -1,4 +1,4 @@
-module mew/plugins/test-interactive
+module mew/plugins/test-agent
 
 go 1.22
 
@@ -9,4 +9,4 @@ require (
 
 require github.com/joho/godotenv v1.5.1 // indirect
 
-replace mew/plugins/sdk => ../sdk
+replace mew/plugins/sdk => ../../sdk

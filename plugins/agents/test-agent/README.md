@@ -1,6 +1,6 @@
-# test-interactive
+# test-agent
 
-一个最小可用的 **Interactive Bot** 示例插件（Go），用于演示：
+一个最小可用的 **Agent Bot** 示例插件（Go），用于演示：
 
 - 使用 **Bot 的 `accessToken`** 换取 **JWT**（`POST /api/auth/bot`）完成身份认证
 - 通过 **Socket.IO Gateway** 接收实时消息事件（`MESSAGE_CREATE`）
@@ -24,7 +24,7 @@
 
 ## 配置（Bot.config）
 
-`test-interactive` **不需要任务配置**，`config` 可以是任意值（不会解析/校验）。
+`test-agent` **不需要任务配置**，`config` 可以是任意值（不会解析/校验）。
 
 ## 运行
 
@@ -34,14 +34,14 @@ go run .
 
 ## 在 Mew 中创建/使用
 
-1. 在前端创建一个 Bot，选择 `serviceType = test-interactive`
+1. 在前端创建一个 Bot，选择 `serviceType = test-agent`
 2. 将该 Bot 邀请进服务器（频道内 @mention 才能触发频道 echo）
 3. 频道内发送：`@botname echo ...`，或在 DM 里发送：`echo ...`
 
 ## 工作原理
 
 1. Bot Service 使用 `MEW_ADMIN_SECRET` 调用 `POST /api/bots/bootstrap` 拉取本 `serviceType` 下的 bot 实例（包含 `accessToken`）
-2. `test-interactive` 对每个 bot：
+2. `test-agent` 对每个 bot：
    - 调用 `POST /api/auth/bot` 用 `accessToken` 换取 JWT
    - 用 JWT 连接 Socket.IO，并监听 `MESSAGE_CREATE`
    - 匹配 `echo` 指令后，通过 `message/create` 上行事件发消息

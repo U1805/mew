@@ -52,7 +52,7 @@ const FeatureList: FeatureItem[] = [
             <strong>Fetcher Bots</strong>：聚合来自 RSS、Twitter、Bilibili 的外部信息流。
           </li>
           <li>
-            <strong>Interactive Bots</strong>：接入 LLM 的 AI 伴侣，提供有记忆、有温度的深度对话与情感陪伴。
+            <strong>Agent Bots</strong>：接入 LLM 的 AI 伴侣，提供有记忆、有温度的深度对话与情感陪伴。
           </li>
         </ul>
       </>

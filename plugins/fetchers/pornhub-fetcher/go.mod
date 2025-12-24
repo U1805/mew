@@ -7,7 +7,7 @@ require (
 	mew/plugins/sdk v0.0.0
 )
 
-replace mew/plugins/sdk => ../sdk
+replace mew/plugins/sdk => ../../sdk
 
 require (
 	github.com/andybalholm/cascadia v1.3.2 // indirect

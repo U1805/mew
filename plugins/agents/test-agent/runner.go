@@ -22,7 +22,7 @@ import (
 	"mew/plugins/sdk/httpx"
 )
 
-type TestInteractiveRunner struct {
+type TestAgentRunner struct {
 	botID       string
 	botName     string
 	accessToken string // bot access token from bootstrap (not a JWT)
@@ -40,7 +40,7 @@ type TestInteractiveRunner struct {
 	dmChannelID map[string]struct{}
 }
 
-func NewTestInteractiveRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*TestInteractiveRunner, error) {
+func NewTestAgentRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*TestAgentRunner, error) {
 	mewURL := strings.TrimRight(strings.TrimSpace(os.Getenv("MEW_URL")), "/")
 	if mewURL == "" {
 		// Best-effort fallback when MEW_API_BASE is customized.
@@ -60,7 +60,7 @@ func NewTestInteractiveRunner(botID, botName, accessToken, rawConfig string, cfg
 		return nil, err
 	}
 
-	return &TestInteractiveRunner{
+	return &TestAgentRunner{
 		botID:       botID,
 		botName:     botName,
 		accessToken: accessToken,
@@ -75,8 +75,8 @@ func NewTestInteractiveRunner(botID, botName, accessToken, rawConfig string, cfg
 	}, nil
 }
 
-func (r *TestInteractiveRunner) Run(ctx context.Context) error {
-	logPrefix := fmt.Sprintf("[test-interactive] bot=%s name=%q", r.botID, r.botName)
+func (r *TestAgentRunner) Run(ctx context.Context) error {
+	logPrefix := fmt.Sprintf("[test-agent] bot=%s name=%q", r.botID, r.botName)
 
 	me, token, err := r.loginBot(ctx)
 	if err != nil {
@@ -115,7 +115,7 @@ func (r *TestInteractiveRunner) Run(ctx context.Context) error {
 	}
 }
 
-func (r *TestInteractiveRunner) runSocketOnce(ctx context.Context, logPrefix string) error {
+func (r *TestAgentRunner) runSocketOnce(ctx context.Context, logPrefix string) error {
 	dialer := websocket.Dialer{
 		HandshakeTimeout: 10 * time.Second,
 	}
@@ -210,7 +210,7 @@ func (r *TestInteractiveRunner) runSocketOnce(ctx context.Context, logPrefix str
 	}
 }
 
-func (r *TestInteractiveRunner) handleEvent(
+func (r *TestAgentRunner) handleEvent(
 	ctx context.Context,
 	logPrefix string,
 	raw string,
@@ -263,7 +263,7 @@ func (r *TestInteractiveRunner) handleEvent(
 	return nil
 }
 
-func (r *TestInteractiveRunner) maybeEcho(ctx context.Context, channelID, content string) (reply string, ok bool, err error) {
+func (r *TestAgentRunner) maybeEcho(ctx context.Context, channelID, content string) (reply string, ok bool, err error) {
 	trimmed := strings.TrimSpace(content)
 
 	// Channel: require a leading mention.
@@ -292,14 +292,14 @@ func (r *TestInteractiveRunner) maybeEcho(ctx context.Context, channelID, conten
 	return "", false, nil
 }
 
-func (r *TestInteractiveRunner) isDMChannel(channelID string) bool {
+func (r *TestAgentRunner) isDMChannel(channelID string) bool {
 	r.dmMu.RLock()
 	defer r.dmMu.RUnlock()
 	_, ok := r.dmChannelID[channelID]
 	return ok
 }
 
-func (r *TestInteractiveRunner) refreshDMChannels(ctx context.Context) error {
+func (r *TestAgentRunner) refreshDMChannels(ctx context.Context) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.apiBase+"/users/@me/channels", nil)
 	if err != nil {
 		return err
@@ -342,7 +342,7 @@ func (r *TestInteractiveRunner) refreshDMChannels(ctx context.Context) error {
 	return nil
 }
 
-func (r *TestInteractiveRunner) loginBot(ctx context.Context) (me meUser, token string, err error) {
+func (r *TestAgentRunner) loginBot(ctx context.Context) (me meUser, token string, err error) {
 	reqBody, err := json.Marshal(map[string]any{"accessToken": r.accessToken})
 	if err != nil {
 		return meUser{}, "", err
@@ -391,7 +391,7 @@ type meUser struct {
 	IsBot    bool   `json:"isBot"`
 }
 
-func (r *TestInteractiveRunner) isOwnMessage(authorRaw json.RawMessage) bool {
+func (r *TestAgentRunner) isOwnMessage(authorRaw json.RawMessage) bool {
 	authorRaw = bytes.TrimSpace(authorRaw)
 	if len(authorRaw) == 0 || authorRaw[0] != '{' {
 		return false
