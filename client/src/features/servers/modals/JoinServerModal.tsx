@@ -9,10 +9,27 @@ export const JoinServerModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
   const queryClient = useQueryClient();
 
+  const [inviteInput, setInviteInput] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [invitePreview, setInvitePreview] = useState<Invite | null>(null);
   const [joinError, setJoinError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const parseInviteCode = (raw: string) => {
+      const trimmed = raw.trim();
+      if (!trimmed) return '';
+
+      try {
+          const url = new URL(trimmed);
+          const parts = url.pathname.split('/').filter(Boolean);
+          const maybeCode = parts[parts.length - 1] ?? '';
+          return maybeCode.split(/[?#]/)[0];
+      } catch {
+          const parts = trimmed.split('/').filter(Boolean);
+          const maybeCode = parts[parts.length - 1] ?? trimmed;
+          return maybeCode.split(/[?#]/)[0];
+      }
+  };
 
   const handleFetchInvite = async (code: string) => {
       setIsLoading(true);
@@ -46,6 +63,7 @@ export const JoinServerModal: React.FC = () => {
   useEffect(() => {
     if (modalData?.code) {
       const code = modalData.code;
+      setInviteInput(code);
       setInviteCode(code);
       handleFetchInvite(code);
     }
@@ -62,10 +80,11 @@ export const JoinServerModal: React.FC = () => {
                     <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Invite Link</label>
                     <input
                         type="text"
-                        value={inviteCode}
+                        value={inviteInput}
                         onChange={(e) => {
                             const val = e.target.value;
-                            const code = val.split('/').pop() || val;
+                            const code = parseInviteCode(val);
+                            setInviteInput(val);
                             setInviteCode(code);
                             if (code.length > 5) handleFetchInvite(code);
                         }}

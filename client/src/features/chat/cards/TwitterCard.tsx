@@ -92,7 +92,17 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
 
   const hostname = useMemo(() => safeHostname(url), [url]);
   const formattedCreatedAt = useMemo(() => (createdAt ? stripTimezoneOffset(createdAt) : ''), [createdAt]);
+
+  const makeImageAttachment = (imgUrl: string): Attachment => ({
+    url: imgUrl,
+    contentType: guessImageContentTypeFromUrl(imgUrl),
+    filename: filenameFromUrl(imgUrl, 'image'),
+    size: 0,
+  });
+
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [previewAttachments, setPreviewAttachments] = useState<Attachment[]>([]);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const quotedPayload = useMemo(() => {
     const candidate = (payload as any).quoted_tweet ?? (payload as any).quotedTweet;
@@ -243,12 +253,10 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                         e.preventDefault();
                         e.stopPropagation();
                         const imgUrl = quotedImages[0];
-                        setPreviewAttachment({
-                          url: imgUrl,
-                          contentType: guessImageContentTypeFromUrl(imgUrl),
-                          filename: filenameFromUrl(imgUrl, 'image'),
-                          size: 0,
-                        });
+                        const attachment = makeImageAttachment(imgUrl);
+                        setPreviewAttachments([attachment]);
+                        setPreviewIndex(0);
+                        setPreviewAttachment(attachment);
                       }}
                     />
                   ) : (
@@ -264,12 +272,11 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            setPreviewAttachment({
-                              url: img,
-                              contentType: guessImageContentTypeFromUrl(img),
-                              filename: filenameFromUrl(img, 'image'),
-                              size: 0,
-                            });
+                            const attachments = quotedImages.map(makeImageAttachment);
+                            const idx = attachments.findIndex((a) => a.url === img);
+                            setPreviewAttachments(attachments);
+                            setPreviewIndex(idx >= 0 ? idx : 0);
+                            setPreviewAttachment(attachments[idx >= 0 ? idx : 0] ?? null);
                           }}
                         />
                       ))}
@@ -311,12 +318,10 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                       e.preventDefault();
                       e.stopPropagation();
                       const imgUrl = images[0];
-                      setPreviewAttachment({
-                        url: imgUrl,
-                        contentType: guessImageContentTypeFromUrl(imgUrl),
-                        filename: filenameFromUrl(imgUrl, 'image'),
-                        size: 0,
-                      });
+                      const attachment = makeImageAttachment(imgUrl);
+                      setPreviewAttachments([attachment]);
+                      setPreviewIndex(0);
+                      setPreviewAttachment(attachment);
                     }}
                   />
                 ) : (
@@ -332,12 +337,11 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          setPreviewAttachment({
-                            url: img,
-                            contentType: guessImageContentTypeFromUrl(img),
-                            filename: filenameFromUrl(img, 'image'),
-                            size: 0,
-                          });
+                          const attachments = images.map(makeImageAttachment);
+                          const idx = attachments.findIndex((a) => a.url === img);
+                          setPreviewAttachments(attachments);
+                          setPreviewIndex(idx >= 0 ? idx : 0);
+                          setPreviewAttachment(attachments[idx >= 0 ? idx : 0] ?? null);
                         }}
                       />
                     ))}
@@ -361,7 +365,13 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
       {previewAttachment && (
         <AttachmentLightbox
           attachment={previewAttachment}
-          onClose={() => setPreviewAttachment(null)}
+          attachments={previewAttachments}
+          initialIndex={previewIndex ?? undefined}
+          onClose={() => {
+            setPreviewAttachment(null);
+            setPreviewAttachments([]);
+            setPreviewIndex(null);
+          }}
         />
       )}
     </div>

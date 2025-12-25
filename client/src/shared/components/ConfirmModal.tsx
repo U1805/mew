@@ -28,14 +28,18 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
-        <div className="p-4 pt-5 pb-3">
+      <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[33vh]">
+
+        <div className="px-4 pt-5 pb-2 shrink-0">
           <h2 className="text-xl font-bold text-white mb-2">{title}</h2>
-          <p className="text-mew-textMuted text-sm leading-5">{description}</p>
+          <p className="text-mew-textMuted text-sm leading-5 break-words">{description}</p>
+        </div>
+
+        <div className="px-4 pb-3 overflow-y-auto flex-1 min-h-0 custom-scrollbar">
           {children}
         </div>
 
-        <div className="bg-[#2B2D31] p-4 flex justify-end items-center mt-2 space-x-3">
+        <div className="bg-[#2B2D31] p-4 flex justify-end items-center mt-auto space-x-3 shrink-0">
           <button
             type="button"
             onClick={onCancel}

@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
+import { Fragment, useCallback, useRef, useEffect, useLayoutEffect, useState } from 'react';
 import { Icon } from '@iconify/react';
 import MessageItem from './MessageItem';
 import TimestampDivider from './TimestampDivider';
@@ -20,6 +20,7 @@ interface MessageListProps {
 }
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
+const SCROLL_BOTTOM_THRESHOLD_PX = 200;
 
 const MessageList: React.FC<MessageListProps> = ({
   messages,
@@ -32,6 +33,7 @@ const MessageList: React.FC<MessageListProps> = ({
 }) => {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const { currentServerId, targetMessageId, setTargetMessageId } = useUIStore();
@@ -40,11 +42,14 @@ const MessageList: React.FC<MessageListProps> = ({
   // 本地 ACK 熔断：避免 setQueryData + effect 互相触发导致死循环。
   const lastAckedMessageIdRef = useRef<string | null>(null);
 
-  const didInitialScrollRef = useRef<string | null>(null);
-
   const pendingPrependRef = useRef(false);
   const beforePrependScrollHeightRef = useRef(0);
   const beforePrependScrollTopRef = useRef(0);
+
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const isNearBottomRef = useRef(true);
+  const lastChannelIdRef = useRef<string | null>(null);
+  const needsInitialScrollRef = useRef(false);
 
   const scrollToBottom = (behavior: ScrollBehavior = 'auto') => {
     const el = scrollContainerRef.current;
@@ -52,20 +57,42 @@ const MessageList: React.FC<MessageListProps> = ({
     el.scrollTo({ top: el.scrollHeight, behavior });
   };
 
-  // 初次进入频道/DM 时默认停留在最底部（最新消息）。
+  const updateScrollToBottomVisibility = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const shouldShow = distanceFromBottom > SCROLL_BOTTOM_THRESHOLD_PX;
+    isNearBottomRef.current = !shouldShow;
+    setShowScrollToBottom(shouldShow);
+  }, []);
+
+  useEffect(() => {
+    if (!channelId) return;
+    if (lastChannelIdRef.current === channelId) return;
+
+    lastChannelIdRef.current = channelId;
+    needsInitialScrollRef.current = true;
+
+    // 切换频道/DM 时默认回到底部（除非正在跳转到某条消息）。
+    isNearBottomRef.current = true;
+    setShowScrollToBottom(false);
+  }, [channelId]);
+
+  // 初次进入/切换频道/DM 后，默认停留在最底部（最新消息）。
   useLayoutEffect(() => {
     if (targetMessageId) return;
     if (!channelId || isLoading || !messages.length) return;
-    if (didInitialScrollRef.current === channelId) return;
+    if (!needsInitialScrollRef.current) return;
 
     // 让布局（尤其是图片高度）先稳定一帧再滚动，避免回弹到顶部。
     requestAnimationFrame(() => {
       scrollToBottom('auto');
       bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      updateScrollToBottomVisibility();
     });
 
-    didInitialScrollRef.current = channelId;
-  }, [channelId, isLoading, messages.length, targetMessageId]);
+    needsInitialScrollRef.current = false;
+  }, [channelId, isLoading, messages.length, targetMessageId, updateScrollToBottomVisibility]);
 
   useLayoutEffect(() => {
     if (!pendingPrependRef.current) return;
@@ -77,6 +104,35 @@ const MessageList: React.FC<MessageListProps> = ({
 
     pendingPrependRef.current = false;
   }, [messages.length]);
+
+  // 新消息到来且用户在底部附近时，始终贴住底部（避免“差一点点没到底”）。
+  useLayoutEffect(() => {
+    if (!messages.length || isLoading) return;
+    if (targetMessageId) return;
+    if (pendingPrependRef.current) return;
+    if (!isNearBottomRef.current) return;
+
+    requestAnimationFrame(() => {
+      scrollToBottom('auto');
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+      updateScrollToBottomVisibility();
+    });
+  }, [messages.length, isLoading, targetMessageId, updateScrollToBottomVisibility]);
+
+  // 图片/内容高度变化时，如果用户在底部附近，保持贴底。
+  useEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+
+    const ro = new ResizeObserver(() => {
+      if (!isNearBottomRef.current) return;
+      scrollToBottom('auto');
+      updateScrollToBottomVisibility();
+    });
+
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [updateScrollToBottomVisibility]);
 
   useEffect(() => {
     if (targetMessageId && messages.length && !isLoading) {
@@ -132,6 +188,9 @@ const MessageList: React.FC<MessageListProps> = ({
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
+
+    updateScrollToBottomVisibility();
+
     if (!onLoadOlder || isLoading || isFetchingOlder || !hasMoreOlder) return;
 
     if (el.scrollTop <= SCROLL_TOP_THRESHOLD_PX) {
@@ -140,75 +199,93 @@ const MessageList: React.FC<MessageListProps> = ({
       beforePrependScrollTopRef.current = el.scrollTop;
       void onLoadOlder();
     }
-  }, [hasMoreOlder, isFetchingOlder, isLoading, onLoadOlder]);
+  }, [hasMoreOlder, isFetchingOlder, isLoading, onLoadOlder, updateScrollToBottomVisibility]);
 
   return (
-    <div
-      ref={scrollContainerRef}
-      onScroll={handleScroll}
-      className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar"
-    >
-      {!isLoading ? (
-        <div className="flex flex-col mt-auto">
-          <div className="flex flex-col pb-4">
-            {isFetchingOlder && (
-              <div className="flex items-center justify-center py-3">
-                <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="18" height="18" />
-              </div>
-            )}
-            {!hasMoreOlder && (
-              <div className="p-4 mt-4 mb-4 border-b border-[#3F4147]">
-                {isDM && otherUser ? (
-                    <>
-                      <div className="w-[80px] h-[80px] rounded-full bg-mew-accent flex items-center justify-center mb-4 overflow-hidden">
-                          {otherUser.avatarUrl ? (
-                               <img src={otherUser.avatarUrl} alt={otherUser.username} className="w-full h-full object-cover" />
-                          ) : (
-                               <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 1).toUpperCase()}</span>
-                          )}
-                      </div>
-                      <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>
-                      <p className="text-mew-textMuted">This is the beginning of your direct message history with <span className="font-semibold text-white">@{otherUser.username}</span>.</p>
-                    </>
-                ) : (
-                    <>
-                      <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
-                          <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
-                      </div>
-                      <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
-                      <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
-                    </>
-                )}
-              </div>
-            )}
-            {messages.map((msg, index) => {
-              const prevMsg = messages[index - 1];
+    <div className="relative flex-1 overflow-hidden">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
+        className="h-full overflow-y-auto overflow-x-hidden flex flex-col custom-scrollbar"
+      >
+        {!isLoading ? (
+          <div ref={contentRef} className="flex flex-col mt-auto">
+            <div className="flex flex-col pb-4">
+              {isFetchingOlder && (
+                <div className="flex items-center justify-center py-3">
+                  <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="18" height="18" />
+                </div>
+              )}
+              {!hasMoreOlder && (
+                <div className="p-4 mt-4 mb-4 border-b border-[#3F4147]">
+                  {isDM && otherUser ? (
+                      <>
+                        <div className="w-[80px] h-[80px] rounded-full bg-mew-accent flex items-center justify-center mb-4 overflow-hidden">
+                            {otherUser.avatarUrl ? (
+                                 <img src={otherUser.avatarUrl} alt={otherUser.username} className="w-full h-full object-cover" />
+                            ) : (
+                                 <span className="text-3xl font-bold text-white">{otherUser.username.substring(0, 1).toUpperCase()}</span>
+                            )}
+                        </div>
+                        <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>
+                        <p className="text-mew-textMuted">This is the beginning of your direct message history with <span className="font-semibold text-white">@{otherUser.username}</span>.</p>
+                      </>
+                  ) : (
+                      <>
+                        <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
+                            <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
+                        <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
+                      </>
+                  )}
+                </div>
+              )}
+              {messages.map((msg, index) => {
+                const prevMsg = messages[index - 1];
 
-              const currentTimestamp = new Date(msg.createdAt);
-              const prevTimestamp = prevMsg ? new Date(prevMsg.createdAt) : null;
+                const currentTimestamp = new Date(msg.createdAt);
+                const prevTimestamp = prevMsg ? new Date(prevMsg.createdAt) : null;
 
-              const showDivider = !!prevTimestamp &&
-                (!isSameDay(currentTimestamp, prevTimestamp) ||
-                  currentTimestamp.getTime() - prevTimestamp.getTime() > 5 * 60 * 1000);
+                const showDivider = !!prevTimestamp &&
+                  (!isSameDay(currentTimestamp, prevTimestamp) ||
+                    currentTimestamp.getTime() - prevTimestamp.getTime() > 5 * 60 * 1000);
 
-              const isSequential = !!prevMsg && !showDivider &&
-                prevMsg.authorId === msg.authorId &&
-                currentTimestamp.getTime() - prevTimestamp.getTime() < 5 * 60 * 1000;
+                const isSequential = !!prevMsg && !showDivider &&
+                  prevMsg.authorId === msg.authorId &&
+                  currentTimestamp.getTime() - prevTimestamp.getTime() < 5 * 60 * 1000;
 
-              return (
-                <Fragment key={msg._id}>
-                  {showDivider && <TimestampDivider timestamp={formatDividerTimestamp(currentTimestamp)} />}
-                  <MessageItem message={msg} isSequential={!!isSequential} />
-                </Fragment>
-              );
-            })}
+                return (
+                  <Fragment key={msg._id}>
+                    {showDivider && <TimestampDivider timestamp={formatDividerTimestamp(currentTimestamp)} />}
+                    <MessageItem message={msg} isSequential={!!isSequential} />
+                  </Fragment>
+                );
+              })}
+            </div>
+            <div ref={bottomRef} />
           </div>
-          <div ref={bottomRef} />
-        </div>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="32" height="32" />
-        </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="32" height="32" />
+          </div>
+        )}
+      </div>
+
+      {showScrollToBottom && !isLoading && (
+        <button
+          type="button"
+          aria-label="Scroll to bottom"
+          className="absolute bottom-4 right-4 z-[2] h-11 w-11 rounded-full bg-[#1E1F22]/90 hover:bg-[#1E1F22] text-white/80 hover:text-white flex items-center justify-center shadow-xl border border-white/10 backdrop-blur-sm transition-colors"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            scrollToBottom('smooth');
+            bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }}
+        >
+          <Icon icon="mdi:arrow-down" width="22" />
+        </button>
       )}
     </div>
   );

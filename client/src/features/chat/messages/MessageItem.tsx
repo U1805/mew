@@ -11,7 +11,7 @@ import ReactionList from './ReactionList';
 import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
 import { Attachment, Message } from '../../../shared/types';
-import { channelApi, infraApi, messageApi } from '../../../shared/services/api';
+import { channelApi, infraApi, messageApi, ttsApi } from '../../../shared/services/api';
 import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
@@ -20,6 +20,21 @@ interface MessageItemProps {
   message: Message;
   isSequential?: boolean;
 }
+
+let activeTtsAudio: HTMLAudioElement | null = null;
+let activeTtsUrl: string | null = null;
+
+const stopActiveTts = () => {
+  if (activeTtsAudio) {
+    activeTtsAudio.pause();
+    activeTtsAudio.currentTime = 0;
+    activeTtsAudio = null;
+  }
+  if (activeTtsUrl) {
+    URL.revokeObjectURL(activeTtsUrl);
+    activeTtsUrl = null;
+  }
+};
 
 const getMessageBestEffortText = (message: Message) => {
   const payloadForwarded = (message.payload as any)?.forwardedMessage;
@@ -226,6 +241,39 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
     } catch (err) {
       console.error('send to jpdict failed', err);
       toast.error('Send failed');
+    }
+  };
+
+  const handleSpeakText = async () => {
+    const selection = (menuSelection || getSelectionTextWithin(itemRef.current)).trim();
+    const text = (selection || getMessageBestEffortText(message)).trim();
+
+    if (!text) {
+      toast.error('Nothing to speak');
+      return;
+    }
+
+    const loadingToast = toast.loading('Generating speech...');
+    try {
+      const res = await ttsApi.synthesize(text);
+      stopActiveTts();
+
+      const blob = new Blob([res.data], { type: 'audio/mpeg' });
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+
+      activeTtsAudio = audio;
+      activeTtsUrl = url;
+
+      audio.onended = () => stopActiveTts();
+      audio.onerror = () => stopActiveTts();
+
+      await audio.play();
+      toast.success('Playing', { id: loadingToast });
+    } catch (err) {
+      console.error('TTS failed', err);
+      toast.error('TTS failed', { id: loadingToast });
+      stopActiveTts();
     }
   };
 
@@ -506,6 +554,7 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
         onForward={handleForward}
         onCopy={handleCopy}
         onAddApp={() => {}}
+        onSpeak={handleSpeakText}
         onSendToJpdict={handleSendToJpdict}
         onDelete={() => openModal('deleteMessage', { message, author })}
       />

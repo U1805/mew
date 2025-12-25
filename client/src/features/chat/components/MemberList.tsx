@@ -230,14 +230,16 @@ const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => 
     if (!canKick && !canManageRoles) return null;
 
     return (
-        <ContextMenu.Content className="min-w-[188px] bg-[#111214] rounded p-1.5 shadow-xl z-50 animate-fade-in border border-[#1E1F22]">
+        <ContextMenu.Portal>
+        <ContextMenu.Content className="min-w-[188px] bg-[#111214] rounded p-1.5 shadow-xl z-[9999] animate-fade-in border border-[#1E1F22]">
             {canManageRoles && (
                 <ContextMenu.Sub>
                     <ContextMenu.SubTrigger className="flex items-center justify-between px-2 py-1.5 hover:bg-mew-accent hover:text-white text-mew-textMuted rounded cursor-pointer text-sm font-medium outline-none">
                         Roles
                         <Icon icon="mdi:chevron-right" width="16" />
                     </ContextMenu.SubTrigger>
-                    <ContextMenu.SubContent className="min-w-[160px] bg-[#111214] rounded p-1.5 shadow-xl z-50 border border-[#1E1F22] ml-1">
+                    <ContextMenu.Portal>
+                    <ContextMenu.SubContent className="min-w-[160px] bg-[#111214] rounded p-1.5 shadow-xl z-[9999] border border-[#1E1F22] ml-1">
                         {roles.filter(r => !r.isDefault).sort((a,b) => b.position - a.position).map(role => (
                             <ContextMenu.Item
                                 key={role._id}
@@ -252,6 +254,7 @@ const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => 
                             </ContextMenu.Item>
                         ))}
                     </ContextMenu.SubContent>
+                    </ContextMenu.Portal>
                 </ContextMenu.Sub>
             )}
 
@@ -266,6 +269,7 @@ const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => 
                 </ContextMenu.Item>
             )}
         </ContextMenu.Content>
+        </ContextMenu.Portal>
     )
 }
 

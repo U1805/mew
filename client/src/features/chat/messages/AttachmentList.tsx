@@ -13,6 +13,8 @@ interface AttachmentListProps {
 
 export const AttachmentList = ({ attachments, serverId, channelId }: AttachmentListProps) => {
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const imageAttachments = attachments.filter(a => a.contentType.startsWith('image/'));
 
   if (!attachments || attachments.length === 0) return null;
 
@@ -41,7 +43,9 @@ export const AttachmentList = ({ attachments, serverId, channelId }: AttachmentL
                 className="relative group overflow-hidden rounded-lg cursor-zoom-in"
                 onClick={(e) => {
                   e.stopPropagation();
+                  const idx = imageAttachments.findIndex(a => a.url === attachment.url);
                   setPreviewAttachment(attachment);
+                  setPreviewIndex(idx >= 0 ? idx : null);
                 }}
               >
                 <img 
@@ -81,7 +85,9 @@ export const AttachmentList = ({ attachments, serverId, channelId }: AttachmentL
       {previewAttachment && (
         <AttachmentLightbox 
             attachment={previewAttachment} 
-            onClose={() => setPreviewAttachment(null)}
+            attachments={imageAttachments}
+            initialIndex={previewIndex ?? undefined}
+            onClose={() => { setPreviewAttachment(null); setPreviewIndex(null); }}
             serverId={serverId}
             channelId={channelId}
         />
