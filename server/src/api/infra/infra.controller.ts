@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import asyncHandler from '../../utils/asyncHandler';
 import ServiceTypeModel from './serviceType.model';
 import { infraRegistry } from '../../infra/infraRegistry';
+import Bot from '../bot/bot.model';
 
 const RESERVED_SERVICE_TYPES = new Set(['sdk']);
 
@@ -53,4 +54,29 @@ export const registerServiceTypeHandler = asyncHandler(async (req: Request, res:
   );
 
   res.status(200).json({ serviceType, serverName });
+});
+
+export const getServiceBotUserHandler = asyncHandler(async (req: Request, res: Response) => {
+  const serviceType = String((req.query as any)?.serviceType || '').trim();
+  if (!serviceType) {
+    return res.status(400).json({ message: 'serviceType is required' });
+  }
+  if (RESERVED_SERVICE_TYPES.has(serviceType)) {
+    return res.status(400).json({ message: `serviceType is reserved: ${serviceType}` });
+  }
+
+  const bot = await Bot.findOne({
+    serviceType,
+    dmEnabled: true,
+    botUserId: { $exists: true, $ne: null },
+  })
+    .sort({ updatedAt: -1 })
+    .select('botUserId');
+
+  const botUserId = bot?.botUserId?.toString() || '';
+  if (!botUserId) {
+    return res.status(404).json({ message: 'No dmEnabled bot found for serviceType' });
+  }
+
+  res.status(200).json({ botUserId });
 });

@@ -57,5 +57,42 @@ describe('Infra routes (/api/infra)', () => {
 
     expect(registerRes.statusCode).toBe(400);
   });
+
+  it('returns botUserId for a dmEnabled bot by serviceType', async () => {
+    const registerRes = await request(app)
+      .post('/api/infra/service-types/register')
+      .set('X-Mew-Admin-Secret', process.env.MEW_ADMIN_SECRET!)
+      .send({ serviceType: 'jpdict-agent' });
+
+    expect(registerRes.statusCode).toBe(200);
+
+    const userData = { email: 'infra-bot-owner@example.com', username: 'infrabotowner', password: 'password123' };
+    await request(app).post('/api/auth/register').send(userData);
+    const loginRes = await request(app).post('/api/auth/login').send({ email: userData.email, password: userData.password });
+    const token = loginRes.body.token as string;
+
+    const createBotRes = await request(app)
+      .post('/api/users/@me/bots')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'MyJpdictBot', serviceType: 'jpdict-agent' });
+
+    expect(createBotRes.statusCode).toBe(201);
+    const botId = createBotRes.body._id as string;
+
+    const enableDmRes = await request(app)
+      .patch(`/api/users/@me/bots/${botId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ dmEnabled: true });
+
+    expect(enableDmRes.statusCode).toBe(200);
+
+    const res = await request(app)
+      .get('/api/infra/service-bot-user?serviceType=jpdict-agent')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.botUserId).toBeTypeOf('string');
+    expect(res.body.botUserId.length).toBeGreaterThan(0);
+  });
 });
 

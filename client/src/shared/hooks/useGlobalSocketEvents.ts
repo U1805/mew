@@ -23,49 +23,60 @@ export const useGlobalSocketEvents = () => {
     };
 
     const handleMessageCreate = (message: Message) => {
-      const { currentChannelId } = useUIStore.getState();
-      const { user } = useAuthStore.getState();
-      const { addUnreadChannel, addUnreadMention } = useUnreadStore.getState();
+      try {
+        if (!message || typeof message !== 'object') return;
 
-      const isViewingChannel = message.channelId === currentChannelId && document.hasFocus();
+        const { currentChannelId } = useUIStore.getState();
+        const { user } = useAuthStore.getState();
+        const { addUnreadChannel, addUnreadMention } = useUnreadStore.getState();
 
-      // If user is viewing the channel, do nothing, as the message will be handled by useSocketMessages
-      if (isViewingChannel) {
-        return;
-      }
+        const isViewingChannel = message.channelId === currentChannelId && document.hasFocus();
 
-      // If not viewing, add to unread
-      addUnreadChannel(message.channelId);
+        // If user is viewing the channel, do nothing, as the message will be handled by useSocketMessages
+        if (isViewingChannel) {
+          return;
+        }
 
-      // Handle mentions
-      const isMentioned = user &&
-        (message.mentions?.some(m => typeof m === 'string' ? m === user._id : m._id === user._id) ||
-         message.content.includes('@everyone') ||
-         message.content.includes('@here'));
+        // If not viewing, add to unread
+        addUnreadChannel(message.channelId);
 
-      if (isMentioned) {
-        addUnreadMention(message._id);
-      }
+        // Handle mentions (message.content may be missing for attachment/card messages)
+        const rawContent = (message as any).content;
+        const contentText = typeof rawContent === 'string' ? rawContent : '';
+        const isMentioned = !!user &&
+          (message.mentions?.some(m => typeof m === 'string' ? m === user._id : m._id === user._id) ||
+           contentText.includes('@everyone') ||
+           contentText.includes('@here'));
 
-      // Update the last message in the channel list cache
-      const updateChannelCache = (queryKey: string[], newMessage: Message) => {
-        queryClient.setQueryData<Channel[]>(queryKey, (oldChannels) => {
-          if (!oldChannels) return oldChannels;
-          return oldChannels.map(channel =>
-            channel._id === newMessage.channelId
-              ? { ...channel, lastMessage: newMessage }
-              : channel
-          );
-        });
-      };
+        if (isMentioned) {
+          addUnreadMention(message._id);
+        }
 
-      // Bring back hidden DM channel on new message and update cache
-      const dmChannels: Channel[] | undefined = queryClient.getQueryData(['dmChannels']);
-      if (dmChannels?.some(c => c._id === message.channelId)) {
-        useHiddenStore.getState().removeHiddenChannel(message.channelId);
-        updateChannelCache(['dmChannels'], message);
-      } else if (message.serverId) {
-        updateChannelCache(['channels', message.serverId], message);
+        // Update the last message in the channel list cache
+        const updateChannelCache = (queryKey: string[], newMessage: Message) => {
+          queryClient.setQueryData<Channel[]>(queryKey, (oldChannels) => {
+            if (!oldChannels) return oldChannels;
+            return oldChannels.map(channel =>
+              channel._id === newMessage.channelId
+                ? { ...channel, lastMessage: newMessage }
+                : channel
+            );
+          });
+        };
+
+        // Bring back hidden DM channel on new message and update cache
+        const dmChannels: Channel[] | undefined = queryClient.getQueryData(['dmChannels']);
+        if (dmChannels?.some(c => c._id === message.channelId)) {
+          useHiddenStore.getState().removeHiddenChannel(message.channelId);
+          updateChannelCache(['dmChannels'], message);
+        } else if (message.serverId) {
+          updateChannelCache(['channels', message.serverId], message);
+        }
+      } catch (err) {
+        if ((import.meta as any).env?.DEV) {
+          // eslint-disable-next-line no-console
+          console.error('useGlobalSocketEvents: handleMessageCreate failed', err);
+        }
       }
     };
 

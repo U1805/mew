@@ -13,4 +13,7 @@ router.post(
   uploadController.uploadFileHandler
 );
 
+// Download attachment by key (useful for bot services in Docker where S3 public domain may be host-only).
+router.get('/:key', authorizeChannel('SEND_MESSAGES'), uploadController.downloadFileHandler);
+
 export default router;

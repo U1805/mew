@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { messageApi, uploadApi } from '../../../shared/services/api';
@@ -95,8 +95,40 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
         return false;
       },
+      handlePaste: (_view: any, event: ClipboardEvent) => {
+        if (!channelId || isUploading) return false;
+
+        const files: File[] = [];
+        const dt = event.clipboardData;
+        if (dt) {
+          if (dt.files && dt.files.length > 0) {
+            files.push(...Array.from(dt.files));
+          } else if (dt.items && dt.items.length > 0) {
+            for (const item of Array.from(dt.items)) {
+              if (item.kind === 'file') {
+                const f = item.getAsFile();
+                if (f) files.push(f);
+              }
+            }
+          }
+        }
+
+        const images = files.filter((f) => (f.type || '').startsWith('image/'));
+        if (images.length === 0) return false;
+
+        event.preventDefault();
+
+        const normalized = images.map((f, idx) => {
+          if (f.name && f.name.trim()) return f;
+          const ext = (f.type || '').split('/')[1] || 'png';
+          return new File([f], `pasted-image-${Date.now()}-${idx}.${ext}`, { type: f.type || 'image/png' });
+        });
+
+        queueFilesForUpload(normalized);
+        return true;
+      },
     };
-  }, []);
+  }, [channelId, isUploading]);
 
   const editor = useEditor({
     extensions,
@@ -117,31 +149,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     }
   }, [activeReplyTo, editor]);
 
-  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !channelId) return;
-
-    const files = Array.from(e.target.files);
-
-    const newUploads = files.map((file: File) => ({
-      filename: file.name,
-      contentType: file.type,
-      size: file.size,
-      localUrl: URL.createObjectURL(file),
-      isUploading: true,
-      progress: 0,
-      file: file,
-    }));
-
-    setAttachments(prev => [...prev, ...newUploads]);
-
-    newUploads.forEach((upload, index) => {
-      uploadFile(upload, attachments.length + index);
-    });
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const uploadFile = async (attachment: any, index: number) => {
+  const uploadFile = useCallback(async (attachment: any, index: number) => {
     if (!attachment.file || !channelId) return;
 
     try {
@@ -181,6 +189,37 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
           return newAttachments;
       });
     }
+  }, [channelId]);
+
+  const queueFilesForUpload = useCallback((files: File[]) => {
+    if (!channelId || files.length === 0) return;
+
+    const newUploads = files.map((file: File) => ({
+      filename: file.name,
+      contentType: file.type,
+      size: file.size,
+      localUrl: URL.createObjectURL(file),
+      isUploading: true,
+      progress: 0,
+      file: file,
+    }));
+
+    setAttachments((prev) => {
+      const startIndex = prev.length;
+      setTimeout(() => {
+        newUploads.forEach((upload, i) => void uploadFile(upload, startIndex + i));
+      }, 0);
+      return [...prev, ...newUploads];
+    });
+  }, [channelId, uploadFile]);
+
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !channelId) return;
+
+    const files = Array.from(e.target.files);
+    queueFilesForUpload(files);
+
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removeAttachment = (index: number) => {

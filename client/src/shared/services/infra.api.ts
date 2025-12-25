@@ -15,6 +15,10 @@ export const infraApi = {
     api.get('/infra/available-services', {
       params: opts?.includeOffline ? { includeOffline: 1 } : undefined,
     }),
+  serviceBotUser: (serviceType: string) =>
+    api.get('/infra/service-bot-user', {
+      params: { serviceType },
+    }),
 };
 
 export default infraApi;

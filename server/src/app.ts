@@ -12,6 +12,7 @@ import uploadRoutes from './api/upload/upload.routes';
 import publicWebhookRoutes from './api/webhook/public.routes';
 import infraRoutes from './api/infra/infra.routes';
 import botBootstrapRoutes from './api/bot/bot.bootstrap.routes';
+import botSelfRoutes from './api/bot/bot.self.routes';
 import healthRoutes from './api/health/health.routes';
 import { errorHandler } from './utils/errorHandler';
 
@@ -32,6 +33,7 @@ app.use('/api/channels/:channelId/uploads', uploadRoutes);
 app.use('/api/invites', invitePublicRoutes);
 app.use('/api/webhooks', publicWebhookRoutes);
 app.use('/api/bots', botBootstrapRoutes);
+app.use('/api/bots', botSelfRoutes);
 app.use('/api/infra', infraRoutes);
 app.use('/api/health', healthRoutes);
 

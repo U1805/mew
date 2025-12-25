@@ -87,3 +87,14 @@ export const findByIdWithTokenUnscoped = async (botId: string): Promise<IBot | n
 export const findByAccessToken = async (accessToken: string): Promise<IBot | null> => {
   return Bot.findOne({ accessToken }).select('+accessToken');
 };
+
+/**
+ * Updates a bot by its ID, ensuring it belongs to the specified bot user ID.
+ */
+export const updateByIdForBotUserId = async (
+  botId: string,
+  botUserId: string,
+  updateData: Partial<IBot>
+): Promise<IBot | null> => {
+  return Bot.findOneAndUpdate({ _id: botId, botUserId: new mongoose.Types.ObjectId(botUserId) as any }, updateData, { new: true });
+};

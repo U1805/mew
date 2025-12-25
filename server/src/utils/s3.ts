@@ -1,4 +1,4 @@
-import { S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import config from '../config';
 import { nanoid } from 'nanoid';
@@ -103,4 +103,18 @@ export const uploadStream = async (options: {
   await upload.done();
 
   return { key: newFilename, mimetype: options.mimetype, size: counter.bytes };
+};
+
+export const getObjectStream = async (key: string) => {
+  const command = new GetObjectCommand({
+    Bucket: config.s3.bucketName,
+    Key: key,
+  });
+
+  const resp = await s3Client.send(command);
+  return {
+    body: resp.Body,
+    contentType: resp.ContentType,
+    contentLength: resp.ContentLength,
+  };
 };

@@ -1,18 +1,19 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type MouseEvent } from 'react';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import clsx from 'clsx';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { EmojiPicker } from './EmojiPicker';
 import { MessageContextMenu } from './MessageContextMenu';
 import ReactionList from './ReactionList';
 import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
-import { Message } from '../../../shared/types';
-import { messageApi } from '../../../shared/services/api';
+import { Attachment, Message } from '../../../shared/types';
+import { channelApi, infraApi, messageApi } from '../../../shared/services/api';
 import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
+import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 
 interface MessageItemProps {
@@ -20,18 +21,55 @@ interface MessageItemProps {
   isSequential?: boolean;
 }
 
+const getMessageBestEffortText = (message: Message) => {
+  const payloadForwarded = (message.payload as any)?.forwardedMessage;
+  return (
+    (typeof message.content === 'string' && message.content.trim()
+      ? message.content
+      : typeof (message.payload as any)?.content === 'string' && (message.payload as any).content.trim()
+        ? (message.payload as any).content
+        : typeof payloadForwarded?.content === 'string' && payloadForwarded.content.trim()
+          ? payloadForwarded.content
+          : typeof (message.payload as any)?.url === 'string'
+            ? (message.payload as any).url
+            : '') || ''
+  );
+};
+
+const getSelectionTextWithin = (container: HTMLElement | null) => {
+  const selection = window.getSelection?.();
+  if (!selection || selection.rangeCount === 0 || !container) return '';
+
+  const raw = selection.toString();
+  const text = raw.trim();
+  if (!text) return '';
+
+  const isNodeInside = (node: Node | null) => {
+    if (!node) return false;
+    const element = node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement;
+    return !!element && container.contains(element);
+  };
+
+  if (!isNodeInside(selection.anchorNode) && !isNodeInside(selection.focusNode)) return '';
+  return text;
+};
+
+const looksLikeIdPlaceholder = (text: string) => /^@?[0-9a-fA-F]{24}$/.test(text.trim());
+
 const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   const { user } = useAuthStore();
-  const { currentServerId, setReplyTo, setTargetMessageId } = useUIStore();
+  const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId } = useUIStore();
   const { openModal } = useModalStore();
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [applyFlash, setApplyFlash] = useState(false);
+  const [menuSelection, setMenuSelection] = useState('');
   const permissions = usePermissions(message.channelId);
   const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
   const itemRef = useRef<HTMLDivElement>(null);
+  const onlineStatus = usePresenceStore((state) => state.onlineStatus);
 
   const canAddReaction = permissions.has('ADD_REACTIONS');
   const canManageMessages = permissions.has('MANAGE_MESSAGES');
@@ -44,7 +82,8 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   const isBilibiliCard = message.type === 'app/x-bilibili-card';
   const isInstagramCard = message.type === 'app/x-instagram-card';
   const isForwardCard = message.type === 'app/x-forward-card';
-  const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isForwardCard;
+  const isJpdictCard = message.type === 'app/x-jpdict-card';
+  const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isForwardCard || isJpdictCard;
   const isAuthor = user?._id?.toString() === author._id?.toString();
   const isRetracted = !!message.retractedAt;
   const referencedMessage = message.referencedMessageId
@@ -53,10 +92,12 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
       )
     : undefined;
 
-  const isMentioned = user && (
-    (Array.isArray(message.mentions) && message.mentions.includes(user._id)) ||
-    message.content.includes('@everyone') ||
-    message.content.includes('@here')
+  const contentText = typeof message.content === 'string' ? message.content : '';
+  const isMentioned = !!user && (
+    (Array.isArray(message.mentions) &&
+      message.mentions.some((m) => (typeof m === 'string' ? m === user._id : m?._id === user._id))) ||
+    contentText.includes('@everyone') ||
+    contentText.includes('@here')
   );
 
   useEffect(() => {
@@ -98,17 +139,7 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   };
 
   const handleCopy = async () => {
-    const payloadForwarded = (message.payload as any)?.forwardedMessage;
-    const candidate =
-      typeof message.content === 'string' && message.content.trim()
-        ? message.content
-        : typeof payloadForwarded?.content === 'string' && payloadForwarded.content.trim()
-          ? payloadForwarded.content
-          : typeof (message.payload as any)?.url === 'string'
-            ? (message.payload as any).url
-            : '';
-
-    const text = candidate || '';
+    const text = getMessageBestEffortText(message);
     if (!text) {
       toast.error('Nothing to copy');
       return;
@@ -128,6 +159,73 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
       document.body.removeChild(textarea);
       if (ok) toast.success('Copied');
       else toast.error('Copy failed');
+    }
+  };
+
+  const jpdictUserIdQuery = useQuery({
+    queryKey: ['service-bot-user', 'jpdict-agent'],
+    queryFn: async () => {
+      try {
+        const res = await infraApi.serviceBotUser('jpdict-agent');
+        return (res.data?.botUserId as string | undefined) || '';
+      } catch {
+        return '';
+      }
+    },
+    staleTime: 60_000,
+    retry: false,
+  });
+  const jpdictUserId = jpdictUserIdQuery.data || '';
+  const canSendToJpdict = !!jpdictUserId && onlineStatus[jpdictUserId] === 'online';
+
+  const handleSendToJpdict = async () => {
+    if (!jpdictUserId) {
+      toast.error('jpdict-agent not found');
+      return;
+    }
+    if (onlineStatus[jpdictUserId] !== 'online') {
+      toast.error('jpdict-agent is offline');
+      return;
+    }
+
+    const selection = (menuSelection || getSelectionTextWithin(itemRef.current)).trim();
+    const attachments = Array.isArray(message.attachments) ? (message.attachments as Attachment[]) : [];
+
+    const payloadToSend: { content?: string; attachments?: Attachment[] } = {};
+
+    if (selection) {
+      payloadToSend.content = selection;
+    } else if (attachments.length > 0) {
+      payloadToSend.attachments = attachments;
+      const caption = (message.content || '').trim();
+      if (caption && !looksLikeIdPlaceholder(caption)) {
+        payloadToSend.content = caption;
+      }
+    } else {
+      const fallbackText = getMessageBestEffortText(message).trim();
+      if (!fallbackText) {
+        toast.error('Nothing to send');
+        return;
+      }
+      payloadToSend.content = fallbackText;
+    }
+
+    try {
+      const dmRes = await channelApi.createDM(jpdictUserId);
+      const dmChannelId = dmRes.data?._id as string | undefined;
+      if (!dmChannelId) {
+        toast.error('Failed to create DM');
+        return;
+      }
+
+      await messageApi.send(undefined, dmChannelId, payloadToSend);
+      await queryClient.invalidateQueries({ queryKey: ['dmChannels'] });
+      setCurrentServer(null);
+      setCurrentChannel(dmChannelId);
+      toast.success('Sent to jpdict');
+    } catch (err) {
+      console.error('send to jpdict failed', err);
+      toast.error('Send failed');
     }
   };
 
@@ -220,11 +318,19 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   };
 
   return (
-    <ContextMenu.Root>
+    <ContextMenu.Root
+      onOpenChange={(open) => {
+        if (open) setMenuSelection(getSelectionTextWithin(itemRef.current));
+        else setMenuSelection('');
+      }}
+    >
       <ContextMenu.Trigger asChild>
         <div
           ref={itemRef}
           id={`message-${message._id}`}
+          onContextMenu={(e) => {
+            setMenuSelection(getSelectionTextWithin(e.currentTarget));
+          }}
           className={clsx(
             'group flex pr-4 relative transition-colors duration-200',
             isSequential ? 'py-0.5' : 'mt-[17px] py-0.5 mb-1',
@@ -393,12 +499,14 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
         canForward={canSendMessages}
         canCopy={true}
         canDelete={isAuthor || canManageMessages}
+        canSendToJpdict={canSendToJpdict}
         isRetracted={isRetracted}
         onAddReaction={handleReactionClick}
         onReply={handleReply}
         onForward={handleForward}
         onCopy={handleCopy}
         onAddApp={() => {}}
+        onSendToJpdict={handleSendToJpdict}
         onDelete={() => openModal('deleteMessage', { message, author })}
       />
     </ContextMenu.Root>

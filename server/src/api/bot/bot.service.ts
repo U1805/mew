@@ -259,3 +259,38 @@ export const bootstrapBotById = async (botId: string, expectedServiceType?: stri
     dmEnabled: bot.dmEnabled,
   };
 };
+
+export const updateBotConfigAsBot = async (
+  botId: string,
+  botUserId: string,
+  patch: { system_prompt: string }
+): Promise<IBot> => {
+  const bot = await botRepository.findByIdWithTokenUnscoped(botId);
+  if (!bot) {
+    throw new NotFoundError('Bot not found.');
+  }
+
+  if (!bot.botUserId || bot.botUserId.toString() !== botUserId) {
+    throw new NotFoundError('Bot not found.');
+  }
+
+  let cfgObj: any = {};
+  try {
+    const raw = typeof bot.config === 'string' ? bot.config : '{}';
+    cfgObj = raw && raw.trim() ? JSON.parse(raw) : {};
+    if (!cfgObj || typeof cfgObj !== 'object' || Array.isArray(cfgObj)) cfgObj = {};
+  } catch {
+    cfgObj = {};
+  }
+
+  cfgObj.system_prompt = patch.system_prompt;
+  const nextConfig = JSON.stringify(cfgObj);
+
+  const updated = await botRepository.updateByIdForBotUserId(botId, botUserId, { config: nextConfig });
+  if (!updated) {
+    throw new NotFoundError('Bot not found.');
+  }
+
+  broadcastBotConfigUpdate(normalizeServiceType(updated.serviceType), updated._id.toString());
+  return updated;
+};

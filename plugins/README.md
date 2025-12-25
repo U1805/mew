@@ -14,6 +14,7 @@
   - `plugins/fetchers/rss-fetcher`：RSS 抓取（serviceType=`rss-fetcher`）
 - `plugins/agents/*`：Agent 类 Bot（Go）
   - `plugins/agents/test-agent`：示例 Agent（serviceType=`test-agent`）
+  - `plugins/agents/jpdict-agent`：词典/翻译 Agent（serviceType=`jpdict-agent`）
 
 ## 通用环境变量
 

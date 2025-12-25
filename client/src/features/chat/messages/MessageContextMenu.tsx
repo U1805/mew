@@ -31,12 +31,14 @@ interface MessageContextMenuProps {
   canForward: boolean;
   canCopy: boolean;
   canDelete: boolean;
+  canSendToJpdict: boolean;
   isRetracted: boolean;
   onAddReaction: (emoji: string) => void;
   onReply: () => void;
   onForward: () => void;
   onCopy: () => void;
   onAddApp: () => void;
+  onSendToJpdict: () => void;
   onDelete: () => void;
 }
 
@@ -46,12 +48,14 @@ export const MessageContextMenu = ({
   canForward,
   canCopy,
   canDelete,
+  canSendToJpdict,
   isRetracted,
   onAddReaction,
   onReply,
   onForward,
   onCopy,
   onAddApp,
+  onSendToJpdict,
   onDelete,
 }: MessageContextMenuProps) => {
   const disabled = isRetracted;
@@ -149,18 +153,44 @@ export const MessageContextMenu = ({
         </span>
       </ContextMenu.Item>
 
-      <ContextMenu.Item
-        className={itemClass}
-        disabled={disabled}
-        onSelect={(e) => {
-          onAddApp();
-        }}
-      >
-        <span className="flex items-center gap-2">
-          <Icon icon="mdi:puzzle-outline" width="18" />
-          APP
-        </span>
-      </ContextMenu.Item>
+      {canSendToJpdict ? (
+        <ContextMenu.Sub>
+          <ContextMenu.SubTrigger className={itemClass} disabled={disabled}>
+            <span className="flex items-center gap-2">
+              <Icon icon="mdi:puzzle-outline" width="18" />
+              APP
+            </span>
+            <Icon icon="mdi:chevron-right" width="16" />
+          </ContextMenu.SubTrigger>
+          <ContextMenu.SubContent className="min-w-[190px] bg-[#111214] rounded p-1.5 shadow-xl z-50 border border-[#1E1F22] ml-1">
+            <ContextMenu.Item
+              className={itemClass}
+              disabled={disabled}
+              onSelect={() => {
+                onSendToJpdict();
+              }}
+            >
+              <span className="flex items-center gap-2">
+                <Icon icon="mdi:send" width="18" />
+                send to jpdict
+              </span>
+            </ContextMenu.Item>
+          </ContextMenu.SubContent>
+        </ContextMenu.Sub>
+      ) : (
+        <ContextMenu.Item
+          className={itemClass}
+          disabled={disabled}
+          onSelect={(e) => {
+            onAddApp();
+          }}
+        >
+          <span className="flex items-center gap-2">
+            <Icon icon="mdi:puzzle-outline" width="18" />
+            APP
+          </span>
+        </ContextMenu.Item>
+      )}
 
       {canDelete && (
         <ContextMenu.Item
