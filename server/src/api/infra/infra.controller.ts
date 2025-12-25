@@ -6,16 +6,30 @@ import { infraRegistry } from '../../infra/infraRegistry';
 const RESERVED_SERVICE_TYPES = new Set(['sdk']);
 
 export const getAvailableServicesHandler = asyncHandler(async (_req: Request, res: Response) => {
-  const types = await ServiceTypeModel.find({ name: { $nin: Array.from(RESERVED_SERVICE_TYPES) } }, { name: 1 }).sort({ name: 1 });
+  const includeOfflineRaw = String((_req.query as any)?.includeOffline || '').trim().toLowerCase();
+  const includeOffline = includeOfflineRaw === '1' || includeOfflineRaw === 'true' || includeOfflineRaw === 'yes' || includeOfflineRaw === 'on';
+
+  const types = await ServiceTypeModel.find(
+    { name: { $nin: Array.from(RESERVED_SERVICE_TYPES) } },
+    { name: 1, serverName: 1, icon: 1, description: 1, configTemplate: 1 }
+  ).sort({ name: 1 });
   const onlineCounts = infraRegistry.getOnlineCounts();
 
   const services = types.map((t) => {
     const serviceType = t.name;
     const connections = onlineCounts[serviceType] ?? 0;
-    return { serviceType, online: connections > 0, connections };
+    return {
+      serviceType,
+      serverName: (t as any).serverName || serviceType,
+      icon: (t as any).icon || '',
+      description: (t as any).description || '',
+      configTemplate: (t as any).configTemplate || '',
+      online: connections > 0,
+      connections,
+    };
   });
 
-  res.status(200).json({ services });
+  res.status(200).json({ services: includeOffline ? services : services.filter((s) => s.online) });
 });
 
 export const registerServiceTypeHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -27,11 +41,16 @@ export const registerServiceTypeHandler = asyncHandler(async (req: Request, res:
     return res.status(400).json({ message: `serviceType is reserved: ${serviceType}` });
   }
 
+  const serverName = String((req.body?.serverName as string) || '').trim() || serviceType;
+  const icon = String((req.body?.icon as string) || '').trim();
+  const description = String((req.body?.description as string) || '').trim();
+  const configTemplate = String((req.body?.configTemplate as string) || '');
+
   await ServiceTypeModel.updateOne(
     { name: serviceType },
-    { $set: { name: serviceType, lastSeenAt: new Date() } },
+    { $set: { name: serviceType, serverName, icon, description, configTemplate, lastSeenAt: new Date() } },
     { upsert: true }
   );
 
-  res.status(200).json({ serviceType });
+  res.status(200).json({ serviceType, serverName });
 });

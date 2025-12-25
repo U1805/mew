@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,6 +16,13 @@ import (
 type ServiceOptions struct {
 	LogPrefix   string
 	ServiceType string
+	ServerName  string
+	Icon        string
+	Description string
+
+	// ConfigTemplate is a JSON string shown as the default template when creating a bot.
+	// Leave empty to provide no template.
+	ConfigTemplate string
 
 	// NewRunner builds a Runner for a single bot instance.
 	NewRunner func(botID, botName, accessToken, rawConfig string, cfg RuntimeConfig) (manager.Runner, error)
@@ -61,11 +69,22 @@ func RunService(ctx context.Context, opts ServiceOptions) error {
 		return ErrInvalidRunnerFactory
 	}
 
-	mgr := manager.NewBotManager(client, cfg.ServiceType, opts.LogPrefix, func(botID, botName, accessToken, rawConfig string) (manager.Runner, error) {
+	reg := manager.ServiceTypeRegistration{
+		ServiceType:    cfg.ServiceType,
+		ServerName:     strings.TrimSpace(opts.ServerName),
+		Icon:           strings.TrimSpace(opts.Icon),
+		Description:    strings.TrimSpace(opts.Description),
+		ConfigTemplate: opts.ConfigTemplate,
+	}
+	if reg.ServerName == "" {
+		reg.ServerName = reg.ServiceType
+	}
+	mgr := manager.NewBotManagerWithRegistration(client, reg, opts.LogPrefix, func(botID, botName, accessToken, rawConfig string) (manager.Runner, error) {
 		return opts.NewRunner(botID, botName, accessToken, rawConfig, cfg)
 	})
 
 	log.Printf("%s starting (serviceType=%s apiBase=%s syncInterval=%s)", opts.LogPrefix, cfg.ServiceType, cfg.APIBase, cfg.SyncInterval)
+	go mew.RunInfraPresence(ctx, cfg.APIBase, cfg.AdminSecret, cfg.ServiceType, opts.LogPrefix)
 
 	if !opts.DisableInitialSync {
 		if err := mgr.SyncOnce(ctx); err != nil {

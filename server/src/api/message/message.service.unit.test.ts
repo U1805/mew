@@ -191,7 +191,7 @@ describe('message.service (unit)', () => {
     await expect(createMessage({ channelId: 'c1' } as any)).rejects.toBeInstanceOf(BadRequestError);
   });
 
-  it('createMessage broadcasts MESSAGE_CREATE and to DM recipients', async () => {
+  it('createMessage broadcasts MESSAGE_CREATE to DM recipients (no channel-room duplicate)', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue({
       ...makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] }),
     });
@@ -208,13 +208,32 @@ describe('message.service (unit)', () => {
 
     const result: any = await createMessage({ channelId: 'c1', authorId: 'u1', content: 'hi', attachments: [{ key: 'k.png' }] } as any);
 
-    expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_CREATE', 'c1', expect.any(Object));
+    expect(socketManager.broadcast).not.toHaveBeenCalled();
     expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u1', 'MESSAGE_CREATE', expect.any(Object));
     expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u2', 'MESSAGE_CREATE', expect.any(Object));
     expect(result.attachments[0].url).toBe('http://cdn.local/k.png');
   });
 
-  it('createMessage triggers async metadata embed update and MESSAGE_UPDATE', async () => {
+  it('createMessage broadcasts MESSAGE_CREATE to the channel room for non-DM channels', async () => {
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'GUILD_TEXT' }));
+    vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);
+    vi.mocked(extractFirstUrl).mockReturnValue(null);
+
+    const doc = makeMessageDoc({
+      channelId: mkId('c1'),
+      authorId: { username: 'alice', avatarUrl: 'a.png', isBot: false },
+      attachments: [],
+    });
+    vi.mocked(messageRepository.create).mockReturnValue(doc as any);
+    vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
+
+    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'hi' } as any);
+
+    expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_CREATE', 'c1', expect.any(Object));
+    expect(socketManager.broadcastToUser).not.toHaveBeenCalled();
+  });
+
+  it('createMessage triggers async metadata embed update and MESSAGE_UPDATE (DM via recipients)', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue({
       ...makeFindByIdQuery({ type: 'DM', recipients: [mkId('u2')] }),
     });
@@ -245,7 +264,7 @@ describe('message.service (unit)', () => {
     // allow the .then(async ...) chain to run
     await new Promise((r) => setTimeout(r, 0));
 
-    expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_UPDATE', 'c1', expect.any(Object));
+    expect(socketManager.broadcast).not.toHaveBeenCalled();
     expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u2', 'MESSAGE_UPDATE', expect.any(Object));
   });
 

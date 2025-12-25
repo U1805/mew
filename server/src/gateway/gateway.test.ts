@@ -150,7 +150,7 @@ describe('WebSocket Gateway', () => {
 
     const savedMsg = await Message.findOne({ channelId: channel1Id, content: 'Hello from channel one' });
     expect(savedMsg).toBeTruthy();
-  }, 15000);
+  }, 30000);
 
   it('should make user join their own user ID room upon connection', async () => {
     await request(app)

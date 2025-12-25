@@ -1,4 +1,4 @@
-# Test Bot (serviceType: `test`)
+# Test Bot (serviceType: `test-fetcher`)
 
 这个 Bot 会从后端批量拉取所有 `serviceType=test` 的 Bot 实例配置，并把每个配置数组元素当作一个独立的定时任务：按 `interval` 间隔向对应 `webhook` 发送 `content`（默认 30 秒）。
 

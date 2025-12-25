@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"log"
+	"strings"
 	"sync"
 
 	"mew/plugins/sdk/mew"
@@ -17,11 +18,19 @@ type Runner interface {
 
 type RunnerFactory func(botID, botName, accessToken, rawConfig string) (Runner, error)
 
+type ServiceTypeRegistration struct {
+	ServiceType    string
+	ServerName     string
+	Icon           string
+	Description    string
+	ConfigTemplate string
+}
+
 type BotManager struct {
-	client      *mew.Client
-	serviceType string
-	logPrefix   string
-	newRunner   RunnerFactory
+	client       *mew.Client
+	registration ServiceTypeRegistration
+	logPrefix    string
+	newRunner    RunnerFactory
 
 	mu   sync.Mutex
 	bots map[string]*runningBot
@@ -34,12 +43,24 @@ type runningBot struct {
 }
 
 func NewBotManager(client *mew.Client, serviceType, logPrefix string, factory RunnerFactory) *BotManager {
+	return NewBotManagerWithRegistration(client, ServiceTypeRegistration{ServiceType: serviceType}, logPrefix, factory)
+}
+
+func NewBotManagerWithRegistration(client *mew.Client, reg ServiceTypeRegistration, logPrefix string, factory RunnerFactory) *BotManager {
+	reg.ServiceType = strings.TrimSpace(reg.ServiceType)
+	reg.ServerName = strings.TrimSpace(reg.ServerName)
+	reg.Icon = strings.TrimSpace(reg.Icon)
+	reg.Description = strings.TrimSpace(reg.Description)
+	if reg.ServerName == "" {
+		reg.ServerName = reg.ServiceType
+	}
+
 	return &BotManager{
-		client:      client,
-		serviceType: serviceType,
-		logPrefix:   logPrefix,
-		newRunner:   factory,
-		bots:        make(map[string]*runningBot),
+		client:       client,
+		registration: reg,
+		logPrefix:    logPrefix,
+		newRunner:    factory,
+		bots:         make(map[string]*runningBot),
 	}
 }
 
@@ -60,11 +81,17 @@ func (m *BotManager) StopAll() {
 }
 
 func (m *BotManager) SyncOnce(ctx context.Context) error {
-	if err := m.client.RegisterServiceType(ctx, m.serviceType); err != nil {
+	if err := m.client.RegisterServiceTypeWithInfo(ctx, mew.ServiceTypeRegistration{
+		ServiceType:    m.registration.ServiceType,
+		ServerName:     m.registration.ServerName,
+		Icon:           m.registration.Icon,
+		Description:    m.registration.Description,
+		ConfigTemplate: m.registration.ConfigTemplate,
+	}); err != nil {
 		return err
 	}
 
-	bots, err := m.client.BootstrapBots(ctx, m.serviceType)
+	bots, err := m.client.BootstrapBots(ctx, m.registration.ServiceType)
 	if err != nil {
 		return err
 	}

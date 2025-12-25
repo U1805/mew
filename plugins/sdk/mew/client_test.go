@@ -34,6 +34,12 @@ func TestClient_RegisterServiceType_And_BootstrapBots(t *testing.T) {
 		switch r.URL.Path {
 		case "/infra/service-types/register":
 			gotRegister = true
+			var body ServiceTypeRegistration
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body.ServiceType != "svc" || body.ServerName != "svc" {
+				http.Error(w, "bad register body", http.StatusBadRequest)
+				return
+			}
 			w.WriteHeader(http.StatusOK)
 		case "/bots/bootstrap":
 			gotBootstrap = true
@@ -111,4 +117,3 @@ func TestClient_BootstrapBots_InvalidJSONIncludesBody(t *testing.T) {
 		t.Fatalf("expected decode error with body, got: %v", err)
 	}
 }
-

@@ -9,6 +9,7 @@ import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 import { BotManagementPanel } from './BotManagementPanel';
+import { PluginManagementPanel } from './PluginManagementPanel';
 
 const UserSettings: React.FC = () => {
   const { isSettingsOpen, closeSettings } = useUIStore();
@@ -124,8 +125,9 @@ const UserSettings: React.FC = () => {
             
             <SidebarItem label="My Account" isActive={activeTab === 'account'} onClick={() => setActiveTab('account')} />
             <SidebarItem label="Profiles" />
-            <SidebarItem label="Privacy & Safety" />
+            <SidebarItem label="Plugins" isActive={activeTab === 'plugins'} onClick={() => setActiveTab('plugins')} />
             <SidebarItem label="Bots" isActive={activeTab === 'bots'} onClick={() => setActiveTab('bots')} />
+            <SidebarItem label="Privacy & Safety" />
             <SidebarItem label="Family Center" />
             <SidebarItem label="Authorized Apps" />
             <SidebarItem label="Devices" />
@@ -280,6 +282,7 @@ const UserSettings: React.FC = () => {
             </>
         )}
 
+        {activeTab === 'plugins' && <PluginManagementPanel />}
         {activeTab === 'bots' && <BotManagementPanel />}
 
       </div>

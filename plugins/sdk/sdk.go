@@ -92,11 +92,21 @@ func NewBotManager(client *MewClient, serviceType, logPrefix string, factory Run
 	return manager.NewBotManager(client, serviceType, logPrefix, factory)
 }
 
+type ServiceTypeRegistration = manager.ServiceTypeRegistration
+
+func NewBotManagerWithRegistration(client *MewClient, reg ServiceTypeRegistration, logPrefix string, factory RunnerFactory) *BotManager {
+	return manager.NewBotManagerWithRegistration(client, reg, logPrefix, factory)
+}
+
 // ---- config helpers ----
 
 func DecodeTasks[T any](rawConfig string) ([]T, error) { return config.DecodeTasks[T](rawConfig) }
 
 func ValidateHTTPURL(raw string) error { return config.ValidateHTTPURL(raw) }
+
+func ConfigTemplateJSON(v any) (string, error) { return config.TemplateJSON(v) }
+
+func TaskConfigTemplateJSON[T any]() (string, error) { return config.TaskTemplateJSON[T]() }
 
 // ---- http helpers ----
 

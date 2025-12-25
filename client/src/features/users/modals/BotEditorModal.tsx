@@ -47,21 +47,35 @@ export const BotEditorModal: React.FC = () => {
   });
 
   const { data: availableServices } = useQuery({
-    queryKey: ['availableServices'],
+    queryKey: ['availableServices', isEditing ? 'includeOffline' : 'onlineOnly'],
     queryFn: async () => {
-      const res = await infraApi.availableServices();
+      const res = await infraApi.availableServices(isEditing ? { includeOffline: true } : undefined);
       return (res.data?.services || []) as AvailableService[];
     },
   });
 
+  const serviceOptions = (availableServices || []).filter((s) => s.online || (isEditing && s.serviceType === serviceType));
+  const selectedService = (availableServices || []).find((s) => s.serviceType === serviceType);
+
   useEffect(() => {
     if (isEditing) return;
     if (serviceType) return;
-    const services = availableServices || [];
+    const services = serviceOptions || [];
     if (services.length === 0) return;
     const preferred = services.find((s) => s.online) || services[0];
     setServiceType(preferred.serviceType);
-  }, [availableServices, isEditing, serviceType]);
+  }, [isEditing, serviceOptions, serviceType]);
+
+  useEffect(() => {
+    if (isEditing) return;
+    if (!serviceType) return;
+    const template = selectedService?.configTemplate || '';
+    if (!template.trim()) return;
+
+    const current = config.trim();
+    if (current && current !== '{}' && current !== 'null') return;
+    if (config !== template) setConfig(template);
+  }, [config, isEditing, selectedService?.configTemplate, serviceType]);
 
   useEffect(() => {
     const initialValues = modalData?.bot as Bot | undefined;
@@ -241,14 +255,21 @@ export const BotEditorModal: React.FC = () => {
                     value={serviceType}
                     onChange={(e) => setServiceType(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none font-medium appearance-none"
+                    disabled={!isEditing && serviceOptions.length === 0}
                   >
                     <option value="" disabled>Select a service type</option>
-                    {(availableServices || []).map((s) => (
+                    {serviceOptions.map((s) => (
                       <option key={s.serviceType} value={s.serviceType}>
-                        {s.serviceType}{s.online ? ' (online)' : ''}
+                        {(s.serverName && s.serverName !== s.serviceType ? ` [${s.serviceType}] ` : '') + (s.serverName || s.serviceType)}
                       </option>
                     ))}
                   </select>
+                  {!isEditing && serviceOptions.length === 0 && (
+                    <p className="text-xs text-mew-textMuted mt-2">No online Bot services are running.</p>
+                  )}
+                  {!!selectedService?.description && (
+                    <p className="text-xs text-mew-textMuted mt-2 whitespace-pre-wrap">{selectedService.description}</p>
+                  )}
                 </div>
               </div>
             </div>

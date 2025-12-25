@@ -91,8 +91,35 @@ func (c *Client) BootstrapBots(ctx context.Context, serviceType string) ([]Boots
 	return parsed.Bots, nil
 }
 
+type ServiceTypeRegistration struct {
+	ServiceType    string `json:"serviceType"`
+	ServerName     string `json:"serverName"`
+	Icon           string `json:"icon"`
+	Description    string `json:"description"`
+	ConfigTemplate string `json:"configTemplate"`
+}
+
 func (c *Client) RegisterServiceType(ctx context.Context, serviceType string) error {
-	reqBody, err := json.Marshal(map[string]string{"serviceType": serviceType})
+	serviceType = strings.TrimSpace(serviceType)
+	return c.RegisterServiceTypeWithInfo(ctx, ServiceTypeRegistration{
+		ServiceType: serviceType,
+		ServerName:  serviceType,
+	})
+}
+
+func (c *Client) RegisterServiceTypeWithInfo(ctx context.Context, info ServiceTypeRegistration) error {
+	info.ServiceType = strings.TrimSpace(info.ServiceType)
+	info.ServerName = strings.TrimSpace(info.ServerName)
+	info.Icon = strings.TrimSpace(info.Icon)
+	info.Description = strings.TrimSpace(info.Description)
+	if info.ServiceType == "" {
+		return fmt.Errorf("serviceType is required")
+	}
+	if info.ServerName == "" {
+		info.ServerName = info.ServiceType
+	}
+
+	reqBody, err := json.Marshal(info)
 	if err != nil {
 		return err
 	}

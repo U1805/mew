@@ -43,12 +43,22 @@
 func main() {
   _ = sdk.RunServiceWithSignals(sdk.ServiceOptions{
     LogPrefix: "[my-bot]",
+    // ServiceType 默认从插件目录名推导，也可以手动覆盖：
+    // ServiceType: "my-service-type",
+    // 注册到 MEW 后台的展示信息（可选）：
+    // ServerName: "我的 Bot（中文名）",
+    // Icon: "https://example.com/icon.png",
+    // Description: "一句话描述（可多行）",
+    // ConfigTemplate: `[{"interval":300,"webhook":"..."}]`,
     NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
       return NewMyRunner(botID, botName, accessToken, rawConfig, cfg)
     },
   })
 }
 ```
+
+`ServerName/Icon/Description/ConfigTemplate` 会在服务端 `POST /api/infra/service-types/register` 时上报，
+用于前端展示和创建 Bot 时的配置模板提示。
 
 ## `.env` 约定
 

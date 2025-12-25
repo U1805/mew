@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import config from '../config';
 import { infraRegistry } from './infraRegistry';
 import ServiceTypeModel from '../api/infra/serviceType.model';
+import { syncBotUsersPresenceForServiceType } from './botPresenceSync';
 
 const RESERVED_SERVICE_TYPES = new Set(['sdk']);
 
@@ -45,16 +46,28 @@ export const registerInfraNamespace = (io: SocketIOServer) => {
   nsp.on('connection', async (socket) => {
     const serviceType = (socket.data as any).serviceType as string;
     socket.join(serviceType);
+
+    const wasOnline = infraRegistry.isOnline(serviceType);
     infraRegistry.addConnection(serviceType, socket.id);
+    if (!wasOnline && infraRegistry.isOnline(serviceType)) {
+      await syncBotUsersPresenceForServiceType(serviceType, 'online');
+    }
 
     await ServiceTypeModel.updateOne(
       { name: serviceType },
-      { $set: { name: serviceType, lastSeenAt: new Date() } },
+      {
+        $set: { name: serviceType, lastSeenAt: new Date() },
+        $setOnInsert: { serverName: serviceType, icon: '', description: '', configTemplate: '' },
+      },
       { upsert: true }
     );
 
     socket.on('disconnect', () => {
+      const wasOnline = infraRegistry.isOnline(serviceType);
       infraRegistry.removeConnection(serviceType, socket.id);
+      if (wasOnline && !infraRegistry.isOnline(serviceType)) {
+        void syncBotUsersPresenceForServiceType(serviceType, 'offline');
+      }
     });
   });
 

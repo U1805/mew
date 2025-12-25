@@ -149,7 +149,14 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   const channelIdStr = populatedMessage.channelId.toString();
 
-  socketManager.broadcast('MESSAGE_CREATE', channelIdStr, messageForClient);
+  if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
+    // DM users join both the DM channel room and their personal room; broadcasting to both causes duplicates.
+    for (const recipient of channel.recipients) {
+      socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_CREATE', messageForClient);
+    }
+  } else {
+    socketManager.broadcast('MESSAGE_CREATE', channelIdStr, messageForClient);
+  }
 
   // --- Async Metadata Fetching ---
   if (data.content && !data.attachments?.length && extractFirstUrl(data.content)) {
@@ -173,11 +180,12 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
           const updatedMessageForClient = processMessageForClient(populatedMessage);
 
-          socketManager.broadcast('MESSAGE_UPDATE', channelIdStr, updatedMessageForClient);
           if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
             for (const recipient of channel.recipients) {
               socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_UPDATE', updatedMessageForClient);
             }
+          } else {
+            socketManager.broadcast('MESSAGE_UPDATE', channelIdStr, updatedMessageForClient);
           }
         }
       })
@@ -187,13 +195,6 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
       });
   }
   // --- End Async Metadata Fetching ---
-
-  // Also broadcast to recipients' personal rooms for DM reliability.
-  if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
-    for (const recipient of channel.recipients) {
-      socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_CREATE', messageForClient);
-    }
-  }
 
   return messageForClient as IMessage;
 };
