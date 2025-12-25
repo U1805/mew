@@ -39,7 +39,7 @@
 ## 去重与缓存
 
 - 解析出的视频会用 `viewkey` 做去重（避免重复推送）
-- 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/pornhub-fetcher/<botId>/task-<idx>-<hash>.json`；可用 `MEW_STATE_DIR` 覆盖），避免重启后重复推送
+- 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/pornhub-fetcher/<botId>/task-<idx>-<hash>.json`），避免重启后重复推送
 
 ## 运行
 

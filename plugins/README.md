@@ -25,7 +25,6 @@
 - `MEW_API_PROXY`：可选，请求代理（默认不使用代理；`env` 表示使用 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`）
 - `MEW_CONFIG_SYNC_INTERVAL_SECONDS`：轮询同步间隔，默认 `60`
 - `MEW_DOTENV`：可选，设置为 `0/false/off/no` 可禁用 `.env` 加载（默认启用）
-- `MEW_STATE_DIR`：可选，插件本地 state 的根目录（默认使用系统用户缓存目录；fallback 到临时目录）
 
 `serviceType` 不通过环境变量设置，而是自动使用插件目录名（例如 `plugins/fetchers/test-fetcher` 的 `serviceType` 为 `test-fetcher`）。
 

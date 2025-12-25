@@ -1,13 +1,18 @@
 package state
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
 
-func TestBaseDir_EnvOverride(t *testing.T) {
-	base := t.TempDir()
-	t.Setenv("MEW_STATE_DIR", base)
+func TestBaseDir_Default(t *testing.T) {
+	d, err := os.UserCacheDir()
+	if err != nil || d == "" {
+		t.Skipf("os.UserCacheDir unavailable: %v", err)
+	}
+
+	base := filepath.Join(d, "mew")
 	if got := BaseDir(); got != base {
 		t.Fatalf("BaseDir() = %q, want %q", got, base)
 	}
@@ -18,4 +23,3 @@ func TestBaseDir_EnvOverride(t *testing.T) {
 		t.Fatalf("TaskFile() dir = %q, want %q", filepath.Dir(got), wantDir)
 	}
 }
-

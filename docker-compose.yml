@@ -116,9 +116,12 @@ services:
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
       # Comma/space/semicolon separated list of plugin serviceType names. Example: "test-fetcher,test-agent"
       MEW_PLUGINS: ${MEW_PLUGINS:-test-fetcher,test-agent}
+    volumes:
+      - plugins_cache:/root/.cache/mew
 
 volumes:
   mongo_data:
   garage_meta:
   garage_data:
   garage_secrets:
+  plugins_cache:

@@ -11,8 +11,7 @@ import (
 )
 
 func TestTaskFile_IgnoresLegacyLayout(t *testing.T) {
-	base := t.TempDir()
-	t.Setenv("MEW_STATE_DIR", base)
+	base := BaseDir()
 
 	serviceType := "svc-" + strings.ReplaceAll(t.Name(), "/", "_")
 	botID := "bot-" + strings.ReplaceAll(t.Name(), "/", "_")
@@ -42,4 +41,3 @@ func TestTaskFile_IgnoresLegacyLayout(t *testing.T) {
 		t.Fatalf("TaskFile() returned legacy path: %q", got)
 	}
 }
-

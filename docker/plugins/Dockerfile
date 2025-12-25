@@ -29,6 +29,8 @@ FROM alpine:3.20
 
 RUN apk add --no-cache ca-certificates tini
 
+ENV HOME=/root
+
 COPY --from=build /out/ /usr/local/bin/
 COPY docker/plugins/entrypoint.sh /usr/local/bin/mew-bot-entrypoint
 

@@ -63,7 +63,7 @@ func main() {
 
 保存目录：
 
-- 默认：`sdk.DevModeDir()`（即 `MEW_DEV_DIR` 或 `MEW_STATE_DIR/dev`）
+- 默认：`sdk.DevModeDir()`（即 `MEW_DEV_DIR` 或 `StateBaseDir()/dev`）
 - webhook 记录：`{DevModeDir}/webhook/post/<serviceType>-<timestamp>-<rand>.json`
 - upload 记录：`{DevModeDir}/webhook/upload/<serviceType>-<timestamp>-<rand>.json`
 - upload 数据：`{DevModeDir}/webhook/upload/<serviceType>-<timestamp>-<rand>-<filename>`
@@ -84,7 +84,7 @@ SDK 默认**不使用代理**（即使系统设置了 `HTTP_PROXY/HTTPS_PROXY`�
 
 ## State（持久化）
 
-SDK 提供了一个简单的 JSON 文件持久化工具，默认写到系统用户缓存目录（可用 `MEW_STATE_DIR` 覆盖）：
+SDK 提供了一个简单的 JSON 文件持久化工具，默认写到系统用户缓存目录：
 
 - `sdk.OpenTaskState[T](serviceType, botID, idx, identity)`：打开一个 task 的 state（`store.Path` + `store.Load()` / `store.Save(v)`）
 - `sdk.TaskStateFile(serviceType, botID, idx, identity)`：底层路径生成（不推荐插件层重复封装）

@@ -28,14 +28,14 @@ func withEnv(t *testing.T, key, value string, fn func()) {
 
 func TestDevMode_PostJSON_RecordsFile(t *testing.T) {
 	tmp := t.TempDir()
-	withEnv(t, "MEW_STATE_DIR", tmp, func() {})
+	withEnv(t, "MEW_DEV_DIR", tmp, func() {})
 	withEnv(t, "DEV_MODE", "true", func() {})
 
 	if err := PostJSON(context.Background(), nil, "https://example.com/api", "", []byte(`{"x":1}`)); err != nil {
 		t.Fatalf("PostJSON: %v", err)
 	}
 
-	dir := filepath.Join(tmp, "dev", "webhook")
+	dir := filepath.Join(tmp, "webhook")
 	entries, err := os.ReadDir(filepath.Join(dir, "post"))
 	if err != nil {
 		t.Fatalf("ReadDir(%s): %v", dir, err)
@@ -72,7 +72,7 @@ func TestDevMode_PostJSON_RecordsFile(t *testing.T) {
 
 func TestDevMode_UploadBytes_RecordsFile(t *testing.T) {
 	tmp := t.TempDir()
-	withEnv(t, "MEW_STATE_DIR", tmp, func() {})
+	withEnv(t, "MEW_DEV_DIR", tmp, func() {})
 	withEnv(t, "DEV_MODE", "1", func() {})
 
 	att, err := UploadBytes(context.Background(), nil, "", "", "hello.txt", "text/plain", []byte("hello"))
@@ -86,7 +86,7 @@ func TestDevMode_UploadBytes_RecordsFile(t *testing.T) {
 		t.Fatalf("expected non-empty key")
 	}
 
-	dir := filepath.Join(tmp, "dev", "webhook")
+	dir := filepath.Join(tmp, "webhook")
 	entries, err := os.ReadDir(filepath.Join(dir, "upload"))
 	if err != nil {
 		t.Fatalf("ReadDir(%s): %v", dir, err)

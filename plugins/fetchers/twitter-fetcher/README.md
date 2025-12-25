@@ -46,7 +46,7 @@
 - 抓取端会随机使用常见浏览器 `User-Agent` 以降低被拦截风险
 - 抓取端会自动请求 `/_trace` 获取 `_utid` Cookie
 - 媒体文件会通过 webhook `/upload` 本地化到 S3/CDN，并在本地 state 中缓存 `remoteURL -> key`，避免重复上传
-- 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/twitter-fetcher/<botId>/task-<idx>-<hash>.json`；可用 `MEW_STATE_DIR` 覆盖），避免重启后重复推送
+- 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/twitter-fetcher/<botId>/task-<idx>-<hash>.json`），避免重启后重复推送
 
 ## 运行
 
