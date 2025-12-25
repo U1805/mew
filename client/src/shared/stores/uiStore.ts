@@ -10,6 +10,14 @@ interface UIState {
   isSearchOpen: boolean;
   searchQuery: string;
   targetMessageId: string | null;
+  replyTo:
+    | {
+        messageId: string;
+        channelId: string;
+        authorUsername?: string;
+        preview?: string;
+      }
+    | null;
   setCurrentServer: (id: string | null) => void;
   setCurrentChannel: (id: string | null) => void;
   toggleMemberList: () => void;
@@ -18,6 +26,8 @@ interface UIState {
   setSearchOpen: (isOpen: boolean) => void;
   setSearchQuery: (query: string) => void;
   setTargetMessageId: (id: string | null) => void;
+  setReplyTo: (replyTo: UIState['replyTo']) => void;
+  clearReplyTo: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -28,6 +38,7 @@ export const useUIStore = create<UIState>((set) => ({
   isSearchOpen: false,
   searchQuery: '',
   targetMessageId: null,
+  replyTo: null,
   setCurrentServer: (id) => set({ currentServerId: id, currentChannelId: null, isSearchOpen: false, searchQuery: '' }),
   setCurrentChannel: (id) => {
     if (id) {
@@ -42,5 +53,7 @@ export const useUIStore = create<UIState>((set) => ({
   setSearchOpen: (isOpen) => set({ isSearchOpen: isOpen }),
   setSearchQuery: (query) => set({ searchQuery: query }),
   setTargetMessageId: (id) => set({ targetMessageId: id }),
+  setReplyTo: (replyTo) => set({ replyTo }),
+  clearReplyTo: () => set({ replyTo: null }),
 }));
 

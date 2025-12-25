@@ -9,6 +9,7 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   isLoading?: boolean;
+  confirmDisabled?: boolean;
   isDestructive?: boolean;
   children?: React.ReactNode;
 }
@@ -21,6 +22,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
   isLoading = false,
+  confirmDisabled = false,
   isDestructive = true,
   children
 }) => {
@@ -44,13 +46,13 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </button>
           <button
             onClick={onConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
             className={clsx(
               "px-6 py-2 rounded-[3px] font-medium text-sm transition-colors text-white",
               isDestructive
                 ? "bg-red-500 hover:bg-red-600"
                 : "bg-mew-accent hover:bg-mew-accentHover",
-              isLoading && "opacity-50 cursor-not-allowed"
+              (isLoading || confirmDisabled) && "opacity-50 cursor-not-allowed"
             )}
           >
             {isLoading ? 'Processing...' : confirmText}

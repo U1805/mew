@@ -131,6 +131,74 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
     throw new BadRequestError('Message must have a channel and an author');
   }
 
+  if (data.type === 'app/x-forward-card') {
+    const payload = data.payload as any;
+    const forwarded = payload?.forwardedMessage;
+
+    if (!forwarded || typeof forwarded !== 'object') {
+      throw new BadRequestError('Forward payload is invalid');
+    }
+
+    const forwardedAttachments = Array.isArray(forwarded.attachments)
+      ? forwarded.attachments
+          .map((a: any) => {
+            if (!a || typeof a !== 'object') return null;
+            return {
+              filename: typeof a.filename === 'string' ? a.filename : '',
+              contentType: typeof a.contentType === 'string' ? a.contentType : 'application/octet-stream',
+              url: typeof a.url === 'string' ? a.url : undefined,
+              size: typeof a.size === 'number' ? a.size : 0,
+            };
+          })
+          .filter(Boolean)
+      : [];
+
+    const forwardedAuthor =
+      forwarded.authorId && typeof forwarded.authorId === 'object'
+        ? {
+            _id: (forwarded.authorId as any)._id,
+            username: (forwarded.authorId as any).username,
+            avatarUrl: (forwarded.authorId as any).avatarUrl,
+            isBot: (forwarded.authorId as any).isBot,
+          }
+        : forwarded.author && typeof forwarded.author === 'object'
+          ? {
+              _id: (forwarded.author as any)._id,
+              username: (forwarded.author as any).username,
+              avatarUrl: (forwarded.author as any).avatarUrl,
+              isBot: (forwarded.author as any).isBot,
+            }
+          : undefined;
+
+    data.content = '';
+    data.attachments = [];
+    data.payload = {
+      forwardedFromLabel: typeof payload?.forwardedFromLabel === 'string' ? payload.forwardedFromLabel : undefined,
+      forwardedMessage: {
+        _id: typeof forwarded._id === 'string' ? forwarded._id : undefined,
+        type: typeof forwarded.type === 'string' ? forwarded.type : 'message/default',
+        content: typeof forwarded.content === 'string' ? forwarded.content : '',
+        payload: forwarded.payload && typeof forwarded.payload === 'object' ? forwarded.payload : undefined,
+        attachments: forwardedAttachments,
+        ...(forwardedAuthor ? { author: forwardedAuthor } : {}),
+        createdAt:
+          typeof forwarded.createdAt === 'string' || forwarded.createdAt instanceof Date
+            ? forwarded.createdAt
+            : undefined,
+      },
+    };
+  }
+
+  if (data.referencedMessageId) {
+    const referenced = await messageRepository.findById(data.referencedMessageId.toString());
+    if (!referenced) {
+      throw new NotFoundError('Referenced message not found');
+    }
+    if (referenced.channelId.toString() !== data.channelId.toString()) {
+      throw new ForbiddenError('Referenced message must be in the same channel');
+    }
+  }
+
   const validatedMentions = await mentionService.processMentions(
     data.content || '',
     data.channelId.toString(),

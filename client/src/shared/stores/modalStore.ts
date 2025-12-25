@@ -12,6 +12,7 @@ type ModalType =
   | 'channelSettings'
   | 'deleteChannel'
   | 'deleteMessage'
+  | 'forwardMessage'
   | 'findUser'
   | 'userProfile'
   | 'createInvite'

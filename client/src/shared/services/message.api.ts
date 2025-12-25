@@ -13,7 +13,13 @@ export const messageApi = {
   send: (
     serverId: string | undefined,
     channelId: string,
-    data: { content?: string; attachments?: Attachment[] }
+    data: {
+      content?: string;
+      attachments?: Attachment[];
+      referencedMessageId?: string;
+      type?: string;
+      payload?: any;
+    }
   ) => {
     const prefix = serverId ? `/servers/${serverId}` : '';
     return api.post(`${prefix}/channels/${channelId}/messages`, data);

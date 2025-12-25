@@ -4,7 +4,7 @@ import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { AttachmentList } from './AttachmentList';
 import { UrlEmbed } from './UrlEmbed';
-import { RssCard, PornhubCard, TwitterCard, BilibiliCard, InstagramCard } from '../cards';
+import { RssCard, PornhubCard, TwitterCard, BilibiliCard, InstagramCard, ForwardCard } from '../cards';
 
 interface MessageContentProps {
     message: Message;
@@ -18,6 +18,11 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
     const isTwitterCard = message.type === 'app/x-twitter-card';
     const isBilibiliCard = message.type === 'app/x-bilibili-card';
     const isInstagramCard = message.type === 'app/x-instagram-card';
+    const isForwardCard = message.type === 'app/x-forward-card';
+
+    if (isForwardCard && message.payload) {
+        return <ForwardCard payload={message.payload} serverId={serverId} channelId={channelId} />;
+    }
 
     if (isRssCard && message.payload) {
         return <RssCard payload={message.payload} fallbackTimestamp={message.createdAt} />;

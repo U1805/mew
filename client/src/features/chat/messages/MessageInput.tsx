@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { messageApi, uploadApi } from '../../../shared/services/api';
 import { Channel, Message, Attachment } from '../../../shared/types';
-import { useAuthStore } from '../../../shared/stores';
+import { useAuthStore, useUIStore } from '../../../shared/stores';
 import { formatFileSize } from '../../../shared/utils/file';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -31,7 +31,13 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   const sendMessageRef = useRef<() => void>(() => {});
 
   const queryClient = useQueryClient();
+  const { replyTo, clearReplyTo, setReplyTo } = useUIStore();
   const canSendMessage = channel?.permissions?.includes('SEND_MESSAGES') ?? false;
+
+  const activeReplyTo = useMemo(() => {
+    if (!replyTo || !channelId) return null;
+    return replyTo.channelId === channelId ? replyTo : null;
+  }, [replyTo, channelId]);
 
   const placeholderText = useMemo(() => {
     if (isUploading) return 'Uploading files...';
@@ -103,6 +109,13 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     if (!editor) return;
     editor.setEditable(canSendMessage && !isUploading);
   }, [canSendMessage, editor, isUploading]);
+
+  useEffect(() => {
+    if (!editor) return;
+    if (activeReplyTo) {
+      requestAnimationFrame(() => editor.commands.focus('end'));
+    }
+  }, [activeReplyTo, editor]);
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !channelId) return;
@@ -184,6 +197,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     const mentionsToSend = extractMentionIdsFromDoc(doc);
 
     const currentServerId = serverId ? serverId : undefined;
+    const replySnapshot = activeReplyTo;
 
     const tempId = new Date().toISOString();
     const user = useAuthStore.getState().user;
@@ -199,6 +213,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       updatedAt: new Date().toISOString(),
       type: 'DEFAULT',
       mentions: mentionsToSend,
+      ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
       attachments: attachments.map(a => ({
           filename: a.filename || '',
           contentType: a.contentType || '',
@@ -213,6 +228,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
     editor.commands.setContent(emptyDoc, true);
     setAttachments([]);
+    if (replySnapshot) clearReplyTo();
 
     try {
       const finalAttachments = attachments
@@ -224,7 +240,8 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
       await messageApi.send(currentServerId, channelId, {
         content: contentToSend,
-        attachments: finalAttachments
+        attachments: finalAttachments,
+        ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
       });
       await queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
     } catch (err) {
@@ -233,6 +250,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       });
       console.error("Failed to send message:", err);
       setAttachments(attachments);
+      if (replySnapshot) setReplyTo(replySnapshot);
     }
   };
 
@@ -285,6 +303,27 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {activeReplyTo && (
+        <div className="bg-[#2B2D31] border border-[#1E1F22] rounded-lg px-3 py-2 mb-2 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-xs text-mew-textMuted">
+              回复 <span className="text-mew-text">{activeReplyTo.authorUsername || 'Unknown'}</span>
+            </div>
+            {activeReplyTo.preview && (
+              <div className="text-xs text-mew-textMuted truncate">{activeReplyTo.preview}</div>
+            )}
+          </div>
+          <button
+            type="button"
+            className="text-mew-textMuted hover:text-mew-text p-1 rounded hover:bg-mew-darker flex-shrink-0"
+            onClick={() => clearReplyTo()}
+            aria-label="cancel reply"
+          >
+            <Icon icon="mdi:close" width="18" height="18" />
+          </button>
         </div>
       )}
 

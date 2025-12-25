@@ -10,13 +10,16 @@ export const createMessageHandler = asyncHandler(async (req: Request, res: Respo
     throw new UnauthorizedError('Not authenticated');
   }
 
-  const { content, attachments } = createMessageSchema.parse(req).body;
+  const { content, attachments, referencedMessageId, type, payload } = createMessageSchema.parse(req).body;
 
   const message = await messageService.createMessage({
     channelId: new Types.ObjectId(req.params.channelId),
     authorId: new Types.ObjectId(req.user.id),
     content,
     attachments,
+    ...(type ? { type } : {}),
+    ...(payload ? { payload } : {}),
+    ...(referencedMessageId ? { referencedMessageId: new Types.ObjectId(referencedMessageId) } : {}),
   });
 
   res.status(201).json(message);

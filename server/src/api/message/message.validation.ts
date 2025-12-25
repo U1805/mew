@@ -18,12 +18,35 @@ const attachmentSchema = z.object({
 });
 
 export const createMessageSchema = z.object({
-  body: z.object({
-    content: z.string().optional(), // Content can be optional if there are attachments
-    attachments: z.array(attachmentSchema).optional(),
-  }).refine(data => (data.content && data.content.trim() !== '') || (data.attachments && data.attachments.length > 0), {
-    message: 'A message must have either content or at least one attachment.',
-  }),
+  body: z
+    .object({
+      content: z.string().optional(), // Content can be optional if there are attachments
+      attachments: z.array(attachmentSchema).optional(),
+      referencedMessageId: z.string().optional(),
+      type: z.string().optional(),
+      payload: z.any().optional(),
+    })
+    .refine(
+      (data) => {
+        const hasContent = !!(data.content && data.content.trim() !== '');
+        const hasAttachments = !!(data.attachments && data.attachments.length > 0);
+
+        if (data.type === 'app/x-forward-card') {
+          const forwarded = (data.payload as any)?.forwardedMessage;
+          return !!(forwarded && typeof forwarded === 'object');
+        }
+
+        // Allow non-default typed messages (e.g. webhook cards) to be created without content/attachments.
+        if (data.type && data.type !== 'message/default') {
+          return !!data.payload;
+        }
+
+        return hasContent || hasAttachments;
+      },
+      {
+        message: 'A message must have either content or at least one attachment.',
+      }
+    ),
 });
 
 export const updateMessageSchema = z.object({
