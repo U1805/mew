@@ -46,6 +46,11 @@ services:
   server:
     image: "ghcr.io/u1805/mew/server:latest"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       mongo:
         condition: service_healthy
@@ -92,6 +97,11 @@ services:
   plugins:
     image: "ghcr.io/u1805/mew/plugins:latest"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       server:
         condition: service_healthy

@@ -30,7 +30,7 @@ services:
       context: .
       dockerfile: docker/garage/Dockerfile.init
     restart: "no"
-    network_mode: service:garage 
+    network_mode: service:garage
     depends_on:
       garage:
         condition: service_started
@@ -50,6 +50,11 @@ services:
       context: .
       dockerfile: server/Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       mongo:
         condition: service_healthy
@@ -100,6 +105,11 @@ services:
       context: .
       dockerfile: docker/plugins/Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       server:
         condition: service_healthy
