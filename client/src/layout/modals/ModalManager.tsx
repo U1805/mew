@@ -12,8 +12,8 @@ import { CreateServerModal } from '../../features/servers/modals/CreateServerMod
 import { CreateCategoryModal } from '../../features/channels/modals/CreateCategoryModal';
 import { CreateChannelModal } from '../../features/channels/modals/CreateChannelModal';
 import { DeleteChannelModal } from '../../features/channels/modals/DeleteChannelModal';
-import { DeleteMessageModal } from '../../features/messages/modals/DeleteMessageModal';
-import { ForwardMessageModal } from '../../features/messages/modals/ForwardMessageModal';
+import { DeleteMessageModal } from '../../features/chat-messages/modals/DeleteMessageModal';
+import { ForwardMessageModal } from '../../features/chat-messages/modals/ForwardMessageModal';
 import { DeleteCategoryModal } from '../../features/channels/modals/DeleteCategoryModal';
 import { DeleteServerModal } from '../../features/servers/modals/DeleteServerModal';
 import { LeaveServerModal } from '../../features/servers/modals/LeaveServerModal';

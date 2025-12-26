@@ -14,9 +14,6 @@ RUN corepack enable && pnpm install --frozen-lockfile --prod=false
 
 COPY client ./client
 
-ARG VITE_API_BASE_URL=/api
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-
 RUN pnpm --filter client build
 
 FROM nginx:1.27-alpine

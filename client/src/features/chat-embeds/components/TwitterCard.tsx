@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
-import { AttachmentLightbox } from '../messages/AttachmentLightbox';
+import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
 
 function safeHostname(url: string | undefined): string | null {
   if (!url) return null;

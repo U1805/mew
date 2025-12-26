@@ -3,7 +3,7 @@ import clsx from 'clsx';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
-import { AttachmentLightbox } from '../messages/AttachmentLightbox';
+import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
 
 // --- Utility Functions (无变化) ---
 

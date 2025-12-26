@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import { format } from 'date-fns';
 import type { Attachment, MessagePayload } from '../../../shared/types';
-import { AttachmentLightbox } from '../messages/AttachmentLightbox';
+import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
 
 function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';

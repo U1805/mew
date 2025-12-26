@@ -4,8 +4,8 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import { uploadApi, messageApi } from '../../../shared/services/api';
 import { Attachment } from '../../../shared/types';
-import { AttachmentImageEditor } from './AttachmentImageEditor';
-import { AttachmentImageViewer } from './AttachmentImageViewer';
+import { AttachmentImageEditor } from '../components/AttachmentImageEditor';
+import { AttachmentImageViewer } from '../components/AttachmentImageViewer';
 
 interface LightboxProps {
   attachment: Attachment;

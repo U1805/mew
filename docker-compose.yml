@@ -89,8 +89,6 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     restart: unless-stopped
     depends_on:
       - server

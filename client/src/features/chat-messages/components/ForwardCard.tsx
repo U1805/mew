@@ -1,7 +1,7 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
 import type { Message } from '../../../shared/types';
-import MessageContent from '../messages/MessageContent';
+import MessageContent from './MessageContent';
 
 interface ForwardCardProps {
   payload: any;

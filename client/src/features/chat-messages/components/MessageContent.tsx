@@ -2,9 +2,9 @@
 import React from 'react';
 import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
-import { AttachmentList } from './AttachmentList';
-import { UrlEmbed } from './UrlEmbed';
-import { RssCard, PornhubCard, TwitterCard, BilibiliCard, InstagramCard, ForwardCard, JpdictCard } from '../cards';
+import { AttachmentList } from '../../chat-attachments/components/AttachmentList';
+import ForwardCard from './ForwardCard';
+import { BilibiliCard, InstagramCard, JpdictCard, PornhubCard, RssCard, TwitterCard, UrlEmbed } from '../../chat-embeds';
 
 interface MessageContentProps {
     message: Message;

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Attachment } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import { formatFileSize } from '../../../shared/utils/file';
-import { AttachmentLightbox } from './AttachmentLightbox';
+import { AttachmentLightbox } from '../modals/AttachmentLightbox';
 import { VideoPlayer } from './VideoPlayer';
 
 interface AttachmentListProps {

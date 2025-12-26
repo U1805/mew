@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { parseMessageContent } from './messageParser';
 
-vi.mock('../../features/chat/messages/Mention', () => ({
+vi.mock('../../features/chat-messages/components/Mention', () => ({
   Mention: ({ userId }: { userId: string }) => (
     <span data-testid="mention" data-userid={userId}>
       @{userId}

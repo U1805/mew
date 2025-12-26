@@ -22,4 +22,3 @@ describe('renderJpdictCardHtml', () => {
     expect(html).toMatch(/<rt>/i);
   });
 });
-

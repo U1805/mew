@@ -1,4 +1,4 @@
-import { Mention } from '../../features/chat/messages/Mention';
+import { Mention } from '../../features/chat-messages/components/Mention';
 
 /**
  * Parses a message content string and replaces mention syntax with components.

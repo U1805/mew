@@ -3,7 +3,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import type { SuggestionOptions } from '@tiptap/suggestion';
 import tippy, { type Instance as TippyInstance } from 'tippy.js';
 import 'tippy.js/dist/tippy.css';
-import MentionSuggestionList, { type MentionSuggestionItem } from './mentionSuggestionList';
+import MentionSuggestionList, { type MentionSuggestionItem } from '../components/MentionSuggestionList';
 import type { ServerMember } from '../../../shared/types';
 
 type MentionProps = {

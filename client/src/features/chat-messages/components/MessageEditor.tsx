@@ -8,8 +8,8 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
-import { createMentionSuggestion } from '../editor/mentionSuggestion';
-import { parseContentStringToTiptapDoc, serializeTiptapDocToContentString } from '../editor/chatContent';
+import { createMentionSuggestion } from '../../chat-editor/hooks/mentionSuggestion';
+import { parseContentStringToTiptapDoc, serializeTiptapDocToContentString } from '../../chat-editor/hooks/chatContent';
 
 interface MessageEditorProps {
     message: Message;
