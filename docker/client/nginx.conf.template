@@ -2,6 +2,8 @@ server {
   listen 80;
   server_name _;
 
+  client_max_body_size ${LIMIT_FILE_SIZE}m;
+
   root /usr/share/nginx/html;
   index index.html;
 
@@ -39,6 +41,8 @@ server {
 server {
   listen 80;
   server_name ~^(?<bucket>.+)\\.web\\.garage\\.localhost$;
+
+  client_max_body_size ${LIMIT_FILE_SIZE}m;
 
   add_header X-Content-Type-Options "nosniff" always;
   add_header Referrer-Policy "no-referrer" always;

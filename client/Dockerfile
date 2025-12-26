@@ -18,7 +18,7 @@ RUN pnpm --filter client build
 
 FROM nginx:1.27-alpine
 
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/client/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/client/dist /usr/share/nginx/html
 
 EXPOSE 80

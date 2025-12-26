@@ -3,6 +3,7 @@ import asyncHandler from '../../utils/asyncHandler';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import Message from '../message/message.model';
 import { nanoid } from 'nanoid';
+import { MAX_UPLOAD_BYTES } from '../../constants/upload';
 
 export const uploadFileHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.file) {
@@ -38,7 +39,7 @@ export const presignUploadHandler = asyncHandler(async (req: Request, res: Respo
   if (Number.isNaN(size) || size <= 0) {
     throw new BadRequestError('size is required');
   }
-  if (size > 1024 * 1024 * 8) {
+  if (size > MAX_UPLOAD_BYTES) {
     throw new BadRequestError('file is too large');
   }
 

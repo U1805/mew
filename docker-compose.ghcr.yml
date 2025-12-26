@@ -1,122 +1,18 @@
+# Override for pulling prebuilt images from GHCR.
+# Use with: docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
 services:
-  mongo:
-    image: mongodb/mongodb-community-server:8.2.2-ubuntu2204
-    restart: unless-stopped
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "mongodb://localhost:27017/admin", "--eval", "db.adminCommand('ping').ok"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-
-  garage:
-    image: dxflrs/garage:v2.1.0
-    restart: unless-stopped
-    volumes:
-      - ./docker/garage/garage.toml:/etc/garage.toml:ro
-      - garage_meta:/var/lib/garage/meta
-      - garage_data:/var/lib/garage/data
-      - garage_secrets:/var/lib/garage/secrets
-    healthcheck:
-      test: ["CMD", "/garage", "--config", "/etc/garage.toml", "status"]
-      start_period: 20s
-      interval: 5s
-      timeout: 5s
-      retries: 30
-
   garage-init:
     image: "ghcr.io/u1805/mew/garage-init:${MEW_IMAGE_TAG:-latest}"
-    restart: "no"
-    network_mode: service:garage
-    depends_on:
-      garage:
-        condition: service_started
-    entrypoint: ["/bin/sh", "/init.sh"]
-    environment:
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-mew-bucket}
-      S3_KEY_NAME: ${S3_KEY_NAME:-mew-app-key}
-    volumes:
-      - ./docker/garage/init.sh:/init.sh:ro
-      - ./docker/garage/garage.toml:/etc/garage.toml:ro
-      - garage_secrets:/var/lib/garage/secrets
-      - garage_meta:/var/lib/garage/meta
-      - garage_data:/var/lib/garage/data
+    build: null
 
   server:
     image: "ghcr.io/u1805/mew/server:latest"
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    depends_on:
-      mongo:
-        condition: service_healthy
-      garage-init:
-        condition: service_completed_successfully
-    environment:
-      PORT: 3000
-      MONGO_URI: mongodb://mongo:27017/mew
-      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
-      MEW_ALLOW_USER_REGISTRATION: ${MEW_ALLOW_USER_REGISTRATION:-true}
-      MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
-      MEW_CORS_ORIGINS: ${MEW_CORS_ORIGINS:-*}
-      MEW_TRUST_PROXY: ${MEW_TRUST_PROXY:-loopback}
-      MEW_INFRA_ALLOWED_IPS: ${MEW_INFRA_ALLOWED_IPS:-}
-      # Garage (S3-compatible storage)
-      S3_ENDPOINT: garage
-      S3_PORT: 3900
-      S3_WEB_ENDPOINT: ${S3_WEB_ENDPOINT:-web.garage.localhost}
-      S3_WEB_PORT: ${S3_WEB_PORT:-80}
-      S3_REGION: garage
-      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-mew-bucket}
-      S3_CREDENTIALS_FILE: /var/run/mew/s3-credentials.json
-      S3_CORS_ORIGINS: ${S3_CORS_ORIGINS:-*}
-      S3_PRESIGN_EXPIRES_SECONDS: ${S3_PRESIGN_EXPIRES_SECONDS:-60}
-    healthcheck:
-      test:
-        ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 20s
-    volumes:
-      - garage_secrets:/var/run/mew:ro
+    build: null
 
   client:
     image: "ghcr.io/u1805/mew/client:latest"
-    restart: unless-stopped
-    depends_on:
-      - server
-    ports:
-      - "80:80"
+    build: null
 
   plugins:
     image: "ghcr.io/u1805/mew/plugins:latest"
-    restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    depends_on:
-      server:
-        condition: service_healthy
-    environment:
-      MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
-      MEW_URL: http://server:3000
-      MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
-      # Comma/space/semicolon separated list of plugin serviceType names. Example: "test-fetcher,test-agent"
-      MEW_PLUGINS: ${MEW_PLUGINS:-test-fetcher,test-agent}
-    volumes:
-      - plugins_cache:/root/.cache/mew
-
-volumes:
-  mongo_data:
-  garage_meta:
-  garage_data:
-  garage_secrets:
-  plugins_cache:
+    build: null

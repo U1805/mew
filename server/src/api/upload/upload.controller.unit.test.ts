@@ -108,7 +108,7 @@ describe('api/upload/upload.controller', () => {
       expect(next.mock.calls[0][0]).toBeInstanceOf(BadRequestError);
 
       next.mockClear();
-      await presignUploadHandler({ body: { filename: 'a.txt', size: 1024 * 1024 * 9 } } as any, res, next);
+      await presignUploadHandler({ body: { filename: 'a.txt', size: 1024 * 1024 * 51 } } as any, res, next);
       expect(next.mock.calls[0][0]).toBeInstanceOf(BadRequestError);
     });
 
@@ -202,4 +202,3 @@ describe('api/upload/upload.controller', () => {
     });
   });
 });
-

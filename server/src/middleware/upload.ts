@@ -1,12 +1,13 @@
 import multer from 'multer';
 import { BadRequestError } from '../utils/errors';
 import { s3StreamingStorage } from './s3Storage';
+import { MAX_UPLOAD_BYTES } from '../constants/upload';
 
 const storage = s3StreamingStorage();
 
 // --- General Attachment Configuration ---
 const attachmentLimits = {
-  fileSize: 1024 * 1024 * 8, // 8 MB limit for general files
+  fileSize: MAX_UPLOAD_BYTES,
 };
 
 export const uploadAttachment = multer({
@@ -16,15 +17,15 @@ export const uploadAttachment = multer({
 
 // --- Image-specific Configuration (for Avatars, Icons) ---
 const imageLimits = {
-  fileSize: 1024 * 1024 * 2, // 2 MB limit for images
+  fileSize: MAX_UPLOAD_BYTES,
 };
 
 const imageFileFilter = (req: any, file: any, cb: any) => {
-  const allowedMimes = ['image/jpeg', 'image/png', 'image/gif'];
+  const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new BadRequestError('Invalid file type. Only JPG, PNG, and GIF are allowed.'), false);
+    cb(new BadRequestError('Invalid file type. Only common image formats are allowed.'), false);
   }
 };
 

@@ -126,15 +126,15 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const allowed = ['image/jpeg', 'image/png', 'image/gif'];
+    const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (!allowed.includes(file.type)) {
-      toast.error('Only JPG, PNG, and GIF are allowed.');
+      toast.error('Only common image formats are allowed.');
       e.target.value = '';
       return;
     }
 
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size must be less than 2MB.');
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Image size must be less than 50MB.');
       e.target.value = '';
       return;
     }
@@ -341,7 +341,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                   )}
                 </div>
                 <div className="text-sm text-mew-textMuted">
-                  JPG/PNG/GIF, up to 2MB.
+                  JPG/PNG/GIF/WEBP/AVIF, up to 50MB.
                 </div>
               </div>
            </div>

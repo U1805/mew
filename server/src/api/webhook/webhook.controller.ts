@@ -4,6 +4,7 @@ import asyncHandler from '../../utils/asyncHandler';
 import { BadRequestError } from '../../utils/errors';
 import { nanoid } from 'nanoid';
 import path from 'path';
+import { MAX_UPLOAD_BYTES } from '../../constants/upload';
 
 export const getWebhooks = asyncHandler(async (req: Request, res: Response) => {
   const { channelId } = req.params;
@@ -84,7 +85,7 @@ export const presignWebhookFile = asyncHandler(async (req: Request, res: Respons
 
   if (!filename.trim()) throw new BadRequestError('filename is required');
   if (Number.isNaN(size) || size <= 0) throw new BadRequestError('size is required');
-  if (size > 1024 * 1024 * 8) throw new BadRequestError('file is too large');
+  if (size > MAX_UPLOAD_BYTES) throw new BadRequestError('file is too large');
 
   const ext = path.extname(filename.trim());
   const key = `${nanoid()}${ext}`;

@@ -80,6 +80,7 @@ services:
       S3_CREDENTIALS_FILE: /var/run/mew/s3-credentials.json
       S3_CORS_ORIGINS: ${S3_CORS_ORIGINS:-*}
       S3_PRESIGN_EXPIRES_SECONDS: ${S3_PRESIGN_EXPIRES_SECONDS:-60}
+      LIMIT_FILE_SIZE: ${LIMIT_FILE_SIZE:-50}
     healthcheck:
       test:
         ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
@@ -97,6 +98,8 @@ services:
     restart: unless-stopped
     depends_on:
       - server
+    environment:
+      LIMIT_FILE_SIZE: ${LIMIT_FILE_SIZE:-50}
     ports:
       - "80:80"
 
@@ -117,7 +120,6 @@ services:
       MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
       MEW_URL: http://server:3000
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
-      # Comma/space/semicolon separated list of plugin serviceType names. Example: "test-fetcher,test-agent"
       MEW_PLUGINS: ${MEW_PLUGINS:-test-fetcher,test-agent}
     volumes:
       - plugins_cache:/root/.cache/mew

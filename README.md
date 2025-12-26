@@ -51,8 +51,12 @@ Endpoints (default `docker-compose.yml`):
 
 ### GHCR
 
-This repo ships a `docker-compose.ghcr.yml` that pulls prebuilt images from GHCR.
+This repo ships a `docker-compose.ghcr.yml` override that pulls prebuilt images from GHCR.
 
 ```bash
-docker compose -f docker-compose.ghcr.yml up -d
+docker compose \
+  --env-file docker-compose.env \
+  -f docker-compose.yml \
+  -f docker-compose.ghcr.yml \
+  up -d
 ```
