@@ -21,6 +21,8 @@ interface MessageListProps {
 
 const SCROLL_TOP_THRESHOLD_PX = 80;
 const SCROLL_BOTTOM_THRESHOLD_PX = 200;
+const JUMP_FETCH_MAX_ATTEMPTS = 12;
+const JUMP_FETCH_MAX_MS = 12_000;
 
 const MessageList: React.FC<MessageListProps> = ({
   messages,
@@ -45,6 +47,10 @@ const MessageList: React.FC<MessageListProps> = ({
   const pendingPrependRef = useRef(false);
   const beforePrependScrollHeightRef = useRef(0);
   const beforePrependScrollTopRef = useRef(0);
+
+  const jumpAttemptsRef = useRef(0);
+  const jumpStartedAtRef = useRef<number | null>(null);
+  const jumpFetchInFlightRef = useRef(false);
 
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const isNearBottomRef = useRef(true);
@@ -72,6 +78,9 @@ const MessageList: React.FC<MessageListProps> = ({
 
     lastChannelIdRef.current = channelId;
     needsInitialScrollRef.current = true;
+    jumpAttemptsRef.current = 0;
+    jumpStartedAtRef.current = null;
+    jumpFetchInFlightRef.current = false;
 
     // 切换频道/DM 时默认回到底部（除非正在跳转到某条消息）。
     isNearBottomRef.current = true;
@@ -135,17 +144,51 @@ const MessageList: React.FC<MessageListProps> = ({
   }, [updateScrollToBottomVisibility]);
 
   useEffect(() => {
-    if (targetMessageId && messages.length && !isLoading) {
-      const el = document.getElementById(`message-${targetMessageId}`);
-      if (!el) return;
+    if (!targetMessageId) {
+      jumpAttemptsRef.current = 0;
+      jumpStartedAtRef.current = null;
+      jumpFetchInFlightRef.current = false;
+      return;
+    }
+
+    if (isLoading) return;
+    if (!jumpStartedAtRef.current) jumpStartedAtRef.current = Date.now();
+
+    const el = document.getElementById(`message-${targetMessageId}`);
+    if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('bg-mew-accent/20');
-      setTimeout(() => {
-        el.classList.remove('bg-mew-accent/20');
+      window.setTimeout(() => {
         setTargetMessageId(null);
       }, 2000);
+      return;
     }
-  }, [targetMessageId, messages, isLoading, setTargetMessageId]);
+
+    const elapsed = Date.now() - jumpStartedAtRef.current;
+    const exceeded =
+      elapsed > JUMP_FETCH_MAX_MS || jumpAttemptsRef.current >= JUMP_FETCH_MAX_ATTEMPTS;
+
+    if (exceeded || !onLoadOlder || !hasMoreOlder) {
+      setTargetMessageId(null);
+      return;
+    }
+
+    if (isFetchingOlder || jumpFetchInFlightRef.current) return;
+    jumpFetchInFlightRef.current = true;
+    jumpAttemptsRef.current += 1;
+
+    const scroller = scrollContainerRef.current;
+    if (scroller) {
+      pendingPrependRef.current = true;
+      beforePrependScrollHeightRef.current = scroller.scrollHeight;
+      beforePrependScrollTopRef.current = scroller.scrollTop;
+    }
+
+    Promise.resolve(onLoadOlder())
+      .catch(() => {})
+      .finally(() => {
+        jumpFetchInFlightRef.current = false;
+      });
+  }, [targetMessageId, isLoading, messages, setTargetMessageId, onLoadOlder, hasMoreOlder, isFetchingOlder]);
 
   useEffect(() => {
     if (!channel || !channelId || !messages.length || isLoading) return;

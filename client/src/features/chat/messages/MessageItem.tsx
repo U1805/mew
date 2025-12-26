@@ -73,13 +73,14 @@ const looksLikeIdPlaceholder = (text: string) => /^@?[0-9a-fA-F]{24}$/.test(text
 
 const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   const { user } = useAuthStore();
-  const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId } = useUIStore();
+  const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId, targetMessageId } = useUIStore();
   const { openModal } = useModalStore();
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [applyFlash, setApplyFlash] = useState(false);
+  const [jumpBlinkOn, setJumpBlinkOn] = useState(false);
   const [menuSelection, setMenuSelection] = useState('');
   const permissions = usePermissions(message.channelId);
   const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
@@ -133,6 +134,24 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
       }
     }
   }, [message._id, unreadMentionMessageIds, removeUnreadMention]);
+
+  useEffect(() => {
+    if (targetMessageId !== message._id) return;
+
+    // Blink background every 0.5s for 2s.
+    setJumpBlinkOn(true);
+    const interval = window.setInterval(() => setJumpBlinkOn((v) => !v), 500);
+    const stopTimer = window.setTimeout(() => {
+      window.clearInterval(interval);
+      setJumpBlinkOn(false);
+    }, 2000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(stopTimer);
+      setJumpBlinkOn(false);
+    };
+  }, [message._id, targetMessageId]);
 
   const handleDelete = (e: MouseEvent) => {
       e.preventDefault();
@@ -384,6 +403,7 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
             isSequential ? 'py-0.5' : 'mt-[17px] py-0.5 mb-1',
             {
               'animate-mention-flash-anim': applyFlash,
+              'bg-[#fde047]/25': jumpBlinkOn,
               'hover:bg-[#2e3035]': !isMentioned,
               'hover:bg-[#F0B232]/20': isMentioned,
             }

@@ -13,15 +13,24 @@ import (
 func TestUploadBytes_AppendsUploadPathAndUploadsMultipart(t *testing.T) {
 	t.Parallel()
 
-	var gotPath string
-	var gotQuery string
+	var gotUploadPath string
+	var gotUploadQuery string
 	var gotFilename string
 	var gotPartContentType string
 	var gotBody []byte
+	var presignCalls int
+	var uploadCalls int
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotPath = r.URL.Path
-		gotQuery = r.URL.RawQuery
+		if r.URL.Path == "/api/webhooks/1/token/presign" {
+			presignCalls++
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		uploadCalls++
+		gotUploadPath = r.URL.Path
+		gotUploadQuery = r.URL.RawQuery
 
 		mr, err := r.MultipartReader()
 		if err != nil {
@@ -48,11 +57,11 @@ func TestUploadBytes_AppendsUploadPathAndUploadsMultipart(t *testing.T) {
 		t.Fatalf("UploadBytes error: %v", err)
 	}
 
-	if gotPath != "/api/webhooks/1/token/upload" {
-		t.Fatalf("unexpected path: %q", gotPath)
+	if gotUploadPath != "/api/webhooks/1/token/upload" {
+		t.Fatalf("unexpected path: %q", gotUploadPath)
 	}
-	if gotQuery != "x=1" {
-		t.Fatalf("unexpected query: %q", gotQuery)
+	if gotUploadQuery != "x=1" {
+		t.Fatalf("unexpected query: %q", gotUploadQuery)
 	}
 	if gotFilename != "hello.txt" {
 		t.Fatalf("unexpected filename: %q", gotFilename)
@@ -65,6 +74,61 @@ func TestUploadBytes_AppendsUploadPathAndUploadsMultipart(t *testing.T) {
 	}
 	if out.Key != "mock-key" || out.Filename != "hello.txt" || out.ContentType != "text/plain" || out.Size != int64(len("hello")) {
 		t.Fatalf("unexpected response: %#v", out)
+	}
+	if presignCalls != 1 {
+		t.Fatalf("expected presign to be called once, got %d", presignCalls)
+	}
+	if uploadCalls != 1 {
+		t.Fatalf("expected multipart upload to be called once, got %d", uploadCalls)
+	}
+}
+
+func TestUploadBytes_UsesPresignPutWhenAvailable(t *testing.T) {
+	t.Parallel()
+
+	var presignCalls int
+	var putCalls int
+	var uploadCalls int
+	var gotPutBody []byte
+
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/webhooks/1/token/presign":
+			presignCalls++
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"key":"k1","url":"` + srv.URL + `/s3put","method":"PUT","headers":{"Content-Type":"text/plain"}}`))
+			return
+		case "/s3put":
+			putCalls++
+			b, _ := io.ReadAll(r.Body)
+			gotPutBody = b
+			w.WriteHeader(http.StatusOK)
+			return
+		case "/api/webhooks/1/token/upload":
+			uploadCalls++
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	webhookURL := srv.URL + "/api/webhooks/1/token"
+	out, err := UploadBytes(context.Background(), srv.Client(), "", webhookURL, "hello.txt", "text/plain", []byte("hello"))
+	if err != nil {
+		t.Fatalf("UploadBytes error: %v", err)
+	}
+	if out.Key != "k1" || out.Size != int64(len("hello")) {
+		t.Fatalf("unexpected response: %#v", out)
+	}
+	if string(gotPutBody) != "hello" {
+		t.Fatalf("unexpected put body: %q", string(gotPutBody))
+	}
+	if presignCalls != 1 || putCalls != 1 || uploadCalls != 0 {
+		t.Fatalf("calls: presign=%d put=%d upload=%d", presignCalls, putCalls, uploadCalls)
 	}
 }
 

@@ -9,15 +9,25 @@ export const getSocket = (): Socket | null => {
   if (!token) return null;
 
   if (!socket) {
-    socket = io('http://localhost:3000', {
-      auth: {
-        token: token,
-      },
-      transports: ['websocket'],
-    });
+    // Use same-origin by default. In dev, Vite proxies `/socket.io` to the API server.
+    const socketUrl = import.meta.env.VITE_SOCKET_URL;
+    const options = {
+      auth: { token },
+      // Prefer WebSocket, but allow HTTP long-polling fallback for environments that block WebSockets.
+      transports: ['websocket', 'polling'],
+    };
+
+    socket = socketUrl ? io(socketUrl, options) : io(options);
 
     socket.on('connect', () => {
       console.log('Connected to Mew Gateway');
+    });
+
+    socket.on('connect_error', (err) => {
+      if ((import.meta as any).env?.DEV) {
+        // eslint-disable-next-line no-console
+        console.warn('Mew Gateway connect_error', err);
+      }
     });
 
     socket.on('disconnect', () => {

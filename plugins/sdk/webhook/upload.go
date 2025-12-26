@@ -26,7 +26,22 @@ type Attachment struct {
 }
 
 func UploadBytes(ctx context.Context, httpClient *http.Client, apiBase, webhookURL, filename, contentType string, data []byte) (Attachment, error) {
-	return UploadReader(ctx, httpClient, apiBase, webhookURL, filename, contentType, bytes.NewReader(data))
+	ct := strings.TrimSpace(contentType)
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+
+	// Prefer pre-signed PUT when size is known.
+	if !devmode.Enabled() {
+		if att, ok, err := uploadViaPresign(ctx, httpClient, apiBase, webhookURL, filename, ct, int64(len(data)), bytes.NewReader(data)); err != nil {
+			return Attachment{}, err
+		} else if ok {
+			return att, nil
+		}
+	}
+
+	// Prevent a double presign attempt inside UploadReader (bytes.Reader exposes Len()).
+	return UploadReader(ctx, httpClient, apiBase, webhookURL, filename, ct, hideLen(bytes.NewReader(data)))
 }
 
 func UploadReader(ctx context.Context, httpClient *http.Client, apiBase, webhookURL, filename, contentType string, r io.Reader) (Attachment, error) {
@@ -59,6 +74,17 @@ func UploadReader(ctx context.Context, httpClient *http.Client, apiBase, webhook
 	ct := strings.TrimSpace(contentType)
 	if ct == "" {
 		ct = "application/octet-stream"
+	}
+
+	// Prefer pre-signed PUT when we can infer a stable size.
+	if !devmode.Enabled() {
+		if size, ok := inferReaderSize(r); ok {
+			if att, ok2, err := uploadViaPresign(ctx, httpClient, apiBase, webhookURL, filename, ct, size, r); err != nil {
+				return Attachment{}, err
+			} else if ok2 {
+				return att, nil
+			}
+		}
 	}
 
 	if devmode.Enabled() {
@@ -163,6 +189,141 @@ func buildUploadURL(webhookURL string) (string, error) {
 	u.Path = p
 	u.RawPath = ""
 	return u.String(), nil
+}
+
+func buildPresignURL(webhookURL string) (string, error) {
+	raw := strings.TrimSpace(webhookURL)
+	if raw == "" {
+		return "", fmt.Errorf("empty webhook url")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("invalid webhook url (missing scheme/host): %q", raw)
+	}
+
+	p := strings.TrimRight(u.Path, "/")
+	if !strings.HasSuffix(p, "/presign") {
+		p = p + "/presign"
+	}
+	u.Path = p
+	u.RawPath = ""
+	return u.String(), nil
+}
+
+type presignResponse struct {
+	Key     string            `json:"key"`
+	URL     string            `json:"url"`
+	Method  string            `json:"method"`
+	Headers map[string]string `json:"headers"`
+}
+
+type noLenReader struct{ io.Reader }
+
+func hideLen(r io.Reader) io.Reader { return noLenReader{Reader: r} }
+
+func inferReaderSize(r io.Reader) (int64, bool) {
+	// Common readers in the SDK path expose Len(). For non-buffered streams, size is unknown.
+	type lenner interface{ Len() int }
+	if v, ok := r.(lenner); ok {
+		n := v.Len()
+		if n > 0 {
+			return int64(n), true
+		}
+	}
+	return 0, false
+}
+
+func uploadViaPresign(
+	ctx context.Context,
+	httpClient *http.Client,
+	apiBase, webhookURL, filename, contentType string,
+	size int64,
+	r io.Reader,
+) (Attachment, bool, error) {
+	if size <= 0 || size > 8*1024*1024 {
+		return Attachment{}, false, nil
+	}
+
+	presignURL, err := buildPresignURL(webhookURL)
+	if err != nil {
+		return Attachment{}, false, nil
+	}
+	if strings.TrimSpace(apiBase) != "" && strings.TrimSpace(presignURL) != "" {
+		rewritten, err := RewriteLoopbackURL(presignURL, apiBase)
+		if err != nil {
+			return Attachment{}, false, err
+		}
+		presignURL = rewritten
+	}
+
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 60 * time.Second}
+	}
+
+	reqBody, err := json.Marshal(map[string]any{
+		"filename":    filename,
+		"contentType": contentType,
+		"size":        size,
+	})
+	if err != nil {
+		return Attachment{}, false, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, presignURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return Attachment{}, false, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return Attachment{}, false, nil
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return Attachment{}, false, nil
+	}
+
+	var parsed presignResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return Attachment{}, false, nil
+	}
+	if strings.TrimSpace(parsed.Key) == "" || strings.TrimSpace(parsed.URL) == "" || strings.ToUpper(strings.TrimSpace(parsed.Method)) != "PUT" {
+		return Attachment{}, false, nil
+	}
+
+	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, parsed.URL, r)
+	if err != nil {
+		return Attachment{}, false, err
+	}
+	for k, v := range parsed.Headers {
+		if strings.TrimSpace(k) == "" || strings.TrimSpace(v) == "" {
+			continue
+		}
+		putReq.Header.Set(k, v)
+	}
+	if putReq.Header.Get("Content-Type") == "" && strings.TrimSpace(contentType) != "" {
+		putReq.Header.Set("Content-Type", contentType)
+	}
+
+	putResp, err := httpClient.Do(putReq)
+	if err != nil {
+		return Attachment{}, false, err
+	}
+	defer putResp.Body.Close()
+
+	if putResp.StatusCode < 200 || putResp.StatusCode >= 300 {
+		b, _ := io.ReadAll(putResp.Body)
+		return Attachment{}, false, fmt.Errorf("presigned put failed: status=%d body=%s", putResp.StatusCode, strings.TrimSpace(string(b)))
+	}
+
+	return Attachment{Filename: filename, ContentType: contentType, Key: parsed.Key, Size: size}, true, nil
 }
 
 func waitWriteErr(ctx context.Context, ch <-chan error) error {

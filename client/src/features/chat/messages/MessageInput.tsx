@@ -153,10 +153,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     if (!attachment.file || !channelId) return;
 
     try {
-      const formData = new FormData();
-      formData.append('file', attachment.file);
-
-      const response = await uploadApi.uploadFile(channelId, formData, (progressEvent) => {
+      const response = await uploadApi.uploadFileSmart(channelId, attachment.file, (progressEvent) => {
         const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setAttachments(prev => {
           const newAttachments = [...prev];
@@ -172,7 +169,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         if (newAttachments[index]) {
           newAttachments[index].isUploading = false;
           // Store the object `key`; server hydrates the final URL.
-          newAttachments[index].key = response.data.key;
+          newAttachments[index].key = (response as any).key;
           newAttachments[index].progress = 100;
         }
         return newAttachments;

@@ -9,6 +9,10 @@ class WebhookRepository {
     return Webhook.findById(webhookId);
   }
 
+  public async findByIdAndChannelWithToken(webhookId: string, channelId: string): Promise<IWebhook | null> {
+    return Webhook.findOne({ _id: webhookId, channelId }).select('+token');
+  }
+
   public async findByIdAndToken(webhookId: string, token: string): Promise<IWebhook | null> {
     return Webhook.findOne({ _id: webhookId, token });
   }

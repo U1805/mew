@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
@@ -14,22 +14,67 @@ interface ChatHeaderProps {
 const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, toggleMemberList }) => {
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
-  const { currentServerId, setSearchOpen, setSearchQuery, isSearchOpen } = useUIStore();
+  const {
+    currentServerId,
+    setSearchOpen,
+    setSearchQuery,
+    isSearchOpen,
+    setDmSearchOpen,
+    setDmSearchQuery,
+    isDmSearchOpen,
+  } = useUIStore();
 
   const [inputValue, setInputValue] = useState('');
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [dmInputValue, setDmInputValue] = useState('');
+  const dmDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    debounceTimerRef.current = setTimeout(() => {
       setSearchQuery(inputValue);
-      if (inputValue.trim()) setSearchOpen(true);
+      setSearchOpen(!!inputValue.trim());
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    };
   }, [inputValue, setSearchQuery, setSearchOpen]);
 
   useEffect(() => {
-    if (!isSearchOpen) setInputValue('');
-  }, [isSearchOpen]);
+    if (!isSearchOpen) {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+      setInputValue('');
+      setSearchQuery('');
+    }
+  }, [isSearchOpen, setSearchQuery]);
+
+  useEffect(() => {
+    if (dmDebounceTimerRef.current) clearTimeout(dmDebounceTimerRef.current);
+
+    dmDebounceTimerRef.current = setTimeout(() => {
+      setDmSearchQuery(dmInputValue);
+      setDmSearchOpen(!!dmInputValue.trim());
+    }, 300);
+
+    return () => {
+      if (dmDebounceTimerRef.current) clearTimeout(dmDebounceTimerRef.current);
+      dmDebounceTimerRef.current = null;
+    };
+  }, [dmInputValue, setDmSearchQuery, setDmSearchOpen]);
+
+  useEffect(() => {
+    if (!isDmSearchOpen) {
+      if (dmDebounceTimerRef.current) clearTimeout(dmDebounceTimerRef.current);
+      dmDebounceTimerRef.current = null;
+      setDmInputValue('');
+      setDmSearchQuery('');
+    }
+  }, [isDmSearchOpen, setDmSearchQuery]);
 
   const isDM = channel?.type === ChannelType.DM;
   
@@ -85,7 +130,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
             />
         )}
 
-        {currentServerId && (
+        {!isDM && currentServerId && (
             <div className={clsx("relative hidden lg:block transition-all", isSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
             <input 
                 type="text" 
@@ -94,6 +139,22 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
                 onChange={(e) => setInputValue(e.target.value)}
                 onFocus={() => {
                     if (inputValue.trim()) setSearchOpen(true);
+                }}
+                className="bg-mew-darker text-sm rounded px-2 py-0.5 w-full transition-all focus:outline-none text-mew-text placeholder-mew-textMuted" 
+            />
+            <Icon icon="mdi:magnify" className="absolute right-1 top-1 text-xs pointer-events-none" />
+            </div>
+        )}
+
+        {isDM && (
+            <div className={clsx("relative hidden lg:block transition-all", isDmSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
+            <input 
+                type="text" 
+                placeholder="Search" 
+                value={dmInputValue}
+                onChange={(e) => setDmInputValue(e.target.value)}
+                onFocus={() => {
+                    if (dmInputValue.trim()) setDmSearchOpen(true);
                 }}
                 className="bg-mew-darker text-sm rounded px-2 py-0.5 w-full transition-all focus:outline-none text-mew-text placeholder-mew-textMuted" 
             />

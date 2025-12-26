@@ -37,11 +37,15 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
   const createMutation = useMutation({
     mutationFn: (data: FormData) => 
       webhookApi.create(serverId, channel._id, data),
-    onSuccess: () => {
+    onSuccess: (res) => {
+      const created = res.data as Webhook;
       queryClient.invalidateQueries({ queryKey: ['webhooks', channel._id] });
       queryClient.invalidateQueries({ queryKey: ['members', serverId] });
-      setView('list');
-      resetForm();
+      setSelectedWebhook(created);
+      setName(created.name);
+      setAvatarFile(null);
+      setAvatarPreview(created.avatarUrl || null);
+      setView('edit');
     }
   });
 
@@ -54,6 +58,24 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
       setView('list');
       resetForm();
     }
+  });
+
+  const resetTokenMutation = useMutation({
+    mutationFn: async (webhookId: string) => {
+      const res = await webhookApi.resetToken(serverId, channel._id, webhookId);
+      return res.data as { webhookId: string; token: string };
+    },
+    onSuccess: ({ webhookId, token }) => {
+      setSelectedWebhook((prev) => (prev && prev._id === webhookId ? { ...prev, token } : prev));
+      queryClient.setQueryData<Webhook[]>(['webhooks', channel._id], (prev) =>
+        prev ? prev.map((wh) => (wh._id === webhookId ? { ...wh, token } : wh)) : prev
+      );
+      toast.success('Webhook token reset.');
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : 'Failed to reset webhook token.';
+      toast.error(message);
+    },
   });
 
   const deleteMutation = useMutation<unknown, Error, Webhook, { previousMembers?: ServerMember[] }>({
@@ -139,11 +161,71 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
     }
   };
 
-  const copyUrl = (webhook: Webhook) => {
-    const url = `${API_URL}/webhooks/${webhook._id}/${webhook.token}`;
-    navigator.clipboard.writeText(url);
-    setCopiedWebhookId(webhook._id);
-    setTimeout(() => setCopiedWebhookId(null), 2000);
+  const buildWebhookUrl = (webhook: Webhook) => {
+    if (!webhook.token) return '';
+    const base = API_URL.replace(/\/$/, '');
+    const pathOrUrl = `${base}/webhooks/${webhook._id}/${webhook.token}`;
+    try {
+      return new URL(pathOrUrl, window.location.origin).toString();
+    } catch {
+      return pathOrUrl;
+    }
+  };
+
+  const copyUrl = async (webhook: Webhook) => {
+    const fallbackCopy = (text: string) => {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, textarea.value.length);
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    };
+
+    let token = webhook.token;
+    if (!token) {
+      try {
+        const res = await webhookApi.getToken(serverId, channel._id, webhook._id);
+        token = (res.data as { webhookId: string; token: string }).token;
+
+        queryClient.setQueryData<Webhook[]>(['webhooks', channel._id], (prev) =>
+          prev ? prev.map((wh) => (wh._id === webhook._id ? { ...wh, token } : wh)) : prev
+        );
+        setSelectedWebhook((prev) => (prev && prev._id === webhook._id ? { ...prev, token } : prev));
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to load webhook token.';
+        toast.error(message);
+        return;
+      }
+    }
+
+    const url = buildWebhookUrl({ ...webhook, token });
+
+    try {
+      if (!window.isSecureContext || !navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+
+      await navigator.clipboard.writeText(url);
+      setCopiedWebhookId(webhook._id);
+      setTimeout(() => setCopiedWebhookId(null), 2000);
+      toast.success('Webhook URL copied.');
+    } catch {
+      const ok = fallbackCopy(url);
+      if (!ok) {
+        toast.error('Failed to copy webhook URL.');
+        return;
+      }
+      setCopiedWebhookId(webhook._id);
+      setTimeout(() => setCopiedWebhookId(null), 2000);
+      toast.success('Webhook URL copied.');
+    }
   };
 
   if (view === 'list') {
@@ -176,13 +258,15 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                        ) : (
                          <Icon icon="mdi:robot" className="text-mew-textMuted" width="20" />
                        )}
-                    </div>
-                    <div>
-                      <div className="font-bold text-white">{wh.name}</div>
-                      <div className="text-xs text-mew-textMuted">****{wh.token.slice(-4)}</div>
-                    </div>
-                 </div>
-                 <div className="flex items-center space-x-2">
+                     </div>
+                     <div>
+                       <div className="font-bold text-white">{wh.name}</div>
+                      <div className="text-xs text-mew-textMuted">
+                        {wh.token ? `****${wh.token.slice(-4)}` : 'Token hidden'}
+                      </div>
+                     </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <button 
                         onClick={() => copyUrl(wh)} 
                         className={clsx(
@@ -263,30 +347,47 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
            </div>
 
            {view === 'edit' && selectedWebhook && (
-             <div>
-                <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Webhook URL</label>
-                <div className="flex">
-                   <input
-                      type="text"
-                      readOnly
-                      value={`${API_URL}/webhooks/${selectedWebhook._id}/${selectedWebhook.token}`}
-                      className="w-full bg-[#1E1F22] text-mew-textMuted p-2.5 rounded-l border-none focus:outline-none focus:ring-0 font-medium text-sm"
-                   />
-                   <button 
-                      type="button"
+              <div>
+                 <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Webhook URL</label>
+                 <div className="flex">
+                    <input
+                       type="text"
+                       readOnly
+                      value={
+                        selectedWebhook.token ? buildWebhookUrl(selectedWebhook) : ''
+                      }
+                      placeholder={selectedWebhook.token ? undefined : 'Token hidden. Reset token to generate a new URL.'}
+                      disabled={!selectedWebhook.token}
+                       className="w-full bg-[#1E1F22] text-mew-textMuted p-2.5 rounded-l border-none focus:outline-none focus:ring-0 font-medium text-sm"
+                    />
+                    <button 
+                       type="button"
                       onClick={() => copyUrl(selectedWebhook)}
-                      className={clsx(
-                          "text-white px-4 rounded-r font-medium text-sm transition-colors min-w-[70px]",
-                          copiedWebhookId === selectedWebhook._id
-                            ? "bg-green-500 hover:bg-green-600"
-                            : "bg-mew-accent hover:bg-mew-accentHover"
-                      )}
+                      disabled={!selectedWebhook.token}
+                       className={clsx(
+                           "text-white px-4 rounded-r font-medium text-sm transition-colors min-w-[70px]",
+                           copiedWebhookId === selectedWebhook._id
+                             ? "bg-green-500 hover:bg-green-600"
+                            : selectedWebhook.token
+                              ? "bg-mew-accent hover:bg-mew-accentHover"
+                              : "bg-[#4E5058] cursor-not-allowed"
+                       )}
+                    >
+                      {copiedWebhookId === selectedWebhook._id ? 'Copied' : 'Copy'}
+                    </button>
+                 </div>
+                 {!selectedWebhook.token && (
+                   <button
+                     type="button"
+                     onClick={() => resetTokenMutation.mutate(selectedWebhook._id)}
+                     disabled={resetTokenMutation.isPending}
+                     className="mt-2 bg-[#1E1F22] hover:bg-[#111214] text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
                    >
-                     {copiedWebhookId === selectedWebhook._id ? 'Copied' : 'Copy'}
+                     {resetTokenMutation.isPending ? 'Resetting…' : 'Reset Token'}
                    </button>
-                </div>
-             </div>
-           )}
+                 )}
+              </div>
+            )}
            
            <div className="pt-4 flex justify-between">
               {view === 'edit' && selectedWebhook ? (

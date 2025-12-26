@@ -155,7 +155,7 @@ export interface Webhook {
   avatarUrl?: string;
   channelId: string;
   serverId: string;
-  token: string;
+  token?: string;
   botUserId: string;
 }
 

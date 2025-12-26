@@ -5,15 +5,18 @@ import ChatHeader from './ChatHeader';
 import MessageList from '../messages/MessageList';
 import MessageInput from '../messages/MessageInput';
 import { SearchResultsPanel } from '../../search/components/SearchResultsPanel';
+import { DmSearchResultsPanel } from '../../search/components/DmSearchResultsPanel';
 import { useUIStore } from '../../../shared/stores';
 import { useSocketMessages } from '../../../shared/hooks/useSocketMessages';
 import { useMessages } from '../../../shared/hooks/useMessages';
 import { useChannel } from '../hooks/useChannel';
+import { ChannelType } from '../../../shared/types';
 
 const ChatArea: React.FC = () => {
   const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList } = useUIStore();
 
   const { data: channel } = useChannel(currentServerId, currentChannelId);
+  const isDM = channel?.type === ChannelType.DM;
 
   const {
     data: messages = [],
@@ -53,6 +56,7 @@ const ChatArea: React.FC = () => {
         </div>
         {/* Search Results Panel - Overlays or sits next to content, but here using absolute positioning within the container managed by itself or container */}
         <SearchResultsPanel />
+        {isDM && <DmSearchResultsPanel />}
         
         {/* Only show member list for server channels */}
         {isMemberListOpen && currentServerId && <MemberList />}

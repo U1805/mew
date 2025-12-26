@@ -1,4 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
+import crypto from 'crypto';
 import config from '../config';
 import { infraRegistry } from './infraRegistry';
 import ServiceTypeModel from '../api/infra/serviceType.model';
@@ -20,6 +21,13 @@ const getAdminSecret = (socket: Socket): string | undefined => {
   return getHandshakeValue(socket, 'adminSecret');
 };
 
+const safeEqual = (a: string, b: string): boolean => {
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+};
+
 export const registerInfraNamespace = (io: SocketIOServer) => {
   const nsp = io.of('/infra');
 
@@ -27,7 +35,7 @@ export const registerInfraNamespace = (io: SocketIOServer) => {
     if (!config.adminSecret) return next(new Error('Authentication error: Admin secret not configured'));
 
     const provided = getAdminSecret(socket);
-    if (!provided || provided !== config.adminSecret) {
+    if (!provided || !safeEqual(provided, config.adminSecret)) {
       return next(new Error('Authentication error: Invalid admin secret'));
     }
 

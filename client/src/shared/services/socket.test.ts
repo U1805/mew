@@ -40,7 +40,14 @@ describe('shared/services/socket', () => {
     expect(s1).toBeTruthy();
     expect(s2).toBe(s1);
     expect(io).toHaveBeenCalledTimes(1);
+    expect(io).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: { token: 'abc' },
+        transports: ['websocket', 'polling'],
+      })
+    );
     expect(on).toHaveBeenCalledWith('connect', expect.any(Function));
+    expect(on).toHaveBeenCalledWith('connect_error', expect.any(Function));
     expect(on).toHaveBeenCalledWith('disconnect', expect.any(Function));
 
     disconnectSocket();

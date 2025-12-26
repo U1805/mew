@@ -7,32 +7,67 @@ interface JpdictCardProps {
   payload: MessagePayload;
 }
 
+export function renderJpdictCardHtml(markdown: string): string {
+  const content = String(markdown || '').trim();
+  if (!content) return '';
+
+  const rendered = marked.parse(content, {
+    gfm: true,
+    breaks: true,
+    async: false,
+  }) as string;
+
+  const sanitized = DOMPurify.sanitize(rendered, {
+    // Keep a tight allowlist. Add only what this card needs.
+    ALLOWED_TAGS: [
+      'p',
+      'br',
+      'strong',
+      'b',
+      'em',
+      'i',
+      'code',
+      'pre',
+      'blockquote',
+      'hr',
+      'ul',
+      'ol',
+      'li',
+      'a',
+      'ruby',
+      'rt',
+      'rp',
+    ],
+    ALLOWED_ATTR: ['href', 'title', 'target', 'rel'],
+    FORBID_TAGS: ['svg', 'math', 'style', 'script', 'iframe', 'object', 'embed'],
+    FORBID_ATTR: ['style', 'onerror', 'onload', 'onclick', 'onmouseover'],
+    ALLOW_DATA_ATTR: false,
+  });
+
+  try {
+    const doc = new DOMParser().parseFromString(sanitized, 'text/html');
+    doc.querySelectorAll('svg, math, script, iframe, object, embed').forEach((el) => el.remove());
+    doc.querySelectorAll('a[href]').forEach((a) => {
+      const raw = a.getAttribute('href') || '';
+      const href = raw.trim();
+      const isHttp = /^https?:\/\//i.test(href);
+      const isMailto = /^mailto:/i.test(href);
+      if (!href || !(isHttp || isMailto)) {
+        a.removeAttribute('href');
+      }
+      a.setAttribute('target', '_blank');
+      a.setAttribute('rel', 'noopener noreferrer');
+    });
+    return doc.body.innerHTML;
+  } catch {
+    return sanitized;
+  }
+}
+
 export const JpdictCard: React.FC<JpdictCardProps> = ({ payload }) => {
   const content = typeof payload.content === 'string' ? payload.content.trim() : '';
   const html = useMemo(() => {
-    if (!content) return '';
-
-    const rendered = marked.parse(content, {
-      gfm: true,
-      breaks: true,
-      async: false,
-    }) as string;
-
-    const sanitized = DOMPurify.sanitize(rendered, {
-      ADD_TAGS: ['ruby', 'rt', 'rp'],
-      ADD_ATTR: ['target', 'rel'],
-    });
-
-    try {
-      const doc = new DOMParser().parseFromString(sanitized, 'text/html');
-      doc.querySelectorAll('a[href]').forEach((a) => {
-        a.setAttribute('target', '_blank');
-        a.setAttribute('rel', 'noopener noreferrer');
-      });
-      return doc.body.innerHTML;
-    } catch {
-      return sanitized;
-    }
+    return renderJpdictCardHtml(content);
   }, [content]);
 
   if (!content) return null;

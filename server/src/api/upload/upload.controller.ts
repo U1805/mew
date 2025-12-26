@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import asyncHandler from '../../utils/asyncHandler';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import Message from '../message/message.model';
+import { nanoid } from 'nanoid';
 
 export const uploadFileHandler = asyncHandler(async (req: Request, res: Response) => {
   if (!req.file) {
@@ -23,6 +24,40 @@ export const uploadFileHandler = asyncHandler(async (req: Request, res: Response
   };
 
   res.status(201).json(attachment);
+});
+
+export const presignUploadHandler = asyncHandler(async (req: Request, res: Response) => {
+  const body = (req.body || {}) as any;
+  const originalname = typeof body.filename === 'string' ? body.filename : '';
+  const contentType = typeof body.contentType === 'string' ? body.contentType : '';
+  const size = typeof body.size === 'number' ? body.size : Number.parseInt(String(body.size || ''), 10);
+
+  if (!originalname.trim()) {
+    throw new BadRequestError('filename is required');
+  }
+  if (Number.isNaN(size) || size <= 0) {
+    throw new BadRequestError('size is required');
+  }
+  if (size > 1024 * 1024 * 8) {
+    throw new BadRequestError('file is too large');
+  }
+
+  const ext = originalname.includes('.') ? `.${originalname.split('.').pop()}` : '';
+  const key = `${nanoid()}${ext}`;
+
+  const { createPresignedPutUrl } = await import('../../utils/s3');
+  const { default: config } = await import('../../config');
+  const url = await createPresignedPutUrl({ key, contentType: contentType.trim() || undefined });
+
+  res.status(200).json({
+    key,
+    url,
+    method: 'PUT',
+    headers: {
+      ...(contentType.trim() ? { 'Content-Type': contentType.trim() } : {}),
+    },
+    expiresInSeconds: config.s3.presignExpiresSeconds,
+  });
 });
 
 export const downloadFileHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -53,6 +88,8 @@ export const downloadFileHandler = asyncHandler(async (req: Request, res: Respon
 
     // Private: user must be authenticated/authorized to reach this route.
     res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Content-Disposition', 'attachment');
 
     const body: any = obj.body as any;
     if (typeof body.pipe === 'function') {

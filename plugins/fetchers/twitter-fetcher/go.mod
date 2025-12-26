@@ -2,6 +2,8 @@ module mew/plugins/twitter-fetcher
 
 go 1.22
 
+toolchain go1.25.5
+
 require mew/plugins/sdk v0.0.0
 
 require (

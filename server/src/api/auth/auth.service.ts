@@ -18,6 +18,7 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await userRepository.findByEmailWithPassword(normalizedEmail);
   if (!user) throw new UnauthorizedError('Invalid credentials');
+  if ((user as any).isBot) throw new UnauthorizedError('Invalid credentials');
 
   const isMatch = await bcrypt.compare(password, user.password || '');
   if (!isMatch) throw new UnauthorizedError('Invalid credentials');
@@ -79,6 +80,7 @@ export const register = async (userData: Partial<IUser>) => {
       email: email?.trim().toLowerCase(),
       username: username?.trim(),
       password: hashedPassword,
+      isBot: false,
     });
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

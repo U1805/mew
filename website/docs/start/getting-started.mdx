@@ -83,6 +83,9 @@ MEW_ALLOW_USER_REGISTRATION=true
 # Infra：Bot Service bootstrap + /infra 命名空间鉴权使用的共享密钥
 MEW_ADMIN_SECRET=replace-this-with-another-super-secret-key
 
+# CORS：API 跨域允许列表（逗号分隔）。生产环境请显式设置，不要使用 '*'
+MEW_CORS_ORIGINS=http://localhost:5173
+
 # 可选：Infra IP 白名单（逗号分隔）。为空时默认允许内网 + loopback。
 MEW_INFRA_ALLOWED_IPS=
 
@@ -99,6 +102,10 @@ S3_PORT=3900
 # 访问端点 (Client-side)
 S3_WEB_ENDPOINT=web.garage.localhost
 S3_WEB_PORT=3902
+
+# 浏览器直传（预签名 PUT）需要配置 S3 CORS 允许 Origin（默认沿用 MEW_CORS_ORIGINS）
+S3_CORS_ORIGINS=http://localhost:5173
+S3_PRESIGN_EXPIRES_SECONDS=60
 
 # 可选：从文件读取 {accessKeyId,secretAccessKey}（docker-compose 的 garage-init 会生成并挂载该文件）
 S3_CREDENTIALS_FILE=
@@ -141,8 +148,13 @@ pnpm dev
 ### 步骤 4: 启动测试 Bot 服务
 为了验证机器人生态，我们提供了一个简单的 Bot 示例：`plugins/fetchers/test-fetcher`。
 
-首先编辑相关配置项：
-```ini title="plugins/.env.local"
+首先将其复制为 `.env.local` 或 `.env`：
+```bash
+cp plugins/.env.example plugins/.env
+```
+
+编辑相关配置项：
+```ini title="plugins/.env"
 # 请使用与后端配置文件中相同的 MEW_ADMIN_SECRET
 MEW_ADMIN_SECRET=replace-this-with-value-in-server
 # BOT 同步配置的间隔时间 (秒)

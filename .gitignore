@@ -6,7 +6,10 @@
 
 # Environment variables
 .env
-!.env.*
+.env.local
+# Allow checked-in templates
+!.env.example
+!.env.*.example
 
 # Node.js & pnpm
 node_modules/
