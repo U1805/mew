@@ -205,4 +205,3 @@ func runInfraPresenceConn(ctx context.Context, conn *websocket.Conn, adminSecret
 		}
 	}
 }
-

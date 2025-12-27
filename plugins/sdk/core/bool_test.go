@@ -26,4 +26,3 @@ func TestIsEnabled(t *testing.T) {
 		t.Fatalf("ptr false should be disabled, got %v", got)
 	}
 }
-

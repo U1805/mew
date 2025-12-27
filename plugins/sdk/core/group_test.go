@@ -41,4 +41,3 @@ func TestGroup_Wait(t *testing.T) {
 		t.Fatalf("expected goroutine to finish before Wait returns")
 	}
 }
-

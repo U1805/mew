@@ -72,4 +72,3 @@ func TestDecodeTasks_InvalidTasksFieldShape(t *testing.T) {
 		t.Fatalf("expected tasks decode error, got: %v", err)
 	}
 }
-

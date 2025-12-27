@@ -11,4 +11,3 @@ func OpenTask[T any](serviceType, botID string, idx int, identity string) TaskSt
 func (s TaskStore[T]) Load() (T, error) { return LoadJSONFile[T](s.Path) }
 
 func (s TaskStore[T]) Save(v T) error { return SaveJSONFile(s.Path, v) }
-

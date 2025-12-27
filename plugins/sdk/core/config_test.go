@@ -101,4 +101,3 @@ func TestLoadRuntimeConfig_SyncInterval(t *testing.T) {
 		t.Fatalf("expected error for non-positive interval")
 	}
 }
-

@@ -1,4 +1,4 @@
-module mew/plugins/jpdict-agent
+module mew/plugins/assistant-agent
 
 go 1.22
 

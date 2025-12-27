@@ -15,4 +15,3 @@ func TestRandomBrowserUserAgent_IsFromList(t *testing.T) {
 		t.Fatalf("unexpected user-agent: %q", got)
 	}
 }
-

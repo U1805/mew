@@ -37,4 +37,3 @@ func TestRewriteLoopbackURL(t *testing.T) {
 		t.Fatalf("unexpected url: %q", out)
 	}
 }
-

@@ -51,4 +51,3 @@ func TestRunInterval_ImmediateAndTicks(t *testing.T) {
 		t.Fatalf("expected at least 3 invocations, got %d", n)
 	}
 }
-

@@ -86,4 +86,3 @@ func TestPostJSONWithRetry_CancelDuringBackoff(t *testing.T) {
 		t.Fatalf("expected exactly 1 attempt before cancel, got %d", n)
 	}
 }
-

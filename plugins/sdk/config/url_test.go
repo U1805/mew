@@ -24,4 +24,3 @@ func TestValidateHTTPURL(t *testing.T) {
 		}
 	}
 }
-

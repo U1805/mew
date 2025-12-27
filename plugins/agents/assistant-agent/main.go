@@ -7,9 +7,7 @@ import (
 )
 
 func main() {
-	serviceType := sdk.ServiceTypeFromCaller()
-
-	cfgTemplate, err := sdk.ConfigTemplateJSON(JpdictConfig{
+	cfgTemplate, err := sdk.ConfigTemplateJSON(AssistantConfig{
 		BaseURL: "https://api.openai.com/v1",
 		APIKey:  "",
 		Model:   "gpt-4o-mini",
@@ -19,12 +17,12 @@ func main() {
 	}
 
 	if err := sdk.RunServiceWithSignals(sdk.ServiceOptions{
-		LogPrefix:      "[jpdict-agent]",
-		ServerName:     "Unown",
-		Description:    "日语全能学习助手：直接输入文本/图片，自动在词典模式与翻译解析模式间切换（回复为词典卡片）。",
+		LogPrefix:      "[assistant-agent]",
+		ServerName:     "Subaru",
+		Description:    "赛博安和昴",
 		ConfigTemplate: cfgTemplate,
 		NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
-			return NewJpdictRunner(serviceType, botID, botName, accessToken, rawConfig, cfg)
+			return NewAssistantRunner(cfg.ServiceType, botID, botName, accessToken, rawConfig, cfg)
 		},
 	}); err != nil {
 		log.Fatal(err)

@@ -72,4 +72,3 @@ func TestLoadDotEnvFromCaller_Disabled_NoLoad(t *testing.T) {
 		t.Fatalf("expected disabled dotenv to not load, got %q", got)
 	}
 }
-

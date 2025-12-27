@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,6 +28,10 @@ func ServiceTypeFromCaller() string { return core.ServiceTypeFromCaller() }
 
 func ServiceTypeFromCallerSkip(callerSkip int) string {
 	return core.ServiceTypeFromCallerSkip(callerSkip)
+}
+
+func MewURLFromEnvOrAPIBase(apiBase, fallback string) string {
+	return core.MewURLFromEnvOrAPIBase(apiBase, fallback)
 }
 
 func LoadRuntimeConfig(serviceType string) (RuntimeConfig, error) {
@@ -69,6 +74,12 @@ func RunInterval(ctx context.Context, interval time.Duration, immediate bool, fn
 
 func BoolOrDefault(v *bool, def bool) bool { return core.BoolOrDefault(v, def) }
 func IsEnabled(v *bool) bool               { return core.IsEnabled(v) }
+
+func PreviewString(s string, maxRunes int) string { return core.PreviewString(s, maxRunes) }
+
+func HumanizeDuration(d time.Duration) string { return core.HumanizeDuration(d) }
+
+func CandidateDataFilePaths(filename string) []string { return core.CandidateDataFilePaths(filename) }
 
 // ---- MEW client ----
 
@@ -134,6 +145,8 @@ func LoadJSONFile[T any](path string) (T, error) { return state.LoadJSONFile[T](
 
 func SaveJSONFile(path string, v any) error { return state.SaveJSONFile(path, v) }
 
+func SaveJSONFileIndented(path string, v any) error { return state.SaveJSONFileIndented(path, v) }
+
 type TaskStateStore[T any] struct {
 	Path string
 }
@@ -197,3 +210,50 @@ func UploadRemoteToWebhook(
 func FilenameFromURL(rawURL, fallback string) string {
 	return webhook.FilenameFromURL(rawURL, fallback)
 }
+
+// ---- MEW user helpers ----
+
+type User = mew.User
+
+func NewMewUserHTTPClient() (*http.Client, error) { return mew.NewUserHTTPClient() }
+
+func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken string) (User, string, error) {
+	return mew.LoginBot(ctx, httpClient, apiBase, accessToken)
+}
+
+func FetchDMChannels(ctx context.Context, httpClient *http.Client, apiBase, userToken string) (map[string]struct{}, error) {
+	return mew.FetchDMChannels(ctx, httpClient, apiBase, userToken)
+}
+
+type ChannelMessage = mew.ChannelMessage
+
+func FetchChannelMessages(
+	ctx context.Context,
+	httpClient *http.Client,
+	apiBase, userToken, channelID string,
+	limit int,
+	before string,
+) ([]ChannelMessage, error) {
+	return mew.FetchChannelMessages(ctx, httpClient, apiBase, userToken, channelID, limit, before)
+}
+
+func SearchChannelMessages(
+	ctx context.Context,
+	httpClient *http.Client,
+	apiBase, userToken, channelID, query string,
+	limit, page int,
+) ([]ChannelMessage, error) {
+	return mew.SearchChannelMessages(ctx, httpClient, apiBase, userToken, channelID, query, limit, page)
+}
+
+func AuthorID(authorRaw json.RawMessage) string { return mew.AuthorID(authorRaw) }
+
+func AuthorUsername(authorRaw json.RawMessage) string { return mew.AuthorUsername(authorRaw) }
+
+func IsOwnMessage(authorRaw json.RawMessage, botUserID string) bool {
+	return mew.IsOwnMessage(authorRaw, botUserID)
+}
+
+type DMChannelCache = mew.DMChannelCache
+
+func NewDMChannelCache() *DMChannelCache { return mew.NewDMChannelCache() }

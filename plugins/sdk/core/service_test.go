@@ -19,4 +19,3 @@ func TestRunService_RequiresNewRunner(t *testing.T) {
 		t.Fatalf("RunService() error=%v, want %v", err, ErrInvalidRunnerFactory)
 	}
 }
-

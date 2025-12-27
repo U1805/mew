@@ -81,4 +81,3 @@ func TestSeenSet_SnapshotIsCopy(t *testing.T) {
 		t.Fatalf("expected internal order unchanged, got %#v", s2)
 	}
 }
-

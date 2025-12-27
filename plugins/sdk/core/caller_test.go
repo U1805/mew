@@ -28,4 +28,3 @@ func TestNonSDKCallerSkip_SkipsSDKFrames(t *testing.T) {
 		t.Fatalf("expected non-sdk frame, got %q (skip=%d)", normalized, skip)
 	}
 }
-

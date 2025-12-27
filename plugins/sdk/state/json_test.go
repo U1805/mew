@@ -51,4 +51,3 @@ func TestSaveJSONFile_And_LoadJSONFile_RoundTrip(t *testing.T) {
 		t.Fatalf("expected no tmp file, stat err=%v", err)
 	}
 }
-

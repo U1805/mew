@@ -39,3 +39,23 @@ func SaveJSONFile(path string, v any) error {
 	_ = os.Remove(path) // Windows rename doesn't overwrite.
 	return os.Rename(tmp, path)
 }
+
+func SaveJSONFileIndented(path string, v any) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+
+	b, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	b = append(b, '\n')
+
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o644); err != nil {
+		return err
+	}
+
+	_ = os.Remove(path) // Windows rename doesn't overwrite.
+	return os.Rename(tmp, path)
+}

@@ -155,4 +155,3 @@ func TestBotManager_SyncOnce_StartReloadStop(t *testing.T) {
 	}
 	mu.Unlock()
 }
-
