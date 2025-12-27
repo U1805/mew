@@ -14,14 +14,11 @@ RUN corepack enable && pnpm install --frozen-lockfile --prod=false
 
 COPY client ./client
 
-ARG VITE_API_BASE_URL=/api
-ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
-
 RUN pnpm --filter client build
 
 FROM nginx:1.27-alpine
 
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+COPY docker/client/nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/client/dist /usr/share/nginx/html
 
 EXPOSE 80

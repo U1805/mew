@@ -21,7 +21,17 @@ const validate = (schema: ZodTypeAny) => (req: Request, res: Response, next: Nex
   }
 
   const data: any = parsed.data as any;
+
+  const replaceInPlace = (target: any, nextValue: any) => {
+    if (!target || typeof target !== 'object') return nextValue;
+    for (const k of Object.keys(target)) delete target[k];
+    Object.assign(target, nextValue);
+    return target;
+  };
+
   if (Object.prototype.hasOwnProperty.call(data, 'body')) req.body = data.body;
+  if (Object.prototype.hasOwnProperty.call(data, 'query')) replaceInPlace(req.query, data.query);
+  if (Object.prototype.hasOwnProperty.call(data, 'params')) replaceInPlace(req.params, data.params);
   next();
 };
 

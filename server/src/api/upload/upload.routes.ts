@@ -6,6 +6,8 @@ import * as uploadController from './upload.controller';
 const router = Router({ mergeParams: true });
 
 // Route: /api/channels/:channelId/uploads
+router.post('/presign', authorizeChannel('ATTACH_FILES'), uploadController.presignUploadHandler);
+
 router.post(
   '/',
   authorizeChannel('ATTACH_FILES'),

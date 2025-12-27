@@ -43,8 +43,11 @@ vi.mock('../../features/channels/modals/CreateChannelModal', () => ({
 vi.mock('../../features/channels/modals/DeleteChannelModal', () => ({
   DeleteChannelModal: () => <div data-testid="deleteChannel" />,
 }));
-vi.mock('../../features/messages/modals/DeleteMessageModal', () => ({
+vi.mock('../../features/chat-messages/modals/DeleteMessageModal', () => ({
   DeleteMessageModal: () => <div data-testid="deleteMessage" />,
+}));
+vi.mock('../../features/chat-messages/modals/ForwardMessageModal', () => ({
+  ForwardMessageModal: () => <div data-testid="forwardMessage" />,
 }));
 vi.mock('../../features/channels/modals/DeleteCategoryModal', () => ({
   DeleteCategoryModal: () => <div data-testid="deleteCategory" />,

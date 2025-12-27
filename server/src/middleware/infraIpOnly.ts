@@ -19,17 +19,28 @@ const isPrivateIpv4 = (ip: string): boolean => {
   return false;
 };
 
+const isPrivateIpv6 = (ip: string): boolean => {
+  const normalized = ip.toLowerCase();
+  if (normalized === '::1') return true; // loopback
+  // Unique local addresses: fc00::/7
+  if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+  // Link-local: fe80::/10 (treat as private-ish for infra)
+  if (normalized.startsWith('fe8') || normalized.startsWith('fe9') || normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+  return false;
+};
+
 const isPrivateIp = (rawIp: string): boolean => {
   const ip = normalizeIp(rawIp);
-  if (ip === '::1') return true;
   const version = net.isIP(ip);
   if (version === 4) return isPrivateIpv4(ip);
-  // For now, treat non-loopback IPv6 as not-private unless explicitly allowlisted
+  if (version === 6) return isPrivateIpv6(ip);
   return false;
 };
 
 export const infraIpOnly = (req: Request, _res: Response, next: NextFunction) => {
-  const ip = (req.ip || '').trim();
+  // Note: req.ip is influenced by Express "trust proxy" and X-Forwarded-For.
+  // This middleware should remain safe even if the request hits the server directly.
+  const ip = String(req.ip || req.socket.remoteAddress || '').trim();
   if (!ip) return next(new ForbiddenError('Forbidden'));
 
   const normalized = normalizeIp(ip);

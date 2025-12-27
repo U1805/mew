@@ -7,6 +7,7 @@ vi.mock('../../utils/s3', () => ({
   uploadStream: vi.fn(),
   getS3PublicUrl: (key: string) => `http://cdn.local/${key}`,
   uploadFile: vi.fn(),
+  createPresignedPutUrl: vi.fn(),
 }));
 
 import { uploadStream } from '../../utils/s3';
@@ -85,6 +86,7 @@ describe('Webhook Routes', () => {
         expect(res.body).toBeInstanceOf(Array);
         expect(res.body.length).toBeGreaterThan(0);
         expect(res.body[0].name).toBe(webhookData.name);
+        expect(res.body[0]).not.toHaveProperty('token');
       });
 
     it('should update a webhook successfully', async () => {
@@ -102,6 +104,42 @@ describe('Webhook Routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body.name).toBe(updatedData.name);
+      expect(res.body).not.toHaveProperty('token');
+    });
+
+    it('should reset a webhook token and return a new token', async () => {
+      const createRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(webhookData);
+      webhookId = createRes.body._id;
+      const oldToken = createRes.body.token;
+
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}/reset-token`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.webhookId).toBe(webhookId);
+      expect(typeof res.body.token).toBe('string');
+      expect(res.body.token).not.toBe(oldToken);
+    });
+
+    it('should fetch a webhook token without resetting it', async () => {
+      const createRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/webhooks`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(webhookData);
+      webhookId = createRes.body._id;
+      const createdToken = createRes.body.token;
+
+      const res = await request(app)
+        .get(`/api/servers/${serverId}/channels/${channelId}/webhooks/${webhookId}/token`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.webhookId).toBe(webhookId);
+      expect(res.body.token).toBe(createdToken);
     });
 
     it('should delete a webhook successfully', async () => {
@@ -348,6 +386,15 @@ describe('Webhook Routes', () => {
       expect(res.body.payload.original_post.ignored_field).toBe(payload.payload.original_post.ignored_field);
     });
 
+    it('should reject unsupported message types', async () => {
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}`)
+        .send({ type: 'app/x-unknown-card', payload: { ok: true } });
+
+      expect(res.statusCode).toBe(400);
+      expect(String(res.body.message || '')).toMatch(/Unsupported message type/i);
+    });
+
     it('should fail with an invalid token', async () => {
       const payload = { content: 'This should fail' };
       const res = await request(app)
@@ -370,6 +417,24 @@ describe('Webhook Routes', () => {
         key: 'mock-file.txt',
         size: 42,
       });
+    });
+
+    it('should presign a webhook upload and return key + put url', async () => {
+      const { createPresignedPutUrl } = await import('../../utils/s3');
+      vi.mocked(createPresignedPutUrl as any).mockResolvedValue('http://s3.local/put-url');
+
+      const res = await request(app)
+        .post(`/api/webhooks/${webhook._id}/${webhook.token}/presign`)
+        .send({ filename: 'hello.txt', contentType: 'text/plain', size: 5 });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        url: 'http://s3.local/put-url',
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/plain' },
+      });
+      expect(typeof res.body.key).toBe('string');
+      expect(res.body.key.length).toBeGreaterThan(0);
     });
 
     it('should return 400 if no file is uploaded via webhook upload endpoint', async () => {

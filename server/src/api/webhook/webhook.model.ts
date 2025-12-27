@@ -17,7 +17,8 @@ const webhookSchema = new Schema<IWebhook>(
     avatarUrl: { type: String },
     channelId: { type: Schema.Types.ObjectId, ref: 'Channel', required: true, index: true },
     serverId: { type: Schema.Types.ObjectId, ref: 'Server', required: true, index: true },
-    token: { type: String, required: true },
+    // Secret used by public webhook endpoints; do not return in read APIs.
+    token: { type: String, required: true, select: false },
     botUserId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true }

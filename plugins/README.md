@@ -33,6 +33,7 @@
 
 `plugins/sdk` 会在启动时尝试从以下位置加载环境变量（仅在变量尚未设置时才会写入）：
 
+- 仓库提供了模板：`plugins/.env.example`（不会被自动加载）；请复制为 `.env.local` 或 `.env` 后再运行 Bot
 - 当前工作目录：`.env.local`（优先）→ `.env`
 - 插件源码目录：`.env.local`（优先）→ `.env`
 - 插件分组目录（如 `plugins/fetchers/`）：`.env.local`（优先）→ `.env`

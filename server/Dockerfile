@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-slim AS base
+FROM node:20-alpine AS base
 WORKDIR /app
 RUN corepack enable
 
@@ -27,7 +27,7 @@ COPY client/package.json client/package.json
 COPY website/package.json website/package.json
 RUN pnpm install --frozen-lockfile --filter server... --prod
 
-FROM node:20-slim AS runtime
+FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 

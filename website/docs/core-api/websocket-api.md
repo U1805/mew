@@ -31,7 +31,8 @@ import { io } from 'socket.io-client';
 
 const socket = io('http://localhost:3000', {
   auth: { token: '<jwt>' },
-  transports: ['websocket'],
+  // Prefer WebSocket, but allow fallback for environments that block WebSockets.
+  transports: ['websocket', 'polling'],
 });
 
 socket.on('ready', () => {

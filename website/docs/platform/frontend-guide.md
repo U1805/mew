@@ -26,15 +26,11 @@ slug: /guide/client-guide
 - 全栈开发：`pnpm dev`
 - 仅前端：`pnpm --filter client dev`
 
-前端 API 基址由 `VITE_API_BASE_URL` 控制：
-
-- 默认：`http://localhost:3000/api`
+前端 API 基址固定使用同源 `/api`。
 
 WebSocket 网关目前在代码中固定为 `http://localhost:3000`。
 
-补充：
-
-- Docker Compose 部署下，`client` 容器会通过 Nginx 反代 `/api` 与 `/socket.io`，并在构建时将 `VITE_API_BASE_URL` 设置为 `/api`。
+- Docker Compose 部署下，`client` 容器会通过 Nginx 反代 `/api` 与 `/socket.io`。
 - 但当前前端 WebSocket 仍直连 `http://localhost:3000`，因此 Nginx 的 `/socket.io` 反代不会被使用；如需同源 WebSocket，请按需调整 `client/src/shared/services/socket.ts`。
 
 ---

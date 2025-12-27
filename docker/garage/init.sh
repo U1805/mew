@@ -11,6 +11,9 @@ KEY_NAME="${S3_KEY_NAME:-mew-app-key}"
 
 GARAGE_CMD="garage --config $CONFIG_PATH"
 
+# Ensure secrets directory exists (named volume may start empty)
+mkdir -p "$SECRETS_DIR"
+
 # Wait for Garage to be ready
 echo "[garage-init] Waiting for Garage to be ready..."
 i=0
@@ -87,6 +90,7 @@ if [ "$NEED_NEW_KEY" -eq 1 ]; then
 fi
 
 # Ensure Permissions
+chmod 755 "$SECRETS_DIR" || true
 echo "[garage-init] Updating bucket permissions..."
 $GARAGE_CMD bucket allow --read --write --owner "$BUCKET_NAME" --key "$KEY_NAME" >/dev/null 2>&1 || true
 

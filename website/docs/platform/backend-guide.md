@@ -32,9 +32,12 @@ slug: /guide/server-guide
 
 可选配置：
 
-- `S3_*`：头像与附件上传（Garage/MinIO 等 S3 兼容存储）；后端启动时会尝试配置 Bucket CORS（失败不会阻断启动，见 `server/src/utils/s3.ts`）。
+- `MEW_CORS_ORIGINS`：API CORS 允许列表（逗号分隔；开发环境默认全开放，生产环境建议显式配置）。
 - `MEW_ADMIN_SECRET`：基础设施共享密钥（Bot Service 引导/注册、`/infra` Socket 命名空间鉴权）。
 - `MEW_INFRA_ALLOWED_IPS`：基础设施接口的 IP 白名单（逗号分隔；为空则默认仅允许私网 IP + 127.0.0.1）。
+- `S3_*`：头像与附件上传（Garage/MinIO 等 S3 兼容存储）；后端启动时会尝试配置 Bucket CORS（失败不会阻断启动，见 `server/src/utils/s3.ts`）。
+- `S3_CORS_ORIGINS`：对象存储 CORS 允许列表（用于浏览器直传；默认沿用 `MEW_CORS_ORIGINS`）。
+- `S3_PRESIGN_EXPIRES_SECONDS`：预签名上传 URL 的过期时间（秒）。
 
 ---
 
@@ -113,6 +116,7 @@ slug: /guide/server-guide
 
 上传路由：`server/src/api/upload/upload.routes.ts`（挂载于 `/api/channels/:channelId/uploads`）：
 
+- `POST /presign`：返回用于浏览器直传的预签名 PUT URL（推荐前端优先使用）。
 - `multer` 中间件（`server/src/middleware/upload.ts`）接收单文件字段 `file`。
 - **流式上传**：通过自定义的 `S3StreamingStorage` 存储引擎（`server/src/middleware/s3Storage.ts`），文件流被直接传输到 S3，避免了在服务器上进行内存或磁盘缓冲，效率更高。
 - 上传逻辑封装在 `server/src/utils/s3.ts#uploadStream`。

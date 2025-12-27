@@ -4,8 +4,6 @@ services:
     restart: unless-stopped
     volumes:
       - mongo_data:/data/db
-    ports:
-      - "27017:27017"
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "mongodb://localhost:27017/admin", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
@@ -20,11 +18,6 @@ services:
       - garage_meta:/var/lib/garage/meta
       - garage_data:/var/lib/garage/data
       - garage_secrets:/var/lib/garage/secrets
-    ports:
-      - "3900:3900" # S3 API
-      - "3901:3901" # RPC
-      - "3902:3902" # S3 Web (public)
-      - "3903:3903" # Admin API
     healthcheck:
       test: ["CMD", "/garage", "--config", "/etc/garage.toml", "status"]
       start_period: 20s
@@ -37,7 +30,7 @@ services:
       context: .
       dockerfile: docker/garage/Dockerfile.init
     restart: "no"
-    network_mode: service:garage 
+    network_mode: service:garage
     depends_on:
       garage:
         condition: service_started
@@ -57,6 +50,11 @@ services:
       context: .
       dockerfile: server/Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       mongo:
         condition: service_healthy
@@ -69,17 +67,20 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1d}
       MEW_ALLOW_USER_REGISTRATION: ${MEW_ALLOW_USER_REGISTRATION:-true}
       MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
+      MEW_CORS_ORIGINS: ${MEW_CORS_ORIGINS:-*}
+      MEW_TRUST_PROXY: ${MEW_TRUST_PROXY:-loopback}
       MEW_INFRA_ALLOWED_IPS: ${MEW_INFRA_ALLOWED_IPS:-}
       # Garage (S3-compatible storage)
       S3_ENDPOINT: garage
       S3_PORT: 3900
       S3_WEB_ENDPOINT: ${S3_WEB_ENDPOINT:-web.garage.localhost}
-      S3_WEB_PORT: 3902
+      S3_WEB_PORT: ${S3_WEB_PORT:-80}
       S3_REGION: garage
       S3_BUCKET_NAME: ${S3_BUCKET_NAME:-mew-bucket}
       S3_CREDENTIALS_FILE: /var/run/mew/s3-credentials.json
-    ports:
-      - "3000:3000"
+      S3_CORS_ORIGINS: ${S3_CORS_ORIGINS:-*}
+      S3_PRESIGN_EXPIRES_SECONDS: ${S3_PRESIGN_EXPIRES_SECONDS:-60}
+      LIMIT_FILE_SIZE: ${LIMIT_FILE_SIZE:-50}
     healthcheck:
       test:
         ["CMD", "node", "-e", "fetch('http://localhost:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
@@ -94,11 +95,11 @@ services:
     build:
       context: .
       dockerfile: client/Dockerfile
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
     restart: unless-stopped
     depends_on:
       - server
+    environment:
+      LIMIT_FILE_SIZE: ${LIMIT_FILE_SIZE:-50}
     ports:
       - "80:80"
 
@@ -107,6 +108,11 @@ services:
       context: .
       dockerfile: docker/plugins/Dockerfile
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       server:
         condition: service_healthy
@@ -114,7 +120,6 @@ services:
       MEW_ADMIN_SECRET: ${MEW_ADMIN_SECRET:-dev-admin-secret}
       MEW_URL: http://server:3000
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
-      # Comma/space/semicolon separated list of plugin serviceType names. Example: "test-fetcher,test-agent"
       MEW_PLUGINS: ${MEW_PLUGINS:-test-fetcher,test-agent}
     volumes:
       - plugins_cache:/root/.cache/mew

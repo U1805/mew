@@ -9,7 +9,7 @@ import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores'
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
 import { useMembers } from '../../../shared/hooks/useMembers';
 import { useRoles } from '../../../shared/hooks/useRoles';
-import { filterMembersForChannel } from './memberListUtils';
+import { filterMembersForChannel } from '../hooks/memberListUtils';
 
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;

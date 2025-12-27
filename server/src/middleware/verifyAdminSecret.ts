@@ -1,8 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import config from '../config';
 import { UnauthorizedError } from '../utils/errors';
 
 const HEADER_NAME = 'x-mew-admin-secret';
+
+const safeEqual = (a: string, b: string): boolean => {
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  if (ba.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ba, bb);
+};
 
 export const verifyAdminSecret = (req: Request, _res: Response, next: NextFunction) => {
   if (!config.adminSecret) {
@@ -10,7 +18,7 @@ export const verifyAdminSecret = (req: Request, _res: Response, next: NextFuncti
   }
 
   const provided = req.header(HEADER_NAME);
-  if (!provided || provided !== config.adminSecret) {
+  if (!provided || !safeEqual(provided, config.adminSecret)) {
     return next(new UnauthorizedError('Invalid admin secret.'));
   }
 

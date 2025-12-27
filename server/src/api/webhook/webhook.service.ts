@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import bcrypt from 'bcryptjs';
 import { IWebhook } from './webhook.model';
 import { webhookRepository } from './webhook.repository';
 import UserModel from '../user/user.model';
@@ -12,6 +13,16 @@ interface WebhookCreationData {
   name: string;
   avatarUrl?: string;
 }
+
+const ALLOWED_WEBHOOK_MESSAGE_TYPES = new Set([
+  'message/default',
+  'app/x-rss-card',
+  'app/x-pornhub-card',
+  'app/x-twitter-card',
+  'app/x-bilibili-card',
+  'app/x-instagram-card',
+  'app/x-jpdict-card',
+]);
 
 const RESERVED_PAYLOAD_KEYS = new Set(['webhookName', 'overrides']);
 
@@ -108,10 +119,11 @@ const createBotUserForWebhook = async (serverId: string, avatarUrl?: string) => 
 
   const suffix = crypto.randomBytes(8).toString('hex');
   const botUsername = `webhook-${suffix}`;
+  const hashedPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
   const botUser = new UserModel({
     email: `${botUsername}@internal.mew`,
     username: botUsername,
-    password: crypto.randomBytes(32).toString('hex'),
+    password: hashedPassword,
     isBot: true,
     avatarUrl: avatarUrl || '',
   });
@@ -124,7 +136,7 @@ export const createWebhook = async (
   serverId: string,
   data: WebhookCreationData,
   avatarFile?: Express.Multer.File
-): Promise<IWebhook> => {
+): Promise<IWebhook & { token: string }> => {
     if (!data?.name || typeof data.name !== 'string' || data.name.trim() === '') {
       throw new BadRequestError('name is required');
     }
@@ -141,11 +153,24 @@ export const createWebhook = async (
       botUserId: botUser._id,
       token,
     });
-    return webhook;
+
+    // token is stored with select:false, so return it explicitly on creation.
+    return Object.assign(webhook, { token });
 };
 
 export const getWebhooksByChannel = async (channelId: string): Promise<IWebhook[]> => {
   return webhookRepository.findByChannel(channelId);
+};
+
+export const getWebhookTokenByChannel = async (
+  channelId: string,
+  webhookId: string
+): Promise<{ webhookId: string; token: string }> => {
+  const webhook = await webhookRepository.findByIdAndChannelWithToken(webhookId, channelId);
+  if (!webhook) {
+    throw new NotFoundError('Webhook not found');
+  }
+  return { webhookId: webhook._id.toString(), token: webhook.token };
 };
 
 export const updateWebhook = async (
@@ -179,6 +204,15 @@ export const assertValidWebhookToken = async (webhookId: string, token: string) 
     throw new UnauthorizedError('Invalid webhook token');
   }
   return webhook;
+};
+
+export const resetWebhookToken = async (webhookId: string): Promise<{ webhookId: string; token: string }> => {
+  const token = crypto.randomBytes(32).toString('hex');
+  const updated = await webhookRepository.findByIdAndUpdate(webhookId, { token } as any);
+  if (!updated) {
+    throw new NotFoundError('Webhook not found');
+  }
+  return { webhookId: updated._id.toString(), token };
 };
 
 interface ExecuteWebhookPayload {
@@ -221,6 +255,10 @@ export const executeWebhook = async (webhookId: string, token: string, payload: 
     const messageType = (typeof payload.type === 'string' && payload.type.trim() !== '') 
         ? payload.type 
         : 'message/default';
+
+    if (!ALLOWED_WEBHOOK_MESSAGE_TYPES.has(messageType)) {
+      throw new BadRequestError(`Unsupported message type: ${messageType}`);
+    }
 
     if (messageType === 'message/default' && content.trim() === '') {
       throw new BadRequestError('content is required');

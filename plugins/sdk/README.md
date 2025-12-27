@@ -11,6 +11,7 @@
 - 标准 Service 主循环（可选）：`sdk.RunServiceWithSignals(sdk.ServiceOptions{...})`
 - goroutine 组管理（可选）：`g := sdk.NewGroup(ctx); g.Go(...); g.Stop()`
 - 基于 webhook url 的文件上传（S3 存储）：`sdk.UploadWebhookReader(...)` / `sdk.UploadWebhookBytes(...)`
+- 在满足条件时（例如 `UploadBytes` 已知大小且 ≤ 8MB），SDK 会优先走 **预签名 PUT 直传**（`/api/webhooks/:id/:token/presign`），失败时自动回退到旧的 multipart 上传（`.../upload`）。
 - 测试模式（DEV_MODE）：不发 webhook、不上传文件，保存所有请求到本地目录（见下）
 
 ## 包结构

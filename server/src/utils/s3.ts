@@ -1,12 +1,21 @@
-import { GetObjectCommand, S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import config from '../config';
 import { nanoid } from 'nanoid';
 import path from 'path';
 import { Transform } from 'stream';
 
-const S3_ENDPOINT = `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.endpoint}:${config.s3.port}`;
-const S3_PUBLIC_BASE = `${config.s3.useSsl ? 'https' : 'http'}://${config.s3.bucketName}.${config.s3.webEndpoint}:${config.s3.webPort}`;
+const protocol = config.s3.useSsl ? 'https' : 'http';
+const buildBaseUrl = (host: string, port: number): string => {
+  if ((protocol === 'http' && port === 80) || (protocol === 'https' && port === 443)) {
+    return `${protocol}://${host}`;
+  }
+  return `${protocol}://${host}:${port}`;
+};
+
+const S3_ENDPOINT = buildBaseUrl(config.s3.endpoint, config.s3.port);
+const S3_PUBLIC_BASE = buildBaseUrl(`${config.s3.bucketName}.${config.s3.webEndpoint}`, config.s3.webPort);
 
 const s3Client = new S3Client({
   endpoint: S3_ENDPOINT,
@@ -20,15 +29,32 @@ const s3Client = new S3Client({
 
 export const configureBucketCors = async () => {
   try {
+    const allowedOrigins = Array.isArray((config as any)?.s3?.corsAllowedOrigins)
+      ? (config as any).s3.corsAllowedOrigins
+      : ['*'];
+    if (allowedOrigins.length === 0) {
+      console.warn('[S3] Skipping bucket CORS config: no allowed origins configured (set S3_CORS_ORIGINS or MEW_CORS_ORIGINS).');
+      return;
+    }
+
     const command = new PutBucketCorsCommand({
       Bucket: config.s3.bucketName,
       CORSConfiguration: {
         CORSRules: [
           {
-            AllowedHeaders: ['*', 'authorization', 'content-type', 'x-amz-date', 'x-amz-security-token', 'x-amz-user-agent'],
-            AllowedMethods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE'],
-            AllowedOrigins: ['*'],
-            ExposeHeaders: ['ETag', 'x-amz-request-id', 'x-amz-id-2'],
+            // Allow browser uploads via pre-signed PUT (PUT) and public reads (GET/HEAD).
+            AllowedMethods: ['GET', 'HEAD', 'PUT'],
+            AllowedOrigins: allowedOrigins,
+            AllowedHeaders: [
+              'authorization',
+              'content-type',
+              'x-amz-acl',
+              'x-amz-content-sha256',
+              'x-amz-date',
+              'x-amz-security-token',
+              'x-amz-user-agent',
+            ],
+            ExposeHeaders: ['ETag'],
             MaxAgeSeconds: 3000,
           },
         ],
@@ -68,6 +94,22 @@ export const uploadFile = async (file: Express.Multer.File) => {
   await upload.done();
 
   return { key: newFilename, mimetype: file.mimetype, size: file.size };
+};
+
+export const createPresignedPutUrl = async (opts: { key: string; contentType?: string }) => {
+  const command = new PutObjectCommand({
+    Bucket: config.s3.bucketName,
+    Key: opts.key,
+    ContentType: opts.contentType || undefined,
+  });
+
+  // Some AWS SDK packages can pull in mismatched `@smithy/types` versions under pnpm, which breaks TS assignability.
+  // Runtime compatibility is unaffected; cast to unblock compilation.
+  const url = await getSignedUrl(s3Client as any, command as any, {
+    expiresIn: Math.max(5, Math.min(config.s3.presignExpiresSeconds, 3600)),
+  });
+
+  return url;
 };
 
 class ByteCounter extends Transform {

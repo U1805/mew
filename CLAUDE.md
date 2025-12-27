@@ -46,7 +46,7 @@ Mew 是一个以即时通讯（IM）平台为核心的个人数字中心，当�
 - 后端配置文件：`server/.env`（从 `server/.env.example` 复制）。默认 `PORT=3000`。
 - 前端开发端口：Vite 默认 `5173`。
 - 文档站端口：`website/package.json` 中固定为 `3001`。
-- API 基址：前端 `client/src/shared/services/http.ts` 当前硬编码为 `http://localhost:3000/api`；若要切换环境变量（如 `VITE_API_BASE_URL`），需要同步调整该实现。
+- API 基址：前端 `client/src/shared/services/http.ts` 固定使用同源 `/api`（开发环境由 Vite proxy 转发，Docker 部署由 Nginx 反代）。
 - Socket Gateway：前端 `client/src/shared/services/socket.ts` 当前连接 `http://localhost:3000`。
 
 ## 后端开发规范（`server/`）

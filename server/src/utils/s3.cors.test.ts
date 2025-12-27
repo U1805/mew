@@ -23,7 +23,7 @@ describe('utils/s3 (configureBucketCors, getS3PublicUrl)', () => {
       },
     }));
     const mod = await import('./s3');
-    expect(mod.getS3PublicUrl('k.png')).toBe('https://mew.web.local:443/k.png');
+    expect(mod.getS3PublicUrl('k.png')).toBe('https://mew.web.local/k.png');
   });
 
   it('configureBucketCors swallows errors and does not throw', async () => {
