@@ -30,20 +30,37 @@ func LoadDotEnvFromCaller(logPrefix string, callerSkip int) {
 		return
 	}
 
-	paths := []string{".env.local", ".env"}
+	paths := []string{".env.local", ".env"} // cwd
 
 	if _, file, _, ok := runtime.Caller(callerSkip); ok {
+		// Walk up from the caller file directory, so running from any subdir
+		// (e.g. plugins/fetchers/<service>/internal/app) still finds:
+		// - plugin root
+		// - plugin group (plugins/fetchers, plugins/agents)
+		// - plugins/
+		// - repo root (common in local dev)
 		dir := filepath.Dir(file)
-		paths = append(
-			paths,
-			filepath.Join(dir, ".env.local"),
-			filepath.Join(dir, ".env"),
-			filepath.Clean(filepath.Join(dir, "..", ".env.local")),
-			filepath.Clean(filepath.Join(dir, "..", ".env")),
-			filepath.Clean(filepath.Join(dir, "..", "..", ".env.local")),
-			filepath.Clean(filepath.Join(dir, "..", "..", ".env")),
-		)
+		for d := dir; ; {
+			paths = append(paths, filepath.Join(d, ".env.local"), filepath.Join(d, ".env"))
+			parent := filepath.Dir(d)
+			if parent == d {
+				break
+			}
+			d = parent
+		}
 	}
+
+	seen := make(map[string]struct{}, len(paths))
+	uniq := make([]string, 0, len(paths))
+	for _, p := range paths {
+		p = filepath.Clean(p)
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		uniq = append(uniq, p)
+	}
+	paths = uniq
 
 	for _, p := range paths {
 		if err := godotenv.Load(p); err != nil {

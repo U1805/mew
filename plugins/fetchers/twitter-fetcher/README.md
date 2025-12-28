@@ -11,15 +11,15 @@
 ```json
 [
   {
+    "username": "yyy",
     "interval": 3600,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
-    "username": "kurusurindesu",
     "enabled": true,
     "send_history_on_start": false
   },
   {
-    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
-    "username": "xxx"
+    "username": "xxx",
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>"
   }
 ]
 ```
@@ -56,5 +56,5 @@
 运行：
 
 ```bash
-go run .
+go run ./cmd/twitter-fetcher
 ```

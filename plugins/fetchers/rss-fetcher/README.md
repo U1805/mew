@@ -11,16 +11,15 @@
 ```json
 [
   {
+    "rss_url": "https://example.com/feed.xml",
     "interval": 3600,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
-    "rss_url": "https://example.com/feed.xml",
     "enabled": true,
-    "send_history_on_start": false,
-    "max_items_per_poll": 5
+    "send_history_on_start": false
   },
   {
-    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
-    "rss_url": "https://another.example/rss"
+    "rss_url": "https://another.example/rss",
+    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>"
   }
 ]
 ```
@@ -54,5 +53,5 @@
 运行：
 
 ```bash
-go run .
+go run ./cmd/rss-fetcher
 ```

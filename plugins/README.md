@@ -44,7 +44,7 @@
 示例：
 
 ```bash
-go run ./plugins/fetchers/test-fetcher
-go run ./plugins/fetchers/rss-fetcher
+go run ./plugins/fetchers/test-fetcher/cmd/test-fetcher
+go run ./plugins/fetchers/rss-fetcher/cmd/rss-fetcher
 go run ./plugins/agents/test-agent
 ```

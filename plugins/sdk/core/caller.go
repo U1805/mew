@@ -11,6 +11,7 @@ import (
 // through facade wrappers.
 func nonSDKCallerSkip(startSkip int) int {
 	const maxSkip = 25
+	firstNonSDK := -1
 	for skip := startSkip; skip <= maxSkip; skip++ {
 		_, file, _, ok := runtime.Caller(skip)
 		if !ok {
@@ -20,7 +21,17 @@ func nonSDKCallerSkip(startSkip int) int {
 		if strings.Contains(normalized, "/plugins/sdk/") {
 			continue
 		}
-		return skip
+		if firstNonSDK < 0 {
+			firstNonSDK = skip
+		}
+		// Prefer the plugin's entrypoint (cmd/<serviceType>/main.go), otherwise
+		// internal package files (e.g. internal/app) would derive "app".
+		if strings.Contains(normalized, "/cmd/") {
+			return skip
+		}
+	}
+	if firstNonSDK >= 0 {
+		return firstNonSDK
 	}
 	return startSkip
 }

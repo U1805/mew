@@ -76,6 +76,11 @@ func BoolOrDefault(v *bool, def bool) bool { return core.BoolOrDefault(v, def) }
 func IsEnabled(v *bool) bool               { return core.IsEnabled(v) }
 
 func PreviewString(s string, maxRunes int) string { return core.PreviewString(s, maxRunes) }
+func CleanText(s string) string                   { return core.CleanText(s) }
+func FirstImageURLFromHTML(htmlStr, baseURL string) string {
+	return core.FirstImageURLFromHTML(htmlStr, baseURL)
+}
+func NormalizeMaybeURL(raw, baseURL string) string { return core.NormalizeMaybeURL(raw, baseURL) }
 
 func HumanizeDuration(d time.Duration) string { return core.HumanizeDuration(d) }
 
@@ -169,6 +174,7 @@ func NewSeenSet(max int) *SeenSet { return collections.NewSeenSet(max) }
 
 type WebhookPayload = webhook.Payload
 type WebhookAttachment = webhook.Attachment
+type MediaCache = webhook.MediaCache
 
 func PostWebhook(ctx context.Context, httpClient *http.Client, apiBase, webhookURL string, payload WebhookPayload, maxRetries int) error {
 	return webhook.Post(ctx, httpClient, apiBase, webhookURL, payload, maxRetries)
@@ -205,6 +211,24 @@ func UploadRemoteToWebhook(
 		ua = RandomBrowserUserAgent()
 	}
 	return webhook.UploadRemote(ctx, downloadClient, uploadClient, apiBase, webhookURL, remoteURL, fallbackFilename, ua)
+}
+
+func UploadRemoteToWebhookCached(
+	ctx context.Context,
+	cache MediaCache,
+	downloadClient *http.Client,
+	uploadClient *http.Client,
+	apiBase, webhookURL, remoteURL, fallbackFilename string,
+	userAgent ...string,
+) (key string, usedCache bool, err error) {
+	ua := ""
+	if len(userAgent) > 0 {
+		ua = strings.TrimSpace(userAgent[0])
+	}
+	if ua == "" {
+		ua = RandomBrowserUserAgent()
+	}
+	return webhook.UploadRemoteKeyCached(ctx, cache, downloadClient, uploadClient, apiBase, webhookURL, remoteURL, fallbackFilename, ua)
 }
 
 func FilenameFromURL(rawURL, fallback string) string {

@@ -17,6 +17,5 @@
 - HistorySearch(keyword): 在当前 DM 频道按关键词搜索历史消息（最多 10 条），并返回每条所属 Session Record ID
 - RecordSearch(record_id): 根据 Session Record ID 取回完整 Session Record 文本
 
-#### 工具调用格式（严格）
-当你需要调用工具时，你必须回复且只回复一行：
-TOOL_CALL: {"tool":"HistorySearch","args":{"keyword":"..."}}  (或 RecordSearch)
+#### 工具调用方式
+当你需要调用工具时，请使用系统提供的 tool/function calling 机制调用对应工具，不要用纯文本模拟工具调用。

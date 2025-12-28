@@ -1,0 +1,82 @@
+package engine
+
+import (
+	sdktracker "mew/plugins/sdk/tracker"
+	"mew/plugins/sdk"
+)
+
+type State struct {
+	Seen       []string          `json:"seen,omitempty"`
+	MediaCache map[string]string `json:"media_cache,omitempty"` // remoteURL -> s3 key
+	MediaOrder []string          `json:"media_order,omitempty"` // FIFO for eviction
+}
+
+type Manager struct {
+	seen *sdktracker.SeenStore[State]
+}
+
+func Load(serviceType, botID string, taskIdx int, identity string) (*Manager, error) {
+	store := sdk.OpenTaskState[State](serviceType, botID, taskIdx, identity)
+
+	ss, err := sdktracker.LoadSeenStore[State](
+		store,
+		2000,
+		func(s State) []string { return s.Seen },
+		func(s *State, seen []string) { s.Seen = seen },
+	)
+	if st := ss.State(); st != nil && st.MediaCache == nil {
+		st.MediaCache = map[string]string{}
+	}
+	return &Manager{seen: ss}, err
+}
+
+func (m *Manager) Fresh() bool {
+	if m == nil || m.seen == nil {
+		return true
+	}
+	return m.seen.Fresh()
+}
+
+func (m *Manager) IsNew(id string) bool {
+	if m == nil || m.seen == nil {
+		return false
+	}
+	return m.seen.IsNew(id)
+}
+
+func (m *Manager) MarkSeen(id string) {
+	if m == nil || m.seen == nil {
+		return
+	}
+	m.seen.MarkSeen(id)
+}
+
+func (m *Manager) GetCachedMedia(url string) (string, bool) {
+	if m == nil || m.seen == nil {
+		return "", false
+	}
+	st := m.seen.State()
+	if st == nil {
+		return "", false
+	}
+	return sdktracker.GetCachedMedia(st.MediaCache, url)
+}
+
+func (m *Manager) CacheMedia(url, key string) {
+	if m == nil || m.seen == nil {
+		return
+	}
+
+	st := m.seen.State()
+	if st == nil {
+		return
+	}
+	st.MediaCache, st.MediaOrder = sdktracker.CacheMedia(st.MediaCache, st.MediaOrder, url, key, 200)
+}
+
+func (m *Manager) Save() error {
+	if m == nil || m.seen == nil {
+		return nil
+	}
+	return m.seen.Save()
+}

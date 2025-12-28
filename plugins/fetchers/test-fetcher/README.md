@@ -6,8 +6,7 @@
 
 ```json
 [
-  { "interval": 3600, "webhook": "http://mew-server/api/webhooks/xxx", "content": "test_channel_1", "enabled": true },
-  { "interval": 7200, "webhook": "http://mew-server/api/webhooks/yyy", "content": "xxx", "enabled": false }
+  { "interval": 3600, "webhook": "http://mew-server/api/webhooks/xxx", "content": "test_channel_1", "enabled": true }
 ]
 ```
 
@@ -27,5 +26,5 @@
 运行：
 
 ```bash
-go run .
+go run ./cmd/test-fetcher
 ```
