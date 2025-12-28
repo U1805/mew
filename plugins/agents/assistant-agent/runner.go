@@ -102,6 +102,7 @@ func (r *AssistantRunner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 	g.Go(func(ctx context.Context) {
 		sdk.RunInterval(ctx, 5*time.Minute, true, func(ctx context.Context) {
+			r.runPeriodicFactEngine(ctx, logPrefix)
 			r.finalizeStaleSessions(ctx, logPrefix)
 		})
 	})
@@ -133,6 +134,74 @@ func (r *AssistantRunner) Run(ctx context.Context) error {
 		return ctx.Err()
 	}
 	return nil
+}
+
+func (r *AssistantRunner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
+	r.knownUsersMu.RLock()
+	users := make([]string, 0, len(r.knownUsers))
+	for id := range r.knownUsers {
+		users = append(users, id)
+	}
+	r.knownUsersMu.RUnlock()
+
+	now := time.Now()
+	for _, userID := range users {
+		lock := r.userMutex(userID)
+		lock.Lock()
+		func() {
+			defer lock.Unlock()
+			paths := assistantUserStatePaths(r.serviceType, r.botID, userID)
+			meta, err := loadMetadata(paths.MetadataPath)
+			if err != nil {
+				log.Printf("%s load metadata failed (periodic): user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+			if meta.RecordID == "" || meta.ChannelID == "" {
+				return
+			}
+			if meta.LastMessageAt.IsZero() {
+				return
+			}
+			if now.Sub(meta.LastMessageAt) > assistantSessionGap {
+				return
+			}
+			if strings.TrimSpace(meta.LastFactRecordID) == strings.TrimSpace(meta.RecordID) && !meta.LastFactProcessedAt.IsZero() && !meta.LastMessageAt.After(meta.LastFactProcessedAt) {
+				return
+			}
+
+			facts, err := loadFacts(paths.FactsPath)
+			if err != nil {
+				log.Printf("%s load facts failed (periodic): user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+
+			sessionMsgs, recordID, _, err := r.loadCurrentSessionRecord(ctx, meta.ChannelID)
+			if err != nil {
+				log.Printf("%s load session record failed (periodic): user=%s channel=%s err=%v", logPrefix, userID, meta.ChannelID, err)
+				return
+			}
+			if strings.TrimSpace(recordID) != strings.TrimSpace(meta.RecordID) {
+				return
+			}
+
+			sessionText := formatSessionRecordForContext(sessionMsgs)
+			res, err := r.extractFactsAndUsage(ctx, r.llmConfig, sessionText, facts)
+			if err != nil {
+				log.Printf("%s fact engine periodic failed: user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+			if len(res.Facts) > 0 || len(res.UsedFactIDs) > 0 {
+				facts.Facts = touchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
+				facts = r.upsertFacts(now, facts, res.Facts)
+				_ = saveFacts(paths.FactsPath, facts)
+				log.Printf("%s facts updated (periodic): user=%s record=%s count=%d used=%d new=%d", logPrefix, userID, meta.RecordID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
+			}
+
+			meta.LastFactRecordID = meta.RecordID
+			meta.LastFactProcessedAt = meta.LastMessageAt
+			_ = saveMetadata(paths.MetadataPath, meta)
+		}()
+	}
 }
 
 func (r *AssistantRunner) finalizeStaleSessions(ctx context.Context, logPrefix string) {

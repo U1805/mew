@@ -185,6 +185,33 @@ func touchFactsUsedByContent(facts []Fact, content string, now time.Time) []Fact
 	return facts
 }
 
+func touchFactsByIDs(facts []Fact, ids []string, now time.Time) []Fact {
+	if len(facts) == 0 || len(ids) == 0 {
+		return facts
+	}
+	want := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		t := strings.TrimSpace(id)
+		if t == "" {
+			continue
+		}
+		want[strings.ToUpper(t)] = struct{}{}
+	}
+	if len(want) == 0 {
+		return facts
+	}
+	for i := range facts {
+		id := strings.ToUpper(strings.TrimSpace(facts[i].FactID))
+		if id == "" {
+			continue
+		}
+		if _, ok := want[id]; ok {
+			facts[i].LastAccessedAt = now
+		}
+	}
+	return facts
+}
+
 type toolCall struct {
 	Tool string         `json:"tool"`
 	Args map[string]any `json:"args"`

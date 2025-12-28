@@ -38,7 +38,9 @@ type Metadata struct {
 	LastMessageAt time.Time `json:"lastMessageAt"`
 	ChannelID     string    `json:"channelId"`
 
-	LastSummarizedRecordID string `json:"lastSummarizedRecordId"`
+	LastSummarizedRecordID string    `json:"lastSummarizedRecordId"`
+	LastFactRecordID       string    `json:"lastFactRecordId"`
+	LastFactProcessedAt    time.Time `json:"lastFactProcessedAt"`
 }
 
 type Fact struct {
@@ -120,6 +122,10 @@ const (
 
 	assistantTimeSincePrefix  = "~"
 	assistantTimeSinceUnknown = "unknown"
+
+	assistantReplyDelayBase    = 350 * time.Millisecond
+	assistantReplyDelayPerRune = 60 * time.Millisecond
+	assistantReplyDelayMax     = 3500 * time.Millisecond
 )
 
 func formatFactsForContext(f FactsFile) string {
@@ -379,34 +385,193 @@ func (r *AssistantRunner) shouldOnDemandRemember(userContent string) bool {
 	return strings.Contains(s, "记住") || strings.Contains(strings.ToLower(s), "remember")
 }
 
-func (r *AssistantRunner) extractFacts(ctx context.Context, cfg AssistantConfig, sessionText string, existing FactsFile) ([]string, error) {
+type factEngineResult struct {
+	Facts       []string `json:"facts"`
+	UsedFactIDs []string `json:"used_fact_ids"`
+}
+
+func formatUserActivityFrequency(activeDays, windowDays int) string {
+	if windowDays <= 0 {
+		windowDays = 7
+	}
+	if activeDays < 0 {
+		activeDays = 0
+	}
+	dayWord := "days"
+	if activeDays == 1 {
+		dayWord = "day"
+	}
+	return fmt.Sprintf("Active %d %s in the last %d", activeDays, dayWord, windowDays)
+}
+
+func (r *AssistantRunner) computeUserActivityFrequency(ctx context.Context, channelID, userID string, asOf time.Time) (string, error) {
+	const maxWindowDays = 30
+	windows := []int{1, 7, 30}
+	if asOf.IsZero() {
+		asOf = time.Now()
+	}
+	loc := asOf.Location()
+	startOfToday := time.Date(asOf.Year(), asOf.Month(), asOf.Day(), 0, 0, 0, 0, loc)
+	windowStart := startOfToday.AddDate(0, 0, -(maxWindowDays - 1))
+
+	activeDayStarts := map[string]time.Time{}
+	before := ""
+	for page := 0; page < assistantMaxFetchPages; page++ {
+		msgs, err := sdk.FetchChannelMessages(ctx, r.mewHTTPClient, r.apiBase, r.userToken, channelID, assistantFetchPageSize, before)
+		if err != nil {
+			return "", err
+		}
+		if len(msgs) == 0 {
+			break
+		}
+		before = msgs[len(msgs)-1].ID
+
+		for _, m := range msgs {
+			if strings.TrimSpace(m.AuthorID()) != strings.TrimSpace(userID) {
+				continue
+			}
+			if m.CreatedAt.IsZero() {
+				continue
+			}
+			t := m.CreatedAt.In(loc)
+			if t.Before(windowStart) {
+				continue
+			}
+			if t.After(asOf) {
+				continue
+			}
+			dayStart := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, loc)
+			activeDayStarts[dayStart.Format("2006-01-02")] = dayStart
+		}
+
+		oldest := msgs[len(msgs)-1].CreatedAt
+		if !oldest.IsZero() && oldest.In(loc).Before(windowStart) {
+			break
+		}
+	}
+
+	parts := make([]string, 0, len(windows))
+	for _, w := range windows {
+		if w <= 0 {
+			continue
+		}
+		ws := startOfToday.AddDate(0, 0, -(w - 1))
+		active := 0
+		for _, dayStart := range activeDayStarts {
+			if dayStart.Before(ws) || dayStart.After(startOfToday) {
+				continue
+			}
+			active++
+		}
+		parts = append(parts, formatUserActivityFrequency(active, w))
+	}
+	return strings.Join(parts, "; "), nil
+}
+
+func assistantReplyDelayForLine(line string) time.Duration {
+	n := len([]rune(strings.TrimSpace(line)))
+	if n <= 0 {
+		return 0
+	}
+	d := assistantReplyDelayBase + time.Duration(n)*assistantReplyDelayPerRune
+	if d > assistantReplyDelayMax {
+		return assistantReplyDelayMax
+	}
+	return d
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	t := time.NewTimer(d)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return
+	case <-t.C:
+		return
+	}
+}
+
+func extractJSONFromLLMText(s string) string {
+	raw := strings.TrimSpace(s)
+	if raw == "" {
+		return ""
+	}
+	// Strip markdown fences like ```json ... ``` or ``` ... ```.
+	if strings.HasPrefix(raw, "```") {
+		rest := strings.TrimSpace(strings.TrimPrefix(raw, "```"))
+		if i := strings.Index(rest, "\n"); i >= 0 {
+			rest = rest[i+1:]
+		}
+		if j := strings.LastIndex(rest, "```"); j >= 0 {
+			rest = rest[:j]
+		}
+		raw = strings.TrimSpace(rest)
+	}
+	// If still not pure JSON, try to salvage the first object/array block.
+	if !(strings.HasPrefix(raw, "{") || strings.HasPrefix(raw, "[")) {
+		if i := strings.Index(raw, "{"); i >= 0 {
+			if j := strings.LastIndex(raw, "}"); j > i {
+				return strings.TrimSpace(raw[i : j+1])
+			}
+		}
+		if i := strings.Index(raw, "["); i >= 0 {
+			if j := strings.LastIndex(raw, "]"); j > i {
+				return strings.TrimSpace(raw[i : j+1])
+			}
+		}
+	}
+	return strings.TrimSpace(raw)
+}
+
+func (r *AssistantRunner) extractFactsAndUsage(ctx context.Context, cfg AssistantConfig, sessionText string, existing FactsFile) (factEngineResult, error) {
 	system := `You are a fact extraction engine.
 Extract stable, user-specific facts from the conversation.
-Return ONLY a JSON array of strings. Each string should be a concise fact sentence.
-Prefer English "User ..." format (e.g. "User's name is Alex.").`
-	user := "Conversation:\n" + sessionText + "\n\nExisting facts:\n" + formatFactsForContext(existing) + "\n\nReturn JSON array only."
+Write each fact in the user's language (use the predominant language of the conversation).
+Do not translate facts into English unless the user is speaking English.
+Also identify which existing facts were mentioned or strongly implied (semantic match is allowed).`
+	user := "Conversation:\n" + sessionText + "\n\nExisting facts (ID: content):\n" + formatFactsForContext(existing) + "\n\nReturn ONLY a JSON object like:\n{\"facts\": [\"...\"], \"used_fact_ids\": [\"F01\", \"F02\"]}\n"
 
 	out, err := callChatCompletions(ctx, r.llmHTTPClient, cfg, []chatMessage{
 		{Role: "system", Content: system},
 		{Role: "user", Content: user},
 	})
 	if err != nil {
-		return nil, err
+		return factEngineResult{}, err
 	}
 
-	var arr []string
-	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &arr); err != nil {
-		return nil, fmt.Errorf("fact engine invalid json: %w (raw=%s)", err, strings.TrimSpace(out))
+	raw := extractJSONFromLLMText(out)
+	var parsed factEngineResult
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		// Backward compat: allow a plain array output.
+		var arr []string
+		if err2 := json.Unmarshal([]byte(raw), &arr); err2 != nil {
+			return factEngineResult{}, fmt.Errorf("fact engine invalid json: %w (raw=%s)", err, raw)
+		}
+		parsed.Facts = arr
 	}
-	clean := make([]string, 0, len(arr))
-	for _, s := range arr {
+
+	cleanFacts := make([]string, 0, len(parsed.Facts))
+	for _, s := range parsed.Facts {
 		t := strings.TrimSpace(s)
 		if t == "" {
 			continue
 		}
-		clean = append(clean, t)
+		cleanFacts = append(cleanFacts, t)
 	}
-	return clean, nil
+
+	cleanIDs := make([]string, 0, len(parsed.UsedFactIDs))
+	for _, id := range parsed.UsedFactIDs {
+		t := strings.TrimSpace(id)
+		if t == "" {
+			continue
+		}
+		cleanIDs = append(cleanIDs, t)
+	}
+
+	return factEngineResult{Facts: cleanFacts, UsedFactIDs: cleanIDs}, nil
 }
 
 func (r *AssistantRunner) upsertFacts(now time.Time, facts FactsFile, newFacts []string) FactsFile {
@@ -513,6 +678,8 @@ func (r *AssistantRunner) processDMMessage(
 		return err
 	}
 
+	prevRecordID := meta.RecordID
+
 	if meta.ChannelID == "" {
 		meta.ChannelID = channelID
 	}
@@ -556,9 +723,17 @@ func (r *AssistantRunner) processDMMessage(
 	meta.LastMessageAt = now
 	meta.ChannelID = channelID
 	meta.SessionStartDatetime = startAt.Format(assistantSessionStartTimeFormat)
+	if strings.TrimSpace(prevRecordID) != strings.TrimSpace(recordID) {
+		meta.LastFactRecordID = ""
+		meta.LastFactProcessedAt = time.Time{}
+	}
 
-	if meta.UserActivityFrequency == "" {
-		meta.UserActivityFrequency = assistantDefaultActivity
+	if meta.UserActivityFrequency == "" || strings.TrimSpace(prevRecordID) != strings.TrimSpace(recordID) {
+		if freq, err := r.computeUserActivityFrequency(ctx, channelID, userID, startAt); err == nil && strings.TrimSpace(freq) != "" {
+			meta.UserActivityFrequency = freq
+		} else if strings.TrimSpace(meta.UserActivityFrequency) == "" {
+			meta.UserActivityFrequency = assistantDefaultActivity
+		}
 	}
 
 	baseline := meta.BaselineMood
@@ -571,8 +746,6 @@ func (r *AssistantRunner) processDMMessage(
 	if err := saveMetadata(paths.MetadataPath, meta); err != nil {
 		return err
 	}
-
-	facts.Facts = touchFactsUsedByContent(facts.Facts, socketMsg.Content, now)
 
 	l1l4 := buildL1L4UserPrompt(meta, facts, summaries)
 	l5, err := r.buildL5MessagesWithAttachments(ctx, sessionMsgs)
@@ -613,15 +786,20 @@ func (r *AssistantRunner) processDMMessage(
 		logPrefix, channelID, userID, sdk.PreviewString(reply, assistantLogContentPreviewLen),
 	)
 
-	linesSent := 0
+	lines := make([]string, 0, assistantMaxReplyLines)
 	for _, line := range strings.Split(reply, "\n") {
-		if linesSent >= assistantMaxReplyLines {
+		if len(lines) >= assistantMaxReplyLines {
 			break
 		}
 		t := strings.TrimSpace(line)
 		if t == "" {
 			continue
 		}
+		lines = append(lines, t)
+	}
+
+	linesSent := 0
+	for i, t := range lines {
 		if err := emit(assistantUpstreamMessageCreate, map[string]any{
 			"channelId": channelID,
 			"content":   t,
@@ -629,16 +807,20 @@ func (r *AssistantRunner) processDMMessage(
 			return fmt.Errorf("send message failed: %w", err)
 		}
 		linesSent++
+		if i < len(lines)-1 {
+			sleepWithContext(ctx, assistantReplyDelayForLine(t))
+		}
 	}
 	log.Printf("%s reply sent: channel=%s user=%s lines=%d", logPrefix, channelID, userID, linesSent)
 
 	if r.shouldOnDemandRemember(socketMsg.Content) {
 		log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
 		sessionText := formatSessionRecordForContext(sessionMsgs)
-		if extracted, err := r.extractFacts(ctx, r.llmConfig, sessionText, facts); err == nil && len(extracted) > 0 {
-			facts = r.upsertFacts(now, facts, extracted)
+		if res, err := r.extractFactsAndUsage(ctx, r.llmConfig, sessionText, facts); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
+			facts.Facts = touchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
+			facts = r.upsertFacts(now, facts, res.Facts)
 			_ = saveFacts(paths.FactsPath, facts)
-			log.Printf("%s facts updated (on-demand): user=%s count=%d", logPrefix, userID, len(facts.Facts))
+			log.Printf("%s facts updated (on-demand): user=%s count=%d used=%d new=%d", logPrefix, userID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 		} else if err != nil {
 			log.Printf("%s fact engine on-demand failed: user=%s err=%v", logPrefix, userID, err)
 		}
@@ -677,10 +859,11 @@ func (r *AssistantRunner) finalizeRecord(ctx context.Context, logPrefix, userID 
 		log.Printf("%s summarize failed: user=%s record=%s err=%v", logPrefix, userID, meta.RecordID, err)
 	}
 
-	if extracted, err := r.extractFacts(ctx, r.llmConfig, recordText, facts); err == nil && len(extracted) > 0 {
-		facts = r.upsertFacts(now, facts, extracted)
+	if res, err := r.extractFactsAndUsage(ctx, r.llmConfig, recordText, facts); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
+		facts.Facts = touchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
+		facts = r.upsertFacts(now, facts, res.Facts)
 		_ = saveFacts(paths.FactsPath, facts)
-		log.Printf("%s facts updated (end-of-session): user=%s count=%d", logPrefix, userID, len(facts.Facts))
+		log.Printf("%s facts updated (end-of-session): user=%s count=%d used=%d new=%d", logPrefix, userID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 	} else if err != nil {
 		log.Printf("%s fact engine end-of-session failed: user=%s err=%v", logPrefix, userID, err)
 	}
@@ -696,6 +879,25 @@ func (r *AssistantRunner) chatWithTools(ctx context.Context, personaSystem, firs
 		chatMessage{Role: "user", Content: strings.TrimSpace(firstUserPrompt)},
 	)
 	messages = append(messages, l5...)
+
+	type pendingRecordSearchResult struct {
+		index    int
+		recordID string
+	}
+	var pendingRecordSearch []pendingRecordSearchResult
+	flushRecordSearch := func() {
+		for _, p := range pendingRecordSearch {
+			rid := strings.TrimSpace(p.recordID)
+			if rid == "" {
+				rid = "unknown"
+			}
+			messages[p.index] = openai.ToolResultMessage(toolRecordSearch, map[string]any{
+				"recordId": rid,
+				"text":     fmt.Sprintf("[Session Record %s has read]", rid),
+			})
+		}
+		pendingRecordSearch = nil
+	}
 
 	for i := 0; i <= assistantMaxToolCalls; i++ {
 		log.Printf("%s llm call: channel=%s attempt=%d messages=%d", assistantLogPrefix, channelID, i+1, len(messages))
@@ -736,6 +938,10 @@ func (r *AssistantRunner) chatWithTools(ctx context.Context, personaSystem, firs
 					messages = append(messages, openai.ToolResultMessage(toolName, map[string]any{"error": err.Error()}))
 				} else {
 					messages = append(messages, openai.ToolResultMessage(toolName, payload))
+					pendingRecordSearch = append(pendingRecordSearch, pendingRecordSearchResult{
+						index:    len(messages) - 1,
+						recordID: recordID,
+					})
 				}
 				log.Printf("%s tool result: channel=%s tool=%s preview=%q",
 					assistantLogPrefix, channelID, toolName, sdk.PreviewString(fmt.Sprintf("%v", payload), assistantLogToolResultPreviewLen),
@@ -751,6 +957,8 @@ func (r *AssistantRunner) chatWithTools(ctx context.Context, personaSystem, firs
 		if ok {
 			log.Printf("%s final_mood parsed: channel=%s valence=%.4f arousal=%.4f", assistantLogPrefix, channelID, mood.Valence, mood.Arousal)
 		}
+		// Only compress RecordSearch payloads after the model has produced a non-tool response.
+		flushRecordSearch()
 		return clean, mood, ok, nil
 	}
 
