@@ -17,14 +17,13 @@
 ## 包结构
 
 - `mew/plugins/sdk`：门面（对外稳定 API）
-- `mew/plugins/sdk/core`：dotenv、运行时配置、service 主循环、Group、RunInterval
-- `mew/plugins/sdk/config`：Bot.config JSON 解码 + 常用校验
-- `mew/plugins/sdk/httpx`：统一的 HTTP client/代理行为 + User-Agent 工具
-- `mew/plugins/sdk/mew`：后端 API client
-- `mew/plugins/sdk/manager`：BotManager（热重载）
-- `mew/plugins/sdk/state`：本地 state 文件路径 + JSON 读写
-- `mew/plugins/sdk/collections`：SeenSet 等小工具
-- `mew/plugins/sdk/webhook`：webhook post（含 loopback rewrite）+ 基于 webhook url 的文件上传（S3 存储）
+- `mew/plugins/sdk/engine`：运行时引擎（dotenv/config/service 主循环/BotManager）
+- `mew/plugins/sdk/client`：后端 API client（含 message/session 辅助）
+- `mew/plugins/sdk/client/socketio`：socket.io gateway client
+- `mew/plugins/sdk/client/webhook`：webhook post + 文件上传（S3 存储）
+- `mew/plugins/sdk/store`：本地 state 文件路径 + JSON 读写 + seen/media cache
+- `mew/plugins/sdk/util`：通用工具（以及 `util/devmode`、`util/html`、`util/httpclient`、`util/time`）
+
 
 ## Runner 接口
 

@@ -12,8 +12,8 @@ import (
 
 	"mew/plugins/jpdict-agent/internal/config"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/mew"
-	"mew/plugins/sdk/socketio"
+	"mew/plugins/sdk/client"
+	"mew/plugins/sdk/client/socketio"
 )
 
 type JpdictRunner struct {
@@ -183,7 +183,7 @@ type socketMessage struct {
 	ReferencedID string             `json:"referencedMessageId,omitempty"`
 }
 
-type socketAttachment = mew.AttachmentRef
+type socketAttachment = client.AttachmentRef
 
 func (r *JpdictRunner) isOwnMessage(authorRaw json.RawMessage) bool {
 	return sdk.IsOwnMessage(authorRaw, r.botUserID)

@@ -9,7 +9,7 @@ import (
 	openaigo "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 
-	"mew/plugins/sdk/mew"
+	"mew/plugins/sdk/client"
 )
 
 const (
@@ -85,8 +85,8 @@ func (r *JpdictRunner) queryLLM(ctx context.Context, text string, attachments []
 	userMsg, err := buildUserMessageParam(ctx, strings.TrimSpace(text), attachments, buildUserContentOptions{
 		DefaultTextPrompt:  jpdictDefaultTextPrompt,
 		DefaultImagePrompt: jpdictDefaultImagePrompt,
-		Download: func(ctx context.Context, att mew.AttachmentRef, limit int64) ([]byte, error) {
-			return mew.DownloadAttachmentBytes(ctx, r.mewHTTPClient, r.llmHTTPClient, r.apiBase, r.userToken, att, limit)
+		Download: func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error) {
+			return client.DownloadAttachmentBytes(ctx, r.mewHTTPClient, r.llmHTTPClient, r.apiBase, r.userToken, att, limit)
 		},
 	})
 	if err != nil {

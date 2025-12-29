@@ -5,7 +5,7 @@ import (
 
 	"mew/plugins/rss-fetcher/internal/source"
 	"mew/plugins/sdk"
-	sdktracker "mew/plugins/sdk/tracker"
+	"mew/plugins/sdk/store"
 )
 
 type State struct {
@@ -18,13 +18,13 @@ type State struct {
 }
 
 type Manager struct {
-	seen *sdktracker.SeenStore[State]
+	seen *store.SeenStore[State]
 }
 
 func Load(serviceType, botID string, taskIdx int, identity string) (*Manager, error) {
-	store := sdk.OpenTaskState[State](serviceType, botID, taskIdx, identity)
-	ss, err := sdktracker.LoadSeenStore[State](
-		store,
+	st := sdk.OpenTaskState[State](serviceType, botID, taskIdx, identity)
+	ss, err := store.LoadSeenStore[State](
+		st,
 		1000,
 		func(s State) []string { return s.Seen },
 		func(s *State, seen []string) { s.Seen = seen },

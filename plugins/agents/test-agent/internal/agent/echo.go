@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
-	"mew/plugins/sdk/socketio"
+	"mew/plugins/sdk/client/socketio"
 )
 
 type socketMessage struct {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"net/http"
 
-	sdkmew "mew/plugins/sdk/mew"
+	"mew/plugins/sdk/client"
 )
 
 func DownloadAttachmentBytes(ctx context.Context, httpClient *http.Client, apiBase, userToken string, att Attachment, limit int64) ([]byte, error) {
-	return sdkmew.DownloadAttachmentBytes(ctx, httpClient, httpClient, apiBase, userToken, att, limit)
+	return client.DownloadAttachmentBytes(ctx, httpClient, httpClient, apiBase, userToken, att, limit)
 }

@@ -1,6 +1,6 @@
 package mew
 
-import "mew/plugins/sdk/mew"
+import "mew/plugins/sdk/client"
 
-type Message = mew.ChannelMessage
-type Attachment = mew.AttachmentRef
+type Message = client.ChannelMessage
+type Attachment = client.AttachmentRef

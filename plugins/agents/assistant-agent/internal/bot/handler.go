@@ -14,7 +14,7 @@ import (
 	mewacl "mew/plugins/assistant-agent/internal/mew"
 	"mew/plugins/assistant-agent/internal/store"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/socketio"
+	"mew/plugins/sdk/client/socketio"
 )
 
 func (r *Runner) handleMessageCreate(

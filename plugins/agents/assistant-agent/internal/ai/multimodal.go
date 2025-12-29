@@ -8,10 +8,10 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/sdk/mew"
+	"mew/plugins/sdk/client"
 )
 
-type DownloadFunc func(ctx context.Context, att mew.AttachmentRef, limit int64) ([]byte, error)
+type DownloadFunc func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error)
 
 type BuildUserContentOptions struct {
 	DefaultTextPrompt     string
@@ -44,11 +44,11 @@ func (o BuildUserContentOptions) withDefaults() BuildUserContentOptions {
 	return o
 }
 
-func BuildUserMessageParam(ctx context.Context, text string, attachments []mew.AttachmentRef, opts BuildUserContentOptions) (openaigo.ChatCompletionMessageParamUnion, error) {
+func BuildUserMessageParam(ctx context.Context, text string, attachments []client.AttachmentRef, opts BuildUserContentOptions) (openaigo.ChatCompletionMessageParamUnion, error) {
 	opts = opts.withDefaults()
 	text = strings.TrimSpace(text)
 
-	images := make([]mew.AttachmentRef, 0, len(attachments))
+	images := make([]client.AttachmentRef, 0, len(attachments))
 	for _, a := range attachments {
 		ct := strings.ToLower(strings.TrimSpace(a.ContentType))
 		if !strings.HasPrefix(ct, "image/") {

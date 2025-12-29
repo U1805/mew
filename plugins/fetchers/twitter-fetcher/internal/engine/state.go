@@ -2,7 +2,7 @@ package engine
 
 import (
 	"mew/plugins/sdk"
-	sdktracker "mew/plugins/sdk/tracker"
+	"mew/plugins/sdk/store"
 )
 
 type State struct {
@@ -12,14 +12,14 @@ type State struct {
 }
 
 type Manager struct {
-	seen *sdktracker.SeenStore[State]
+	seen *store.SeenStore[State]
 }
 
 func Load(serviceType, botID string, taskIdx int, identity string) (*Manager, error) {
-	store := sdk.OpenTaskState[State](serviceType, botID, taskIdx, identity)
+	st := sdk.OpenTaskState[State](serviceType, botID, taskIdx, identity)
 
-	ss, err := sdktracker.LoadSeenStore[State](
-		store,
+	ss, err := store.LoadSeenStore[State](
+		st,
 		2000,
 		func(s State) []string { return s.Seen },
 		func(s *State, seen []string) { s.Seen = seen },
@@ -59,7 +59,7 @@ func (m *Manager) GetCachedMedia(url string) (string, bool) {
 	if st == nil {
 		return "", false
 	}
-	return sdktracker.GetCachedMedia(st.MediaCache, url)
+	return store.GetCachedMedia(st.MediaCache, url)
 }
 
 func (m *Manager) CacheMedia(url, key string) {
@@ -70,7 +70,7 @@ func (m *Manager) CacheMedia(url, key string) {
 	if st == nil {
 		return
 	}
-	st.MediaCache, st.MediaOrder = sdktracker.CacheMedia(st.MediaCache, st.MediaOrder, url, key, 200)
+	st.MediaCache, st.MediaOrder = store.CacheMedia(st.MediaCache, st.MediaOrder, url, key, 200)
 }
 
 func (m *Manager) Save() error {

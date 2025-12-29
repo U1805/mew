@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"mew/plugins/sdk"
-	sdkmew "mew/plugins/sdk/mew"
+	"mew/plugins/sdk/client"
 )
 
 type Fetcher struct {
@@ -56,7 +56,7 @@ func (f *Fetcher) FetchSessionMessages(ctx context.Context, channelID string) (s
 		desc = append(desc, msgs...)
 		before = msgs[len(msgs)-1].ID
 
-		curCount, boundaryFound := sdkmew.CurrentSessionCountInDesc(desc, f.SessionGap, f.MaxSessionMessages)
+		curCount, boundaryFound := client.CurrentSessionCountInDesc(desc, f.SessionGap, f.MaxSessionMessages)
 		if curCount >= f.MaxSessionMessages || boundaryFound {
 			desc = desc[:curCount]
 			break
@@ -67,7 +67,7 @@ func (f *Fetcher) FetchSessionMessages(ctx context.Context, channelID string) (s
 		return nil, "", time.Time{}, fmt.Errorf("no messages in channel=%s", channelID)
 	}
 
-	sdkmew.ReverseMessagesInPlace(desc)
+	client.ReverseMessagesInPlace(desc)
 	if len(desc) > f.MaxSessionMessages {
 		desc = desc[len(desc)-f.MaxSessionMessages:]
 	}
@@ -100,9 +100,9 @@ func (f *Fetcher) RecordSearch(ctx context.Context, channelID, recordID string) 
 		before = msgs[len(msgs)-1].ID
 
 		chrono := append([]Message(nil), desc...)
-		sdkmew.ReverseMessagesInPlace(chrono)
-		sessions := sdkmew.SplitSessionsChronological(chrono, f.SessionGap)
-		if s := sdkmew.FindSessionByRecordID(sessions, recordID); len(s) > 0 {
+		client.ReverseMessagesInPlace(chrono)
+		sessions := client.SplitSessionsChronological(chrono, f.SessionGap)
+		if s := client.FindSessionByRecordID(sessions, recordID); len(s) > 0 {
 			return s, nil
 		}
 	}
@@ -129,8 +129,8 @@ func (f *Fetcher) RecordIDForMessage(ctx context.Context, channelID, messageID s
 		before = msgs[len(msgs)-1].ID
 
 		chrono := append([]Message(nil), desc...)
-		sdkmew.ReverseMessagesInPlace(chrono)
-		sessions := sdkmew.SplitSessionsChronological(chrono, f.SessionGap)
+		client.ReverseMessagesInPlace(chrono)
+		sessions := client.SplitSessionsChronological(chrono, f.SessionGap)
 		for _, s := range sessions {
 			for _, m := range s {
 				if m.ID == messageID {

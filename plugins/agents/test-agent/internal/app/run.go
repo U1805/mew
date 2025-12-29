@@ -1,8 +1,8 @@
 package app
 
 import (
-	"mew/plugins/test-agent/internal/agent"
 	"mew/plugins/sdk"
+	"mew/plugins/test-agent/internal/agent"
 )
 
 func Run() error {

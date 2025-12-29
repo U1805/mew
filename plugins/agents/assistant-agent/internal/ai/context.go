@@ -13,7 +13,7 @@ import (
 	"mew/plugins/assistant-agent/internal/store"
 	"mew/plugins/assistant-agent/prompt"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/mew"
+	"mew/plugins/sdk/client"
 )
 
 func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
@@ -77,7 +77,7 @@ func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, fact
 	return strings.TrimSpace(b.String())
 }
 
-func BuildL5Messages(sessionMsgs []mew.ChannelMessage, botUserID string) []openaigo.ChatCompletionMessageParamUnion {
+func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string) []openaigo.ChatCompletionMessageParamUnion {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
 	for _, m := range sessionMsgs {
 		content := strings.TrimSpace(m.Content)
@@ -99,7 +99,7 @@ func BuildL5Messages(sessionMsgs []mew.ChannelMessage, botUserID string) []opena
 	return out
 }
 
-func FormatSessionRecordForContext(msgs []mew.ChannelMessage) string {
+func FormatSessionRecordForContext(msgs []client.ChannelMessage) string {
 	if len(msgs) == 0 {
 		return "(empty)"
 	}
@@ -131,7 +131,7 @@ type UserContentPartsOptions struct {
 	Download              DownloadFunc
 }
 
-func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []mew.ChannelMessage, botUserID string, opts UserContentPartsOptions) ([]openaigo.ChatCompletionMessageParamUnion, error) {
+func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.ChannelMessage, botUserID string, opts UserContentPartsOptions) ([]openaigo.ChatCompletionMessageParamUnion, error) {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
 	for _, m := range sessionMsgs {
 		role := "user"
