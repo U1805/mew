@@ -10,7 +10,7 @@ vi.mock('../../gateway/events', () => ({
 
 import app from '../../app';
 
-describe('DM Search Routes: GET /api/channels/:channelId/search', () => {
+describe('Channel Search Routes: GET /api/channels/:channelId/search', () => {
   const userA = { email: 'dmsearch-a@example.com', username: 'dmsearcha', password: 'password123' };
   const userB = { email: 'dmsearch-b@example.com', username: 'dmsearchb', password: 'password123' };
   const userC = { email: 'dmsearch-c@example.com', username: 'dmsearchc', password: 'password123' };
@@ -87,6 +87,81 @@ describe('DM Search Routes: GET /api/channels/:channelId/search', () => {
   it('should return 403 for non-recipients', async () => {
     const res = await request(app)
       .get(`/api/channels/${dmChannelId}/search?q=cats`)
+      .set('Authorization', `Bearer ${tokenC}`);
+
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('supports searching in a server channel for server members', async () => {
+    const serverRes = await request(app)
+      .post('/api/servers')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'dmsearch-server' });
+    const serverId = serverRes.body._id;
+
+    const channelRes = await request(app)
+      .post(`/api/servers/${serverId}/channels`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'general', type: 'GUILD_TEXT' });
+    const guildChannelId = channelRes.body._id;
+
+    await request(app)
+      .post(`/api/servers/${serverId}/channels/${guildChannelId}/messages`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ content: 'guild cats' });
+
+    const res = await request(app)
+      .get(`/api/channels/${guildChannelId}/search?q=cats`)
+      .set('Authorization', `Bearer ${tokenA}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.messages).toBeInstanceOf(Array);
+    expect(res.body.messages.length).toBeGreaterThan(0);
+    expect(res.body.messages[0].channelId).toBe(guildChannelId);
+  });
+
+  it('supports reading server channel messages via /api/channels/:channelId/messages for members', async () => {
+    const serverRes = await request(app)
+      .post('/api/servers')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'dmsearch-server-read' });
+    const serverId = serverRes.body._id;
+
+    const channelRes = await request(app)
+      .post(`/api/servers/${serverId}/channels`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'general', type: 'GUILD_TEXT' });
+    const guildChannelId = channelRes.body._id;
+
+    await request(app)
+      .post(`/api/servers/${serverId}/channels/${guildChannelId}/messages`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ content: 'guild read test' });
+
+    const res = await request(app)
+      .get(`/api/channels/${guildChannelId}/messages?limit=5`)
+      .set('Authorization', `Bearer ${tokenA}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.length).toBeGreaterThan(0);
+    expect(res.body[0].channelId).toBe(guildChannelId);
+  });
+
+  it('blocks reading server channel messages via /api/channels/:channelId/messages for non-members', async () => {
+    const serverRes = await request(app)
+      .post('/api/servers')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'dmsearch-server-read-block' });
+    const serverId = serverRes.body._id;
+
+    const channelRes = await request(app)
+      .post(`/api/servers/${serverId}/channels`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ name: 'general', type: 'GUILD_TEXT' });
+    const guildChannelId = channelRes.body._id;
+
+    const res = await request(app)
+      .get(`/api/channels/${guildChannelId}/messages?limit=5`)
       .set('Authorization', `Bearer ${tokenC}`);
 
     expect(res.statusCode).toBe(403);

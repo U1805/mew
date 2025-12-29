@@ -1,12 +1,14 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/packages/param"
@@ -30,6 +32,11 @@ type ChatWithToolsOptions struct {
 	ChannelID             string
 	LLMPreviewLen         int
 	ToolResultPreviewLen  int
+
+	// LLM call retries (for flaky upstreams returning errors or empty choices).
+	MaxLLMRetries          int
+	LLMRetryInitialBackoff time.Duration
+	LLMRetryMaxBackoff     time.Duration
 }
 
 func ChatWithTools(
@@ -55,7 +62,7 @@ func ChatWithTools(
 	tools := []openaigo.ChatCompletionToolUnionParam{
 		openaigo.ChatCompletionFunctionTool(shared.FunctionDefinitionParam{
 			Name:        opts.HistorySearchToolName,
-			Description: param.NewOpt("Search recent DM history by keyword and return matching messages + Session Record IDs."),
+			Description: param.NewOpt("Search recent channel history by keyword and return matching messages + Session Record IDs."),
 			Strict:      param.NewOpt(true),
 			Parameters: shared.FunctionParameters{
 				"type": "object",
@@ -68,7 +75,7 @@ func ChatWithTools(
 		}),
 		openaigo.ChatCompletionFunctionTool(shared.FunctionDefinitionParam{
 			Name:        opts.RecordSearchToolName,
-			Description: param.NewOpt("Load a full Session Record text by record_id."),
+			Description: param.NewOpt("Load a full Session Record text by record_id from the current channel."),
 			Strict:      param.NewOpt(true),
 			Parameters: shared.FunctionParameters{
 				"type": "object",
@@ -115,7 +122,13 @@ func ChatWithTools(
 			log.Printf("%s llm call: channel=%s attempt=%d messages=%d", opts.LogPrefix, opts.ChannelID, i+1, len(messages))
 		}
 		logLLMMessages(opts.LogPrefix, opts.ChannelID, messages)
-		resp, err := CallChatCompletion(ctx, httpClient, cfg, messages, tools)
+		resp, err := CallChatCompletionWithRetry(ctx, httpClient, cfg, messages, tools, CallChatCompletionWithRetryOptions{
+			MaxRetries:     opts.MaxLLMRetries,
+			InitialBackoff: opts.LLMRetryInitialBackoff,
+			MaxBackoff:     opts.LLMRetryMaxBackoff,
+			LogPrefix:      opts.LogPrefix,
+			ChannelID:      opts.ChannelID,
+		})
 		if err != nil {
 			return "", store.Mood{}, false, err
 		}
@@ -213,10 +226,14 @@ func logLLMMessages(logPrefix, channelID string, messages []openaigo.ChatComplet
 	if strings.TrimSpace(logPrefix) == "" {
 		return
 	}
-	b, err := json.MarshalIndent(messages, "", "  ")
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	err := enc.Encode(messages)
 	if err != nil {
 		log.Printf("%s llm messages marshal failed: channel=%s err=%v", logPrefix, channelID, err)
 		return
 	}
-	log.Printf("%s llm messages: channel=%s\n%s", logPrefix, channelID, string(b))
+	log.Printf("%s llm messages: channel=%s\n%s", logPrefix, channelID, strings.TrimSpace(buf.String()))
 }

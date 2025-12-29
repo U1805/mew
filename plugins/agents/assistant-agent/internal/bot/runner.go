@@ -68,7 +68,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 	if err != nil {
 		return nil, fmt.Errorf("read persona failed: %w", err)
 	}
-	
+
 	llmTransport := http.DefaultTransport.(*http.Transport).Clone()
 	llmTransport.Proxy = nil
 	llmHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
@@ -123,7 +123,31 @@ func (r *Runner) Run(ctx context.Context) error {
 		log.Printf("%s refresh DM channels failed (will retry later): %v", logPrefix, err)
 	}
 
+	type messageCreateJob struct {
+		payload json.RawMessage
+		emit    socketio.EmitFunc
+	}
+	jobs := make(chan messageCreateJob, assistantIncomingQueueSize)
+
 	g := sdk.NewGroup(ctx)
+	for i := 0; i < assistantWorkerCount; i++ {
+		workerID := i + 1
+		g.Go(func(ctx context.Context) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case job := <-jobs:
+					if len(job.payload) == 0 || job.emit == nil {
+						continue
+					}
+					if err := r.handleMessageCreate(ctx, logPrefix, job.payload, job.emit); err != nil {
+						log.Printf("%s event handler error: worker=%d err=%v", logPrefix, workerID, err)
+					}
+				}
+			}
+		})
+	}
 	g.Go(func(ctx context.Context) {
 		sdk.RunInterval(ctx, 5*time.Minute, true, func(ctx context.Context) {
 			r.runPeriodicFactEngine(ctx, logPrefix)
@@ -138,8 +162,13 @@ func (r *Runner) Run(ctx context.Context) error {
 			if len(payload) == 0 {
 				return nil
 			}
-			if err := r.handleMessageCreate(ctx, logPrefix, payload, emit); err != nil {
-				log.Printf("%s event handler error: %v", logPrefix, err)
+
+			// Important: do not block the gateway read loop with long-running work (LLM calls, history fetch),
+			// otherwise ping/pong frames cannot be processed in time and the server may disconnect the socket.
+			select {
+			case jobs <- messageCreateJob{payload: payload, emit: emit}:
+			default:
+				log.Printf("%s incoming queue full, drop MESSAGE_CREATE: size=%d", logPrefix, assistantIncomingQueueSize)
 			}
 			return nil
 		}, socketio.GatewayOptions{}, socketio.ReconnectOptions{

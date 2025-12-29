@@ -131,6 +131,70 @@ describe('message.service (unit)', () => {
     vi.clearAllMocks();
   });
 
+  it('getMessagesByChannel includes unified context for normal messages', async () => {
+    const msg: any = {
+      _id: 'm1',
+      channelId: 'c1',
+      authorId: { username: 'orig', avatarUrl: 'orig.png', isBot: false },
+      type: 'message/default',
+      content: 'hello world',
+      payload: undefined,
+      attachments: [],
+    };
+    vi.mocked(messageRepository.findByChannel).mockResolvedValue([msg] as any);
+
+    const result: any = await getMessagesByChannel({ channelId: 'c1', limit: 20 });
+
+    expect(result[0].context).toBe('hello world');
+  });
+
+  it('getMessagesByChannel derives context from card-style payload when content is empty', async () => {
+    const msg: any = {
+      _id: 'm1',
+      channelId: 'c1',
+      authorId: { username: 'orig', avatarUrl: 'orig.png', isBot: false },
+      type: 'message/default',
+      content: '',
+      payload: { title: 'T', summary: 'S', url: 'https://example.com', webhookName: 'Hook' },
+      attachments: [],
+    };
+    vi.mocked(messageRepository.findByChannel).mockResolvedValue([msg] as any);
+
+    const result: any = await getMessagesByChannel({ channelId: 'c1', limit: 20 });
+
+    expect(result[0].context).toContain('source: Hook');
+    expect(result[0].context).toContain('title: T');
+    expect(result[0].context).toContain('summary: S');
+    expect(result[0].context).toContain('url: https://example.com');
+  });
+
+  it('getMessagesByChannel derives context from forwarded message payload', async () => {
+    const msg: any = {
+      _id: 'm1',
+      channelId: 'c1',
+      authorId: { username: 'orig', avatarUrl: 'orig.png', isBot: false },
+      type: 'app/x-forward-card',
+      content: '',
+      payload: {
+        forwardedFromLabel: 'somewhere',
+        forwardedMessage: {
+          content: 'forwarded text',
+          author: { username: 'bob' },
+          attachments: [{ filename: 'a.png' }],
+        },
+      },
+      attachments: [],
+    };
+    vi.mocked(messageRepository.findByChannel).mockResolvedValue([msg] as any);
+
+    const result: any = await getMessagesByChannel({ channelId: 'c1', limit: 20 });
+
+    expect(result[0].context).toContain('forwarded_from: somewhere');
+    expect(result[0].context).toContain('forwarded_author: bob');
+    expect(result[0].context).toContain('forwarded text');
+    expect(result[0].context).toContain('forwarded_attachments: a.png');
+  });
+
   it('getMessagesByChannel applies webhook overrides and hydrates URLs', async () => {
     const doc = makeMessageDoc({
       authorId: { username: 'orig', avatarUrl: 'orig.png' },

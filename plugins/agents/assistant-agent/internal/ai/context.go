@@ -80,7 +80,7 @@ func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, fact
 func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string) []openaigo.ChatCompletionMessageParamUnion {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
 	for _, m := range sessionMsgs {
-		content := strings.TrimSpace(m.Content)
+		content := strings.TrimSpace(m.ContextText())
 		if content == "" {
 			continue
 		}
@@ -93,7 +93,7 @@ func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string) []op
 		if role == "assistant" {
 			out = append(out, openaigo.AssistantMessage(content))
 		} else {
-			out = append(out, openaigo.UserMessage(content))
+			out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMeta(m.AuthorUsername(), m.AuthorID(), m.CreatedAt, content)))
 		}
 	}
 	return out
@@ -116,7 +116,7 @@ func FormatSessionRecordForContext(msgs []client.ChannelMessage) string {
 		if author == "" {
 			author = "unknown"
 		}
-		line := fmt.Sprintf("[%s] %s %s: %s", strings.TrimSpace(m.ID), ts, author, strings.TrimSpace(m.Content))
+		line := fmt.Sprintf("[%s] %s %s: %s", strings.TrimSpace(m.ID), ts, author, strings.TrimSpace(m.ContextText()))
 		b.WriteString(strings.TrimSpace(line))
 		b.WriteString("\n")
 	}
@@ -140,7 +140,7 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.Ch
 		}
 
 		if role == "user" {
-			userMsg, err := BuildUserMessageParam(ctx, strings.TrimSpace(m.Content), m.Attachments, BuildUserContentOptions{
+			userMsg, err := BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), m.CreatedAt, strings.TrimSpace(m.ContextText()), m.Attachments, BuildUserContentOptions{
 				DefaultImagePrompt:    opts.DefaultImagePrompt,
 				MaxImageBytes:         opts.MaxImageBytes,
 				MaxTotalImageBytes:    opts.MaxTotalImageBytes,
@@ -154,7 +154,7 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.Ch
 			continue
 		}
 
-		content := strings.TrimSpace(m.Content)
+		content := strings.TrimSpace(m.ContextText())
 		if content == "" {
 			continue
 		}

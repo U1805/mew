@@ -224,6 +224,8 @@ export interface Message {
 
   type: string; // 默认 message/default
   content?: string;
+  // 统一的纯文本上下文（给 Bot/LLM 用）；普通消息通常等于 content，卡片消息会从 payload 中提取摘要。
+  context?: string;
   payload?: Record<string, any>;
   attachments?: Attachment[];
   mentions?: string[];

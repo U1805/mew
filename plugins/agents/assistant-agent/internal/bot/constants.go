@@ -13,8 +13,12 @@ const (
 	assistantMaxFetchPages      = 20
 	assistantMaxReplyLines      = 20
 	assistantMaxToolCalls       = 3
+	assistantMaxLLMRetries      = 5
 	assistantMaxFacts           = 30
 	assistantMaxSummaries       = 30
+
+	assistantIncomingQueueSize = 256
+	assistantWorkerCount       = 4
 
 	assistantSessionGap = 10 * time.Minute
 
@@ -36,6 +40,9 @@ const (
 	assistantReplyDelayBase    = 350 * time.Millisecond
 	assistantReplyDelayPerRune = 60 * time.Millisecond
 	assistantReplyDelayMax     = 3500 * time.Millisecond
+
+	assistantLLMRetryInitialBackoff = 250 * time.Millisecond
+	assistantLLMRetryMaxBackoff     = 5 * time.Second
 
 	PersonaPromptRelPath               = "prompt/system_prompt.txt"
 	PersonaPromptEmbeddedName          = "system_prompt.txt"

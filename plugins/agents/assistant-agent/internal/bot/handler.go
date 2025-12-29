@@ -1,10 +1,14 @@
 package bot
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,13 +37,33 @@ func (r *Runner) handleMessageCreate(
 	if r.isOwnAuthor(msg.AuthorRaw) {
 		return nil
 	}
-	if !r.isDMChannel(msg.ChannelID) {
+
+	channelID := msg.ChannelID
+	trimmed := strings.TrimSpace(msg.Content)
+	rest, mentioned := socketio.StripLeadingBotMention(trimmed, r.botUserID)
+
+	isDM := r.isDMChannel(channelID)
+
+	// If it's neither a known DM channel nor a leading-mention in a guild channel, it might be a newly created DM.
+	if !isDM && !mentioned {
 		if err := r.refreshDMChannels(ctx); err != nil {
 			return nil
 		}
-		if !r.isDMChannel(msg.ChannelID) {
+		isDM = r.isDMChannel(channelID)
+		if !isDM {
 			return nil
 		}
+	}
+
+	// In guild channels, only reply when directly @mentioned at the beginning.
+	if !isDM && !mentioned {
+		return nil
+	}
+
+	// Strip leading mention for both guild + DM (if present), to keep the user prompt clean.
+	if mentioned {
+		msg.Content = rest
+		msg.Context = rest
 	}
 
 	userID := msg.AuthorID()
@@ -47,9 +71,14 @@ func (r *Runner) handleMessageCreate(
 		return nil
 	}
 
-	log.Printf("%s DM MESSAGE_CREATE: channel=%s msg=%s user=%s content=%q",
+	mode := "DM"
+	if !isDM {
+		mode = "CHANNEL"
+	}
+	log.Printf("%s %s MESSAGE_CREATE: channel=%s msg=%s user=%s content=%q",
 		logPrefix,
-		msg.ChannelID,
+		mode,
+		channelID,
 		msg.ID,
 		userID,
 		sdk.PreviewString(msg.Content, assistantLogContentPreviewLen),
@@ -290,13 +319,16 @@ func (r *Runner) reply(ctx context.Context, channelID string, l1l4 string, l5 []
 			return r.runRecordSearch(ctx, channelID, recordID)
 		},
 	}, ai.ChatWithToolsOptions{
-		MaxToolCalls:          assistantMaxToolCalls,
-		HistorySearchToolName: DefaultHistorySearchToolName,
-		RecordSearchToolName:  DefaultRecordSearchToolName,
-		LogPrefix:             assistantLogPrefix,
-		ChannelID:             channelID,
-		LLMPreviewLen:         assistantLogLLMPreviewLen,
-		ToolResultPreviewLen:  assistantLogToolResultPreviewLen,
+		MaxToolCalls:           assistantMaxToolCalls,
+		HistorySearchToolName:  DefaultHistorySearchToolName,
+		RecordSearchToolName:   DefaultRecordSearchToolName,
+		LogPrefix:              assistantLogPrefix,
+		ChannelID:              channelID,
+		LLMPreviewLen:          assistantLogLLMPreviewLen,
+		ToolResultPreviewLen:   assistantLogToolResultPreviewLen,
+		MaxLLMRetries:          assistantMaxLLMRetries,
+		LLMRetryInitialBackoff: assistantLLMRetryInitialBackoff,
+		LLMRetryMaxBackoff:     assistantLLMRetryMaxBackoff,
 	})
 }
 
@@ -329,11 +361,16 @@ func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelI
 
 	linesSent := 0
 	for i, t := range lines {
-		if err := emit(assistantUpstreamMessageCreate, map[string]any{
+		sendErr := emit(assistantUpstreamMessageCreate, map[string]any{
 			"channelId": channelID,
 			"content":   t,
-		}); err != nil {
-			return fmt.Errorf("send message failed: %w", err)
+		})
+		if sendErr != nil {
+			// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
+			if err := r.postMessageHTTP(ctx, channelID, t); err != nil {
+				return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
+			}
+			log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
 		}
 		linesSent++
 		if i < len(lines)-1 {
@@ -341,6 +378,43 @@ func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelI
 		}
 	}
 	log.Printf("%s reply sent: channel=%s user=%s lines=%d", logPrefix, channelID, userID, linesSent)
+	return nil
+}
+
+func (r *Runner) postMessageHTTP(ctx context.Context, channelID, content string) error {
+	if r.mewHTTPClient == nil {
+		return fmt.Errorf("missing mew http client")
+	}
+	if strings.TrimSpace(r.userToken) == "" {
+		return fmt.Errorf("missing user token")
+	}
+	if strings.TrimSpace(r.apiBase) == "" {
+		return fmt.Errorf("missing api base")
+	}
+	channelID = strings.TrimSpace(channelID)
+	if channelID == "" {
+		return fmt.Errorf("missing channel id")
+	}
+
+	u := strings.TrimRight(r.apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
+	body, _ := json.Marshal(map[string]any{"content": content})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(r.userToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.mewHTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+		return fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
 	return nil
 }
 

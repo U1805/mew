@@ -30,7 +30,7 @@ func (r *Runner) runHistorySearch(ctx context.Context, channelID, keyword string
 			"createdAt": m.CreatedAt.Format(time.RFC3339),
 			"authorId":  m.AuthorID(),
 			"author":    m.AuthorUsername(),
-			"content":   m.Content,
+			"content":   m.ContextText(),
 			"recordId":  recordID,
 		})
 	}

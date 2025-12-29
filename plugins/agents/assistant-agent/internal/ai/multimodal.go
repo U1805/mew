@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
@@ -44,9 +45,10 @@ func (o BuildUserContentOptions) withDefaults() BuildUserContentOptions {
 	return o
 }
 
-func BuildUserMessageParam(ctx context.Context, text string, attachments []client.AttachmentRef, opts BuildUserContentOptions) (openaigo.ChatCompletionMessageParamUnion, error) {
+func BuildUserMessageParam(ctx context.Context, speakerUsername, speakerUserID string, sentAt time.Time, text string, attachments []client.AttachmentRef, opts BuildUserContentOptions) (openaigo.ChatCompletionMessageParamUnion, error) {
 	opts = opts.withDefaults()
 	text = strings.TrimSpace(text)
+	meta := SpeakerMetaLine(speakerUsername, speakerUserID, sentAt)
 
 	images := make([]client.AttachmentRef, 0, len(attachments))
 	for _, a := range attachments {
@@ -67,7 +69,7 @@ func BuildUserMessageParam(ctx context.Context, text string, attachments []clien
 		if text == "" {
 			text = opts.DefaultTextPrompt
 		}
-		return openaigo.UserMessage(text), nil
+		return openaigo.UserMessage(meta + "\n" + text), nil
 	}
 
 	if text == "" {
@@ -79,7 +81,7 @@ func BuildUserMessageParam(ctx context.Context, text string, attachments []clien
 
 	total := int64(0)
 	parts := make([]openaigo.ChatCompletionContentPartUnionParam, 0, 1+len(images))
-	parts = append(parts, openaigo.TextContentPart(text))
+	parts = append(parts, openaigo.TextContentPart(meta+"\n"+text))
 
 	for _, img := range images {
 		if img.Size > 0 && img.Size > opts.MaxImageBytes {
