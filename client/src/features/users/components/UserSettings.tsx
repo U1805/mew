@@ -212,7 +212,7 @@ const UserSettings: React.FC = () => {
                         <div className="flex items-center justify-between mb-6">
                             <div>
                                 <h3 className="text-xl font-bold text-white">{user?.username}</h3>
-                                <p className="text-sm text-mew-textMuted">#{user?._id?.slice(0, 4) || '0000'}</p>
+                                <p className="text-sm text-mew-textMuted">#{user?.discriminator || '0000'}</p>
                             </div>
                             <button 
                                 onClick={handleAvatarClick}

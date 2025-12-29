@@ -107,7 +107,7 @@ export const MentionSuggestionList = ({ serverId, query, onSelect, onClose }: Me
             {(member as any).isGlobal ? (
                 <span className="ml-2 text-xs text-mew-textMuted truncate">Notify everyone online or all members</span>
             ) : (
-                <span className="ml-1 text-xs text-mew-textMuted">#{member.userId._id.slice(0, 4)}</span>
+                <span className="ml-1 text-xs text-mew-textMuted">#{member.userId.discriminator || '????'}</span>
             )}
           </div>
         ))}

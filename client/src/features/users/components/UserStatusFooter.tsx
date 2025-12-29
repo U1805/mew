@@ -17,7 +17,7 @@ export const UserStatusFooter: React.FC = () => {
             </div>
             <div className="flex-1 min-w-0 mr-2 group cursor-pointer" onClick={() => { /* Perhaps copy ID */ }}>
                 <div className="text-sm font-semibold text-white truncate">{user?.username || 'Guest'}</div>
-                <div className="text-xs text-mew-textMuted truncate group-hover:text-mew-text">#{user?._id?.substring(0, 4) || '0000'}</div>
+                <div className="text-xs text-mew-textMuted truncate group-hover:text-mew-text">#{user?.discriminator || '0000'}</div>
             </div>
             <div className="flex items-center">
                 <button className="text-mew-textMuted hover:text-white p-1.5 rounded hover:bg-mew-dark transition-colors" title="Mute">

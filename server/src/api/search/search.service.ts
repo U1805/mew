@@ -81,7 +81,7 @@ export const searchMessagesInServer = async ({
   const [total, messages] = await Promise.all([
     Message.countDocuments(matchQuery),
     Message.find(matchQuery)
-      .populate('authorId', 'username avatarUrl')
+      .populate('authorId', 'username discriminator avatarUrl')
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip((page - 1) * limit)
@@ -116,7 +116,7 @@ export const searchMessagesInChannel = async ({
   const [total, messages] = await Promise.all([
     Message.countDocuments(matchQuery),
     Message.find(matchQuery)
-      .populate('authorId', 'username avatarUrl')
+      .populate('authorId', 'username discriminator avatarUrl')
       .sort({ createdAt: -1 })
       .limit(limit)
       .skip((page - 1) * limit)

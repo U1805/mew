@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
 import { useAuthStore, useUIStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
+import { formatUserTag } from '../../../shared/utils/userTag';
 
 interface ChatHeaderProps {
   channel: Channel | null;
@@ -84,7 +85,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
   if (isDM && channel?.recipients) {
     otherUser = channel.recipients.find((r: any) => r._id !== user?._id);
     if (otherUser) {
-        title = otherUser.username;
+        title = formatUserTag(otherUser);
     }
   }
 

@@ -23,7 +23,13 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const isMatch = await bcrypt.compare(password, user.password || '');
   if (!isMatch) throw new UnauthorizedError('Invalid credentials');
 
-  const payload = { id: user._id, username: user.username };
+  // Ensure discriminator exists for legacy users (lazy-migration).
+  if (!(user as any).discriminator) {
+    (user as any).discriminator = undefined;
+    await user.save();
+  }
+
+  const payload = { id: user._id, username: user.username, discriminator: (user as any).discriminator };
   const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -56,7 +62,13 @@ export const loginBot = async (data: { accessToken?: string }) => {
     throw new UnauthorizedError('Bot user not found');
   }
 
-  const payload = { id: user._id, username: user.username };
+  // Ensure discriminator exists for legacy users (lazy-migration).
+  if (!(user as any).discriminator) {
+    (user as any).discriminator = undefined;
+    await (user as any).save();
+  }
+
+  const payload = { id: user._id, username: user.username, discriminator: (user as any).discriminator };
   const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 
   const userObj: any = user.toObject ? user.toObject() : user;
@@ -79,6 +91,7 @@ export const register = async (userData: Partial<IUser>) => {
     const newUser = await userRepository.create({
       email: email?.trim().toLowerCase(),
       username: username?.trim(),
+      // discriminator is auto-assigned in User model pre-validate hook
       password: hashedPassword,
       isBot: false,
     });
@@ -86,7 +99,7 @@ export const register = async (userData: Partial<IUser>) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _, ...userWithoutPassword } = newUser.toObject();
 
-    const payload = { id: newUser._id, username: newUser.username };
+    const payload = { id: newUser._id, username: newUser.username, discriminator: (newUser as any).discriminator };
     const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
 
     if (userWithoutPassword.avatarUrl) {

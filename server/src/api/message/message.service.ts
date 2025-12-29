@@ -211,7 +211,7 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
   });
   await messageRepository.save(message);
 
-  const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
+  const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
 
   const messageForClient = processMessageForClient(populatedMessage);
 
@@ -299,7 +299,7 @@ export const getMessageById = async (messageId: string) => {
     message.mentions = validatedMentions as mongoose.Types.ObjectId[]; // Update mentions field
     await messageRepository.save(message);
 
-    const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
+    const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
 
     const messageForClient = processMessageForClient(populatedMessage);
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
@@ -321,7 +321,7 @@ export const getMessageById = async (messageId: string) => {
 
     await messageRepository.save(message);
 
-    const populatedMessage = await message.populate('authorId', 'username avatarUrl isBot');
+    const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
 
     const messageForClient = processMessageForClient(populatedMessage);
 
@@ -341,7 +341,7 @@ export const addReaction = async (
       );
 
       if (existingReaction && existingReaction.emoji === emoji) {
-        return processMessageForClient(await message.populate('authorId', 'username avatarUrl isBot'));
+        return processMessageForClient(await message.populate('authorId', 'username discriminator avatarUrl isBot'));
       }
 
       const finalMessage = await messageRepository.addReaction(messageId, userId, emoji, existingReaction?.emoji);

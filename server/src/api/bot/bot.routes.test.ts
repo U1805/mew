@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
 import ServiceTypeModel from '../infra/serviceType.model';
+import BotModel from './bot.model';
+import UserModel from '../user/user.model';
 
 // Mock the socketManager to prevent errors in tests
 vi.mock('../../gateway/events', () => ({
@@ -174,6 +176,47 @@ describe('Bot Routes (/@me/bots)', () => {
         .get(`/api/users/@me/bots/${botId}`)
         .set('Authorization', `Bearer ${token}`);
       expect(getRes.statusCode).toBe(404);
+    });
+
+    it('should allow reusing the same username base via discriminator (Discord-style)', async () => {
+      // Create a bot (and its backing bot user)
+      const create1 = await request(app)
+        .post('/api/users/@me/bots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'SameName', serviceType: 'rss-fetcher' });
+      expect(create1.statusCode).toBe(201);
+
+      const bot1 = await BotModel.findById(create1.body._id).lean();
+      expect(bot1).toBeTruthy();
+      const botUser1 = await UserModel.findById((bot1 as any).botUserId).lean();
+      expect(botUser1).toBeTruthy();
+      expect((botUser1 as any).username).toBe('SameName');
+      expect((botUser1 as any).discriminator).toMatch(/^\d{4}$/);
+
+      // Delete bot record (bot user must remain to preserve message references)
+      const del = await request(app)
+        .delete(`/api/users/@me/bots/${create1.body._id}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(del.statusCode).toBe(204);
+
+      const botUser1StillExists = await UserModel.exists({ _id: (botUser1 as any)._id });
+      expect(!!botUser1StillExists).toBe(true);
+
+      // Re-create a bot with the same name; username stays the same, discriminator changes.
+      const create2 = await request(app)
+        .post('/api/users/@me/bots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'SameName', serviceType: 'rss-fetcher' });
+      expect(create2.statusCode).toBe(201);
+
+      const bot2 = await BotModel.findById(create2.body._id).lean();
+      expect(bot2).toBeTruthy();
+      const botUser2 = await UserModel.findById((bot2 as any).botUserId).lean();
+      expect(botUser2).toBeTruthy();
+
+      expect((botUser2 as any).username).toBe('SameName');
+      expect((botUser2 as any).discriminator).toMatch(/^\d{4}$/);
+      expect((botUser2 as any).discriminator).not.toBe((botUser1 as any).discriminator);
     });
 
     it('should return 404 when trying to delete a bot owned by another user', async () => {

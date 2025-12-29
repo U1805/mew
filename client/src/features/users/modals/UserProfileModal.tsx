@@ -8,6 +8,7 @@ import { channelApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUser } from '../hooks/useUser';
+import { formatUserTag } from '../../../shared/utils/userTag';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
@@ -55,7 +56,7 @@ export const UserProfileModal: React.FC = () => {
                  <div className="absolute -top-[50px] left-4 p-[6px] bg-[#232428] rounded-full">
                      <div className="w-[90px] h-[90px] rounded-full bg-[#1E1F22] flex items-center justify-center overflow-hidden">
                          {user.avatarUrl ? (
-                             <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                         <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                          ) : (
                              <span className="text-2xl font-bold text-white">{user.username.substring(0, 1).toUpperCase()}</span>
                          )}
@@ -86,7 +87,7 @@ export const UserProfileModal: React.FC = () => {
 
                  <div className="mt-8 bg-[#111214] rounded-lg p-3">
                      <h2 className="text-xl font-bold text-white mb-0.5">{user.username}</h2>
-                     <div className="text-sm text-mew-textMuted mb-4">#{user._id.slice(0, 4)}</div>
+                     <div className="text-sm text-mew-textMuted mb-4">{formatUserTag(user)}</div>
 
                      <div className="h-[1px] bg-mew-divider mb-3"></div>
 

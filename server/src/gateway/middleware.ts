@@ -5,7 +5,7 @@ import config from '../config';
 // Extend Socket type to include user payload
 declare module 'socket.io' {
   interface Socket {
-    user?: { id: string; username: string };
+    user?: { id: string; username: string; discriminator?: string };
   }
 }
 
@@ -17,7 +17,7 @@ export const authMiddleware = (socket: Socket, next: (err?: Error) => void) => {
   }
 
   try {
-    const user = jwt.verify(token, config.jwtSecret) as { id: string; username: string };
+    const user = jwt.verify(token, config.jwtSecret) as { id: string; username: string; discriminator?: string };
     socket.user = user;
     next();
   } catch (e) {

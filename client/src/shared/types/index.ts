@@ -3,6 +3,7 @@ import { Permission } from '../constants/permissions';
 export interface User {
   _id: string;
   username: string;
+  discriminator?: string;
   email: string;
   avatarUrl?: string;
   isBot: boolean;
