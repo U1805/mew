@@ -39,7 +39,7 @@ func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
 var developerInstructionsOnce sync.Once
 var developerInstructionsTemplate string
 
-func DeveloperInstructionsText(silenceToken, relPath, embeddedName string) string {
+func DeveloperInstructionsText(silenceToken, wantMoreToken, proactiveTokenPrefix, relPath, embeddedName string) string {
 	developerInstructionsOnce.Do(func() {
 		s, err := ReadPromptWithOverrides(relPath, embeddedName)
 		if err != nil {
@@ -51,7 +51,11 @@ func DeveloperInstructionsText(silenceToken, relPath, embeddedName string) strin
 	if developerInstructionsTemplate == "" {
 		return ""
 	}
-	return strings.ReplaceAll(developerInstructionsTemplate, "{{SILENCE_TOKEN}}", silenceToken)
+	out := developerInstructionsTemplate
+	out = strings.ReplaceAll(out, "{{SILENCE_TOKEN}}", silenceToken)
+	out = strings.ReplaceAll(out, "{{WANT_MORE_TOKEN}}", wantMoreToken)
+	out = strings.ReplaceAll(out, "{{PROACTIVE_TOKEN_PREFIX}}", proactiveTokenPrefix)
+	return out
 }
 
 func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, facts store.FactsFile, summaries store.SummariesFile) string {

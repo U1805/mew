@@ -6,7 +6,13 @@ const (
 	assistantEventMessageCreate    = "MESSAGE_CREATE"
 	assistantUpstreamMessageCreate = "message/create"
 
-	assistantSilenceToken = "<SILENCE>"
+	assistantSilenceToken  = "<SILENCE>"
+	assistantWantMoreToken = "<WANT_MORE>"
+
+	// assistantProactiveTokenPrefix is a single-line control directive emitted by the LLM.
+	// Expected format (one line):
+	//   <PROACTIVE>{"delay_seconds":180,"reason":"..."}
+	assistantProactiveTokenPrefix = "<PROACTIVE>"
 
 	assistantMaxSessionMessages = 40
 	assistantFetchPageSize      = 100
@@ -16,6 +22,7 @@ const (
 	assistantMaxLLMRetries      = 5
 	assistantMaxFacts           = 30
 	assistantMaxSummaries       = 30
+	assistantMaxProactiveQueue  = 16
 
 	assistantIncomingQueueSize = 256
 	assistantWorkerCount       = 4

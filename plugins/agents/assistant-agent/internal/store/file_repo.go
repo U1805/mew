@@ -12,6 +12,7 @@ type UserStatePaths struct {
 	FactsPath     string
 	SummariesPath string
 	MetadataPath  string
+	ProactivePath string
 }
 
 func UserStatePathsFor(serviceType, botID, userID string) UserStatePaths {
@@ -22,6 +23,7 @@ func UserStatePathsFor(serviceType, botID, userID string) UserStatePaths {
 		FactsPath:     filepath.Join(userDir, "facts.json"),
 		SummariesPath: filepath.Join(userDir, "summaries.json"),
 		MetadataPath:  filepath.Join(userDir, "metadata.json"),
+		ProactivePath: filepath.Join(userDir, "proactive.json"),
 	}
 }
 

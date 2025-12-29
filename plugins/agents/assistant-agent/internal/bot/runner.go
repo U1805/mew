@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -119,6 +121,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	r.userToken = token
 	r.fetcher.UserToken = token
 
+	r.loadKnownUsersFromDisk(logPrefix)
+
 	if err := r.refreshDMChannels(ctx); err != nil {
 		log.Printf("%s refresh DM channels failed (will retry later): %v", logPrefix, err)
 	}
@@ -152,6 +156,11 @@ func (r *Runner) Run(ctx context.Context) error {
 		sdk.RunInterval(ctx, 5*time.Minute, true, func(ctx context.Context) {
 			r.runPeriodicFactEngine(ctx, logPrefix)
 			r.finalizeStaleSessions(ctx, logPrefix)
+		})
+	})
+	g.Go(func(ctx context.Context) {
+		sdk.RunInterval(ctx, 10*time.Second, true, func(ctx context.Context) {
+			r.runProactiveQueue(ctx, logPrefix)
 		})
 	})
 	g.Go(func(ctx context.Context) {
@@ -310,4 +319,26 @@ func (r *Runner) userMutex(userID string) *sync.Mutex {
 	mu := &sync.Mutex{}
 	r.userLock[userID] = mu
 	return mu
+}
+
+func (r *Runner) loadKnownUsersFromDisk(logPrefix string) {
+	usersDir := filepath.Join(sdk.BotStateDir(r.serviceType, r.botID), "users")
+	ents, err := os.ReadDir(usersDir)
+	if err != nil {
+		return
+	}
+
+	r.knownUsersMu.Lock()
+	defer r.knownUsersMu.Unlock()
+	for _, e := range ents {
+		if !e.IsDir() {
+			continue
+		}
+		id := strings.TrimSpace(e.Name())
+		if id == "" {
+			continue
+		}
+		r.knownUsers[id] = struct{}{}
+	}
+	log.Printf("%s loaded known users from disk: dir=%s count=%d", logPrefix, usersDir, len(r.knownUsers))
 }

@@ -188,8 +188,37 @@ func (r *Runner) processDMMessage(
 		}
 	}
 
-	if err := r.sendReply(ctx, emit, channelID, userID, reply, logPrefix); err != nil {
+	clean, controls := parseReplyControls(reply)
+	if err := r.sendReply(ctx, emit, channelID, userID, clean, logPrefix); err != nil {
 		return err
+	}
+	r.maybeEnqueueProactive(now, paths, channelID, recordID, controls.proactive, logPrefix)
+
+	// If the model explicitly asks for a continuation, prompt it once more.
+	if controls.wantMore {
+		l5More := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(l5)+2)
+		l5More = append(l5More, l5...)
+		if strings.TrimSpace(clean) != "" {
+			l5More = append(l5More, openaigo.AssistantMessage(strings.TrimSpace(clean)))
+		}
+		l5More = append(l5More, openaigo.UserMessage("(you want to say more)"))
+
+		more, moreMood, moreGotMood, moreErr := r.reply(ctx, channelID, l1l4, l5More)
+		if moreErr != nil {
+			return moreErr
+		}
+		if moreGotMood {
+			meta.FinalMood = moreMood
+			if err := store.SaveMetadata(paths.MetadataPath, meta); err != nil {
+				return err
+			}
+		}
+
+		moreClean, moreControls := parseReplyControls(more)
+		if err := r.sendReply(ctx, emit, channelID, userID, moreClean, logPrefix); err != nil {
+			return err
+		}
+		r.maybeEnqueueProactive(now, paths, channelID, recordID, moreControls.proactive, logPrefix)
 	}
 	r.maybeOnDemandRemember(ctx, socketMsg.Content, sessionMsgs, facts, paths, userID, channelID, now, logPrefix)
 	return nil
@@ -290,7 +319,13 @@ func (r *Runner) buildPrompt(
 	sessionMsgs []mewacl.Message,
 	logPrefix string,
 ) (l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) {
-	l1l4 = ai.BuildL1L4UserPrompt(ai.DeveloperInstructionsText(assistantSilenceToken, DeveloperInstructionsPromptRelPath, DeveloperInstructionsEmbeddedName), meta, facts, summaries)
+	l1l4 = ai.BuildL1L4UserPrompt(ai.DeveloperInstructionsText(
+		assistantSilenceToken,
+		assistantWantMoreToken,
+		assistantProactiveTokenPrefix,
+		DeveloperInstructionsPromptRelPath,
+		DeveloperInstructionsEmbeddedName,
+	), meta, facts, summaries)
 	l5, err := ai.BuildL5MessagesWithAttachments(ctx, sessionMsgs, r.botUserID, ai.UserContentPartsOptions{
 		DefaultImagePrompt:    DefaultImagePrompt,
 		MaxImageBytes:         DefaultMaxImageBytes,
