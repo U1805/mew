@@ -32,32 +32,14 @@ const normalizeBotUsernameBase = (name?: string) => {
   return (trimmed || 'bot').slice(0, 50);
 };
 
-const generateUniqueBotUsername = async (baseName?: string, excludeUserId?: string) => {
-  const base = normalizeBotUsernameBase(baseName);
-
-  const isTaken = async (username: string) => {
-    const query: any = { username };
-    if (excludeUserId) query._id = { $ne: excludeUserId };
-    return !!(await UserModel.exists(query));
-  };
-
-  if (!(await isTaken(base))) return base;
-
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const candidate = `${base}-${nanoid(6)}`.slice(0, 50);
-    if (!(await isTaken(candidate))) return candidate;
-  }
-
-  return `${base}-${nanoid(10)}`.slice(0, 50);
-};
-
 const createBotUser = async (bot: IBot, avatarKey?: string) => {
-  const username = await generateUniqueBotUsername(bot.name);
+  const username = normalizeBotUsernameBase(bot.name);
   const hashedPassword = await bcrypt.hash(nanoid(32), 10);
 
   const botUser = new UserModel({
     email: `bot-${bot._id.toString()}@internal.mew`,
     username,
+    // discriminator is auto-assigned in User model pre-validate hook
     password: hashedPassword,
     isBot: true,
     avatarUrl: avatarKey,
@@ -82,11 +64,25 @@ const syncBotUserProfile = async (bot: IBot, opts: { name?: string; avatarKey?: 
   await ensureBotUserExists(bot, opts.avatarKey);
   if (!bot.botUserId) return;
 
-  const botUser = await UserModel.findById(bot.botUserId).select('username avatarUrl');
+  const botUser = await UserModel.findById(bot.botUserId).select('username discriminator avatarUrl');
   if (!botUser) return;
 
-  if (opts.name && opts.name.trim() && botUser.username !== opts.name.trim()) {
-    botUser.username = await generateUniqueBotUsername(opts.name, botUser._id.toString());
+  if (opts.name && opts.name.trim()) {
+    const nextUsername = normalizeBotUsernameBase(opts.name);
+    if (botUser.username !== nextUsername) {
+      botUser.username = nextUsername;
+      try {
+        await botUser.save();
+      } catch (error: any) {
+        // If (username, discriminator) conflicts, clear discriminator and let the User model re-assign.
+        if (error?.name === 'MongoServerError' && error?.code === 11000) {
+          (botUser as any).discriminator = undefined;
+          await botUser.save();
+        } else {
+          throw error;
+        }
+      }
+    }
   }
   if (opts.avatarKey) botUser.avatarUrl = opts.avatarKey;
 

@@ -5,7 +5,7 @@ class MemberRepository {
   async find(filter: any): Promise<any[]> {
     // Repository owns populate/lean decisions.
     return ServerMember.find(filter)
-      .populate('userId', '_id username avatarUrl isBot email createdAt')
+      .populate('userId', '_id username discriminator avatarUrl isBot email createdAt')
       .lean();
   }
 

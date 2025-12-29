@@ -27,7 +27,7 @@ const botInviteService = {
       username: { $regex: regex },
       _id: { $nin: memberUserIds },
     })
-      .select('_id username avatarUrl isBot')
+      .select('_id username discriminator avatarUrl isBot')
       .limit(20)
       .lean();
 
@@ -43,6 +43,7 @@ const botInviteService = {
       .map((u: any) => ({
         _id: u._id,
         username: u.username,
+        discriminator: u.discriminator,
         avatarUrl: u.avatarUrl ? getS3PublicUrl(u.avatarUrl) : undefined,
         isBot: true,
       }));

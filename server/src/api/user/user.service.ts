@@ -3,6 +3,7 @@ import { NotFoundError, UnauthorizedError, BadRequestError, ConflictError } from
 import { getS3PublicUrl } from '../../utils/s3';
 import { userRepository } from './user.repository';
 import BotModel from '../bot/bot.model';
+import UserModel from './user.model';
 
 const userService = {
   async getMe(userId: string) {
@@ -21,7 +22,7 @@ const userService = {
     const users = await userRepository.find({
       username: { $regex: query, $options: 'i' },
       _id: { $ne: currentUserId },
-    }, '_id username avatarUrl isBot', 10);
+    }, '_id username discriminator avatarUrl isBot', 10);
 
     const botUserIds = users.filter((u: any) => (u as any).isBot).map((u) => u._id);
     const botDmEnabledByUserId = new Map<string, boolean>();
@@ -41,9 +42,9 @@ const userService = {
         const { _id, username, avatarUrl, isBot } = userObject;
         if (isBot) {
           const dmEnabled = botDmEnabledByUserId.get(_id.toString()) === true;
-          return { _id, username, avatarUrl, isBot, dmEnabled };
+          return { _id, username, discriminator: userObject.discriminator, avatarUrl, isBot, dmEnabled };
         }
-        return { _id, username, avatarUrl, isBot: false };
+        return { _id, username, discriminator: userObject.discriminator, avatarUrl, isBot: false };
       })
       .filter((u: any) => !u.isBot || u.dmEnabled === true);
   },
@@ -61,21 +62,44 @@ const userService = {
     const { _id, username, avatarUrl, isBot, createdAt } = userObject;
     if (isBot) {
       const bot = await BotModel.findOne({ botUserId: _id }).select('dmEnabled').lean();
-      return { _id, username, avatarUrl, isBot, createdAt, dmEnabled: bot?.dmEnabled === true };
+      return { _id, username, discriminator: userObject.discriminator, avatarUrl, isBot, createdAt, dmEnabled: bot?.dmEnabled === true };
     }
-    return { _id, username, avatarUrl, isBot, createdAt };
+    return { _id, username, discriminator: userObject.discriminator, avatarUrl, isBot, createdAt };
   },
 
   async updateMe(userId: string, updateData: { username?: string; avatarUrl?: string }) {
     try {
-      const user = await userRepository.updateById(userId, updateData);
-      if (!user) {
-        throw new NotFoundError('User not found');
+      const user = await UserModel.findById(userId).select('username discriminator avatarUrl isBot email createdAt updatedAt');
+      if (!user) throw new NotFoundError('User not found');
+
+      if (typeof updateData.username === 'string' && updateData.username.trim()) {
+        const nextUsername = updateData.username.trim();
+        if (user.username !== nextUsername) {
+          user.username = nextUsername;
+          // Keep discriminator if possible; on conflict, clear and let the User model auto-assign a new one.
+          try {
+            await user.save();
+          } catch (error: any) {
+            if (error?.name === 'MongoServerError' && error?.code === 11000) {
+              (user as any).discriminator = undefined;
+              await user.save();
+            } else if (error?.message === 'DISCRIMINATOR_EXHAUSTED') {
+              throw new ConflictError('Username is unavailable.');
+            } else {
+              throw error;
+            }
+          }
+        }
       }
-      const userObject = user.toObject();
-      if (userObject.avatarUrl) {
-          userObject.avatarUrl = getS3PublicUrl(userObject.avatarUrl);
+
+      if (typeof updateData.avatarUrl === 'string' && updateData.avatarUrl) {
+        user.avatarUrl = updateData.avatarUrl;
       }
+
+      await user.save();
+
+      const userObject: any = user.toObject();
+      if (userObject.avatarUrl) userObject.avatarUrl = getS3PublicUrl(userObject.avatarUrl);
       return userObject;
     } catch (error: any) {
       if (error.name === 'MongoServerError' && error.code === 11000) {

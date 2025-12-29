@@ -148,7 +148,7 @@ const channelService = {
     }
 
     let newDmChannel = await channelRepository.createDmChannel(userId, recipientId);
-    newDmChannel = await newDmChannel.populate('recipients', 'username avatarUrl');
+    newDmChannel = await newDmChannel.populate('recipients', 'username discriminator avatarUrl');
 
     if (Array.isArray((newDmChannel as any).recipients)) {
       (newDmChannel as any).recipients = (newDmChannel as any).recipients.map(hydrateUserAvatarUrl);

@@ -12,7 +12,7 @@ class MessageRepository {
     return Message.find(query)
       .sort({ createdAt: -1 })
       .limit(limit)
-      .populate('authorId', 'username avatarUrl isBot')
+      .populate('authorId', 'username discriminator avatarUrl isBot')
       .lean();
   }
 
@@ -54,7 +54,7 @@ class MessageRepository {
       { _id: messageId },
       { $pull: { reactions: { userIds: { $size: 0 } } } },
       { new: true }
-    ).populate('authorId', 'username avatarUrl isBot');
+    ).populate('authorId', 'username discriminator avatarUrl isBot');
 
     return finalMessage;
   }
@@ -74,7 +74,7 @@ class MessageRepository {
       { _id: messageId },
       { $pull: { reactions: { userIds: { $size: 0 } } } },
       { new: true }
-    ).populate('authorId', 'username avatarUrl isBot');
+    ).populate('authorId', 'username discriminator avatarUrl isBot');
   }
 }
 
