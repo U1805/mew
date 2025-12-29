@@ -9,10 +9,7 @@ func RunService() error {
 	configTemplate, _ := sdk.ConfigTemplateJSON([]any{
 		map[string]any{
 			"username":              "xxxxxx",
-			"interval":              3600,
 			"webhook":               "http://mew-server/api/webhooks/<webhookId>/<token>",
-			"enabled":               true,
-			"send_history_on_start": false,
 		},
 	})
 

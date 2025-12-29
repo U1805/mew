@@ -8,10 +8,8 @@ import (
 func RunService() error {
 	configTemplate, _ := sdk.ConfigTemplateJSON([]any{
 		map[string]any{
-			"interval": 30,
 			"webhook":  "http://mew-server/api/webhooks/<webhookId>/<token>",
 			"content":  "test message",
-			"enabled":  true,
 		},
 	})
 

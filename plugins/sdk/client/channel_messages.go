@@ -29,8 +29,6 @@ func (m ChannelMessage) AuthorID() string { return AuthorID(m.AuthorRaw) }
 
 func (m ChannelMessage) AuthorUsername() string { return AuthorUsername(m.AuthorRaw) }
 
-func (m ChannelMessage) MentionIDs() []string { return MentionIDs(m.MentionsRaw) }
-
 func FetchChannelMessages(ctx context.Context, httpClient *http.Client, apiBase, userToken, channelID string, limit int, before string) ([]ChannelMessage, error) {
 	if httpClient == nil {
 		return nil, fmt.Errorf("httpClient is required")

@@ -1,6 +1,9 @@
 package webhook
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 type testCache struct {
 	m      map[string]string
@@ -25,7 +28,7 @@ func (c *testCache) CacheMedia(remoteURL, key string) {
 
 func TestUploadRemoteKeyCached_UsesCache(t *testing.T) {
 	c := &testCache{m: map[string]string{"https://example.com/a.png": "k1"}}
-	key, used, err := UploadRemoteKeyCached(nil, c, nil, nil, "", "", "https://example.com/a.png", "a.png", "ua")
+	key, used, err := UploadRemoteKeyCached(context.TODO(), c, nil, nil, "", "", "https://example.com/a.png", "a.png", "ua")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -42,7 +45,7 @@ func TestUploadRemoteKeyCached_UsesCache(t *testing.T) {
 
 func TestUploadRemoteKeyCached_EmptyURL(t *testing.T) {
 	c := &testCache{}
-	key, used, err := UploadRemoteKeyCached(nil, c, nil, nil, "", "", "   ", "a.png", "ua")
+	key, used, err := UploadRemoteKeyCached(context.TODO(), c, nil, nil, "", "", "   ", "a.png", "ua")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}

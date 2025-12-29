@@ -43,7 +43,7 @@ func (r *JpdictRunner) handleQuery(ctx context.Context, input string, attachment
 	if text == "" && len(attachments) == 0 {
 		return outboundMessage{
 			Type:    jpdictCardMessageType,
-			Content: "",
+			Content: jpdictEmptyInputErrorReplyText,
 			Payload: map[string]any{"content": jpdictEmptyInputErrorReplyText},
 		}, true, nil
 	}
@@ -52,14 +52,14 @@ func (r *JpdictRunner) handleQuery(ctx context.Context, input string, attachment
 	if err != nil {
 		return outboundMessage{
 			Type:    jpdictCardMessageType,
-			Content: "",
+			Content: jpdictRequestFailedPrefix + err.Error(),
 			Payload: map[string]any{"content": jpdictRequestFailedPrefix + err.Error()},
 		}, true, nil
 	}
 
 	return outboundMessage{
 		Type:    jpdictCardMessageType,
-		Content: "",
+		Content: reply,
 		Payload: map[string]any{"content": reply},
 	}, true, nil
 }

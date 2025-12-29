@@ -68,6 +68,14 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 	if err != nil {
 		return nil, fmt.Errorf("read persona failed: %w", err)
 	}
+	
+	llmTransport := http.DefaultTransport.(*http.Transport).Clone()
+	llmTransport.Proxy = nil
+	llmHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout:     75 * time.Second,
+		UseMEWProxy: true,
+		Transport:   llmTransport,
+	})
 
 	r := &Runner{
 		serviceType:   serviceType,
@@ -80,7 +88,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		mewURL:        mewURL,
 		wsURL:         wsURL,
 		mewHTTPClient: mewHTTPClient,
-		llmHTTPClient: ai.NewHTTPClient(),
+		llmHTTPClient: llmHTTPClient,
 		aiConfig:      llmCfg,
 		persona:       persona,
 		dmChannels:    sdk.NewDMChannelCache(),

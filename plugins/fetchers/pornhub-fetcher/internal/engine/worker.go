@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -114,7 +115,7 @@ func (w *Worker) processAndSend(ctx context.Context, author source.Author, item 
 	}
 
 	msg := sdk.WebhookPayload{
-		Content:   item.Title,
+		Content:   fmt.Sprintf("@%v posted a new video - %v", author.Name, item.Title),
 		Type:      cardMessageType,
 		Payload:   payload,
 		Username:  author.Name,
