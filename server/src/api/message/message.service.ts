@@ -24,6 +24,71 @@ function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messag
   return messageObject;
 }
 
+function buildMessageContext(messageObject: any): string {
+  const content = typeof messageObject?.content === 'string' ? messageObject.content.trim() : '';
+  const type = typeof messageObject?.type === 'string' ? messageObject.type.trim() : '';
+  const payload = messageObject?.payload && typeof messageObject.payload === 'object' ? messageObject.payload : undefined;
+  const attachments = Array.isArray(messageObject?.attachments) ? messageObject.attachments : [];
+
+  if (content) return content;
+
+  const parts: string[] = [];
+
+  // app/x-forward-card: use the embedded forwarded message as context.
+  if (type === 'app/x-forward-card' && payload?.forwardedMessage && typeof payload.forwardedMessage === 'object') {
+    const fm = payload.forwardedMessage as any;
+    const fromLabel = typeof payload.forwardedFromLabel === 'string' ? payload.forwardedFromLabel.trim() : '';
+    const author = fm.author && typeof fm.author === 'object' ? fm.author : undefined;
+    const authorName = typeof author?.username === 'string' ? author.username.trim() : '';
+    const forwardedText = typeof fm.content === 'string' ? fm.content.trim() : '';
+
+    if (fromLabel) parts.push(`forwarded_from: ${fromLabel}`);
+    if (authorName) parts.push(`forwarded_author: ${authorName}`);
+    if (forwardedText) parts.push(forwardedText);
+
+    const forwardedAttachments = Array.isArray(fm.attachments) ? fm.attachments : [];
+    const forwardedFilenames = forwardedAttachments
+      .map((a: any) => (typeof a?.filename === 'string' ? a.filename.trim() : ''))
+      .filter(Boolean);
+    if (forwardedFilenames.length > 0) {
+      parts.push(`forwarded_attachments: ${forwardedFilenames.join(', ')}`);
+    }
+  }
+
+  // Common card-style payload fields.
+  if (payload) {
+    const title = typeof payload.title === 'string' ? payload.title.trim() : '';
+    const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
+    const url = typeof payload.url === 'string' ? payload.url.trim() : '';
+    const webhookName = typeof payload.webhookName === 'string' ? payload.webhookName.trim() : '';
+
+    if (webhookName) parts.push(`source: ${webhookName}`);
+    if (title) parts.push(`title: ${title}`);
+    if (summary) parts.push(`summary: ${summary}`);
+    if (url) parts.push(`url: ${url}`);
+
+    const embeds = Array.isArray(payload.embeds) ? payload.embeds : [];
+    for (const e of embeds) {
+      if (!e || typeof e !== 'object') continue;
+      const eUrl = typeof (e as any).url === 'string' ? (e as any).url.trim() : '';
+      const eTitle = typeof (e as any).title === 'string' ? (e as any).title.trim() : '';
+      const eDesc = typeof (e as any).description === 'string' ? (e as any).description.trim() : '';
+      const line = [eTitle, eDesc, eUrl].filter(Boolean).join(' | ');
+      if (line) parts.push(`embed: ${line}`);
+    }
+  }
+
+  // Fallback: attachments list, if any.
+  const filenames = attachments
+    .map((a: any) => (typeof a?.filename === 'string' ? a.filename.trim() : ''))
+    .filter(Boolean);
+  if (filenames.length > 0) {
+    parts.push(`attachments: ${filenames.join(', ')}`);
+  }
+
+  return parts.join('\n').trim();
+}
+
 async function checkMessagePermissions(messageId: string, userId: string) {
   const message = await getMessageById(messageId);
 
@@ -104,6 +169,9 @@ function processMessageForClient(message: any): object {
 
   // Finally, hydrate any attachments in the message
   messageObject = hydrateAttachmentUrls(messageObject);
+
+  // Provide a unified plain-text context string for bots/LLM consumers.
+  messageObject.context = buildMessageContext(messageObject);
 
   return messageObject;
 }

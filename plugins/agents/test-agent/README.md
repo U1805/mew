@@ -29,7 +29,7 @@
 ## 运行
 
 ```bash
-go run .
+go run ./cmd/test-agent
 ```
 
 ## 在 Mew 中创建/使用

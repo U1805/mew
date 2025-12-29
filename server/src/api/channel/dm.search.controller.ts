@@ -3,6 +3,7 @@ import asyncHandler from '../../utils/asyncHandler';
 import Channel from './channel.model';
 import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/errors';
 import { searchMessagesInChannel } from '../search/search.service';
+import ServerMember from '../member/member.model';
 
 interface AuthenticatedRequest extends Request {
   user?: { id: string; username: string; [key: string]: any };
@@ -16,15 +17,17 @@ export const searchDmMessagesHandler = asyncHandler(
     if (!userId) throw new ForbiddenError('Authentication required.');
     if (!channelId) throw new BadRequestError('Channel ID is required.');
 
-    const channel = await Channel.findById(channelId).select('type recipients').lean();
+    const channel = await Channel.findById(channelId).select('type recipients serverId').lean();
     if (!channel) throw new NotFoundError('Channel not found.');
 
-    if (channel.type !== 'DM') {
-      throw new BadRequestError('This endpoint only supports DM channels.');
+    if (channel.type === 'DM') {
+      const isRecipient = Array.isArray(channel.recipients) && channel.recipients.some((id: any) => id.equals(userId));
+      if (!isRecipient) throw new ForbiddenError('You are not a recipient of this DM channel.');
+    } else {
+      if (!channel.serverId) throw new BadRequestError('Invalid channel: serverId is missing.');
+      const member = await ServerMember.findOne({ serverId: channel.serverId.toString(), userId }).lean();
+      if (!member) throw new ForbiddenError('You are not a member of this server.');
     }
-
-    const isRecipient = Array.isArray(channel.recipients) && channel.recipients.some((id: any) => id.equals(userId));
-    if (!isRecipient) throw new ForbiddenError('You are not a recipient of this DM channel.');
 
     const q = String((req.query as any)?.q ?? '');
     const limit = Number((req.query as any)?.limit ?? 20);
@@ -40,4 +43,7 @@ export const searchDmMessagesHandler = asyncHandler(
     res.json(result);
   }
 );
+
+// Backward-compatible alias (old name used by earlier code/tests).
+export const searchChannelMessagesHandler = searchDmMessagesHandler;
 

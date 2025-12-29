@@ -11,7 +11,7 @@
 ```json
 [
   {
-    "username": "nirei_nozomi_official",
+    "username": "yyyyy",
     "interval": 3600,
     "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
     "enabled": true,
@@ -53,6 +53,6 @@
 运行：
 
 ```bash
-go run .
+go run ./cmd/instagram-fetcher
 ```
 

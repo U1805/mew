@@ -49,6 +49,6 @@
 运行：
 
 ```bash
-go run .
+go run ./cmd/pornhub-fetcher
 ```
 
