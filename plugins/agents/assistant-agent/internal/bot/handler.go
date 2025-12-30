@@ -288,14 +288,18 @@ func (r *Runner) updateSessionState(
 	meta.StartAt = startAt
 	meta.LastMessageAt = now
 	meta.ChannelID = channelID
-	meta.SessionStartDatetime = startAt.Format(assistantSessionStartTimeFormat)
+	startAtLocal := startAt
+	if r.timeLoc != nil && !startAtLocal.IsZero() {
+		startAtLocal = startAtLocal.In(r.timeLoc)
+	}
+	meta.SessionStartDatetime = startAtLocal.Format(assistantSessionStartTimeFormat)
 	if strings.TrimSpace(prevRecordID) != strings.TrimSpace(recordID) {
 		meta.LastFactRecordID = ""
 		meta.LastFactProcessedAt = time.Time{}
 	}
 
 	if meta.UserActivityFrequency == "" || strings.TrimSpace(prevRecordID) != strings.TrimSpace(recordID) {
-		if freq, err := r.fetcher.UserActivityFrequency(ctx, channelID, userID, startAt); err == nil && strings.TrimSpace(freq) != "" {
+		if freq, err := r.fetcher.UserActivityFrequency(ctx, channelID, userID, startAtLocal); err == nil && strings.TrimSpace(freq) != "" {
 			meta.UserActivityFrequency = freq
 		} else if strings.TrimSpace(meta.UserActivityFrequency) == "" {
 			meta.UserActivityFrequency = assistantDefaultActivity
@@ -331,13 +335,14 @@ func (r *Runner) buildPrompt(
 		MaxImageBytes:         DefaultMaxImageBytes,
 		MaxTotalImageBytes:    DefaultMaxTotalImageBytes,
 		KeepEmptyWhenNoImages: true,
+		Location:              r.timeLoc,
 		Download: func(ctx context.Context, att mewacl.Attachment, limit int64) ([]byte, error) {
 			return mewacl.DownloadAttachmentBytes(ctx, r.mewHTTPClient, r.apiBase, r.userToken, att, limit)
 		},
 	})
 	if err != nil {
 		log.Printf("%s build L5 with attachments failed (fallback to text-only): %v", logPrefix, err)
-		l5 = ai.BuildL5Messages(sessionMsgs, r.botUserID)
+		l5 = ai.BuildL5Messages(sessionMsgs, r.botUserID, r.timeLoc)
 	}
 	log.Printf("%s prompt prepared: L1L4_len=%d L5_msgs=%d facts=%d summaries=%d",
 		logPrefix, len(l1l4), len(l5), len(facts.Facts), len(summaries.Summaries),
@@ -469,7 +474,13 @@ func (r *Runner) maybeOnDemandRemember(
 
 	log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
 	sessionText := ai.FormatSessionRecordForContext(sessionMsgs)
-	res, err := ai.ExtractFactsAndUsage(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts)
+	res, err := ai.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, ai.CognitiveRetryOptions{
+		MaxRetries:     assistantMaxLLMRetries,
+		InitialBackoff: assistantLLMRetryInitialBackoff,
+		MaxBackoff:     assistantLLMRetryMaxBackoff,
+		LogPrefix:      logPrefix,
+		ChannelID:      channelID,
+	})
 	if err != nil || (len(res.Facts) == 0 && len(res.UsedFactIDs) == 0) {
 		if err != nil {
 			log.Printf("%s fact engine on-demand failed: user=%s err=%v", logPrefix, userID, err)
@@ -501,7 +512,13 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 	}
 	recordText := ai.FormatSessionRecordForContext(msgs)
 
-	if summaryText, err := ai.SummarizeRecord(ctx, r.llmHTTPClient, r.aiConfig, recordText); err == nil && strings.TrimSpace(summaryText) != "" {
+	if summaryText, err := ai.SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, ai.CognitiveRetryOptions{
+		MaxRetries:     assistantMaxLLMRetries,
+		InitialBackoff: assistantLLMRetryInitialBackoff,
+		MaxBackoff:     assistantLLMRetryMaxBackoff,
+		LogPrefix:      logPrefix,
+		ChannelID:      meta.ChannelID,
+	}); err == nil && strings.TrimSpace(summaryText) != "" {
 		summaries = store.AppendSummary(now, summaries, meta.RecordID, summaryText, assistantMaxSummaries)
 		_ = store.SaveSummaries(paths.SummariesPath, summaries)
 		meta.LastSummarizedRecordID = meta.RecordID
@@ -513,7 +530,13 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 		log.Printf("%s summarize failed: user=%s record=%s err=%v", logPrefix, userID, meta.RecordID, err)
 	}
 
-	if res, err := ai.ExtractFactsAndUsage(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
+	if res, err := ai.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts, ai.CognitiveRetryOptions{
+		MaxRetries:     assistantMaxLLMRetries,
+		InitialBackoff: assistantLLMRetryInitialBackoff,
+		MaxBackoff:     assistantLLMRetryMaxBackoff,
+		LogPrefix:      logPrefix,
+		ChannelID:      meta.ChannelID,
+	}); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
 		facts.Facts = store.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
 		facts = store.UpsertFacts(now, facts, res.Facts, assistantMaxFacts)
 		_ = store.SaveFacts(paths.FactsPath, facts)

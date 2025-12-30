@@ -81,7 +81,7 @@ func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, fact
 	return strings.TrimSpace(b.String())
 }
 
-func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string) []openaigo.ChatCompletionMessageParamUnion {
+func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string, loc *time.Location) []openaigo.ChatCompletionMessageParamUnion {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
 	for _, m := range sessionMsgs {
 		content := strings.TrimSpace(m.ContextText())
@@ -97,7 +97,11 @@ func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string) []op
 		if role == "assistant" {
 			out = append(out, openaigo.AssistantMessage(content))
 		} else {
-			out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMeta(m.AuthorUsername(), m.AuthorID(), m.CreatedAt, content)))
+			sentAt := m.CreatedAt
+			if loc != nil && !sentAt.IsZero() {
+				sentAt = sentAt.In(loc)
+			}
+			out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMeta(m.AuthorUsername(), m.AuthorID(), sentAt, content)))
 		}
 	}
 	return out
@@ -133,6 +137,7 @@ type UserContentPartsOptions struct {
 	MaxTotalImageBytes    int64
 	KeepEmptyWhenNoImages bool
 	Download              DownloadFunc
+	Location              *time.Location
 }
 
 func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.ChannelMessage, botUserID string, opts UserContentPartsOptions) ([]openaigo.ChatCompletionMessageParamUnion, error) {
@@ -144,7 +149,11 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.Ch
 		}
 
 		if role == "user" {
-			userMsg, err := BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), m.CreatedAt, strings.TrimSpace(m.ContextText()), m.Attachments, BuildUserContentOptions{
+			sentAt := m.CreatedAt
+			if opts.Location != nil && !sentAt.IsZero() {
+				sentAt = sentAt.In(opts.Location)
+			}
+			userMsg, err := BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), sentAt, strings.TrimSpace(m.ContextText()), m.Attachments, BuildUserContentOptions{
 				DefaultImagePrompt:    opts.DefaultImagePrompt,
 				MaxImageBytes:         opts.MaxImageBytes,
 				MaxTotalImageBytes:    opts.MaxTotalImageBytes,
