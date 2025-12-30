@@ -3,9 +3,7 @@
   "position": 0,
   "collapsible": false,
   "link": {
-    "type": "generated-index",
-    "title": "文档",
-    "description": "Mew 文档导航与阅读路径（按“从能跑起来 → 理解架构 → 深入开发 → 扩展生态”的顺序阅读）。",
-    "slug": "/"
+    "type": "doc",
+    "id": "start/paths"
   }
 }

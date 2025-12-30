@@ -6,7 +6,7 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const docsRootCategory = require('./docs/_category_.json') as {
   label: string;
-  link?: { type: 'generated-index'; title?: string; description?: string; slug?: string };
+  link?: { type: 'generated-index'; title?: string; description?: string; slug?: string; id?: string };
 };
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -25,14 +25,22 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'category',
-          label: '开始',
-          items: ['start/introduction', 'start/getting-started'],
+          label: '概念与架构',
+          items: ['start/introduction', 'platform/platform-design'],
         },
         {
           type: 'category',
-          label: '平台',
+          label: '使用与部署',
           items: [
-            'platform/platform-design',
+            'start/getting-started',
+            'reference/infrastructure-setup',
+            'reference/references',
+          ],
+        },
+        {
+          type: 'category',
+          label: '平台设计',
+          items: [
             'platform/backend-guide',
             'platform/frontend-guide',
             {
@@ -45,7 +53,7 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: 'category',
-          label: 'Bot 生态',
+          label: 'Bot 开发',
           items: [
             'bot-sdk/bot-ecosystem',
             {
@@ -56,15 +64,9 @@ const sidebars: SidebarsConfig = {
                 'bot-sdk/core-concepts',
                 'bot-sdk/fetcher-bot',
                 'bot-sdk/agent-bot',
-                'bot-sdk/best-practices',
               ],
             },
           ],
-        },
-        {
-          type: 'category',
-          label: '参考',
-          items: ['reference/references', 'reference/infrastructure-setup'],
         },
       ],
     },
