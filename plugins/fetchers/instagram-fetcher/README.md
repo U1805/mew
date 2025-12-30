@@ -41,7 +41,7 @@
 
 ## 去重与缓存
 
-- 用 Story `id` 去重（避免重复推送）
+- 优先用 Story `display_url_filename` 去重（更稳定；为空时回退到 `id`）
 - 媒体文件会通过 webhook `/upload` 本地化到 S3/CDN，并在本地 state 中缓存 `remoteURL -> key`，避免重复上传
 - 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/instagram-fetcher/<botId>/task-<idx>-<hash>.json`）
 

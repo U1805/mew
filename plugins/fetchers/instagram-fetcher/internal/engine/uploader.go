@@ -129,6 +129,11 @@ func (u *Uploader) SendStory(ctx context.Context, user *source.UserProfile, stor
 		return err
 	}
 
-	log.Printf("%s posted story: id=%s", u.logPrefix, strings.TrimSpace(story.ID))
+	log.Printf(
+		"%s posted story: key=%s id=%s",
+		u.logPrefix,
+		strings.TrimSpace(story.DisplayURLFilename),
+		strings.TrimSpace(story.ID),
+	)
 	return nil
 }
