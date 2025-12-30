@@ -17,3 +17,8 @@ hola:
   label: Hola
   permalink: /hola
   description: Hola tag description
+
+changelog:
+  label: 更新日志
+  permalink: /changelog
+  description: 版本发布与产品更新记录

@@ -1,0 +1,205 @@
+---
+slug: changelog/v1.5.0
+title: v1.5.0 更新日志
+date: 2025-12-30
+tags: [changelog]
+---
+
+本文是 Mew 的第一篇更新日志（Changelog）。我们把从 **v0.1.0** 到 **v1.5.0** 的版本变更一次性汇总在这里，后续每次发布都会在 `website/blog/changelog/` 新建一篇对应版本的 Blog。
+
+<!-- truncate -->
+
+:::caution
+**v0.7.0** 与 **v1.0.0** 都包含 Breaking Changes：升级前建议先通读本文对应版本的小节，并按需调整部署与插件代码。
+:::
+
+## v1.5.0 (2025-12-30)
+
+### ✨ 新功能
+
+- 新增 **assistant-agent**，并对 plugins 架构与 SDK 做了增强与重构。
+- 新增类似 Discord 的 username discriminator（区分号）机制。
+
+### 🔒 安全
+
+- 完成一次 security review，并修复审计问题。
+
+## v1.4.0 (2025-12-26)
+
+### ✨ 新功能
+
+- 新增 `jpdict-agent`：支持通过文本选择进行日文翻译。
+- 增强 bot 注册流程：支持更丰富的 service metadata。
+- 新增消息右键菜单（context menu），优化日常操作体验。
+
+### 🐛 Bug Fixes
+
+- 增加 plugins 持久化 cache，提升稳定性。
+- 修复多处 UI 细节问题。
+
+## v1.3.0 (2025-12-25)
+
+### ✨ 新功能
+
+- 新增 server bot 邀请系统。
+- 新增 bot DM 权限控制。
+- 新增可交互的 echo bot，并补齐 bot authentication 链路。
+
+### 🛠️ 工程调整
+
+- 重构 plugins 目录结构，将 `interactive` 统一更名为 `agents`。
+- 重构与更新文档结构，提升可维护性。
+
+## v1.2.0 (2025-12-24)
+
+### ✨ 新功能
+
+- 新增 Instagram content fetcher plugin 与 card 集成。
+- 新增 Bilibili content fetcher plugin 与 card 集成。
+- plugins SDK 新增 development mode，方便本地开发与调试。
+- 新增环境变量 `DISABLE_REGISTRATION`，用于控制是否允许新用户注册。
+
+### 🛠️ 改进
+
+- 重构 chat cards 目录结构，便于后续扩展。
+- 增加 plugins SDK 单元测试，并补齐部分 client socket 测试用例。
+
+## v1.1.0 (2025-12-22)
+
+### ✨ 新功能
+
+- 新增 Twitter content fetcher plugin 与 card 集成。
+- 新增 Pornhub content fetcher plugin 与 card 集成。
+- plugins SDK 模块化重构，并沉淀共享 utilities。
+- Webhook endpoints 新增文件上传支持。
+
+### 🐛 Bug Fixes
+
+- 修复 message list “滚动加载更多（scroll-to-load）”的问题，并处理 ESLint 报错。
+- 修复 webhook messages 共享 `authorId` 造成的引用污染问题。
+
+### 🛠️ 工程调整
+
+- 更新 GitHub Actions workflow 配置。
+
+## v1.0.0 (2025-12-21)
+
+### 💥 Breaking Changes
+
+- 项目目录重命名：`frontend/` → `client/`，`backend/` → `server/`；会影响 import path、部署脚本与相关文档。
+- plugins SDK 架构做了模块化调整，已有插件可能需要按新结构适配。
+
+### ✨ 新功能 / 改进
+
+- 优化 CI/CD 与 Docker build 流程，并接入 GitHub Container Registry（GHCR）。
+
+## v0.7.0 (2025-12-20)
+
+### 💥 Breaking Changes
+
+- bot 部署方式升级为统一的构建与部署体系：引入 `MEW_BOTS` 环境变量用于多 bot 管理，旧的“每个 plugin 一个 Dockerfile”方式不再适用。
+
+### ✨ 新功能 / 改进
+
+- 增加 health check API，方便监控与运维集成。
+- 增加 Garage（S3-compatible）存储服务与初始化脚本。
+- 后端性能优化：补齐复合索引、优化权限计算与批量同步、优化 S3 upload（streaming）等。
+- 文档升级：将 getting-started 改为交互式 MDX，并调整 bot-sdk 相关文档结构。
+
+### 🐛 Bug Fixes
+
+- 修复 Docker bot 网络访问配置、Vite dev server 绑定、以及部分文档链接问题。
+
+## v0.6.0 (2025-12-18)
+
+### ✨ 新功能
+
+- 新增 bot 管理能力，并引入更模块化的 bot/plugin 架构。
+- 新增 RSS fetcher plugin，并优化 RSS cards（如 avatar 展示）。
+- 增加 Docker Compose 部署栈，降低自建门槛。
+- 增加更完整的 frontend/backend 测试覆盖。
+
+### 🐛 Bug Fixes
+
+- 修复 member list webhook bots 与测试 bot 环境相关问题。
+
+## v0.5.0 (2025-12-15)
+
+### ✨ 新功能
+
+- 接入 TipTap chat editor，提升富文本编辑体验。
+- 支持在设置中修改 username/password。
+- 支持编辑 channel topic。
+- 支持 video 与 URL preview。
+- 支持上传 user avatar 与 server icon。
+
+### 🛠️ 工程调整
+
+- 增加 docs deployment 的 GitHub Actions workflow，并整理 docs 与 API references。
+
+### 🐛 Bug Fixes
+
+- 修复 avatar URL 与 chat auto-scroll 相关问题。
+- 修复 avatars 与 server settings 的 UI 问题。
+
+## v0.4.0 (2025-12-13)
+
+### ✨ 新功能
+
+- 新增文件上传与 attachment 能力，并拆分附件相关组件以提升可维护性。
+- 引入 Repository pattern，重构核心架构与服务层。
+
+### 🐛 Bug Fixes
+
+- 修复 DM 投递与历史加载问题。
+
+### 🔒 安全
+
+- 修复 React 依赖的关键安全问题，并更新前后端依赖版本。
+
+### 🛠️ 工程调整
+
+- 更新项目文档与工具权限说明，并调整 Claude Code 相关配置。
+
+## v0.3.0 (2025-12-11)
+
+### 💥 Breaking Changes
+
+- 权限系统移除 `VIEW_CHANNEL` 权限；属于一次较大的权限模型调整，可能影响已有 role 配置。
+
+### ✨ 新功能
+
+- 支持频道内 @mentions。
+- 支持浏览器 tab 未读通知。
+- 聊天记录增加时间分隔（timestamp divider）。
+- Webhook username 展示优化，并统一 “BOT” 标识；支持在 member list 直接展示 Webhooks。
+
+### 🐛 Bug Fixes
+
+- 修复删除 server/channel 时 Webhook 未级联删除的问题。
+- 修复 member list 分组与 Webhook 可见性相关问题。
+
+## v0.2.0 (2025-12-10)
+
+### ✨ 新功能
+
+- 将 Docusaurus documentation site 引入 monorepo，并补齐基础文档站点。
+
+## v0.1.1 (2025-12-09)
+
+### ✨ 新功能
+
+- 引入 RBAC（Role Based Access Control）能力，并补齐前端 UI 组件。
+
+### 🛠️ 工程调整
+
+- 清理过时的文档文件。
+
+## v0.1.0 (2025-12-06)
+
+### ✨ 新功能
+
+- 完成项目基础架构：Auth、核心 APIs、WebSocket 通信与基础测试框架。
+- 完成核心聊天能力：server/category/channel 管理、member 邀请与踢出、presence、Webhook、DM。
+- 完成消息相关能力：reaction、撤回/删除、未读状态持久化、用户资料（profile）、消息搜索等。
+

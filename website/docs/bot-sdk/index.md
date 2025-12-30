@@ -25,7 +25,6 @@ Mew Bot SDK 是扩展 Mew 生态能力的核心工具。通过它，你可以构
 *   [**核心概念**](./core-concepts): 深入了解 Bot、Bot Service 以及它们之间的工作机制。
 *   [**构建 Fetcher Bot**](./fetcher-bot): 学习如何创建一个能自动抓取并推送外部内容的机器人。
 *   [**构建 Agent Bot**](./agent-bot): 学习如何构建一个能与用户实时对话和交互的机器人。
-*   [**最佳实践**](./best-practices): 了解在生产环境中开发可靠、可扩展机器人的高级技巧。
 
 ---
 

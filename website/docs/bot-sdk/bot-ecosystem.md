@@ -1,7 +1,6 @@
 ---
 sidebar_label: '机器人'
 sidebar_position: 10
-slug: /guide/bot-ecosystem
 ---
 
 # 🤖 机器人开发
