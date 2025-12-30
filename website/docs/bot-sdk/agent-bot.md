@@ -23,7 +23,7 @@ sidebar_label: 'Agent Bot'
     对每一个 Bot 实例，使用其 `accessToken` 调用 `POST /api/auth/bot` 接口，换取用于后续通信的 `JWT`。
 
 3.  **连接网关**
-    使用获取到的 `JWT`，通过 WebSocket 连接到 Tailchat 的 `Socket.IO Gateway`，并开始监听服务端的实时事件，例如 `MESSAGE_CREATE`。
+    使用获取到的 `JWT`，通过 WebSocket 连接到 `Socket.IO Gateway`，并开始监听服务端的实时事件，例如 `MESSAGE_CREATE`。
 
 4.  **处理并响应消息**
     当接收到的消息满足预设条件时（例如被 `@` 或包含特定指令），通过 `Socket.IO` 向上行通道发送 `message/create` 事件，从而实现消息的发送与回复。
@@ -43,7 +43,7 @@ go run ./cmd/test-agent
 
 ### 2. 在前端注册并使用 Bot
 
-服务启动后，我们需要在 Tailchat 前端界面中创建一个 Bot 实例并与之交互。
+服务启动后，我们需要在前端界面中创建一个 Bot 实例并与之交互。
 
 1.  **创建 Bot**
     在前端设置中创建一个 Bot，并确保 **`serviceType`** 字段填写为 `test-agent`。
