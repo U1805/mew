@@ -36,6 +36,7 @@ type Runner struct {
 	llmHTTPClient *http.Client
 
 	aiConfig config.AssistantConfig
+	timeLoc  *time.Location
 	persona  string
 
 	dmChannels *sdk.DMChannelCache
@@ -62,6 +63,10 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 	}
 
 	llmCfg, err := config.ParseAssistantConfig(rawConfig)
+	if err != nil {
+		return nil, err
+	}
+	timeLoc, err := llmCfg.TimeLocation()
 	if err != nil {
 		return nil, err
 	}
@@ -92,6 +97,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		mewHTTPClient: mewHTTPClient,
 		llmHTTPClient: llmHTTPClient,
 		aiConfig:      llmCfg,
+		timeLoc:       timeLoc,
 		persona:       persona,
 		dmChannels:    sdk.NewDMChannelCache(),
 		store:         store.NewStore(serviceType, botID),
@@ -247,7 +253,13 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 			}
 
 			sessionText := ai.FormatSessionRecordForContext(sessionMsgs)
-			res, err := ai.ExtractFactsAndUsage(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts)
+			res, err := ai.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, ai.CognitiveRetryOptions{
+				MaxRetries:     assistantMaxLLMRetries,
+				InitialBackoff: assistantLLMRetryInitialBackoff,
+				MaxBackoff:     assistantLLMRetryMaxBackoff,
+				LogPrefix:      logPrefix,
+				ChannelID:      meta.ChannelID,
+			})
 			if err != nil {
 				log.Printf("%s fact engine periodic failed: user=%s err=%v", logPrefix, userID, err)
 				return

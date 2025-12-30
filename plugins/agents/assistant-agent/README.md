@@ -8,7 +8,8 @@
 {
   "base_url": "https://api.openai.com/v1",
   "api_key": "sk-***",
-  "model": "gpt-4o-mini"
+  "model": "gpt-4o-mini",
+  "timezone": "+08:00"
 }
 ```
 
