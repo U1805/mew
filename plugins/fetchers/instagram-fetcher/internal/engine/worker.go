@@ -25,6 +25,52 @@ type Worker struct {
 	fetchTimeout time.Duration
 }
 
+type seenTracker interface {
+	IsNew(id string) bool
+	MarkSeen(id string)
+}
+
+func storyDedupKey(story source.StoryItem) string {
+	if k := strings.TrimSpace(story.DisplayURLFilename); k != "" {
+		return k
+	}
+	if k := strings.TrimSpace(story.ID); k != "" {
+		return k
+	}
+	return ""
+}
+
+func storySeenKeys(story source.StoryItem) []string {
+	key := storyDedupKey(story)
+	if key == "" {
+		return nil
+	}
+	id := strings.TrimSpace(story.ID)
+	if id == "" || id == key {
+		return []string{key}
+	}
+	return []string{key, id}
+}
+
+func isStoryNew(tr seenTracker, story source.StoryItem) bool {
+	keys := storySeenKeys(story)
+	if len(keys) == 0 {
+		return false
+	}
+	for _, k := range keys {
+		if !tr.IsNew(k) {
+			return false
+		}
+	}
+	return true
+}
+
+func markStorySeen(tr seenTracker, story source.StoryItem) {
+	for _, k := range storySeenKeys(story) {
+		tr.MarkSeen(k)
+	}
+}
+
 func (w *Worker) Run(ctx context.Context) {
 	sdk.RunInterval(ctx, w.interval, true, func(ctx context.Context) {
 		fetchCtx, cancel := context.WithTimeout(ctx, w.fetchTimeout)
@@ -38,7 +84,7 @@ func (w *Worker) Run(ctx context.Context) {
 
 		edges := make([]source.StoryItem, 0, len(stories))
 		for _, e := range stories {
-			if strings.TrimSpace(e.ID) == "" {
+			if storyDedupKey(e) == "" {
 				continue
 			}
 			edges = append(edges, e)
@@ -56,12 +102,17 @@ func (w *Worker) Run(ctx context.Context) {
 			if a.TakenAt == 0 && b.TakenAt != 0 {
 				return false
 			}
+			ka := storyDedupKey(a)
+			kb := storyDedupKey(b)
+			if ka != "" && kb != "" && ka != kb {
+				return ka < kb
+			}
 			return a.ID < b.ID
 		})
 
 		if w.firstRun && !w.sendHistory && w.freshState {
 			for _, e := range edges {
-				w.tracker.MarkSeen(e.ID)
+				markStorySeen(w.tracker, e)
 			}
 			_ = w.tracker.Save()
 			w.firstRun = false
@@ -72,7 +123,7 @@ func (w *Worker) Run(ctx context.Context) {
 
 		var newStories []source.StoryItem
 		for _, s := range edges {
-			if w.tracker.IsNew(s.ID) {
+			if isStoryNew(w.tracker, s) {
 				newStories = append(newStories, s)
 			}
 		}
@@ -83,10 +134,16 @@ func (w *Worker) Run(ctx context.Context) {
 
 		for _, s := range newStories {
 			if err := w.processAndSend(ctx, user, s); err != nil {
-				log.Printf("%s process failed: story=%s err=%v", w.logPrefix, strings.TrimSpace(s.ID), err)
+				log.Printf(
+					"%s process failed: story_key=%s story_id=%s err=%v",
+					w.logPrefix,
+					storyDedupKey(s),
+					strings.TrimSpace(s.ID),
+					err,
+				)
 				continue
 			}
-			w.tracker.MarkSeen(s.ID)
+			markStorySeen(w.tracker, s)
 		}
 
 		_ = w.tracker.Save()
