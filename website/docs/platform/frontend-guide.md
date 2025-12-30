@@ -6,95 +6,142 @@ slug: /guide/client-guide
 
 # 🎨 前端开发指南
 
-前端位于 `client/`，是一个基于 **React + Vite** 的 SPA，主要负责：
+欢迎来到前端开发的世界！本篇指南将带你快速了解 `client/` 目录下的前端项目，并掌握其核心开发模式。
 
-- 通过 **REST API** 拉取状态（服务器/频道/消息等）
-- 通过 **Socket.IO** 接收实时事件（新消息、频道更新、权限变化等）
-- 将消息按 `type` 进行“多态渲染”（默认文本 + 可扩展类型）
+前端项目是一个基于 **React + Vite** 构建的单页应用 (SPA)。它的主要职责非常明确：
 
-接口细节请参考：
+-   通过 **REST API** 拉取应用的初始状态与数据（如服务器列表、频道信息、历史消息等）。
+-   通过 **Socket.IO** 建立长连接，实时接收并响应来自服务端的事件（如新消息、成员在线状态变化等）。
+-   将不同 `type` 的消息分发给对应的渲染器，实现丰富的消息展示效果。
 
-- [`core-api/rest-api`](../core-api/rest-api.md)
-- [`core-api/websocket-api`](../core-api/websocket-api.md)
+:::info 技术栈速览
+-   **框架**: React 18
+-   **构建工具**: Vite
+-   **状态管理**: Zustand (客户端 UI 状态) + TanStack Query (服务端数据缓存)
+-   **样式**: TailwindCSS
+-   **测试**: Vitest + MSW
+:::
 
----
+在开始之前，建议先熟悉项目所依赖的核心接口：
 
-## 🚀 启动与配置
-
-从仓库根目录：
-
-- 全栈开发：`pnpm dev`
-- 仅前端：`pnpm --filter client dev`
-
-前端 API 基址固定使用同源 `/api`。
-
-WebSocket 网关目前在代码中固定为 `http://localhost:3000`。
-
-- Docker Compose 部署下，`client` 容器会通过 Nginx 反代 `/api` 与 `/socket.io`。
-- 但当前前端 WebSocket 仍直连 `http://localhost:3000`，因此 Nginx 的 `/socket.io` 反代不会被使用；如需同源 WebSocket，请按需调整 `client/src/shared/services/socket.ts`。
+-   [核心 API: REST API](../core-api/rest-api.md)
+-   [核心 API: WebSocket API](../core-api/websocket-api.md)
 
 ---
 
-## 🧱 代码结构（以职责划分）
+## 环境启动与开发流程
 
-前端采用“Feature-First”组织方式，常用入口：
+在项目根目录下，你可以通过以下命令启动前端开发环境：
 
-- `client/src/layout/Layout.tsx`：主布局与全局事件挂载
-- `client/src/shared/services/*`：HTTP API 与 Socket 客户端
-- `client/src/shared/hooks/*`：对 Query 缓存与 Socket 事件的封装
-- `client/src/shared/stores/*`：Zustand 状态（UI/未读/鉴权等）
+1.  **启动前端与后端 (推荐)**
+    ```bash
+    pnpm dev
+    ```
+    此命令会同时启动前端开发服务器和后端服务，提供完整的全栈开发体验。
 
----
+2.  **仅启动前端**
+    ```bash
+    pnpm --filter client dev
+    ```
+    适用于你已经有了一个独立运行的后端服务，只想单独调试前端界面的场景。
 
-## 🧠 状态管理约定
+:::info 关于 API 代理
+为了简化开发，前端所有 API 请求都指向同源路径（如 `/api` 和 `/socket.io`）。
 
-前端将状态分为两类：
-
-- **服务端状态**：来自后端的列表/详情（消息、频道、成员等）→ TanStack Query 管理缓存与失效。
-- **客户端状态**：UI 交互与导航状态（当前服务器/频道、弹窗、未读集合等）→ Zustand 管理。
-
-这种拆分能让“数据一致性”和“UI 交互”各自有明确归属，避免 store 过度膨胀。
-
----
-
-## 🔌 Socket 事件接入（推荐模式）
-
-Socket 单例：`client/src/shared/services/socket.ts`。
-
-目前事件监听按“作用域”拆分为 hooks：
-
-- `useGlobalSocketEvents`：全局事件，例如 `DM_CHANNEL_CREATE`、以及用于触发未读/提及逻辑的全局 `MESSAGE_CREATE`。
-- `useSocketMessages(channelId)`：当前频道内的消息流，处理 `MESSAGE_CREATE`、`MESSAGE_UPDATE`、`MESSAGE_DELETE` 和 `MESSAGE_REACTION_*` 事件。
-- `usePresenceEvents`：在线状态，处理 `PRESENCE_INITIAL_STATE` 和 `PRESENCE_UPDATE`。
-- `useServerEvents(serverId)`：当前服务器内的事件，处理 `CATEGORY_*`、`MEMBER_*` 和 `PERMISSIONS_UPDATE`。
-
-这些 hooks 会在 `Layout.tsx` 顶层被调用，保证登录后持续订阅。
+在开发环境下，`client/vite.config.ts` 文件中配置了代理规则，会将这些请求自动转发到本地运行的后端服务（默认为 `http://localhost:3000`），无需手动处理跨域问题。
+:::
 
 ---
 
-## 🧩 消息渲染扩展点
+## 代码结构导览
 
-后端的消息包含 `type/content/payload/attachments` 等字段）。
+项目采用“功能优先 (Feature-First)”的目录组织方式。对于新加入的开发者，以下是几个关键的入口文件，可以帮助你快速定位代码：
 
-前端可以在消息渲染组件中基于 `type` 分发到自定义渲染器；当前实现示例位于：
-
-- `client/src/features/chat/messages/MessageContent.tsx`
-
-***目前已支持的自定义卡片类型包括：***
-- `app/x-rss-card`
-- `app/x-pornhub-card`
-- `app/x-twitter-card`
-- `app/x-bilibili-card`
-- `app/x-instagram-card`
-
-如果你要新增一种消息类型，推荐流程：
-
-1. 明确 `type` 命名（例如 `app/x-your-card`）
-2. 约定 `payload` 结构（写在对应 Bot/服务端逻辑与文档中）
-3. 在前端注册/分发到对应渲染组件，并确保 `content` 仍可作为纯文本降级
+-   `client/src/layout/Layout.tsx`：**主布局组件**。这里是应用的顶层结构，也是挂载全局 Socket 事件监听的最佳位置。
+-   `client/src/shared/services/*`：**服务层**。封装了 HTTP (axios) 和 Socket.IO 客户端的单例与核心逻辑。
+-   `client/src/shared/hooks/*`：**自定义 Hooks**。这里封装了对 TanStack Query 数据获取和 Socket 事件订阅的通用逻辑，是业务组件获取数据的主要方式。
+-   `client/src/shared/stores/*`：**状态管理 (Zustand)**。存放纯客户端状态，如 UI 状态、未读消息计数、用户认证信息等。
 
 ---
 
-## 🧪 测试与 Mock
+## 核心理念：状态管理
 
-前端使用 Vitest；MSW 位于 `client/src/mocks/*`，用于在测试环境模拟后端接口。
+为了保持逻辑清晰并避免状态管理混乱，我们将前端状态严格划分为两类：
+
+| 状态类型 | 职责描述 | 管理工具 |
+| :--- | :--- | :--- |
+| **服务端状态** | 从后端获取的所有数据，如消息列表、频道详情、服务器成员等。这类状态的“真实来源”在服务器。 | **TanStack Query** |
+| **客户端状态** | 应用的 UI 交互状态，与后端数据无直接关联。如当前选中的服务器/频道 ID、弹窗的开关状态、未读消息的集合等。 | **Zustand** |
+
+这种分离策略，使得“服务端数据同步”和“客户端交互响应”各司其职，让状态的来源和变更路径都变得非常明确。
+
+---
+
+## Socket 事件处理模式
+
+所有 Socket.IO 的事件处理都遵循一套推荐模式：**在顶层组件通过自定义 Hooks 进行订阅**。
+
+Socket 客户端单例位于 `client/src/shared/services/socket.ts`。
+
+目前，事件监听已按其作用域拆分到不同的 Hooks 中：
+
+#### `useGlobalSocketEvents`
+负责监听全局范围的事件，这些事件不局限于某个特定的服务器或频道。
+-   `DM_CHANNEL_CREATE`: 创建了新的私信频道。
+-   `MESSAGE_CREATE`: 用于触发全局的未读/提及计数逻辑。
+
+#### `useServerEvents(serverId)`
+负责监听当前所在服务器内的事件。
+-   `CATEGORY_*`: 分组的创建/更新/删除。
+-   `MEMBER_*`: 成员的加入/离开/信息更新。
+-   `PERMISSIONS_UPDATE`: 权限变更。
+
+#### `useSocketMessages(channelId)`
+负责监听当前所在频道内的消息相关事件。
+-   `MESSAGE_CREATE`: 接收新消息。
+-   `MESSAGE_UPDATE`: 消息更新与消息撤回。
+-   `MESSAGE_REACTION_*`: 消息回应 (Reaction) 的添加与移除。
+
+#### `usePresenceEvents`
+负责监听用户在线状态事件。
+-   `PRESENCE_INITIAL_STATE`: 获取初始的在线用户列表。
+-   `PRESENCE_UPDATE`: 接收在线状态的变更。
+
+:::info 订阅机制
+这些 Hooks 都在主布局组件 `Layout.tsx` 中被调用。这样做可以确保用户登录后，应用能持续订阅所有必要的事件，无论用户导航到哪个页面。
+:::
+
+---
+
+## 扩展点：自定义消息渲染
+
+消息的核心渲染逻辑位于 `client/src/features/chat-messages/components/MessageContent.tsx`。
+
+该组件会根据消息对象的 `type` 字段，将渲染任务分发给不同的子组件。这为扩展新的消息类型提供了极大的便利。
+
+**目前已支持的自定义卡片类型包括：**
+-   `app/x-rss-card`
+-   `app/x-pornhub-card`
+-   `app/x-twitter-card`
+-   `app/x-bilibili-card`
+-   `app/x-instagram-card`
+-   `app/x-forward-card`
+-   `app/x-jpdict-card`
+
+如果你希望新增一种自定义消息卡片，请遵循以下流程：
+
+1.  **定义 `type` 名称**：为你的新卡片类型设计一个唯一的标识符，推荐使用 `app/x-your-card` 格式。
+2.  **约定 `payload` 结构**：明确该类型消息所携带的数据结构，并在相关文档和后端逻辑中进行说明。
+3.  **实现渲染组件**：在前端创建一个新的 React 组件用于渲染你的卡片，并在 `MessageContent.tsx` 中添加分发逻辑。同时，确保消息的 `content` 字段可以作为纯文本内容进行降级显示，以兼容不支持此类型的客户端。
+
+---
+
+## 测试
+
+前端测试使用 **Vitest** 作为测试运行器。我们还集成了 **MSW (Mock Service Worker)** 来拦截和模拟后端的 API 请求，确保测试环境的稳定与可预测性。
+
+-   所有 Mock 逻辑位于 `client/src/mocks/*` 目录。
+-   运行测试：
+    ```bash
+    pnpm --filter client test
+    ```

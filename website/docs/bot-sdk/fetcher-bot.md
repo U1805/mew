@@ -2,21 +2,29 @@
 sidebar_label: 'Fetcher Bot'
 ---
 
-## 🕷️ 构建 Fetcher Bot
+# 🕷️ 构建 Fetcher Bot
 
-**目标**：编写一个后台 Bot 服务，从 Mew 平台拉取本 `serviceType` 下的 Bot 配置，把 `bot.config` 解析为任务列表，并按任务定时向 Webhook 投递消息。
+本篇文档将引导你一步步构建一个后台 `Fetcher Bot` 服务。
 
-> **参考实现**：`plugins/fetchers/test-fetcher`（建议先跑通这个示例再开始改造）。
+#### **目标**
+我们的目标是编写一个 Go 服务，它能自动从 Mew 平台拉取属于自己 `serviceType` 的 Bot 配置。服务会解析配置中的任务列表，并按照设定的时间间隔，周期性地向指定的 Webhook 地址推送消息。
 
-### 1. Service 入口（main）
+:::info 参考实现
+我们强烈建议您先跑通示例项目 `plugins/fetchers/test-fetcher`，这会帮助您更快地理解核心流程，然后再基于它进行改造。
+:::
 
-Fetcher Bot 推荐直接复用项目内的 Go SDK：`plugins/sdk`。SDK 会负责：
+### 第一步：创建服务入口
 
-- 读取 `.env(.local)` 与运行时配置（`MEW_ADMIN_SECRET`, `MEW_API_BASE`, 同步间隔等）
-- 通过 `POST /api/bots/bootstrap` 拉取/热更新 bot 配置
-- 管理每个 bot 实例的生命周期（配置变更时自动取消旧实例）
+为了简化开发，我们推荐直接复用项目内置的 Go SDK (`plugins/sdk`)。这个 SDK 已经为你处理好了大部分的底层工作，包括：
 
-```go
+*   **配置加载**：自动读取 `.env` 和 `.env.local` 文件，以及运行时的环境变量（如 `MEW_ADMIN_SECRET`, `MEW_URL` 等）。
+*   **配置同步**：通过 `POST /api/bots/bootstrap` 接口**轮询**拉取 Bot 配置，并支持热更新。
+*   **服务注册**：通过 `POST /api/infra/service-types/register` 自动上报 `serviceType` 的元信息，这使得前端在创建 Bot 时能看到你的服务类型并提供配置模板。
+*   **生命周期管理**：为每个 Bot 实例创建独立的运行环境。当配置发生变更时，SDK 会自动停止旧实例并启动新实例。
+
+一个最简的服务入口 `main.go` 如下所示：
+
+```go title="main.go"
 package main
 
 import (
@@ -25,10 +33,12 @@ import (
 	"mew/plugins/sdk"
 )
 
-func main() {
+func main()
+	// 使用 sdk.RunServiceWithSignals 启动服务，它会自动处理信号并优雅退出
 	if err := sdk.RunServiceWithSignals(sdk.ServiceOptions{
-		LogPrefix: "[my-fetcher]",
+		LogPrefix: "[my-fetcher]", // 日志前缀，方便调试
 		NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
+			// NewRunner 是一个工厂函数，每当有新的 Bot 实例需要运行时，SDK 就会调用它
 			return NewMyRunner(botID, botName, accessToken, rawConfig, cfg)
 		},
 	}); err != nil {
@@ -37,68 +47,111 @@ func main() {
 }
 ```
 
-> `serviceType` 默认从插件目录名推导：例如你的代码在 `plugins/fetchers/rss-fetcher`，则默认 `serviceType=rss-fetcher`。
+:::info 关于 `serviceType`
+SDK 会自动从**入口 `main.go` 所在目录的名称**推导出 `serviceType`。例如，如果你的代码位于 `plugins/fetchers/rss-fetcher`，那么 `serviceType` 就会被设为 `rss-fetcher`。当然，你也可以在 `sdk.ServiceOptions` 中显式传递 `ServiceType` 参数来覆盖这个默认行为。
+:::
 
-### 2. 解析任务配置（bot.config）
+### 第二步：解析任务配置 (`bot.config`)
 
-Fetcher Bot 通常使用“任务数组”来表达多个定时任务：Mew 后端存储的是 JSON 字符串，插件启动时解析成结构体列表。
+Fetcher Bot 的核心配置通常是一个**任务数组**。Mew 后端会将这份配置以 JSON 字符串的形式存储，我们需要在服务启动时将其解析为 Go 的结构体列表。
 
-```go
+```go title="config.go"
+package main
+
+import (
+	"fmt"
+
+	"mew/plugins/sdk"
+)
+
+// TaskConfig 定义了单个任务的结构
 type TaskConfig struct {
-	Interval int    `json:"interval"`
-	Webhook  string `json:"webhook"`
-	Enabled  *bool  `json:"enabled,omitempty"`
+	Interval int    `json:"interval"` // 任务执行间隔（秒）
+	Webhook  string `json:"webhook"`  // 消息推送的目标 Webhook URL
+	Enabled  *bool  `json:"enabled,omitempty"` // 任务是否启用，指针类型可以区分“未设置”和“false”
 }
 
+// parseTasks 解析原始 JSON 配置字符串
 func parseTasks(rawConfig string) ([]TaskConfig, error) {
+	// 使用泛型函数 DecodeTasks，它可以智能处理多种 JSON 格式
 	tasks, err := sdk.DecodeTasks[TaskConfig](rawConfig)
 	if err != nil {
 		return nil, err
 	}
+
+	// 对解析出的任务进行校验和设置默认值
 	for i := range tasks {
 		if tasks[i].Interval <= 0 {
-			tasks[i].Interval = 30
+			tasks[i].Interval = 30 // 默认间隔 30 秒
 		}
 		if err := sdk.ValidateHTTPURL(tasks[i].Webhook); err != nil {
-			return nil, fmt.Errorf("tasks[%d].webhook invalid: %w", i, err)
+			return nil, fmt.Errorf("tasks[%d].webhook 无效: %w", i, err)
 		}
 	}
+
 	return tasks, nil
 }
 ```
 
-### 3. 运行定时任务并投递 Webhook
+:::info `sdk.DecodeTasks[T]` 的妙用
+这个辅助函数非常灵活，它能兼容三种常见的 JSON 配置格式：
+1.  任务数组：`[{"interval": 60, ...}]`
+2.  单个任务对象：`{"interval": 60, ...}`
+3.  带 `tasks` 字段的包装对象：`{ "tasks": [...] }`
 
-SDK 提供了 `Group` 与 `RunInterval`，适合一 bot 多任务的并发模型：每个任务一个 goroutine，统一受 `ctx` 管理。
+同时，对于空配置（如 `""`, `"null"`, `"{}"`），它会安全地返回 `nil`，无需额外处理。
+:::
 
-```go
+### 第三步：实现定时任务与 Webhook 推送
+
+对于“一个 Bot 实例，多个并发任务”的场景，SDK 提供了 `Group` 和 `RunInterval` 这两个工具，可以轻松地实现。
+
+*   `sdk.Group`：管理一组 `goroutine`，并统一通过 `context` 控制它们的生命周期。
+*   `sdk.RunInterval`：一个简单的定时器，它会阻塞式地按照指定间隔重复执行一个函数。
+
+```go title="runner.go"
 func (r *MyRunner) Run(ctx context.Context) error {
+	// 创建一个与 Run 方法的 ctx 关联的 goroutine Group
 	g := sdk.NewGroup(ctx)
 
+	// 创建一个带超时的 HTTP 客户端，用于发送 Webhook
 	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
 	if err != nil {
 		return err
 	}
 
+	// 遍历所有任务，为每个启用的任务启动一个独立的 goroutine
 	for i, task := range r.tasks {
 		if !sdk.IsEnabled(task.Enabled) {
-			continue
+			continue // 跳过被禁用的任务
 		}
-		taskIndex := i
-		taskCopy := task
+
+		taskIndex := i    // 捕获循环变量
+		taskCopy := task  // 捕获循环变量
+
 		g.Go(func(ctx context.Context) {
+			// RunInterval 会在后台执行定时任务，直到 ctx 被取消
 			sdk.RunInterval(ctx, time.Duration(taskCopy.Interval)*time.Second, true, func(ctx context.Context) {
+				// 实际的任务逻辑：发送 Webhook
+				// PostWebhook 内置了重试机制（默认 3 次）
 				_ = sdk.PostWebhook(ctx, webhookHTTPClient, r.apiBase, taskCopy.Webhook, sdk.WebhookPayload{
-					Content: fmt.Sprintf("hello from %s task=%d", r.botName, taskIndex),
-				}, 3)
+					Content: fmt.Sprintf("来自 %s 的问候 (任务 %d)", r.botName, taskIndex),
+				})
 			})
 		})
 	}
 
+	// 等待 Group 中的所有 goroutine 结束
 	<-g.Context().Done()
 	g.Wait()
 	return nil
 }
 ```
 
-下一步：继续阅读 [构建 Agent Bot](/docs/bot-sdk/agent-bot) 来实现双向会话型 Bot。
+这段代码为每个启用的任务创建了一个独立的 `goroutine`。`RunInterval` 负责定时触发，`PostWebhook` 负责消息的投递。整个过程由 `ctx` 控制，当 Bot 配置变更或服务关闭时，所有任务都能被优雅地中止。
+
+### 接下来？
+
+恭喜！你已经掌握了如何构建一个单向推送消息的 `Fetcher Bot`。
+
+现在，让我们更进一步，学习如何构建一个可以与用户进行双向实时会话的 **[Agent Bot](./agent-bot)**。

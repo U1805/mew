@@ -6,99 +6,127 @@ slug: /reference/infrastructure-setup
 
 # 💾 基础设施部署
 
-本文档将指导您在单机环境下部署 **MongoDB**（数据库）和 **Garage**（高性能对象存储）。这两个组件构成了 Mew 应用的核心数据底座。
+在本节中，我们将学习如何在单机环境下部署 **MongoDB** (数据库) 和 **Garage** (高性能 S3 兼容对象存储)。这两个组件是 Mew 应用稳定运行的核心数据底座。
 
-## 📋 前置准备 (Prerequisites)
+我们将提供两种部署方式，您可以根据自己的需求选择：
 
-在开始之前，请确保您的环境满足以下要求：
-*   **操作系统**：Linux / macOS / Windows（Docker Desktop/WSL2）
-*   **依赖工具**：
-    *   `docker` (>= 20.10)
-    *   `openssl` (用于生成安全密钥，可选)
-    *   `curl` 或 `wget` (用于测试，可选)
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
 
----
+<Tabs groupId="deployment-method">
+<TabItem value="compose" label="🚀 一键部署 (推荐)" default>
 
-## 0. 使用 Docker Compose（一键启动，推荐）
+我们强烈推荐使用官方提供的 `docker-compose.yml` 文件一键启动所有服务。这种方式最简单、最快捷，且不易出错。
 
-仓库已经提供 `docker-compose.yml`，会自动启动：
+该配置会完整启动 Mew 的全套服务，包括：
 
-- MongoDB（数据库）
-- Garage（S3 对象存储）
-- Server（API + Socket.IO）
-- Client（Nginx 托管 + 反代 `/api`、`/socket.io`）
-- Plugins（Bot Service 运行器，默认启动 `test-fetcher,test-agent`，由 `MEW_PLUGINS` 控制）
+-   **MongoDB**: 主数据库。
+-   **Garage**: S3 兼容对象存储服务。
+-   **Server**: 后端 API 与 Socket.IO 服务。
+-   **Client**: 基于 Nginx 托管的前端应用，并反向代理后端 API。
+-   **Plugins**: Bot Service 运行器，默认启动 `test-fetcher,test-agent` (可通过 `MEW_PLUGINS` 环境变量控制)。
+
+### 启动命令
+
+确保项目根目录下存在 `.env` 或 `docker-compose.env` 配置文件，然后执行：
 
 ```bash
+# --env-file 指定环境变量文件
+# --build 会在首次启动或代码更新时构建镜像
 docker compose --env-file docker-compose.env up --build
 ```
 
-默认端口：
+### 访问地址
 
-- 前端：`http://localhost`
-- 后端：`http://localhost:3000`
-- Garage S3 API：`http://localhost:3900`
-- Garage Web（公共读）：`http://localhost:3902`
+启动成功后，默认服务地址如下：
+-   **前端 (UI)**: `http://localhost/`
+-   **后端 (API)**: `http://localhost/api` (由 Nginx 代理)
+-   **Garage Web**: `http://<bucket>.web.garage.localhost/<key>` (由 Nginx 代理)
 
-> ℹ️ Garage Web 默认使用 `*.web.garage.localhost`（例如：`http://mew-bucket.web.garage.localhost:3902/<key>`）。
-> 大多数系统里 `*.localhost` 会解析到 `127.0.0.1`；如你的环境不支持，请改用 hosts/DNS 或调整 `S3_WEB_ENDPOINT`。
+:::info 关于 `*.localhost` 域名
+大多数现代操作系统会自动将任何 `*.localhost` 的子域名解析到 `127.0.0.1`。如果您的环境不支持，请手动修改 `hosts` 文件，或调整 `S3_WEB_ENDPOINT` 等相关环境变量。
+:::
 
-## 1. 部署 MongoDB
+:::tip 端口暴露策略
+`docker-compose.yml` 默认只将 Nginx 的 `80` 端口映射到宿主机。MongoDB、Garage、Server 的内部端口（如 `27017`, `3900`, `3000`）均**不会直接暴露**，以增强安全性。
 
-我们将部署 MongoDB 社区版作为主数据库。
+如果您需要从宿主机直接访问这些服务（例如使用 `mongosh` 调试数据库），请在 `docker-compose.yml` 中为对应服务手动添加 `ports` 映射。
+:::
 
-### 1.1 启动服务
+</TabItem>
+<TabItem value="manual" label="👨‍💻 分步手动部署">
 
-运行以下命令初始化容器：
+本节适用于希望深入了解组件细节或需要进行高度自定义部署的开发者。我们将依次手动部署 MongoDB 和 Garage。
+
+### 前置准备
+
+在开始之前，请确保您的环境已安装以下工具：
+*   **操作系统**: Linux / macOS / Windows (需 Docker Desktop 或 WSL2)
+*   **核心依赖**: `docker` (>= 20.10)
+*   **辅助工具**: `openssl` (用于生成安全密钥), `curl` 或 `wget` (用于测试)
+
+---
+
+### 1. 部署 MongoDB
+
+首先，我们部署 MongoDB 社区版作为主数据库。
+
+#### 1.1 启动服务
+
+运行以下命令来创建并启动 MongoDB 容器：
 
 ```bash
-# 1. 创建数据持久化目录
+# 步骤 1: 创建用于数据持久化的本地目录
 mkdir -p ~/mongodb/data
 
-# 2. 启动 MongoDB 容器
-# -p 27017:27017 : 暴露标准服务端口
-# -v ...         : 将数据挂载到宿主机，防止容器删除后数据丢失
-# --name mongodb : 指定容器名称以便后续管理
+# 步骤 2: 启动 MongoDB 容器
 sudo docker run \
   --name mongodb \
+  --restart always \
   -p 27017:27017 \
   -v ~/mongodb/data:/data/db \
   -d mongodb/mongodb-community-server:8.2.2-ubuntu2204
 ```
 
-### 1.2 验证部署
+:::info 命令解析
+-   `--name mongodb`: 为容器指定一个易于管理的名称。
+-   `--restart always`: 确保 Docker 重启时容器能自动启动。
+-   `-p 27017:27017`: 将容器的 `27017` 端口映射到宿主机，方便外部连接。
+-   `-v ~/mongodb/data:/data/db`: 将容器内的数据目录挂载到宿主机，**防止数据丢失**。
+-   `-d`: 后台运行容器。
+:::
 
-等待几秒钟后，检查容器状态：
+#### 1.2 验证部署
+
+等待几秒钟，然后检查容器的运行状态：
 
 ```bash
 sudo docker ps --filter "name=mongodb"
 ```
 
 **✅ 预期结果：**
-状态栏 (`STATUS`) 应显示为 `Up`。如果显示 `Restarting`，请检查 `~/mongodb/data` 的目录权限。
+您应该能看到容器的 `STATUS` 栏显示为 `Up`。如果显示 `Restarting`，请检查 `~/mongodb/data` 目录的读写权限。
 
 ---
 
-## 2. 部署 Garage S3 服务
+### 2. 部署 Garage S3 服务
 
-[Garage](https://garagehq.deuxfleurs.fr/) 是一个轻量级、自包含的 S3 兼容对象存储服务。我们将通过 **配置生成** -> **服务启动** -> **集群初始化** 三步完成部署。
+[Garage](https://garagehq.deuxfleurs.fr/) 是一个轻量级、自包含的 S3 兼容对象存储服务。我们将通过 **配置生成 -> 服务启动 -> 集群初始化** 三个核心步骤完成部署。
 
-> 如果你使用的是仓库根目录的 `docker-compose.yml`，Garage 会由 `garage`/`garage-init` 服务自动启动并初始化（包含 bucket、key、website/public read）。
-> 你可以直接跳过本节，或把本节作为“手动部署/生产部署”的参考。
+#### 2.1 自动生成配置
 
-### 2.1 自动化生成配置
+为了简化繁琐的配置过程，我们提供以下脚本来自动生成目录结构和 `garage.toml` 配置文件。
 
-为了简化繁琐的配置过程，我们使用以下脚本自动生成目录结构和 `garage.toml` 配置文件。
-
-> 🛡️ **安全机制**：脚本会调用 `openssl` 自动生成高强度的 `rpc_secret`（节点通信密钥）和 `admin_token`，确保集群安全。
+:::tip 安全设计
+该脚本会自动调用 `openssl` 生成高强度的 `rpc_secret` 和 `admin_token`，确保节点间通信和管理操作的安全性。
+:::
 
 ```bash
-# === 配置开始 ===
-
 # 1. 准备目录结构
-mkdir -p ~/garage/data ~/garage/meta
+mkdir -p ~/garage/data ~/garage/meta ~/garage/secrets
 
 # 2. 写入配置文件 (garage.toml)
+# 注意：配置中的 rpc_secret 和 admin_token 会在执行时动态生成
 cat > ~/garage/garage.toml <<EOF
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
@@ -130,10 +158,10 @@ admin_token = "$(openssl rand -base64 32)"
 metrics_token = "$(openssl rand -base64 32)"
 EOF
 
-echo "✅ Garage 配置文件已生成：~/garage/garage.toml"
+echo "✅ Garage 配置文件已成功生成：~/garage/garage.toml"
 ```
 
-### 2.2 启动 Garage 容器
+#### 2.2 启动 Garage 容器
 
 ```bash
 sudo docker run \
@@ -144,22 +172,24 @@ sudo docker run \
   -v ~/garage/garage.toml:/etc/garage.toml \
   -v ~/garage/meta:/var/lib/garage/meta \
   -v ~/garage/data:/var/lib/garage/data \
+  -v ~/garage/secrets:/var/lib/garage/secrets \
   dxflrs/garage:v2.1.0
 ```
+:::tip 国内镜像加速
+如果从 Docker Hub 拉取镜像超时，可以尝试使用国内镜像源替换，例如：
+`swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/dxflrs/garage:v2.1.0`
+:::
 
-> ℹ️ **国内镜像源加速**：
-> 如遇拉取超时，可替换镜像为：`swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/dxflrs/garage:v2.1.0`
+#### 2.3 健康检查
 
-### 2.3 健康检查
-
-在配置集群拓扑前，必须确保节点服务已就绪。
+在配置集群前，必须确保节点服务已就绪。
 
 ```bash
 sudo docker exec garaged ./garage status
 ```
 
 **✅ 预期结果：**
-关注输出中的 `Capacity` 和状态列。此时看到 `NO ROLE ASSIGNED` 是**正常**的，因为我们还没分配角色。
+此时看到 `NO ROLE ASSIGNED` 是**完全正常**的，因为我们还未给节点分配角色。
 
 ```text
 ==== HEALTHY NODES ====
@@ -169,23 +199,18 @@ ID                Hostname      Address         Tags  Zone  Capacity
 
 ---
 
-## 3. 初始化集群布局 (Layout)
+### 3. 初始化集群布局 (Layout)
 
-Garage 采用独特的“拓扑声明”机制。我们需要显式告诉节点：“你是一个存储节点，位于 `dc1` 区域，拥有 1GB 容量。”
-
-### 操作步骤
-
-我们将使用脚本自动提取节点 ID 并应用配置，避免手动复制出错。
+Garage 采用“拓扑声明”机制。我们需要显式地告诉节点：“你是一个存储节点，位于 `dc1` 区域，拥有 1GB 的存储容量。”
 
 ```bash
-# 1. 自动提取当前节点的 ID
-# 技巧：筛选状态为 NO ROLE 的节点行，提取第一列
+# 1. 自动提取当前节点的 ID (技巧：通过 grep 和 awk 精准捕获)
 NODE_ID=$(sudo docker exec garaged ./garage status | grep "NO ROLE" | awk '{print $1}')
 
 if [ -z "$NODE_ID" ]; then
-  echo "❌ 错误：未找到待配置的节点，请检查 'garage status' 输出。"
+  echo "❌ 错误：未找到待配置的节点，请检查 'garage status' 的输出。"
 else
-  echo "🔧 正在配置节点: $NODE_ID ..."
+  echo "🔧 正在为节点 $NODE_ID 分配角色..."
 
   # 2. 分配角色：区域=dc1, 容量=1G
   sudo docker exec garaged ./garage layout assign -z dc1 -c 1G "$NODE_ID"
@@ -194,64 +219,53 @@ else
   sudo docker exec garaged ./garage layout apply --version 1
 fi
 ```
-
 **✅ 成功标志：**
-终端输出包含：`New cluster layout with updated role assignment has been applied in cluster.`
+终端输出 `New cluster layout ... has been applied in cluster.` 则表示成功。
 
 ---
 
-## 4. 配置存储桶与访问权限
+### 4. 配置存储桶与访问权限
 
-最后，我们需要为应用创建专用的 **Bucket（桶）** 和 **Access Key（访问凭证）**。
+最后，为我们的应用创建专用的 **Bucket (桶)** 和 **Access Key (访问凭证)**。
 
-### 4.1 创建资源
+#### 4.1 创建资源
 
 ```bash
-# 1. 创建存储桶 'mew-bucket'
+# 1. 创建名为 'mew-bucket' 的存储桶
 sudo docker exec garaged ./garage bucket create mew-bucket
 
-# 2. 创建访问密钥 'mew-app-key'
+# 2. 创建名为 'mew-app-key' 的访问密钥
 sudo docker exec garaged ./garage key create mew-app-key
 ```
 
-> 🛑 **高危提醒：立即保存**
-> 请务必复制下方的 **Secret access key**。
-> Secret Key 类似于密码，Garage 不会二次显示它。一旦遗失，您只能删除旧 Key 并重新生成。
+:::danger **立即保存 Secret Key**
+请**立即复制并妥善保管**下方输出的 `Secret access key`。它相当于密码，Garage **不会二次显示**。一旦遗失，只能删除旧 Key 并重新生成。
+:::
 
 **输出示例：**
 ```text
-Key ID:       GK121b3f65ee8989c9205ad883   <-- Access Key (用户ID)
+Key ID:       GK121b3f65ee8989c9205ad883   <-- 对应环境变量 S3_ACCESS_KEY_ID
 Key name:     mew-app-key
-Secret key:   8122334f0f2d5f5cd7...        <-- Secret Key (密码)
+Secret key:   8122334f0f2d5f5cd7...        <-- 对应环境变量 S3_SECRET_ACCESS_KEY
 ```
 
-> 执行以下命令查看密钥详情:
-> sudo docker exec garaged ./garage key info mew-app-key
+#### 4.2 授权绑定
 
-将上面的 `Key ID` / `Secret key` 填入后端环境变量：
-
-- `S3_ACCESS_KEY_ID=<Key ID>`
-- `S3_SECRET_ACCESS_KEY=<Secret key>`
-
-如果你使用的是 `docker-compose.yml`，默认会把它们写到 `garage_secrets` 卷里的 `s3-credentials.json`，并通过 `S3_CREDENTIALS_FILE` 注入给后端。
-
-### 4.3 授权绑定
-
-默认情况下 Key 和 Bucket 是隔离的。我们需要赋予 Key 对 Bucket 的读写权限。
+默认情况下，Key 和 Bucket 是相互独立的。我们需要为 Key 赋予操作 Bucket 的权限。
 
 ```bash
-# 赋予读(Read)、写(Write)、所有者(Owner)权限
+# 赋予 mew-app-key 对 mew-bucket 的读(Read)、写(Write)、所有者(Owner)权限
 sudo docker exec garaged ./garage bucket allow \
   --read --write --owner \
   mew-bucket \
   --key mew-app-key
 
-# 验证权限表
+# 验证权限是否生效
 sudo docker exec garaged ./garage bucket info mew-bucket
 ```
 
 **✅ 最终验证：**
-检查输出底部的 `KEYS FOR THIS BUCKET` 区域，确认 `mew-app-key` 拥有 `RWO` 权限。
+检查输出底部的 `KEYS FOR THIS BUCKET` 区域，确认 `mew-app-key` 已拥有 `RWO` 权限。
 
 ```text
 ==== KEYS FOR THIS BUCKET ====
@@ -259,44 +273,20 @@ Permissions  Access key                  Local aliases
 RWO          GK121b3f65ee8...            mew-app-key
 ```
 
-### 4.4 设置公共读权限 (解决 403 Forbidden)
+#### 4.3 设置公共读权限 (解决 403 Forbidden)
 
-默认情况下，存储桶是私有的，只有授权的 Key (如 `mew-app-key`) 才能读写。当浏览器通过 URL 直接访问文件时，会因为匿名访问而被拒绝（`403 Forbidden`）。
-
-要允许公开访问（例如，在 `<img>` 标签中显示图片），需要为存储桶设置公共读策略。
+默认存储桶是私有的。当浏览器通过 URL 直接访问文件时，会因匿名访问而被拒绝 (`403 Forbidden`)。为了能公开访问文件（例如在网页中显示图片），需要开启公共读策略。
 
 ```bash
 # 将存储桶 'mew-bucket' 设置为网站模式，以允许公共读取
 sudo docker exec garaged ./garage bucket website --allow mew-bucket
-
-# 验证公共读权限
-sudo docker exec garaged ./garage bucket info mew-bucket
 ```
-
 **✅ 验证：**
-执行此命令后，你将看到桶信息包含如下内容：
-```
-==== BUCKET INFORMATION ====
-Website access:    true
-  index document:  index.html
-  error document:  (not defined)
-```
+再次执行 `sudo docker exec garaged ./garage bucket info mew-bucket`，您将看到 `Website access: true`。
+
+</TabItem>
+</Tabs>
 
 ---
 
-### 4.5 (可选) 清理与删除
-
-如果您需要清理测试资源，可以使用以下命令删除存储桶和访问密钥。
-
-```bash
-# === 删除访问密钥 ===
-# 如果不再需要某个密钥，可以将其删除。
-# 警告：删除后，使用该密钥的应用将无法再访问 S3 服务。
-sudo docker exec garaged ./garage key delete mew-app-key
-
-# === 删除存储桶 ===
-# 警告：此操作将永久删除桶及其中的所有数据，无法恢复！请谨慎操作。
-sudo docker exec garaged ./garage bucket delete mew-bucket
-```
-
-🎉 **恭喜！** 您的基础数据设施已部署完毕。
+🎉 **恭喜！** 您的基础数据设施已部署完毕。现在，您可以继续进行后端服务的配置与部署了。

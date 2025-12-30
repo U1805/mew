@@ -1,26 +1,30 @@
 ---
-sidebar_label: '核心平台设计'
+sidebar_label: '系统架构'
 sidebar_position: 30
 slug: /guide/platform-design
 ---
 
-# 🏛️ 核心平台设计
+# 🏛️ 系统架构
 
-Mew 的“核心平台”负责三件事：
+Mew 的核心平台是一个集成了身份认证、消息持久化与实时通信的后端服务。其核心职责可以概括为三点：
 
-- **身份与权限**：用户/服务器/角色/成员/频道的组织与授权。
-- **消息与持久化**：消息写入 MongoDB，并支持分页拉取与搜索。
-- **实时同步**：通过 Socket.IO 推送事件，让客户端“实时更新”而不是“频繁轮询”。
+-   **身份与权限**：管理用户、服务器、角色、成员和频道等核心实体，并处理复杂的权限计算。
+-   **消息与持久化**：将消息等核心数据写入 MongoDB，并提供高效的分页拉取与搜索能力。
+-   **实时同步**：通过 Socket.IO 将事件实时推送到客户端，确保所有用户界面都能即时更新。
 
-本文档聚焦架构与关键概念；具体字段、接口与事件请以参考文档为准：
-
-- [<kbd>数据结构</kbd>](../core-api/data-structures.md)
-- [<kbd>REST API</kbd>](../core-api/rest-api.md)
-- [<kbd>WebSocket API</kbd>](../core-api/websocket-api.md)
+:::info
+本篇文档侧重于讲解系统架构与关键概念。
+关于具体的字段、接口与事件定义，请参阅以下 API 参考文档：
+-   [数据结构](../core-api/data-structures.md)
+-   [REST API](../core-api/rest-api.md)
+-   [WebSocket API](../core-api/websocket-api.md)
+:::
 
 ---
 
 ## 🧩 系统组成
+
+Mew 采用前后端分离的经典架构，并通过 WebSocket 与 REST API 协同工作，同时为机器人服务提供了专用的通信通道。
 
 ```mermaid
 flowchart LR
@@ -45,90 +49,104 @@ flowchart LR
   GW --> DB
 ```
 
-- **Client**：以 REST 拉取“资源状态”（服务器、频道、消息列表等），以 WebSocket 订阅“状态变化”（新消息、权限变化、频道更新等）。
-- **Server**：Express 提供 REST API；Socket.IO 网关主要负责提供实时事件推送。客户端的写入操作（如发送消息、更新设置等）也通过 REST API 完成。
-- **Bot Services**: 后端服务（例如 RSS 抓取器）通过一个专用的 `/infra` Socket.IO 命名空间连接到网关。它们使用共享密钥进行认证，并接收系统级指令（如配置更新），实现了与核心平台解耦的微服务架构。
-- **MongoDB**：主存储（用户、服务器、角色、频道、消息、邀请等）。
-- **对象存储**：头像与附件上传；后端存储 `key`，对外返回时会补全为可访问的 `url`。
+-   **客户端 (Client)**：通过REST API拉取初始状态（如服务器列表、历史消息），同时通过WebSocket订阅状态变更（如新消息、权限更新），实现高效的实时通信。
+-   **服务端 (Server)**：在同一进程内提供 REST API 和 WebSocket 实时事件。用户的写入操作（如发送消息）主要通过 REST API 完成。
+-   **机器人服务 (Bot Services)**：一个独立的后端服务，它通过以下方式与主平台交互：
+    1.  通过受保护的REST API(`/api/bots/bootstrap`) 拉取自身的配置和 `accessToken`。
+    2.  使用WebSocket的 `/infra` 命名空间上报在线状态。
+    3.  使用获取到的 `accessToken` 以一个“机器人用户”的身份连接默认的 WebSocket 命名空间，收发消息和事件。
+-   **MongoDB**：作为主数据库，存储所有核心数据。
+-   **对象存储 (S3)**：用于存储用户头像、聊天附件等文件。服务端只存储文件的 `key`，在返回给客户端时会动态拼接成可访问的 `url`。
 
 ---
 
-## 🗂️ 核心实体（概览）
+## 🗂️ 核心实体
 
-平台层的主要对象关系（只保留关键关联）：
+平台主要对象之间的关系如下：
 
 ```mermaid
 erDiagram
-  User ||--o{ ServerMember : joins
-  User { bool isBot }
-  Bot ||--|{ User : "is represented by"
-  Server ||--o{ ServerMember : has
-  Server ||--o{ Role : defines
-  Server ||--o{ Category : groups
-  Server ||--o{ Channel : contains
-  Channel ||--o{ Message : stores
-  Channel ||--o{ Webhook : targets
-  Channel { string lastReadMessageId }
+    User {
+        bool isBot
+    }
+    Bot {
+        string serviceType
+    }
+    User ||--o{ ServerMember : "加入"
+    Bot ||--|{ User : "表现为"
+    Server ||--o{ ServerMember : "拥有"
+    Server ||--o{ Role : "定义"
+    Server ||--o{ Category : "分组"
+    Server ||--o{ Channel : "包含"
+    Channel ||--o{ Message : "存储"
+    Channel ||--o{ Webhook : "指向"
+    Channel {
+        string lastReadMessageId "为当前用户聚合"
+    }
 ```
 
-一些实现细节（以代码为准）：
-
-- **User**：`isBot` 字段用于区分不同类型的“机器人”用户和人类用户。平台中有三类用户：
-    1.  **人类用户**：通过邮箱密码注册/登录。
-    2.  **Bot 用户**：由 `Bot` 实体自动创建并关联，代表一个可编程的机器人应用。
-    3.  **Webhook 用户**：由 `Webhook` 实体自动创建，仅用于代表该 Webhook 发送消息。
-- **Bot**: 这是一个由人类用户创建和管理的实体，它拥有独立的 `accessToken` 用于登录、`serviceType` 用于关联后端服务、以及自定义配置 `config`。每个 `Bot` 实体都对应一个 `isBot: true` 的 `User` 实体。
-- **Channel**：`GUILD_TEXT`（服务器频道）与 `DM`（私信）共用一套模型。
-- **已读状态**：用于“已读/未读”能力，**在 `Channel` 模型上直接通过 `lastReadMessageId` 字段记录。客户端 `ack` 接口会更新此字段。**
-- **Message**：支持 `type/content/payload/attachments/mentions/reactions` 等。
-- **Webhook**：在某个频道下创建，它也会自动创建一个关联的 `User` 实体。其公开执行端点使用 `webhookId + token` 进行认证。
+:::info 实现细节
+-   **用户 (User)**：平台内存在三种类型的用户，均通过 `isBot` 字段进行区分。
+    -   **人类用户**：通过邮箱密码注册登录。
+    -   **Bot 用户**：由一个 `Bot` 实体自动创建并关联，代表一个可编程的应用。
+    -   **Webhook 用户**：由一个 `Webhook` 实体自动创建，仅用于代表该 Webhook 在频道内发送消息。
+-   **机器人 (Bot)**：这是一个管理实体，拥有独立的 `accessToken`、`serviceType` 和自定义配置 `config`。每个 `Bot` 都会对应一个 `isBot: true` 的 `User` 实体。
+-   **频道 (Channel)**：服务器频道和私信共用同一套数据模型。
+-   **已读状态**：用户的频道已读状态（`lastReadMessageId`）并非直接存储在频道对象上，而是由后端在请求时，根据 `ChannelReadState` 表动态聚合而来。
+:::
 
 ---
 
-## 🔐 权限模型（如何生效）
+## 🔐 权限模型
 
-Mew 以“服务器角色 + 频道覆盖”的方式计算用户在某个频道的最终权限：
+**Mew 的权限模型基于“服务器角色 + 频道权限覆盖”的方式计算用户在某个频道的最终权限。**
 
-- **角色（Role）**：属于某个 Server，包含一组权限字符串。
-- **成员（ServerMember）**：在某个 Server 内拥有若干角色（`roleIds`）。
-- **频道覆盖（permissionOverrides）**：在 Channel 上对“某个角色”或“某个成员”设置 allow/deny。
-- **最终权限**：由后端计算并返回给客户端（例如频道列表会附带 `permissions` 数组）。
+用户的最终权限是在后端动态计算出来的，计算逻辑如下：
 
-实现上还有几点值得注意：
+1.  **基础权限**：首先获取用户在服务器内的所有 **角色 (Role)** 所赋予的权限总和。
+2.  **权限覆盖**：然后，应用当前 **频道 (Channel)** 上的 **权限覆盖 (permissionOverrides)** 设置，这些覆盖可以针对特定角色或特定成员增加（allow）或移除（deny）权限。
+3.  **最终权限**：计算出的最终权限集会随着频道信息一同返回给客户端。
 
-- **服务器所有者与管理员特权**: 服务器所有者（`ServerMember.isOwner` 为 `true`）或**拥有 `ADMINISTRATOR` 权限角色的成员**会绕过所有权限计算，直接获得所有权限。
-- **默认角色**: 创建服务器时，会自动创建 `@everyone` 角色作为基础权限，并为所有者创建一个拥有 `ADMINISTRATOR` 权限的 “Owner” 角色，确保所有者始终拥有最高权限。
-- **自我锁定保护**：更新频道权限覆盖时，会阻止普通成员提交导致自己失去 `MANAGE_CHANNEL` 的配置。
-- **权限变更事件**：角色更新、成员角色更新、频道覆盖更新都会广播 `PERMISSIONS_UPDATE`，客户端通常需要失效缓存并重拉。
-
----
-
-## ⚡️ 实时模型（事件从哪来、发到哪）
-
-Socket.IO 的房间划分（由后端实现，客户端隐式使用）：
-
-- **频道房间**：用户会加入其可达的每个 `channelId`（DM 与服务器频道）。
-- **服务器房间**：用户会加入其所属的每个 `serverId`（用于服务器级事件广播）。
-- **个人房间**：用户会加入自己的 `userId`（用于定向通知，如 `SERVER_KICK`）。
-
-事件广播策略（简化理解）：
-
-- **频道级事件**（如 `MESSAGE_CREATE/MESSAGE_UPDATE`）→ 发到 `channelId` 房间。
-- **服务器级事件**（如 `CHANNEL_UPDATE/CATEGORY_UPDATE/PERMISSIONS_UPDATE`）→ 发到 `serverId` 房间。
-- **用户定向事件**（如 `SERVER_KICK/DM_CHANNEL_CREATE`）→ 发到 `userId` 房间。
-- **服务专用命名空间**: 此外，平台还为后端服务（Bots）提供了一个专用的 `/infra` 命名空间。服务通过 `adminSecret` 和 `serviceType` 认证后加入对应的房间，用于接收系统级指令，如 `SYSTEM_BOT_CONFIG_UPDATE`。
-
-完整事件清单与 payload 结构见：[`core-api/websocket-api`](../core-api/websocket-api.md)。
+:::info 实现细节
+-   **管理员特权**：服务器所有者或拥有 `ADMINISTRATOR` 权限角色的成员，将绕过所有权限检查，始终获得所有权限。
+-   **默认角色**：每个服务器在创建时都会自动生成一个 `@everyone` 角色作为所有成员的基础权限，以及一个拥有 `ADMINISTRATOR` 权限的 “Owner” 角色。
+-   **自我锁定保护**：当普通管理员修改频道权限时，系统会阻止其提交会导致自己失去 `MANAGE_CHANNEL` 权限的配置，防止误操作。
+-   **权限变更事件**：任何可能影响用户权限的操作（如角色更新、成员角色变更、频道覆盖更新），都会广播 `PERMISSIONS_UPDATE` 事件，通知客户端刷新权限相关的缓存。
+:::
 
 ---
 
-## 🧾 消息协议（多态渲染）
+## ⚡️ 实时通信模型
 
-Mew 的消息允许携带“渲染提示”以实现丰富的卡片式消息：
+为了高效地广播事件，后端通过 Socket.IO 的房间（Room）机制对用户进行分组。客户端无需关心房间的具体实现，只需连接即可。
 
-- `type`：默认 `DEFAULT`，也可以扩展为自定义类型，**例如 `app/x-rss-card`、`app/x-twitter-card`、`app/x-bilibili-card` 等，客户端会根据此类型渲染不同的卡片组件。**
-- `content`：纯文本内容，作为后备或与卡片共存。
-- `payload`：结构化数据，供自定义渲染器使用。一个典型应用是 Webhook 消息，可以通过 `payload.overrides` 字段覆盖本次消息的 `username` 和 `avatarUrl`。
-- `attachments`：上传后返回的元数据数组（`key` 会在返回给客户端时补全为 `url`）。
+-   **频道房间 (Channel Room)**：用户会自动加入其所有相关频道的房间（包括私信和服务器频道），用于接收频道内的消息和事件。
+-   **服务器房间 (Server Room)**：用户会加入自己所在的所有服务器的房间（以 `serverId` 标识），用于接收服务器级别的事件。
+-   **个人房间 (User Room)**：每个用户会加入以自己 `userId` 命名的房间，用于接收定向通知（如被踢出服务器）。
 
-这些字段的实际形态与补全规则请以：[`core-api/data-structures`](../core-api/data-structures.md) 为准。
+基于以上房间划分，事件的广播策略非常清晰：
+
+-   **频道级事件** (如 `MESSAGE_CREATE`) → 发送到对应的 `channelId` 房间。
+-   **服务器级事件** (如 `CHANNEL_UPDATE`) → 发送到对应的 `serverId` 房间。
+-   **用户定向事件** (如 `SERVER_KICK`) → 发送到对应的 `userId` 房间。
+
+:::info 服务专用通信
+除了用户通信，平台还为后端机器人服务提供了一个专用的 `/infra` WebSocket 命名空间。机器人服务通过 `adminSecret` 认证后，可以在此通道上报自己的健康状态，并触发关联的机器人用户状态同步。
+:::
+
+---
+
+## 🧾 消息协议与多态渲染
+
+为了实现丰富的卡片式消息（而不只是纯文本），Mew 的消息协议支持“多态渲染”。
+
+-   `type`：一个字符串，默认为 `message/default`。客户端可以根据不同的 `type` 值渲染不同的组件。
+-   `content`：纯文本内容，作为消息的后备展示或与卡片共存。
+-   `payload`：一个 JSON 对象，用于存放结构化数据，供自定义卡片渲染器使用。
+-   `attachments`：文件上传后，服务端返回的附件元数据数组。
+
+:::info 已支持的卡片类型
+目前仓库内已实现的前端卡片渲染器包括：
+`app/x-rss-card`、`app/x-twitter-card`、`app/x-bilibili-card` 等。
+具体实现可参考 `client/src/features/chat-messages/components/MessageContent.tsx`。
+:::

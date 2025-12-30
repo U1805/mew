@@ -1,174 +1,178 @@
 ---
-sidebar_label: 'Bot 生态系统'
+sidebar_label: '机器人'
 sidebar_position: 10
 slug: /guide/bot-ecosystem
 ---
 
-# 🤖 Bot 生态系统
+# 🤖 机器人开发
 
-> **🚧 施工中 (Work in Progress)**
->
-> 本章节描述的 API 和 SDK 正在快速迭代中。
+Mew 的核心设计理念之一是微服务化。平台本身仅负责核心的消息路由，而所有业务逻辑——无论是抓取外部内容，还是与 AI 进行交互——均通过独立的 **Bot** 服务实现。
 
-欢迎来到 Mew 的“业务大脑”。
+这种设计赋予了 Mew 极高的可扩展性。
 
-Mew 采用了**微服务架构**的极致形式：平台本身（The Bus）只负责消息的搬运，而所有真正有趣的业务逻辑——无论是抓取推特新闻，还是与 AI 谈天说地——都由独立运行的 **Bot 服务** 承担。
-
-这种设计赋予了 Mew 无限的可能性：**想要新功能？写个 Bot 就行，无需触碰核心代码。**
+> **想要新功能？编写一个 Bot 即可，无需改动核心代码。**
 
 ---
 
-## 3.1 核心范式
+## Bot 的两种工作模式
 
-Mew 的 Bot 生态被划分为两个平行的世界，分别对应两种截然不同的数据流向。
+根据数据流向和交互方式的不同，Mew 的机器人主要分为两种类型。
 
-### 📡 1. 广播模式：消息推送 Bot
-> **关键词**: 单向、无状态、高并发、Webhook
+### 1. 消息推送 Bot (Fetcher)
 
-这类 Bot 是不知疲倦的**信息搬运工**。它们运行在后台，定期从外部世界抓取数据，并通过 Webhook 单向投递到 Mew。
+> **关键词**: 单向推送、无状态、高并发、Webhook
 
-*   **典型场景**: RSS 阅读器、Twitter/X 监控、股票预警、Bilibili 更新提醒。
-*   **通信流向**: `External World` -> `Fetcher Bot` -> `Webhook` -> `Mew Channel`
+这类 Bot 主要负责从外部数据源（如 RSS、Twitter）获取信息，并**单向推送**到 Mew 的指定频道。它们是信息聚合与分发的管道。
+
+*   **典型场景**: RSS 阅读器、社交媒体监控、服务状态预警、更新提醒。
+*   **通信流向**: `外部服务` -> `Fetcher Bot` -> `Webhook` -> `Mew 频道`
 
 ```mermaid
 sequenceDiagram
-    participant Web as 🌍 External Web
+    participant Web as 🌍 外部服务
     participant Bot as 🐹 Fetcher Bot
-    participant Mew as 🚌 Mew Platform
-    participant User as 👤 User
+    participant Mew as 🚌 Mew 平台
+    participant User as 👤 用户
 
-    loop Interval Loop
-        Bot ->> Web: 1. 抓取新内容 (Poll)
+    loop 定时轮询
+        Bot ->> Web: 1. 拉取新内容
         Web -->> Bot: 返回数据
-        Bot ->> Bot: 2. 数据去重与格式化
-        Bot ->> Mew: 3. HTTP POST (Webhook)
+        Bot ->> Bot: 2. 格式化与去重
+        Bot ->> Mew: 3. 发送 HTTP POST 请求 (Webhook)
     end
     Mew->>User: 4. 推送消息
 ```
 
-### 💬 2. 会话模式：Agent Bot
-> **关键词**: 双向、有状态、事件驱动、WebSocket
+### 2. 会话机器人 (Agent)
 
-这类 Bot 是聪明的**对话伙伴**。它们通过 WebSocket 接入平台，能够“听懂”用户的话，并经过思考（LLM 推理）后做出回应。
+> **关键词**: 双向交互、有状态、事件驱动、WebSocket
 
-*   **典型场景**: AI 女友/男友、RPG 游戏主持人、智能客服、运维助手。
-*   **通信流向**: `User` \<-> `Mew Platform` \<-> `WebSocket` \<-> `Agent Bot` \<-> `LLM`
+这类 Bot 负责与用户进行**双向交互**。它们通过 WebSocket 长连接接入平台，能够接收并响应用户的消息，通常用于实现需要上下文理解的复杂任务。
+
+*   **典型场景**: AI 聊天伴侣、RPG 游戏主持人 (GM)、智能客服、运维助手。
+*   **通信流向**: `用户` \<-> `Mew 平台` \<-> `WebSocket` \<-> `Agent Bot` \<-> `LLM`
 
 ```mermaid
 sequenceDiagram
-    participant User as 👤 User
-    participant Mew as 🚌 Mew Platform
+    participant User as 👤 用户
+    participant Mew as 🚌 Mew 平台
     participant Bot as 💬 Agent Bot
-    participant LLM as 🧠 OpenAI/Claude
+    participant LLM as 🧠 AI 服务 (LLM)
 
-    User->>Mew: 1. 发送 "你好"
-    Mew->>Bot: 2. WebSocket Push (MESSAGE_CREATE)
-    Bot->>LLM: 3. 构建 Prompt 并请求
-    LLM-->>Bot: 4. 生成回复 "喵~ 你好呀"
-    Bot->>Mew: 5. API Call (Send Message)
-    Mew->>User: 6. 展示回复
+    User->>Mew: 1. 发送消息 (如: @Bot 你好)
+    Mew->>Bot: 2. 推送 WebSocket 事件 (MESSAGE_CREATE)
+    Bot->>LLM: 3. 构造 Prompt 并请求 LLM
+    LLM-->>Bot: 4. 返回生成的回复
+    Bot->>Mew: 5. 调用 API 发送消息
+    Mew->>User: 6. 展示 Bot 的回复
 ```
 
 ---
 
-## 3.2 配置驱动架构
+## 配置驱动的设计
 
-Mew 的一大创新在于**“配置中心化”**。
+Mew 的 Bot 设计核心在于**配置与代码分离**。Bot 的运行时行为由其在 Mew 平台上的配置（Config）决定，而非硬编码在代码中。
 
-Bot 的代码逻辑（Code）与业务配置（Config）是完全分离的。Bot 服务启动时，会从 Mew 平台拉取它的“任务清单”。这意味着：**你可以在 Mew 的网页 UI 上直接修改 Bot 的行为，而无需重启 Bot 后端服务。**
+这意味着，你可以在 Mew 的管理界面直接修改 Bot 的配置来调整其行为（例如更换 RSS 源地址），**而无需重启后端的 Bot 服务**。
 
-### 3.2.1 数据模型
+:::info 工作原理
+Bot 服务会定期从 Mew 平台拉取其最新的配置列表。SDK 内的 `BotManager` 会比较配置的哈希值，如果检测到变更，它会自动对该 Bot 的运行实例（Runner）执行“热重载”（优雅退出旧实例并启动新实例），从而应用新配置。
+:::
 
-每个 Bot 在数据库中存储为一个对象，其中最核心的是 `serviceType` 和 `config` 字段。
+### 数据模型
 
-```typescript
-// Collection: bots
+每个 Bot 对应数据库中的一个文档。其核心字段为 `serviceType` (决定了由哪个后端服务处理) 和 `config` (具体的业务配置)。
+
+```typescript title="数据表 collection: bots"
 interface Bot {
   _id: ObjectId;
-  name: string;        // 🤖 显示名称
-  avatar: string;      // 🖼️ 头像 URL
-  accessToken: string; // 🔑 身份令牌 (用于 Bot API/WebSocket 鉴权)
-  
-  // 核心字段
-  serviceType: string; // 🏷️ 托管服务类型 (e.g., 'rss-fetcher', 'test-fetcher', 'test-agent')
-  config: any;         // ⚙️ 动态配置对象 (Schema 由 type 决定)
-  
-  dm_enabled: boolean; // 是否允许私聊
-  ownerId: ObjectId;   // 创建者 ID
+  ownerId: ObjectId;      // 创建者 User ID
+  botUserId?: ObjectId;   // 关联的 Bot User (isBot: true)
+  name: string;           // 显示名称
+  avatarUrl?: string;     // 头像 URL
+  serviceType: string;    // 服务类型, 如 'rss-fetcher', 'claude-agent'
+  dmEnabled: boolean;     // 是否允许用户私聊
+  config: string;         // 业务配置 (JSON 字符串)
+  accessToken?: string;   // 用于 Bot 认证，获取 JWT
 }
 ```
 
-### 3.2.2 Webhook 的解耦设计
+### Webhook 的匿名投递机制
 
-对于 Fetcher Bot，我们设计了一套**“匿名投递”**机制。
+对于 Fetcher 类型的 Bot，平台提供了一套解耦的 Webhook 机制：
 
-1.  **生成**: 用户在任意频道设置中点击“生成 Webhook”。
-2.  **绑定**: 用户将 Webhook URL 填入 Bot 的 `config` 中。
-3.  **运行**: Bot 只管向这个 URL 发送数据，它**不需要知道**这个 URL 背后是哪个服务器的哪个频道，也不需要处理复杂的频道权限。
+1.  **生成**：用户在任意频道的设置中，可以生成一个唯一的 Webhook URL。
+2.  **配置**：用户将此 URL 填入对应 Bot 的 `config` 中。
+3.  **投递**：Bot 服务仅需向此 URL 发送 POST 请求即可推送消息。它无需关心频道权限、服务器地址等细节，实现了彻底的解耦。
 
 ---
 
-## 3.3 实现：Fetcher Bots
+## 实践：开发消息推送 Bot (Fetcher)
 
-> **参考实现**：`plugins/fetchers/*`（例如 `plugins/fetchers/test-fetcher`）
+> **参考实现**：`plugins/fetchers/test-fetcher`
 
-Fetcher 服务是一个纯后台守护进程。
+Fetcher Bot 是一个后台守护进程，根据 `config` 中的任务列表执行数据拉取和推送。
 
 ### 配置示例
-在 Mew UI 中，你可以为 `serviceType: 'rss-fetcher'` 等 Bot 填入如下 JSON：
 
-#### 📰 RSS 订阅 (`serviceType: 'rss-fetcher'`)
-```json
+以下是 `serviceType: 'rss-fetcher'` 的 Bot 配置示例，该配置为一个 `JSON` 数组，每个对象代表一个订阅任务。
+
+```json title="config 字段内容 (serviceType: 'rss-fetcher')"
 [
   {
     "rss_url": "https://hn.algolia.com/rss",
     "interval": 3600,
-    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>",
+    "webhook": "http://<mew-host>/api/webhooks/<webhookId>/<token>",
     "enabled": true,
     "send_history_on_start": false
   }
 ]
 ```
 
-说明：
+| 字段名 | 描述 |
+| :--- | :--- |
+| `rss_url` | 订阅的 RSS/Atom 源地址。 |
+| `interval` | 轮询间隔时间，单位为秒。 |
+| `webhook` | 频道生成的 Webhook 投递地址。 |
+| `enabled` | `true` / `false`，是否启用此任务。 |
+| `send_history_on_start` | `true` / `false`，启动时是否推送历史消息。 |
 
-- `rss_url`：RSS/Atom 地址（兼容 `url` 别名）
-- `interval`：轮询间隔（秒）
-- `webhook`：频道 Webhook 投递地址（后端路由：`POST /api/webhooks/:webhookId/:token`）
-- 推送消息类型默认为 `app/x-rss-card`（前端会渲染为 RSS 卡片）
 
-#### 🐦 Twitter/X 监控 (`type: 'x'`)
-支持数组结构，一个 Bot 实例监控多个账号。
-```json
-[
-  {
-    "username": "elonmusk",
-    "interval": 600,
-    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>"
-  },
-  {
-    "username": "nasa",
-    "interval": 1800,
-    "webhook": "http://mew-server/api/webhooks/<webhookId>/<token>"
-  }
-]
-```
+:::caution 网络可达性问题
+请确保 `webhook` 的主机地址对于 **Bot 的运行环境** 是可访问的。
+- **Docker Compose 内部**: Bot 容器通常可以通过服务名访问主服务，如 `http://server:3000/api/webhooks/...`。
+- **外部服务器**: Bot 若部署在其他机器上，必须使用公网可访问的域名或 IP，如 `https://mew.example.com/api/webhooks/...`。
+:::
 
 ---
 
-## 3.4 实现：Agent Bots
+## 实践：开发会话机器人 (Agent)
 
-> **参考实现**：`plugins/agents/*`（例如 `plugins/agents/test-agent`）
+> **参考实现**：`plugins/agents/test-agent`
 
-Agent 服务是一个长连接客户端。它通过 WebSocket 保持在线，随时准备响应用户的 `@提及` 或私聊。
+Agent Bot 是一个长连接客户端，通过 WebSocket 实时监听和响应用户消息。
 
 ### 配置示例
-`bot.config` 的 Schema 完全由你的 Agent 插件决定。
-
-例如 `test-agent` 不需要任务配置，因此 `config` 可以是任意值（不会解析/校验）。
+`config` 的结构完全由你的 Agent 插件定义。对于简单的 Agent，`config` 甚至可以为空 `JSON` 对象 `{}`。
 
 ### 开发流程
-1.  **监听**: 接收 `MESSAGE_CREATE` 事件。
-2.  **过滤**: 忽略自己发送的消息，忽略无关频道的消息。
-3.  **处理**: 命中触发条件后执行业务逻辑（可选：调用 LLM / 工具 / 查询数据库）。
-4.  **回复**: 发送消息回平台（参考 `plugins/agents/test-agent` 的 `message/create` 上行事件）。
+标准的 Agent Bot 开发遵循以下步骤：
+1.  **连接**：使用 Bot 的 `accessToken` 认证并建立 WebSocket 连接。
+2.  **监听**：订阅 `MESSAGE_CREATE` 网关事件。
+3.  **过滤**：判断消息是否满足触发条件（例如，是否为 `@自己` 的消息、是否来自特定频道、是否为私聊）。同时，必须忽略由 Bot 自己发送的消息，避免无限循环。
+4.  **处理**：执行核心业务逻辑（如调用 LLM API、查询数据库、执行指令等）。
+5.  **回复**：通过 WebSocket 或 REST API 将处理结果作为新消息发送回频道。
+
+---
+
+## 深入理解：配置同步机制
+
+当前版本的配置同步是通过 **定时轮询** 实现的，具体流程如下：
+
+*   Bot Service 启动后，会定期调用内部接口 `POST /api/bots/bootstrap`（需携带管理员密钥 `X-Mew-Admin-Secret`），拉取所有与其 `serviceType` 匹配的 Bot 实例及其配置。
+*   `plugins/sdk` 中的 `BotManager` 模块会负责管理所有 Bot 实例的生命周期。
+*   当检测到某个 Bot 的 `config` 发生变化、或者有新增/删除的 Bot 时，`BotManager` 会自动触发对应 Runner 的热重载。
+
+:::info
+`/infra` Socket.IO 命名空间当前主要用于 Bot 的在线状态统计与同步，并不负责推送“配置更新”事件。
+:::

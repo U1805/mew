@@ -5,226 +5,263 @@ slug: /guide/getting-started
 ---
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
+import Link from '@docusaurus/Link';
 
 # 🚀 快速上手
 
-欢迎来到 Mew 的世界！本章节将协助你完成环境配置，并点燃你的第一个 Mew 实例。
+欢迎来到 Mew 的世界！本指南将引导你完成环境的搭建，并成功运行你的第一个 Mew 实例。
 
-为了满足不同场景的需求，我们提供了两条路径：
-*   **🛠️ 本地开发环境**：适合贡献代码、调试功能或进行二次开发。
-*   **🐳 Docker 一键部署**：适合生产环境部署或快速体验。
+我们提供了两种路径以满足不同需求：
+*   **本地开发**：适合贡献代码、功能调试或进行二次开发。
+*   **Docker 部署**：推荐用于生产环境或快速体验完整功能。
 
 ---
 
-## 📋 环境要求
+## 环境要求
 
-在开始之前，请确保你的开发环境满足以下要求。
+在开始之前，请确保你的系统满足以下基本要求。
 
 ### 核心依赖
-无论选择哪种部署方式，都需要以下基础服务：
-*   **MongoDB**：一个可用的 MongoDB 实例（本地、容器或云服务均可）。
-*   **Garage**：一个可用的 Garage 实例，用于处理头像与附件上传（亦可使用任何兼容 S3 协议的对象存储）。
-    *   本地 Docker 部署方案请参考 [基础设施部署](../reference/infrastructure-setup.md)。
+无论采用何种方式，Mew 的运行都依赖以下基础服务：
+*   **MongoDB**: 一个可用的 MongoDB 实例（版本 `v5.0+`）。
+*   **S3 兼容对象存储**: 如 `MinIO` 或 `Garage`，用于存储用户头像和文件附件。
 
-### 开发环境依赖
-如果你计划运行源码进行开发，请额外安装：
-*   **Node.js**：`v18+`（建议使用 LTS 版本）。
-*   **pnpm**：建议使用项目声明的版本（参见根目录 `package.json#packageManager`）。
-    *   若未安装：`npm install -g pnpm`
-*   **Go**：需要安装 Go 语言编译器（用于运行插件及 Bot 服务）。
+:::info 基础设施部署
+如果你需要先快速启动 `MongoDB` 和 `Garage`，可以参考我们的 <Link to="/docs/reference/infrastructure-setup">基础设施部署指南</Link>。
+:::
+
+:::caution S3 路径风格
+请注意，Mew 对外暴露文件 URL 时采用 **Virtual-Hosted** 风格，形如 `http(s)://<bucket>.<S3_WEB_ENDPOINT>/<key>`。请确保你的 S3 服务支持并正确配置了此模式。
+:::
+
+### 开发环境额外依赖
+如果你计划从源码运行，请额外安装以下工具：
+*   **Node.js**: `v18` 或更高版本 (推荐使用 LTS 版本)。
+*   **pnpm**: 推荐使用项目根目录 `package.json` 中 `packageManager` 字段指定的版本。
+    *   *若未安装, 可执行 `npm install -g pnpm`*
+*   **Go**: Go 语言编译器，用于运行插件和 Bot 服务。
 
 ---
 
-## ⚙️ 基础配置
+## 基础配置
 
-Mew 遵循 **The Twelve-Factor App** 原则，通过环境变量管理配置。
+Mew 通过环境变量进行配置，以实现开发与生产环境的统一管理。
 
-### 1. 初始化环境变量
-后端服务需要配置敏感信息才能启动。在**项目根目录**下，初始化后端配置文件：
+### 步骤 1: 初始化环境变量
+
+首先，我们需要为后端服务创建一份本地配置文件。请在**项目根目录**下执行：
 
 <Tabs>
   <TabItem value="bash" label="Bash" default>
     ```bash
-    # 进入后端目录
+    # 进入后端代码目录
     cd server
 
-    # 复制示例配置文件
+    # 从示例文件复制创建 .env
     cp .env.example .env
     ```
   </TabItem>
   <TabItem value="powershell" label="PowerShell">
     ```powershell
+    # 进入后端代码目录
     Set-Location server
+
+    # 从示例文件复制创建 .env
     Copy-Item .env.example .env
     ```
   </TabItem>
 </Tabs>
 
-### 2. 修改配置参数
-使用编辑器打开 `.env`。以下是关键参数说明：
+
+### 步骤 2: 修改关键配置
+
+使用你喜欢的编辑器打开 `server/.env` 文件，修改以下**核心参数**。
+
+*   `MONGO_URI`: 你的 MongoDB 连接字符串。
+*   `JWT_SECRET`: 用于签发用户 Token 的密钥。
+*   `MEW_ADMIN_SECRET`: 用于内部服务间鉴权的共享密钥。
+*   `S3_*` 相关配置: 填写你的 S3 对象存储信息。
+
+:::info 生成强密钥
+你可以使用以下命令快速生成安全的随机密钥，用于 `JWT_SECRET` 和 `MEW_ADMIN_SECRET`：
+```bash
+openssl rand -base64 32
+```
+:::
+
+<details>
+  <summary>查看完整的 <code>server/.env</code> 参数说明</summary>
 
 ```ini title="server/.env"
-# 💡 在终端运行 `openssl rand -base64 32` 可快速生成强密钥
-
 # 🍃 MongoDB 连接字符串
 # 格式: mongodb://[username:password@]host[:port]/[database]
 MONGO_URI=mongodb://localhost:27017/mew
 
-# 🚪 服务端口
+# 🚪 服务监听端口
 PORT=3000
 
-# 🔐 JWT 签名密钥
+# 🔐 JWT 签名密钥 (必须修改)
 JWT_SECRET=replace-this-with-a-super-secret-key
 JWT_EXPIRES_IN=1d
 
-# Auth：是否允许公开注册（/api/auth/register）
-MEW_ALLOW_USER_REGISTRATION=true
-
-# Infra：Bot Service bootstrap + /infra 命名空间鉴权使用的共享密钥
+# 🔑 内部服务共享密钥 (必须修改, 用于 Bot Service 和 /infra 接口鉴权)
 MEW_ADMIN_SECRET=replace-this-with-another-super-secret-key
 
-# CORS：API 跨域允许列表（逗号分隔）。生产环境请显式设置，不要使用 '*'
+# 🌐 API 跨域允许列表 (逗号分隔)
+# 开发环境可留空, 生产环境强烈建议设置为你的前端域名
 MEW_CORS_ORIGINS=http://localhost:5173
 
-# 可选：Infra IP 白名单（逗号分隔）。为空时默认允许内网 + loopback。
+# 👤 是否允许公开注册
+MEW_ALLOW_USER_REGISTRATION=true
+
+# 🛡️ Express trust proxy
+# 如果 Server 部署在反向代理 (Nginx/Caddy) 之后, 建议根据实际情况调整
+MEW_TRUST_PROXY=loopback
+
+# 🔒 Infra 接口 IP 白名单 (可选, 逗号分隔)
+# 留空则默认允许内网 + loopback 地址
 MEW_INFRA_ALLOWED_IPS=
 
-# S3 兼容对象存储：头像与附件上传需要
-# 桶相关配置
+# --- S3 兼容对象存储配置 ---
 S3_REGION=garage
 S3_BUCKET_NAME=mew-bucket
 S3_ACCESS_KEY_ID=replace-this-with-your-access-key-id
 S3_SECRET_ACCESS_KEY=replace-this-with-your-secret-access-key
 S3_USE_SSL=false
-# 上传端点 (Server-side)
+# 服务端上传端点
 S3_ENDPOINT=localhost
 S3_PORT=3900
-# 访问端点 (Client-side)
+# 客户端访问端点
 S3_WEB_ENDPOINT=web.garage.localhost
 S3_WEB_PORT=3902
-
-# 浏览器直传（预签名 PUT）需要配置 S3 CORS 允许 Origin（默认沿用 MEW_CORS_ORIGINS）
-S3_CORS_ORIGINS=http://localhost:5173
+# 浏览器直传 CORS 来源 (默认沿用 MEW_CORS_ORIGINS)
+S3_CORS_ORIGINS=
+# 预签名 URL 有效期 (秒)
 S3_PRESIGN_EXPIRES_SECONDS=60
-
-# 可选：从文件读取 {accessKeyId,secretAccessKey}（docker-compose 的 garage-init 会生成并挂载该文件）
+# 从文件读取凭证 (可选, 用于 Docker)
 S3_CREDENTIALS_FILE=
 ```
+</details>
 
-> **⚠️ 注意**：Mew 目前暂不提供命令行用户初始化工具。首次启动服务后，请直接访问前端页面注册管理员账户。
+:::caution `MEW_ADMIN_SECRET` 用途说明
+此密钥**并非**管理员账号密码，而是服务间通信的“通行证”。用户账号需要在前端启动后自行注册。
+:::
 
 ---
 
-## 💻 本地开发
+## 本地开发
 
 ### 步骤 1: 安装依赖
-利用 pnpm 的 Workspace 特性，一条命令即可安装前端、后端及共享库的所有依赖。
+在项目根目录执行以下命令，pnpm 将自动安装所有工作空间（前端、后端、共享库）的依赖。
 
 ```bash
 pnpm install
 ```
 
-### 步骤 2: 启动服务
-确保 **MongoDB** 和 **Garage** 已在后台运行，然后在根目录执行：
+### 步骤 2: 启动核心服务
+请确保 `MongoDB` 和 `Garage` 服务已在后台运行。然后在项目根目录执行：
 
 ```bash
 pnpm dev
 ```
 
-此命令将通过 `concurrently` 并行启动以下服务：
-*   🟢 **Server**: 监听 `http://localhost:3000`
-*   🔵 **Client**: 监听 `http://localhost:5173` (Vite 默认端口)
+此命令会同时启动前端和后端开发服务器：
+*   🟢 **后端 API**: 监听 `http://localhost:3000`
+*   🔵 **前端页面**: 监听 `http://localhost:5173`
 
-### 步骤 3: 验证与调试
-*   **访问 UI**: 浏览器打开 [http://localhost:5173](http://localhost:5173) 即可看到登录界面。
-*   **查看日志**: 所有服务的日志（API 请求、报错信息）都会输出在当前终端窗口中。
+### 步骤 3: 访问和调试
+*   **访问前端**: 在浏览器中打开 [http://localhost:5173](http://localhost:5173)，你将看到 Mew 的登录/注册界面。
+*   **查看日志**: 所有服务的日志（包括 API 请求和错误信息）都会实时输出到你运行 `pnpm dev` 的终端窗口中。
+*   **停止服务**: 在终端按下 `Ctrl + C` 即可。
 
-> 🛑 **停止服务**: 在终端按 `Ctrl + C` 即可终止所有进程。
+---
 
-### 步骤 4: 启动测试 Bot 服务
-为了验证机器人生态，我们提供了一个简单的 Bot 示例：`plugins/fetchers/test-fetcher`。
+### (可选) 启动 Bot 服务
 
-首先将其复制为 `.env.local` 或 `.env`：
+为了测试机器人功能，我们提供了一个 Go 语言编写的示例 Bot。
+
+#### A. 配置 Bot 环境变量
 ```bash
-cp plugins/.env.example plugins/.env
-```
+# 进入插件目录
+cd plugins
 
-编辑相关配置项：
-```ini title="plugins/.env"
-# 请使用与后端配置文件中相同的 MEW_ADMIN_SECRET
+# 复制配置文件
+cp .env.example .env.local
+```
+编辑 `plugins/.env.local` 文件，确保 `MEW_ADMIN_SECRET` 与 `server/.env` 中的值**完全一致**。
+
+```ini title="plugins/.env.local"
+# 必须与后端配置保持一致
 MEW_ADMIN_SECRET=replace-this-with-value-in-server
-# BOT 同步配置的间隔时间 (秒)
-MEW_CONFIG_SYNC_INTERVAL_SECONDS=10
+# 后端 API 地址 (SDK 会自动拼接 /api)
+MEW_URL=http://localhost:3000
 ```
 
-进入测试 Bot 文件夹运行服务：
+#### B. 运行测试 Bot
 ```bash
-cd plugins/fetchers/test-fetcher
-go run .
+# 进入测试 Bot 源码目录
+cd fetchers/test-fetcher
+
+# 运行服务
+go run ./cmd/test-fetcher
 ```
+:::info
+Bot 的 `serviceType` 会根据其入口文件 (`main.go`) 所在的目录名自动推导，此处为 `test-fetcher`。
+:::
 
-> `serviceType` 默认由插件目录名推导：例如 `plugins/fetchers/test-fetcher` 的 `serviceType=test-fetcher`。
-
-### 步骤 5: 配置并运行 Bot
-服务启动后，需要在前端进行配置以联通 Bot 与频道。
+#### C. 在前端配置并激活 Bot
 
 1.  **创建 Webhook**:
-    *   在网页中新建一个服务器 (Server) 和频道 (Channel)。
-    *   进入频道设置，创建一个 Webhook，并复制其 URL（例如 `http://localhost:3000/api/webhooks/<webhookId>/<token>`）。
-    *   *注：Bot 将通过此 Webhook 获得向该频道发送消息的权限。*
+    *   在 Mew 网页中，创建一个服务器和一个频道。
+    *   进入该频道的设置，创建一个 Webhook，并复制其 URL。Bot 将通过此 URL 向频道发送消息。
 
 2.  **注册 Bot**:
     *   进入“用户设置” -> “Bot” 标签页。
-    *   点击注册新 Bot，`Service Type` 选择 **`test-fetcher`**。
+    *   点击“注册新 Bot”，在 `Service Type` 下拉框中选择 `test-fetcher`。
 
-3.  **配置参数**:
-    *   在 `Config` 区域填入以下 JSON 配置：
+3.  **填写配置**:
+    *   在 `Config` 输入框中填入以下 JSON：
     ```json
     [
       {
         "interval": 60,
-        "webhook": "http://localhost:3000/api/webhooks/<webhookId>/<token>",
+        "webhook": "在此处粘贴你复制的 Webhook URL",
         "content": "Hello World from Test Bot!"
       }
     ]
     ```
-    *   **interval**: 发送消息的间隔时间（秒）。
-    *   **webhook**: 第 1 步中获取的 Webhook URL。
-    *   **content**: 希望 Bot 发送的消息内容。
+    *   `interval`: 发送消息的间隔（秒）。
+    *   `webhook`: 第 1 步中获取的 URL。
+    *   `content`: Bot 发送的消息内容。
 
-配置保存后，你将在对应频道中看到 Bot 每隔 60 秒自动发送一条消息。
+保存配置后，Bot 服务会自动同步。稍等片刻，你就能在指定频道中看到 Bot 定时发送的消息了。
 
 ---
 
-## 🐳 Docker 部署
+## Docker 部署
 
-适合快速部署完整的生产或演示环境。
+此方式适合一键部署包含所有依赖（Mew, MongoDB, Garage）的完整环境。
 
-### 1. 基础设施配置
-仓库已提供可直接启动的 `docker/garage/garage.toml`（内含 dev-only 密钥/Token）。
+### 步骤 1: 配置环境变量
+在项目根目录下，直接编辑 `docker-compose.env` 文件。**请务必修改以下默认值**：
+*   `JWT_SECRET`
+*   `MEW_ADMIN_SECRET`
+*   `MEW_CORS_ORIGINS` (生产环境请设置为你的前端访问域名，不要使用 `*`)
 
-如果你要部署到生产环境，建议自行生成并替换 `rpc_secret` / `admin_token` / `metrics_token`：
+:::info 生产环境基础设施
+默认的 `docker/garage/garage.toml` 包含仅供开发的密钥。在部署到生产环境前，强烈建议你自行生成 `rpc_secret`, `admin_token` 等并替换掉原有配置。
+:::
 
-**生成 RPC Secret:**
-```bash
-openssl rand -hex 32
-```
-
-**生成 Admin Token 和 Metrics Token:**
-```bash
-openssl rand -base64 32
-```
-
-请将生成的字符串填入 `garage.toml` 中对应的 `rpc_secret`, `admin_token`, `metrics_token` 等字段。
-
-### 2. 启动服务
+### 步骤 2: 启动所有服务
 在项目根目录下执行：
-
 ```bash
 docker compose --env-file docker-compose.env up --build
 ```
+该命令会构建 Mew 镜像，并拉取 `mongo` 和 `garage` 镜像，然后一并启动。
 
-> **💡 提示**：默认配置将自动启动 MongoDB 和 Garage 容器。若需连接外部数据库或对象存储，请修改 `docker-compose.yml` 中的相关配置。
+### 步骤 3: 访问服务
+服务启动后，你可以通过以下地址访问：
+*   **前端页面**: `http://localhost/`
+*   **后端 API**: `http://localhost/api` (已通过 Nginx 反向代理)
 
-### 3. 使用 Bot 服务
-Docker 环境下的 Bot 使用方式与本地开发一致。请参考 [本地开发 - 步骤 5](#步骤-5-配置并运行-bot) 进行 Webhook 配置与 Bot 注册。
+Bot 服务的使用方式与本地开发完全相同，请参考 [本地开发 - C. 在前端配置并激活 Bot](#c-在前端配置并激活-bot) 章节进行操作。
