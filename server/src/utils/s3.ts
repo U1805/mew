@@ -14,8 +14,43 @@ const buildBaseUrl = (host: string, port: number): string => {
   return `${protocol}://${host}:${port}`;
 };
 
+const normalizeStaticBaseUrl = (raw: string | undefined): string | null => {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/\/+$/, '');
+};
+
 const S3_ENDPOINT = buildBaseUrl(config.s3.endpoint, config.s3.port);
 const S3_PUBLIC_BASE = buildBaseUrl(`${config.s3.bucketName}.${config.s3.webEndpoint}`, config.s3.webPort);
+const STATIC_PUBLIC_BASE = normalizeStaticBaseUrl((config as any).staticUrl);
+
+const rewriteS3PublicUrlToStaticUrl = (rawUrl: string): string | null => {
+  if (!STATIC_PUBLIC_BASE) return null;
+
+  try {
+    const u = new URL(rawUrl);
+    // Avoid rewriting signed URLs / parameterized URLs.
+    if (u.search || u.hash) return null;
+
+    // If the URL is already on the configured static base (even if protocol/port differs),
+    // normalize it to exactly `${MEW_STATIC_URL}/<key>` so callers always get the reachable external URL.
+    const staticBase = new URL(`${STATIC_PUBLIC_BASE}/`);
+    if (u.hostname === staticBase.hostname && u.pathname.startsWith(staticBase.pathname)) {
+      const key = u.pathname.slice(staticBase.pathname.length).replace(/^\/+/, '');
+      return key ? `${STATIC_PUBLIC_BASE}/${key}` : STATIC_PUBLIC_BASE;
+    }
+
+    const s3Base = new URL(`${S3_PUBLIC_BASE}/`);
+    if (u.hostname !== s3Base.hostname) return null;
+
+    const key = u.pathname.replace(/^\/+/, '');
+    if (!key) return null;
+
+    return `${STATIC_PUBLIC_BASE}/${key}`;
+  } catch {
+    return null;
+  }
+};
 
 const s3Client = new S3Client({
   endpoint: S3_ENDPOINT,
@@ -72,8 +107,9 @@ export const configureBucketCors = async () => {
 // Helper to convert a stored S3 key into a full, publicly accessible URL.
 export const getS3PublicUrl = (key: string): string => {
   if (!key) return '';
-  // Don't re-hydrate a URL that is already complete.
-  if (key.startsWith('http')) return key;
+  // If a URL is already complete, keep it, but allow rewriting known Garage bucket URLs to MEW_STATIC_URL.
+  if (key.startsWith('http')) return rewriteS3PublicUrlToStaticUrl(key) ?? key;
+  if (STATIC_PUBLIC_BASE) return `${STATIC_PUBLIC_BASE}/${key}`;
   return `${S3_PUBLIC_BASE}/${key}`;
 };
 

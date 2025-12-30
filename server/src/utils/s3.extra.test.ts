@@ -23,6 +23,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/lib-storage', () => ({ Upload: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
+        staticUrl: '',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.local',
@@ -54,6 +55,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/lib-storage', () => ({ Upload: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
+        staticUrl: '',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.local',
@@ -105,6 +107,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
+        staticUrl: '',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.local',
@@ -148,6 +151,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
+        staticUrl: '',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.local',
@@ -187,6 +191,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
+        staticUrl: '',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.local',
@@ -208,5 +213,102 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     await expect(mod.configureBucketCors()).resolves.toBeUndefined();
     expect(warn).toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('getS3PublicUrl uses MEW_STATIC_URL override when set', async () => {
+    vi.resetModules();
+
+    vi.doMock('@aws-sdk/client-s3', () => ({
+      S3Client: vi.fn().mockImplementation(function (this: any) {
+        this.send = vi.fn();
+      }),
+      PutObjectCommand: vi.fn(),
+      GetObjectCommand: vi.fn(),
+      PutBucketCorsCommand: vi.fn(),
+    }));
+    vi.doMock('@aws-sdk/lib-storage', () => ({ Upload: vi.fn() }));
+    vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
+    vi.doMock('../config', () => ({
+      default: {
+        staticUrl: 'http://localhost:151/static/',
+        s3: {
+          endpoint: 'api.local',
+          webEndpoint: 'web.local',
+          port: 3900,
+          webPort: 3902,
+          accessKeyId: 'k',
+          secretAccessKey: 's',
+          bucketName: 'b',
+          useSsl: false,
+          region: 'r',
+          presignExpiresSeconds: 60,
+          corsAllowedOrigins: ['*'],
+        },
+      },
+    }));
+
+    const mod = await import('./s3');
+    expect(mod.getS3PublicUrl('k.png')).toBe('http://localhost:151/static/k.png');
+  });
+
+  it('getS3PublicUrl rewrites Garage bucket URLs to MEW_STATIC_URL when set', async () => {
+    vi.resetModules();
+
+    vi.doMock('@aws-sdk/client-s3', () => ({
+      S3Client: vi.fn().mockImplementation(function (this: any) {
+        this.send = vi.fn();
+      }),
+      PutObjectCommand: vi.fn(),
+      GetObjectCommand: vi.fn(),
+      PutBucketCorsCommand: vi.fn(),
+    }));
+    vi.doMock('@aws-sdk/lib-storage', () => ({ Upload: vi.fn() }));
+    vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
+    vi.doMock('../config', () => ({
+      default: {
+        staticUrl: 'http://localhost:151/static/',
+        s3: {
+          endpoint: 'api.local',
+          webEndpoint: 'web.garage.localhost',
+          port: 3900,
+          webPort: 80,
+          accessKeyId: 'k',
+          secretAccessKey: 's',
+          bucketName: 'mew-bucket',
+          useSsl: false,
+          region: 'r',
+          presignExpiresSeconds: 60,
+          corsAllowedOrigins: ['*'],
+        },
+      },
+    }));
+
+    const mod = await import('./s3');
+    expect(mod.getS3PublicUrl('http://mew-bucket.web.garage.localhost/HQgtYqX6Jl9F0Y3Fe0qnK.png')).toBe(
+      'http://localhost:151/static/HQgtYqX6Jl9F0Y3Fe0qnK.png'
+    );
+
+    // Already on static base: keep as-is.
+    expect(mod.getS3PublicUrl('http://localhost:151/static/HQgtYqX6Jl9F0Y3Fe0qnK.png')).toBe(
+      'http://localhost:151/static/HQgtYqX6Jl9F0Y3Fe0qnK.png'
+    );
+
+    // Host mismatch: don't rewrite.
+    expect(mod.getS3PublicUrl('http://example.com/HQgtYqX6Jl9F0Y3Fe0qnK.png')).toBe(
+      'http://example.com/HQgtYqX6Jl9F0Y3Fe0qnK.png'
+    );
+
+    // Signed/parameterized URL: don't rewrite.
+    expect(mod.getS3PublicUrl('http://mew-bucket.web.garage.localhost/HQgtYqX6Jl9F0Y3Fe0qnK.png?X-Amz-Signature=1')).toBe(
+      'http://mew-bucket.web.garage.localhost/HQgtYqX6Jl9F0Y3Fe0qnK.png?X-Amz-Signature=1'
+    );
+
+    // Port mismatch: still rewrite (common when Garage Web is behind a reverse proxy / port mapping).
+    expect(mod.getS3PublicUrl('http://mew-bucket.web.garage.localhost:81/HQgtYqX6Jl9F0Y3Fe0qnK.png')).toBe(
+      'http://localhost:151/static/HQgtYqX6Jl9F0Y3Fe0qnK.png'
+    );
+
+    // Invalid URL: keep as-is.
+    expect(mod.getS3PublicUrl('http://')).toBe('http://');
   });
 });

@@ -43,6 +43,10 @@ docker compose --env-file docker-compose.env up --build
 -   **后端 (API)**: `http://localhost/api` (由 Nginx 代理)
 -   **Garage Web**: `http://<bucket>.web.garage.localhost/<key>` (由 Nginx 代理)
 
+如果您将 `client` 的端口映射为非 `80`（例如 `151:80`），建议在 `docker-compose.env` 中设置：
+- `MEW_STATIC_URL=http://localhost:151/static/`（API 返回的文件 URL 会使用该前缀）
+- 并通过 `http://localhost:151/static/<key>` 访问文件
+
 :::info 关于 `*.localhost` 域名
 大多数现代操作系统会自动将任何 `*.localhost` 的子域名解析到 `127.0.0.1`。如果您的环境不支持，请手动修改 `hosts` 文件，或调整 `S3_WEB_ENDPOINT` 等相关环境变量。
 :::

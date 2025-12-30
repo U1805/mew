@@ -4,13 +4,6 @@ Welcome to Mew, a highly extensible personal digital hub centered around an Inst
 
 This project is a monorepo containing the client, server, and plugin services.
 
-## Documentation
-
-Project docs live in `website/docs` (Docusaurus).
-
-- Local preview: `pnpm dev:website`
-- Build: `pnpm build:website`
-
 ## Getting Started
 
 ### Docker (recommended)
@@ -43,11 +36,7 @@ docker compose --env-file docker-compose.env up --build
 
 Endpoints (default `docker-compose.yml`):
 
-- Client: `http://localhost:80`
-- Server: `http://localhost:3000/api`
-- MongoDB: `mongodb://localhost:27017`
-- Garage (S3 API): `http://localhost:3900`
-- Garage (Public Web): `http://localhost:3902`
+- `http://localhost:151`
 
 ### GHCR
 

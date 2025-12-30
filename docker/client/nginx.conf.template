@@ -31,6 +31,19 @@ server {
     proxy_set_header X-Forwarded-Proto $scheme;
   }
 
+  # Serve public files via a stable path-based URL.
+  # This is used when the host port is not 80, e.g. http://localhost:151/static/<key>
+  location /static/ {
+    # Force a fixed bucket by setting Host to <bucket>.<root_domain> for Garage Web.
+    proxy_set_header Host ${S3_BUCKET_NAME}.${S3_WEB_ENDPOINT};
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    rewrite ^/static/(.*)$ /$1 break;
+    proxy_pass http://garage:3902;
+  }
+
   location / {
     try_files $uri $uri/ /index.html;
   }
@@ -46,6 +59,17 @@ server {
 
   add_header X-Content-Type-Options "nosniff" always;
   add_header Referrer-Policy "no-referrer" always;
+
+  # If MEW_STATIC_URL is configured, redirect bucket-style URLs to the path-based URL.
+  # Example: http://mew-bucket.web.garage.localhost/<key> -> http://localhost:151/static/<key>
+  set $static_url "${MEW_STATIC_URL}";
+  set $static_url_trimmed $static_url;
+  if ($static_url_trimmed ~* ^(.+)/$) {
+    set $static_url_trimmed $1;
+  }
+  if ($static_url_trimmed != "") {
+    return 302 $static_url_trimmed$request_uri;
+  }
 
   location / {
     proxy_pass http://garage:3902;
@@ -76,4 +100,3 @@ server {
 #     proxy_set_header X-Forwarded-Proto $scheme;
 #   }
 # }
-

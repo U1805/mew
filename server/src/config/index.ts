@@ -75,6 +75,7 @@ export const createConfig = (env: ConfigEnv = process.env, deps?: { fs?: typeof 
     env: env.NODE_ENV || 'development',
     mongoUri: env.MONGO_URI || 'mongodb://localhost:27017/mew',
     port: parsePort(env.PORT, 3000),
+    staticUrl: (env.MEW_STATIC_URL || '').trim(),
     jwtSecret: env.JWT_SECRET || (isProduction ? '' : 'dev-jwt-secret'),
     jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN),
     allowUserRegistration: parseBoolean(env.MEW_ALLOW_USER_REGISTRATION, true),

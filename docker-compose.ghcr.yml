@@ -2,7 +2,7 @@
 # Use with: docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
 services:
   garage-init:
-    image: "ghcr.io/u1805/mew/garage-init:${MEW_IMAGE_TAG:-latest}"
+    image: "ghcr.io/u1805/mew/garage-init:latest"
     build: null
 
   server:

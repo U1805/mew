@@ -70,6 +70,7 @@ services:
       MEW_CORS_ORIGINS: ${MEW_CORS_ORIGINS:-*}
       MEW_TRUST_PROXY: ${MEW_TRUST_PROXY:-loopback}
       MEW_INFRA_ALLOWED_IPS: ${MEW_INFRA_ALLOWED_IPS:-}
+      MEW_STATIC_URL: ${MEW_STATIC_URL:-http://localhost:151/static/}
       # Garage (S3-compatible storage)
       S3_ENDPOINT: garage
       S3_PORT: 3900
@@ -100,8 +101,11 @@ services:
       - server
     environment:
       LIMIT_FILE_SIZE: ${LIMIT_FILE_SIZE:-50}
+      MEW_STATIC_URL: ${MEW_STATIC_URL:-http://localhost:151/static/}
+      S3_BUCKET_NAME: ${S3_BUCKET_NAME:-mew-bucket}
+      S3_WEB_ENDPOINT: ${S3_WEB_ENDPOINT:-web.garage.localhost}
     ports:
-      - "80:80"
+      - "151:80"
 
   plugins:
     build:

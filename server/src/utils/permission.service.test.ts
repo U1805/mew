@@ -166,6 +166,17 @@ describe('Permission Service - calculateEffectivePermissions', () => {
     expect(permissions).toContain('SEND_MESSAGES');
   });
 
+  it('should apply a DENY override from a member-specific override', () => {
+    const everyoneRole = createMockRole(everyoneRoleId, ['SEND_MESSAGES'], 0, true);
+    const member = createMockMember(user1Id, [everyoneRoleId]);
+    const channel = createMockChannel(ChannelType.GUILD_TEXT, [
+      { targetType: 'member', targetId: user1Id, allow: [], deny: ['SEND_MESSAGES'] },
+    ]);
+
+    const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
+    expect(permissions).toEqual(new Set());
+  });
+
   it('should correctly apply overrides based on role position hierarchy', () => {
     const everyoneRole = createMockRole(everyoneRoleId, [], 0, true);
     const lowerRole = createMockRole(role1Id, [], 1); // position 1

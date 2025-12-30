@@ -8,6 +8,7 @@ vi.mock('@aws-sdk/lib-storage');
 vi.mock('nanoid');
 vi.mock('../config', () => ({
   default: {
+    staticUrl: '',
     s3: {
       endpoint: 'mock-s3.com',
       webEndpoint: 'mock-s3.com',
