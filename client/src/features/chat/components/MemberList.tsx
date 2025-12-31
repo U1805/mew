@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import clsx from 'clsx';
 import { memberApi } from '../../../shared/services/api';
 import { ServerMember, Role } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
@@ -19,13 +20,11 @@ const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
 };
 
 const MemberList = () => {
-  const { currentServerId, currentChannelId } = useUIStore();
+  const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList } = useUIStore();
   const onlineStatus = usePresenceStore(state => state.onlineStatus);
 
   const { data: members, isLoading: membersLoading } = useMembers(currentServerId);
   const { data: roles, isLoading: rolesLoading } = useRoles(currentServerId);
-
-  if (!currentServerId) return null;
 
   const isLoading = membersLoading || rolesLoading;
 
@@ -87,24 +86,51 @@ const MemberList = () => {
   }, [members, roles, currentChannelId]);
 
   return (
-    <div className="w-60 bg-[#2B2D31] flex flex-col flex-shrink-0 h-full overflow-y-auto custom-scrollbar p-3">
-      {isLoading ? (
-          <div className="flex justify-center mt-10">
-             <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" />
-          </div>
-      ) : (
-          <>
-            {memberGroups.map(([groupName, members]) => (
+    <>
+      {/* Mobile Backdrop - Fade In/Out */}
+      <div
+        className={clsx(
+          "fixed inset-0 bg-black/60 z-30 md:hidden transition-opacity duration-300 ease-in-out",
+          isMemberListOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+        onClick={toggleMemberList}
+      />
+
+      {/* Member List Drawer */}
+      <div
+        className={clsx(
+          "bg-[#2B2D31] flex flex-col flex-shrink-0 h-full overflow-y-auto custom-scrollbar border-l border-mew-darkest shadow-xl",
+          // Animation Transitions
+          "transition-[width,transform] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+          // Positioning:
+          // Mobile: Fixed absolute on right, slides in/out.
+          // Desktop: Relative flex item, width animates from 0 to 240px.
+          "absolute right-0 top-0 bottom-0 z-40 md:relative md:z-0",
+          isMemberListOpen 
+            ? "w-[240px] translate-x-0" 
+            : "w-[240px] translate-x-[100%] md:w-0 md:translate-x-0 md:border-none"
+        )}
+      >
+        <div className={clsx("p-3 pb-20 md:pb-3 w-[240px]")}> {/* Fixed width content container to prevent squishing during width transition */}
+            {!currentServerId ? null : isLoading ? (
+            <div className="flex justify-center mt-10">
+                <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" />
+            </div>
+            ) : (
+            <>
+                {memberGroups.map(([groupName, members]) => (
                 <MemberGroup
                     key={groupName}
                     title={`${groupName} — ${members.length}`}
                     members={members}
                     onlineStatus={onlineStatus}
                 />
-            ))}
-          </>
-      )}
-    </div>
+                ))}
+            </>
+            )}
+        </div>
+      </div>
+    </>
   );
 };
 

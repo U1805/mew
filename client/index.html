@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>Mew | Digital Hub</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,13 +28,24 @@
                 divider: '#1E1F22'
               }
             },
+            transitionTimingFunction: {
+              // iOS-like silky smooth easing
+              'ios': 'cubic-bezier(0.32, 0.72, 0, 1)',
+              'spring': 'cubic-bezier(0.175, 0.885, 0.32, 1.1)',
+            },
             animation: {
               'mention-flash-anim': 'mention-flash 0.8s ease-in-out 2',
               'fade-in': 'fadeIn 0.2s ease-out forwards',
-              'fade-in-up': 'fadeInUp 0.3s ease-out forwards',
+              'fade-in-up': 'fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards', // Smoother up
               'scale-in': 'scaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards',
               'pop': 'pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards',
               'scale-out': 'scaleOut 0.2s cubic-bezier(0.4, 0, 1, 1) forwards',
+              // Mobile Page Transitions
+              'slide-in-right': 'slideInRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards',
+              'slide-out-left': 'slideOutLeft 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards',
+              'slide-in-left': 'slideInLeft 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards',
+              'slide-out-right': 'slideOutRight 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards',
+              'bottom-sheet-up': 'bottomSheetUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards',
             },
             keyframes: {
               'mention-flash': {
@@ -46,11 +57,11 @@
                 '100%': { opacity: '1' },
               },
               fadeInUp: {
-                '0%': { opacity: '0', transform: 'translateY(10px)' },
-                '100%': { opacity: '1', transform: 'translateY(0)' },
+                '0%': { opacity: '0', transform: 'translateY(15px) scale(0.98)' },
+                '100%': { opacity: '1', transform: 'translateY(0) scale(1)' },
               },
               scaleIn: {
-                '0%': { opacity: '0', transform: 'scale(0.9)' },
+                '0%': { opacity: '0', transform: 'scale(0.95)' },
                 '100%': { opacity: '1', transform: 'scale(1)' },
               },
               pop: {
@@ -60,6 +71,27 @@
               scaleOut: {
                 '0%': { transform: 'scale(1)', opacity: '1' },
                 '100%': { transform: 'scale(0.5)', opacity: '0' },
+              },
+              // New Mobile Keyframes
+              slideInRight: {
+                '0%': { transform: 'translateX(100%)' },
+                '100%': { transform: 'translateX(0)' },
+              },
+              slideOutLeft: {
+                '0%': { transform: 'translateX(0)' },
+                '100%': { transform: 'translateX(-30%)', opacity: '0' }, // Parallax effect
+              },
+              slideInLeft: {
+                '0%': { transform: 'translateX(-30%)', opacity: '0' },
+                '100%': { transform: 'translateX(0)', opacity: '1' },
+              },
+              slideOutRight: {
+                '0%': { transform: 'translateX(0)' },
+                '100%': { transform: 'translateX(100%)' },
+              },
+              bottomSheetUp: {
+                '0%': { transform: 'translateY(100%)' },
+                '100%': { transform: 'translateY(0)' },
               }
             }
           }
@@ -70,6 +102,17 @@
       body {
         background-color: #313338;
         color: #DBDEE1;
+        /* Prevent bounce scroll on mobile */
+        overscroll-behavior-y: none;
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        /* Use dynamic viewport height for mobile browsers */
+        height: 100dvh; 
+      }
+      #root {
+        height: 100%;
+        width: 100%;
       }
       /* Custom Scrollbar */
       ::-webkit-scrollbar {
@@ -85,6 +128,36 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #111214;
+      }
+
+      /* Hide scrollbar for Chrome, Safari and Opera on mobile generally if preferred */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Adjust inputs for mobile to prevent auto-zoom (font-size 16px is iOS threshold) */
+      @media screen and (max-width: 768px) {
+        input, textarea, select {
+          font-size: 16px !important; 
+        }
+      }
+
+      /* Mobile Bottom Sheet Override */
+      @media screen and (max-width: 640px) {
+        .animate-scale-in {
+          /* Replace scale-in with slide-up for mobile modals */
+          animation: bottomSheetUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards !important;
+          border-bottom-left-radius: 0 !important;
+          border-bottom-right-radius: 0 !important;
+          margin-bottom: 0 !important;
+          margin-top: auto !important;
+          width: 100% !important;
+          max-width: 100% !important;
+        }
       }
     </style>
 </head>

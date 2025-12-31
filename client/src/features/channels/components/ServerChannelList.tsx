@@ -59,12 +59,12 @@ export const ServerChannelList: React.FC = () => {
   });
 
   return (
-    <div className="w-60 bg-mew-darker flex flex-col flex-shrink-0 border-r border-mew-darkest">
+    <div className="w-full h-full bg-mew-darker flex flex-col flex-shrink-0 border-r border-mew-darkest">
       {/* Server Header Dropdown */}
       <div
         ref={dropdownRef}
         className={clsx(
-            "h-12 shadow-sm flex items-center justify-between px-4 border-b border-mew-darkest cursor-pointer transition-colors relative select-none",
+            "h-12 shadow-sm flex items-center justify-between px-4 border-b border-mew-darkest cursor-pointer transition-colors relative select-none shrink-0",
             isDropdownOpen ? "bg-[#35373C] hover:bg-[#35373C]" : "hover:bg-mew-dark"
         )}
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
@@ -166,7 +166,10 @@ export const ServerChannelList: React.FC = () => {
                         <Icon
                             icon="mdi:chevron-down"
                             width="12"
-                            className={clsx("mr-0.5 transition-transform duration-200", collapsedCategories[category._id] && "-rotate-90")}
+                            className={clsx(
+                                "mr-0.5 transition-transform duration-200 ease-ios", // Use silky ease
+                                collapsedCategories[category._id] ? "-rotate-90" : "rotate-0"
+                            )}
                         />
                         {category.name}
                     </div>

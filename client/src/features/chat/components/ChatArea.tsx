@@ -13,7 +13,13 @@ import { useChannel } from '../hooks/useChannel';
 import { ChannelType } from '../../../shared/types';
 
 const ChatArea: React.FC = () => {
-  const { currentServerId, currentChannelId, isMemberListOpen, toggleMemberList } = useUIStore();
+  const { 
+    currentServerId, 
+    currentChannelId, 
+    isMemberListOpen, 
+    toggleMemberList,
+    toggleMobileSidebar
+  } = useUIStore();
 
   const { data: channel } = useChannel(currentServerId, currentChannelId);
   const isDM = channel?.type === ChannelType.DM;
@@ -27,19 +33,35 @@ const ChatArea: React.FC = () => {
   } = useMessages(currentServerId, currentChannelId);
   useSocketMessages(currentChannelId);
 
+  // --- 空状态处理 (未选择频道) ---
   if (!currentChannelId) {
     return (
-      <div className="flex-1 bg-mew-dark flex items-center justify-center flex-col text-mew-textMuted">
+      <div className="flex-1 bg-mew-dark flex items-center justify-center flex-col text-mew-textMuted h-full relative">
+        
+        {/* 
+          新增：移动端左上角的汉堡菜单 
+          让用户在空状态下也能唤出侧边栏
+        */}
+        <div className="absolute top-0 left-0 w-full h-12 flex items-center px-4 md:hidden z-10">
+          <button 
+            onClick={() => toggleMobileSidebar(true)}
+            className="text-mew-textMuted hover:text-white p-2 -ml-2 active:scale-90 transition-transform rounded-full hover:bg-mew-darker/50"
+          >
+            <Icon icon="mdi:menu" width="28" height="28" />
+          </button>
+        </div>
+
         <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
              <Icon icon="mdi:chat-outline" width="32" height="32" />
         </div>
-        <p>Select a channel to start chatting</p>
+        <p className="mb-6">Select a channel to start chatting</p>
       </div>
     );
   }
 
+  // --- 正常聊天界面 ---
   return (
-    <div className="flex-1 bg-mew-dark flex flex-col min-w-0 h-full">
+    <div className="flex-1 bg-mew-dark flex flex-col min-w-0 h-full relative overflow-hidden">
       <ChatHeader channel={channel || null} isMemberListOpen={isMemberListOpen} toggleMemberList={toggleMemberList} />
       <div className="flex flex-1 overflow-hidden relative">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
@@ -54,12 +76,12 @@ const ChatArea: React.FC = () => {
           />
           <MessageInput channel={channel || null} serverId={currentServerId} channelId={currentChannelId} />
         </div>
-        {/* Search Results Panel - Overlays or sits next to content, but here using absolute positioning within the container managed by itself or container */}
+        
         <SearchResultsPanel />
         {isDM && <DmSearchResultsPanel />}
         
-        {/* Only show member list for server channels */}
-        {isMemberListOpen && currentServerId && <MemberList />}
+        {/* Always render MemberList, it handles its own visibility/animation */}
+        {currentServerId && <MemberList />}
       </div>
     </div>
   );

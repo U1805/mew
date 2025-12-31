@@ -27,8 +27,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   children
 }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[33vh]">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in sm:p-0">
+      <div className="bg-[#313338] w-full sm:w-full sm:max-w-md rounded-t-lg sm:rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[85vh] sm:max-h-[80vh]">
 
         <div className="px-4 pt-5 pb-2 shrink-0">
           <h2 className="text-xl font-bold text-white mb-2">{title}</h2>

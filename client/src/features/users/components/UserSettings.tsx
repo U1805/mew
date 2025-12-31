@@ -16,6 +16,8 @@ const UserSettings: React.FC = () => {
   const { user, logout, setAuth, token } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState('account');
+  // New state for mobile navigation
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -49,7 +51,7 @@ const UserSettings: React.FC = () => {
 
       setPendingFile(file);
       setPreviewUrl(URL.createObjectURL(file));
-      e.target.value = ''; // Reset input to allow re-selecting the same file if cancelled
+      e.target.value = ''; 
   };
 
   const cancelUpload = () => {
@@ -116,17 +118,34 @@ const UserSettings: React.FC = () => {
     }
   };
 
+  const handleTabClick = (tab: string) => {
+      setActiveTab(tab);
+      setMobileMenuOpen(false); // Switch to content view on mobile
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
-      {/* Sidebar (Left) */}
-      <div className="w-full max-w-[35%] min-w-[218px] bg-[#2B2D31] flex flex-col items-end pt-[60px] pb-4 px-2 overflow-y-auto">
-         <div className="w-[192px] px-1.5">
+    <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans">
+      
+      {/* Sidebar (Left) - Hidden on mobile when content is open */}
+      <div className={clsx(
+          "w-full md:w-[35%] md:min-w-[218px] bg-[#2B2D31] flex-col md:items-end pt-4 md:pt-[60px] pb-4 px-2 overflow-y-auto z-10",
+          mobileMenuOpen ? "flex" : "hidden md:flex"
+      )}>
+         <div className="w-full md:w-[192px] px-4 md:px-1.5">
+            {/* Mobile Header with Close Button inside sidebar */}
+            <div className="flex md:hidden items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-white">Settings</h2>
+                <button onClick={closeSettings} className="p-2 text-mew-textMuted hover:text-white">
+                    <Icon icon="mdi:close" width="24" />
+                </button>
+            </div>
+
             <div className="text-xs font-bold text-mew-textMuted uppercase px-2.5 mb-1.5 mt-2">User Settings</div>
             
-            <SidebarItem label="My Account" isActive={activeTab === 'account'} onClick={() => setActiveTab('account')} />
+            <SidebarItem label="My Account" isActive={activeTab === 'account'} onClick={() => handleTabClick('account')} />
             <SidebarItem label="Profiles" />
-            <SidebarItem label="Plugins" isActive={activeTab === 'plugins'} onClick={() => setActiveTab('plugins')} />
-            <SidebarItem label="Bots" isActive={activeTab === 'bots'} onClick={() => setActiveTab('bots')} />
+            <SidebarItem label="Plugins" isActive={activeTab === 'plugins'} onClick={() => handleTabClick('plugins')} />
+            <SidebarItem label="Bots" isActive={activeTab === 'bots'} onClick={() => handleTabClick('bots')} />
             <SidebarItem label="Privacy & Safety" />
             <SidebarItem label="Family Center" />
             <SidebarItem label="Authorized Apps" />
@@ -155,140 +174,157 @@ const UserSettings: React.FC = () => {
          </div>
       </div>
 
-      {/* Main Content (Center) */}
-      <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[740px] overflow-y-auto custom-scrollbar">
+      {/* Main Content (Center) - Hidden on mobile when menu is open */}
+      <div className={clsx(
+          "flex-1 bg-[#313338] pt-0 md:pt-[60px] px-0 md:px-10 max-w-full md:max-w-[740px] overflow-y-auto custom-scrollbar flex flex-col h-full",
+          !mobileMenuOpen ? "flex" : "hidden md:flex"
+      )}>
         
-        {activeTab === 'account' && (
-            <>
-                <h2 className="text-xl font-bold text-white mb-6">My Account</h2>
+        {/* Mobile Header: Back Button & Context Title */}
+        <div className="md:hidden h-14 flex items-center px-4 bg-[#313338] border-b border-[#26272D] sticky top-0 z-20 shrink-0">
+            <button 
+                onClick={() => setMobileMenuOpen(true)}
+                className="mr-4 text-mew-textMuted hover:text-white"
+            >
+                <Icon icon="mdi:arrow-left" width="24" />
+            </button>
+            <span className="font-bold text-lg text-white capitalize">
+                {activeTab === 'account' ? 'My Account' : activeTab}
+            </span>
+        </div>
 
-                {/* Profile Card */}
-                <div className="bg-[#1E1F22] rounded-lg mb-8 overflow-hidden">
-                    {/* Banner Area */}
-                    <div className="h-[100px] bg-mew-accent relative">
-                        {/* Avatar */}
-                        <div className="absolute left-4 -bottom-[36px]">
-                            <div 
-                                className="w-[80px] h-[80px] rounded-full p-[6px] bg-[#1E1F22] relative group cursor-pointer"
-                                onClick={handleAvatarClick}
-                            >
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef} 
-                                    className="hidden" 
-                                    accept="image/png, image/jpeg, image/gif" 
-                                    onChange={handleFileChange}
-                                />
-                                
-                                <div className="w-full h-full rounded-full overflow-hidden relative">
-                                    {user?.avatarUrl ? (
-                                        <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full bg-mew-accentHover flex items-center justify-center text-white text-2xl font-bold">
-                                            {user?.username?.slice(0, 2).toUpperCase()}
-                                        </div>
-                                    )}
+        <div className="p-4 md:p-0 pb-10">
+            {activeTab === 'account' && (
+                <>
+                    <h2 className="text-xl font-bold text-white mb-6 hidden md:block">My Account</h2>
+
+                    {/* Profile Card */}
+                    <div className="bg-[#1E1F22] rounded-lg mb-8 overflow-hidden">
+                        {/* Banner Area */}
+                        <div className="h-[100px] bg-mew-accent relative">
+                            {/* Avatar */}
+                            <div className="absolute left-4 -bottom-[36px]">
+                                <div 
+                                    className="w-[80px] h-[80px] rounded-full p-[6px] bg-[#1E1F22] relative group cursor-pointer"
+                                    onClick={handleAvatarClick}
+                                >
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/png, image/jpeg, image/gif" 
+                                        onChange={handleFileChange}
+                                    />
                                     
-                                    {/* Hover Overlay */}
-                                    <div className={clsx(
-                                        "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
-                                        isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                    )}>
-                                        {isUploading ? (
-                                            <Icon icon="mdi:loading" className="text-white animate-spin" width="24" />
+                                    <div className="w-full h-full rounded-full overflow-hidden relative">
+                                        {user?.avatarUrl ? (
+                                            <img src={user.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="text-white text-[10px] font-bold uppercase tracking-wide">Change</span>
+                                            <div className="w-full h-full bg-mew-accentHover flex items-center justify-center text-white text-2xl font-bold">
+                                                {user?.username?.slice(0, 2).toUpperCase()}
+                                            </div>
                                         )}
+                                        
+                                        {/* Hover Overlay */}
+                                        <div className={clsx(
+                                            "absolute inset-0 bg-black/50 flex items-center justify-center transition-opacity",
+                                            isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                        )}>
+                                            {isUploading ? (
+                                                <Icon icon="mdi:loading" className="text-white animate-spin" width="24" />
+                                            ) : (
+                                                <span className="text-white text-[10px] font-bold uppercase tracking-wide">Change</span>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#1E1F22]"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Info Area */}
+                        <div className="pt-12 pb-4 px-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white">{user?.username}</h3>
+                                    <p className="text-sm text-mew-textMuted">#{user?.discriminator || '0000'}</p>
+                                </div>
+                                <button 
+                                    onClick={handleAvatarClick}
+                                    disabled={isUploading}
+                                    className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors w-full sm:w-auto"
+                                >
+                                    Edit User Profile
+                                </button>
+                            </div>
+
+                            {/* Account Details Block */}
+                            <div className="bg-[#2B2D31] rounded-lg p-4 space-y-5">
+                                
+                                {/* Display Name */}
+                                <div className="flex justify-between items-center">
+                                    <div className="min-w-0 pr-2">
+                                        <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Display Name</div>
+                                        <div className="text-white text-sm font-medium truncate">{user?.username}</div>
+                                    </div>
+                                    <button onClick={() => setIsEditUsernameModalOpen(true)} className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors shrink-0">
+                                        Edit
+                                    </button>
                                 </div>
 
-                                <div className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-green-500 border-[4px] border-[#1E1F22]"></div>
+                                {/* Email */}
+                                <div className="flex justify-between items-center">
+                                    <div className="min-w-0 pr-2">
+                                        <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Email</div>
+                                        <div className="text-white text-sm font-medium truncate">
+                                            {user?.email ? user.email.replace(/(.{2})(.*)(@.*)/, "$1*****$3") : 'No Email'}
+                                        </div>
+                                    </div>
+                                    <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors shrink-0">
+                                        Edit
+                                    </button>
+                                </div>
+
+                                {/* Phone Number */}
+                                <div className="flex justify-between items-center">
+                                    <div className="min-w-0 pr-2">
+                                        <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Phone Number</div>
+                                        <div className="text-mew-textMuted text-sm truncate">You haven&rsquo;t added a phone number yet.</div>
+                                    </div>
+                                    <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors shrink-0">
+                                        Add
+                                    </button>
+                                </div>
+
                             </div>
                         </div>
                     </div>
 
-                    {/* Info Area */}
-                    <div className="pt-12 pb-4 px-4">
-                        <div className="flex items-center justify-between mb-6">
-                            <div>
-                                <h3 className="text-xl font-bold text-white">{user?.username}</h3>
-                                <p className="text-sm text-mew-textMuted">#{user?.discriminator || '0000'}</p>
-                            </div>
-                            <button 
-                                onClick={handleAvatarClick}
-                                disabled={isUploading}
-                                className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
-                            >
-                                Edit User Profile
-                            </button>
-                        </div>
+                    <div className="h-[1px] bg-mew-divider my-8"></div>
 
-                        {/* Account Details Block */}
-                        <div className="bg-[#2B2D31] rounded-lg p-4 space-y-5">
-                            
-                            {/* Display Name */}
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Display Name</div>
-                                    <div className="text-white text-sm font-medium">{user?.username}</div>
-                                </div>
-                                <button onClick={() => setIsEditUsernameModalOpen(true)} className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                                    Edit
-                                </button>
-                            </div>
-
-                            {/* Email */}
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Email</div>
-                                    <div className="text-white text-sm font-medium">
-                                        {user?.email ? user.email.replace(/(.{2})(.*)(@.*)/, "$1*****$3") : 'No Email'}
-                                    </div>
-                                </div>
-                                <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                                    Edit
-                                </button>
-                            </div>
-
-                            {/* Phone Number */}
-                            <div className="flex justify-between items-center">
-                                <div>
-                                    <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Phone Number</div>
-                                    <div className="text-mew-textMuted text-sm">You haven&rsquo;t added a phone number yet.</div>
-                                </div>
-                                <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded text-sm font-medium transition-colors">
-                                    Add
-                                </button>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-
-                <div className="h-[1px] bg-mew-divider my-8"></div>
-
-                {/* Password & Auth */}
-                <h3 className="text-lg font-bold text-white mb-4">Password and Authentication</h3>
-                <button onClick={() => setIsChangePasswordModalOpen(true)} className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors mb-2">
-                    Change Password
-                </button>
-                <div className="text-xs text-mew-textMuted mt-4 mb-8">
-                    <h4 className="font-bold uppercase mb-2">Two-Factor Authentication</h4>
-                    <p className="mb-4">Protect your account with an extra layer of security. Once configured, you&rsquo;ll be required to enter both your password and an authentication code from your mobile phone in order to sign in.</p>
-                    <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-2 rounded text-sm font-medium transition-colors">
-                        Enable Two-Factor Auth
+                    {/* Password & Auth */}
+                    <h3 className="text-lg font-bold text-white mb-4">Password and Authentication</h3>
+                    <button onClick={() => setIsChangePasswordModalOpen(true)} className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors mb-2">
+                        Change Password
                     </button>
-                </div>
-            </>
-        )}
+                    <div className="text-xs text-mew-textMuted mt-4 mb-8">
+                        <h4 className="font-bold uppercase mb-2">Two-Factor Authentication</h4>
+                        <p className="mb-4 leading-5">Protect your account with an extra layer of security. Once configured, you&rsquo;ll be required to enter both your password and an authentication code from your mobile phone in order to sign in.</p>
+                        <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+                            Enable Two-Factor Auth
+                        </button>
+                    </div>
+                </>
+            )}
 
-        {activeTab === 'plugins' && <PluginManagementPanel />}
-        {activeTab === 'bots' && <BotManagementPanel />}
-
+            {activeTab === 'plugins' && <PluginManagementPanel />}
+            {activeTab === 'bots' && <BotManagementPanel />}
+        </div>
       </div>
 
-      {/* Close Button Column (Right) */}
-      <div className="w-[18%] min-w-[60px] pt-[60px] pl-5">
+      {/* Close Button Column (Right) - Desktop Only */}
+      <div className="hidden md:block w-[18%] min-w-[60px] pt-[60px] pl-5">
          <div 
             className="flex flex-col items-center cursor-pointer group"
             onClick={closeSettings}

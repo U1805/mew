@@ -31,8 +31,8 @@ export const DMChannelList = () => {
   };
 
   return (
-    <div className="w-60 bg-mew-darker flex flex-col border-r border-mew-darkest flex-shrink-0">
-      <div className="h-12 shadow-sm flex items-center px-2 border-b border-mew-darkest">
+    <div className="w-full h-full bg-mew-darker flex flex-col border-r border-mew-darkest flex-shrink-0">
+      <div className="h-12 shadow-sm flex items-center px-2 border-b border-mew-darkest shrink-0">
            <button
               className="w-full text-left px-2 py-1 rounded bg-mew-darkest text-mew-textMuted text-sm hover:bg-[#1E1F22] transition-colors"
               onClick={() => openModal('findUser')}

@@ -15,6 +15,7 @@ interface ChatHeaderProps {
 const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, toggleMemberList }) => {
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
+  const [mobileSearchActive, setMobileSearchActive] = useState(false);
   const {
     currentServerId,
     setSearchOpen,
@@ -23,6 +24,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
     setDmSearchOpen,
     setDmSearchQuery,
     isDmSearchOpen,
+    toggleMobileSidebar,
   } = useUIStore();
 
   const [inputValue, setInputValue] = useState('');
@@ -31,12 +33,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
   const [dmInputValue, setDmInputValue] = useState('');
   const dmDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Sync internal state with store state (handle closing from other components)
+  useEffect(() => {
+    if (!isSearchOpen && !isDmSearchOpen) {
+        setMobileSearchActive(false);
+    }
+  }, [isSearchOpen, isDmSearchOpen]);
+
   useEffect(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
     debounceTimerRef.current = setTimeout(() => {
       setSearchQuery(inputValue);
-      setSearchOpen(!!inputValue.trim());
+      // Only auto-open if we are typing, not just clearing
+      if (inputValue.trim()) setSearchOpen(true);
     }, 300);
 
     return () => {
@@ -59,7 +69,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
 
     dmDebounceTimerRef.current = setTimeout(() => {
       setDmSearchQuery(dmInputValue);
-      setDmSearchOpen(!!dmInputValue.trim());
+      if (dmInputValue.trim()) setDmSearchOpen(true);
     }, 300);
 
     return () => {
@@ -91,9 +101,61 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
 
   const isOnline = otherUser && onlineStatus[otherUser._id] === 'online';
 
+  const handleMobileCancel = () => {
+    setMobileSearchActive(false);
+    if (isDM) setDmSearchOpen(false);
+    else setSearchOpen(false);
+  };
+
+  const handleMobileSearchStart = () => {
+    setMobileSearchActive(true);
+    if (isDM) setDmSearchOpen(true);
+    else setSearchOpen(true);
+  };
+
   return (
-    <div className="h-12 border-b border-mew-darkest flex items-center px-4 shadow-sm flex-shrink-0 bg-mew-dark z-20">
-      <div className="text-mew-textMuted mr-2 flex items-center justify-center">
+    <div className="h-12 border-b border-mew-darkest flex items-center px-4 shadow-sm flex-shrink-0 bg-mew-dark z-20 relative transition-colors duration-200">
+      
+      {/* Mobile Search Overlay - Transforms existing header into search bar */}
+      {mobileSearchActive && (
+        <div className="absolute inset-0 bg-[#2B2D31] z-30 flex items-center px-3 animate-fade-in w-full">
+           <div className="flex-1 relative flex items-center">
+              <input 
+                  type="text" 
+                  autoFocus
+                  placeholder={isDM ? "Search DM" : "Search"}
+                  value={isDM ? dmInputValue : inputValue}
+                  onChange={(e) => isDM ? setDmInputValue(e.target.value) : setInputValue(e.target.value)}
+                  className="bg-[#1E1F22] text-sm rounded-md pl-9 pr-8 py-1.5 w-full focus:outline-none text-white placeholder-mew-textMuted border-none" 
+              />
+              <Icon icon="mdi:magnify" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-mew-textMuted" width="18" />
+              {(isDM ? dmInputValue : inputValue) && (
+                  <button 
+                    onClick={() => isDM ? setDmInputValue('') : setInputValue('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-mew-textMuted hover:text-white"
+                  >
+                      <Icon icon="mdi:close-circle" width="16" />
+                  </button>
+              )}
+           </div>
+           <button 
+             onClick={handleMobileCancel} 
+             className="ml-3 text-white text-sm font-medium whitespace-nowrap active:opacity-70"
+           >
+             Cancel
+           </button>
+        </div>
+      )}
+
+      {/* Hamburger / Back Button (Mobile) - Hidden when searching */}
+      <button 
+        className={clsx("md:hidden mr-3 text-mew-textMuted hover:text-white cursor-pointer active:scale-90 transition-transform p-1 -ml-1", mobileSearchActive && "hidden")}
+        onClick={() => toggleMobileSidebar(true)}
+      >
+        <Icon icon="mdi:menu" width="26" height="26" />
+      </button>
+
+      <div className={clsx("text-mew-textMuted mr-2 flex items-center justify-center", mobileSearchActive && "hidden")}>
           {isDM ? (
               <Icon icon="mdi:at" width="24" height="24" />
           ) : (
@@ -101,10 +163,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
           )}
       </div>
 
-      <span className="font-bold text-white mr-2">{title}</span>
+      <span className={clsx("font-bold text-white mr-2 truncate flex-1 md:flex-none", mobileSearchActive && "hidden")}>{title}</span>
 
-      {isDM && otherUser && (
-           <div className="flex items-center">
+      {isDM && otherUser && !mobileSearchActive && (
+           <div className="flex items-center flex-shrink-0">
                 <div className={clsx(
                     "w-2.5 h-2.5 rounded-full mr-2",
                     isOnline ? "bg-green-500" : "bg-gray-500"
@@ -113,24 +175,34 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
            </div>
       )}
 
-      {!isDM && (
-          <span className="text-xs text-mew-textMuted border-l border-mew-textMuted pl-2 ml-2 hidden md:block truncate">
-            {channel?.topic || `Welcome to the beginning of the #${title} channel.`}
+      {!isDM && !mobileSearchActive && (
+          <span className="text-xs text-mew-textMuted border-l border-mew-textMuted pl-2 ml-2 hidden md:block truncate max-w-[300px]">
+            {channel?.topic || `Welcome to #${title}`}
           </span>
       )}
       
-      <div className="ml-auto flex items-center space-x-4 text-mew-textMuted">
-        <Icon icon="mdi:bell" className="hover:text-mew-text cursor-pointer hidden sm:block" />
-        <Icon icon="mdi:pin" className="hover:text-mew-text cursor-pointer hidden sm:block" />
+      <div className="ml-auto flex items-center space-x-3 text-mew-textMuted flex-shrink-0">
+        {/* Mobile Search Icon Trigger */}
+        <button 
+          className={clsx("lg:hidden hover:text-mew-text p-1 active:bg-[#35373C] rounded", mobileSearchActive && "hidden")}
+          onClick={handleMobileSearchStart}
+        >
+           <Icon icon="mdi:magnify" width="22" />
+        </button>
+
+        <Icon icon="mdi:bell" className="hover:text-mew-text cursor-pointer hidden sm:block" width="22" />
+        <Icon icon="mdi:pin" className="hover:text-mew-text cursor-pointer hidden sm:block" width="22" />
 
         {!isDM && (
-            <Icon
-            icon="mdi:account-group"
-            className={clsx("hover:text-mew-text cursor-pointer transition-colors", isMemberListOpen && "text-white")}
-            onClick={toggleMemberList}
-            />
+            <button 
+              className={clsx("p-1 transition-colors active:scale-95", isMemberListOpen ? "text-white" : "hover:text-mew-text", mobileSearchActive && "hidden")}
+              onClick={toggleMemberList}
+            >
+              <Icon icon="mdi:account-group" width="24" height="24" />
+            </button>
         )}
 
+        {/* Desktop Search Inputs */}
         {!isDM && currentServerId && (
             <div className={clsx("relative hidden lg:block transition-all", isSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
             <input 
@@ -138,9 +210,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
                 placeholder="Search" 
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                onFocus={() => {
-                    if (inputValue.trim()) setSearchOpen(true);
-                }}
+                onFocus={() => { if (inputValue.trim()) setSearchOpen(true); }}
                 className="bg-mew-darker text-sm rounded px-2 py-0.5 w-full transition-all focus:outline-none text-mew-text placeholder-mew-textMuted" 
             />
             <Icon icon="mdi:magnify" className="absolute right-1 top-1 text-xs pointer-events-none" />
