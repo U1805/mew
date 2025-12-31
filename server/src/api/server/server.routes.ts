@@ -11,6 +11,7 @@ import inviteRoutes from '../invite/invite.routes';
 import memberRoutes from '../member/member.routes';
 import searchRoutes from '../search/search.routes';
 import botInviteRoutes from '../botInvite/botInvite.routes';
+import stickerRoutes from '../sticker/sticker.routes';
 
 import { protect } from '../../middleware/auth';
 import { authorizeServer } from '../../middleware/checkPermission';
@@ -48,6 +49,7 @@ router.post(
 router.use('/:serverId/channels', channelRoutes);
 router.use('/:serverId/invites', inviteRoutes);
 router.use('/:serverId/members', memberRoutes);
+router.use('/:serverId/stickers', stickerRoutes);
 router.use('/:serverId/search', checkServerMembership, searchRoutes);
 router.use('/:serverId/bots', botInviteRoutes);
 

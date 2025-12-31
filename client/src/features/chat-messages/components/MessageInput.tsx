@@ -16,6 +16,8 @@ import {
   serializeTiptapDocToContentString,
 } from '../../chat-editor/hooks/chatContent';
 import clsx from 'clsx';
+import { StickerPicker } from './StickerPicker';
+import type { Sticker } from '../../../shared/types';
 
 interface MessageInputProps {
   channel: Channel | null;
@@ -26,6 +28,7 @@ interface MessageInputProps {
 const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   const [attachments, setAttachments] = useState<Array<Partial<Attachment & { isUploading?: boolean; progress?: number; file?: File; localUrl?: string; error?: string; key?: string }>>>([]);
   const isUploading = attachments.some(a => a.isUploading);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const placeholderRef = useRef('');
@@ -50,7 +53,6 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
   const mentionExtension = useMemo(() => {
     if (!serverId) return null;
-
     return Mention.configure({
       HTMLAttributes: {
         class:
@@ -89,16 +91,13 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
           sendMessageRef.current();
           return true;
         }
-
         if (event.key === 'Escape') {
           return true;
         }
-
         return false;
       },
       handlePaste: (_view: any, event: ClipboardEvent) => {
         if (!channelId || isUploading) return false;
-
         const files: File[] = [];
         const dt = event.clipboardData;
         if (dt) {
@@ -113,18 +112,14 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
             }
           }
         }
-
         const images = files.filter((f) => (f.type || '').startsWith('image/'));
         if (images.length === 0) return false;
-
         event.preventDefault();
-
         const normalized = images.map((f, idx) => {
           if (f.name && f.name.trim()) return f;
           const ext = (f.type || '').split('/')[1] || 'png';
           return new File([f], `pasted-image-${Date.now()}-${idx}.${ext}`, { type: f.type || 'image/png' });
         });
-
         queueFilesForUpload(normalized);
         return true;
       },
@@ -137,6 +132,23 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     editable: canSendMessage && !isUploading,
     editorProps,
   });
+
+  const handleSendSticker = useCallback(
+    async (sticker: Sticker) => {
+      if (!channelId) return;
+      if (!canSendMessage || isUploading) return;
+      try {
+        await messageApi.send(serverId || undefined, channelId, {
+          type: 'message/sticker',
+          payload: { stickerId: sticker._id },
+        });
+        setShowStickerPicker(false);
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [channelId, canSendMessage, isUploading, serverId]
+  );
 
   useEffect(() => {
     if (!editor) return;
@@ -152,30 +164,24 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
   const uploadFile = useCallback(async (attachment: any, index: number) => {
     if (!attachment.file || !channelId) return;
-
     try {
       const response = await uploadApi.uploadFileSmart(channelId, attachment.file, (progressEvent) => {
         const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
         setAttachments(prev => {
           const newAttachments = [...prev];
-          if (newAttachments[index]) {
-            newAttachments[index].progress = progress;
-          }
+          if (newAttachments[index]) newAttachments[index].progress = progress;
           return newAttachments;
         });
       });
-
       setAttachments(prev => {
         const newAttachments = [...prev];
         if (newAttachments[index]) {
           newAttachments[index].isUploading = false;
-          // Store the object `key`; server hydrates the final URL.
           newAttachments[index].key = (response as any).key;
           newAttachments[index].progress = 100;
         }
         return newAttachments;
       });
-
     } catch (error) {
       console.error('File upload failed:', error);
       setAttachments(prev => {
@@ -191,7 +197,6 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
   const queueFilesForUpload = useCallback((files: File[]) => {
     if (!channelId || files.length === 0) return;
-
     const newUploads = files.map((file: File) => ({
       filename: file.name,
       contentType: file.type,
@@ -201,7 +206,6 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       progress: 0,
       file: file,
     }));
-
     setAttachments((prev) => {
       const startIndex = prev.length;
       setTimeout(() => {
@@ -213,10 +217,8 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !channelId) return;
-
     const files = Array.from(e.target.files);
     queueFilesForUpload(files);
-
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -226,19 +228,14 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
   const handleSendMessage = async () => {
     if (!editor || !channelId || isUploading) return;
-
     const doc = editor.getJSON();
     const contentToSend = serializeTiptapDocToContentString(doc);
     if (!contentToSend.trim() && attachments.length === 0) return;
-
     const mentionsToSend = extractMentionIdsFromDoc(doc);
-
     const currentServerId = serverId ? serverId : undefined;
     const replySnapshot = activeReplyTo;
-
     const tempId = new Date().toISOString();
     const user = useAuthStore.getState().user;
-
     if (!user) return;
 
     const newMessage: Message = {
@@ -269,12 +266,8 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
     try {
       const finalAttachments = attachments
-        // Only send uploaded attachments (with key).
         .filter(a => !a.isUploading && a.key)
         .map(({ filename, contentType, key, size }) => ({ filename, contentType, key, size } as unknown as Attachment));
-
-      console.log('Sending attachments:', finalAttachments);
-
       await messageApi.send(currentServerId, channelId, {
         content: contentToSend,
         attachments: finalAttachments,
@@ -315,24 +308,17 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                     <span className="text-xs text-mew-text leading-tight break-all z-10 px-1">{file.filename}</span>
                   </>
                 )}
-
                 {file.isUploading && (
                   <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center">
                     <div className="w-12 h-12 border-4 border-t-transparent border-mew-accent rounded-full animate-spin"></div>
                     <span className="text-white text-sm mt-2 font-semibold">{file.progress}%</span>
                   </div>
                 )}
-
                 {!file.isUploading && (
-                  <button
-                    onClick={() => removeAttachment(index)}
-                    className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity z-20"
-                    aria-label="remove attachment"
-                  >
+                  <button onClick={() => removeAttachment(index)} className="absolute top-1 right-1 bg-black/50 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity z-20">
                     <Icon icon="mdi:close" width="18" height="18" />
                   </button>
                 )}
-
                 <div className="absolute bottom-1 left-1 right-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded-sm truncate z-10">
                   {formatFileSize(file.size!)}
                 </div>
@@ -344,65 +330,86 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       )}
 
       {activeReplyTo && (
-        <div className="bg-[#2B2D31] border border-[#1E1F22] rounded-lg px-3 py-2 mb-2 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xs text-mew-textMuted">
-              回复 <span className="text-mew-text">{activeReplyTo.authorUsername || 'Unknown'}</span>
-            </div>
-            {activeReplyTo.preview && (
-              <div className="text-xs text-mew-textMuted truncate">{activeReplyTo.preview}</div>
-            )}
+        <div className="bg-[#2B2D31] border-x border-t border-[#1E1F22] rounded-t-lg px-3 py-2 flex items-center justify-between gap-3 text-sm">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <Icon icon="mdi:reply" className="text-mew-textMuted shrink-0" />
+            <span className="text-mew-textMuted whitespace-nowrap">Replying to <span className="font-semibold text-white">{activeReplyTo.authorUsername}</span></span>
           </div>
-          <button
-            type="button"
-            className="text-mew-textMuted hover:text-mew-text p-1 rounded hover:bg-mew-darker flex-shrink-0"
-            onClick={() => clearReplyTo()}
-            aria-label="cancel reply"
-          >
-            <Icon icon="mdi:close" width="18" height="18" />
+          <button onClick={() => clearReplyTo()} className="text-mew-textMuted hover:text-mew-text p-0.5">
+            <Icon icon="mdi:close-circle" width="16" />
           </button>
         </div>
       )}
 
       <form 
         onSubmit={(e) => { e.preventDefault(); void handleSendMessage(); }} 
-        className={attachments.length > 0 ? "bg-[#383A40] rounded-b-lg p-2.5 flex items-center relative z-10" : "bg-[#383A40] rounded-lg p-2.5 flex items-center relative z-10"}
+        className={clsx(
+            "bg-[#383A40] flex items-center relative z-20 transition-all shadow-sm",
+            attachments.length > 0 || activeReplyTo ? "rounded-b-lg border-x border-b border-[#383A40]" : "rounded-lg"
+        )}
       >
-        <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            multiple
-            className="hidden"
-            data-testid="file-input"
-        />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple className="hidden" />
+        
+        {/* Left Actions */}
         <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-mew-textMuted hover:text-mew-text p-1 mr-1 md:mr-2 rounded-full hover:bg-mew-darker flex-shrink-0"
+            className="text-mew-textMuted hover:text-[#DBDEE1] p-2.5 mx-1 flex-shrink-0"
             disabled={!canSendMessage || isUploading}
-            aria-label="add attachment"
         >
           <Icon icon="mdi:plus-circle" width="24" height="24" />
         </button>
-        <div className="mew-chat-editor bg-transparent flex-1 disabled:cursor-not-allowed min-w-0">
+
+        {/* Text Area */}
+        <div className="mew-chat-editor bg-transparent flex-1 disabled:cursor-not-allowed min-w-0 py-2.5 max-h-[50vh] overflow-y-auto custom-scrollbar">
           {editor ? <EditorContent editor={editor} /> : null}
         </div>
-        <div className="flex items-center space-x-1 md:space-x-2 mr-1 md:mr-2 flex-shrink-0">
-          <button type="button" className="hidden md:block text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:gift" width="24" height="24" /></button>
-          <button type="button" className="hidden md:block text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:sticker-emoji" width="24" height="24" /></button>
-          <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:emoticon-happy" width="24" height="24" /></button>
-          <button
-            type="submit"
-            className={clsx(
-                "p-1 rounded-full transition-colors",
-                !canSendMessage || isUploading ? "text-mew-textMuted opacity-50 cursor-not-allowed" : "text-white bg-mew-accent hover:bg-mew-accentHover"
-            )}
-            disabled={!canSendMessage || isUploading}
-            aria-label="send message"
-          >
-            <Icon icon="mdi:send" width="18" height="18" />
+
+        {/* Right Actions (Gift, Sticker, Emoji) */}
+        <div className="flex items-center pr-3 gap-1 flex-shrink-0">
+          <button type="button" className="hidden md:flex text-mew-textMuted hover:text-[#DBDEE1] p-1.5 hover:bg-[#3F4147] rounded-md transition-colors">
+              <Icon icon="mdi:gift" width="24" height="24" />
           </button>
+          
+          <div className="relative hidden md:block">
+            <button
+              type="button"
+              className={clsx(
+                  "p-1.5 rounded-md transition-colors",
+                  showStickerPicker ? "text-mew-text bg-[#3F4147]" : "text-mew-textMuted hover:text-[#DBDEE1] hover:bg-[#3F4147]"
+              )}
+              onClick={() => setShowStickerPicker((v) => !v)}
+              disabled={!canSendMessage || isUploading}
+              title="Open Sticker Picker"
+              aria-label="open sticker picker"
+            >
+              <Icon icon="mdi:sticker-emoji" width="24" height="24" />
+            </button>
+            
+            {showStickerPicker && (
+              <StickerPicker
+                serverId={serverId}
+                onSelect={(s) => void handleSendSticker(s)}
+                onClose={() => setShowStickerPicker(false)}
+              />
+            )}
+          </div>
+
+          <button type="button" className="text-mew-textMuted hover:text-[#DBDEE1] p-1.5 hover:bg-[#3F4147] rounded-md transition-colors">
+              <Icon icon="mdi:emoticon-happy" width="24" height="24" />
+          </button>
+          
+          {/* Send Button only if content/attachments exist, logically visible but discord usually hides it unless mobile */}
+          {/* We keep it visible for functionality transparency */}
+          {(editor?.getText().trim() || attachments.length > 0) && (
+              <button
+                type="submit"
+                className="text-mew-textMuted hover:text-mew-accent p-1.5 hover:bg-[#3F4147] rounded-md transition-colors"
+                disabled={!canSendMessage || isUploading}
+              >
+                <Icon icon="mdi:send" width="24" height="24" />
+              </button>
+          )}
         </div>
       </form>
     </div>

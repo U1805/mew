@@ -311,4 +311,50 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     // Invalid URL: keep as-is.
     expect(mod.getS3PublicUrl('http://')).toBe('http://');
   });
+
+  it('deleteObject sends DeleteObjectCommand', async () => {
+    vi.resetModules();
+
+    const send = vi.fn().mockResolvedValue({});
+    const S3Client = vi.fn().mockImplementation(function (this: any) {
+      this.send = send;
+    });
+    const DeleteObjectCommand = vi.fn();
+
+    vi.doMock('@aws-sdk/client-s3', () => ({
+      S3Client,
+      DeleteObjectCommand,
+      PutObjectCommand: vi.fn(),
+      GetObjectCommand: vi.fn(),
+      PutBucketCorsCommand: vi.fn(),
+    }));
+    vi.doMock('@aws-sdk/lib-storage', () => ({ Upload: vi.fn() }));
+    vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
+    vi.doMock('../config', () => ({
+      default: {
+        staticUrl: '',
+        s3: {
+          endpoint: 'api.local',
+          webEndpoint: 'web.local',
+          port: 3900,
+          webPort: 3902,
+          accessKeyId: 'k',
+          secretAccessKey: 's',
+          bucketName: 'b',
+          useSsl: false,
+          region: 'r',
+          presignExpiresSeconds: 60,
+          corsAllowedOrigins: ['*'],
+        },
+      },
+    }));
+
+    const mod = await import('./s3');
+    await expect(mod.deleteObject(' k.png ')).resolves.toBeUndefined();
+    expect(DeleteObjectCommand).toHaveBeenCalledWith({ Bucket: 'b', Key: 'k.png' });
+    expect(send).toHaveBeenCalledTimes(1);
+
+    await expect(mod.deleteObject('')).resolves.toBeUndefined();
+    expect(send).toHaveBeenCalledTimes(1);
+  });
 });

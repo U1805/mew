@@ -36,6 +36,12 @@ vi.mock('../server/server.model', () => ({
   },
 }));
 
+vi.mock('../sticker/sticker.model', () => ({
+  default: {
+    findOne: vi.fn(),
+  },
+}));
+
 vi.mock('./mention.service', () => ({
   default: {
     processMentions: vi.fn(),
@@ -67,6 +73,7 @@ import Channel from '../channel/channel.model';
 import Member from '../member/member.model';
 import Role from '../role/role.model';
 import Server from '../server/server.model';
+import Sticker from '../sticker/sticker.model';
 import mentionService from './mention.service';
 import { extractFirstUrl, getLinkPreviewWithSafety } from '../metadata/metadata.service';
 import { calculateEffectivePermissions } from '../../utils/permission.service';
@@ -295,6 +302,68 @@ describe('message.service (unit)', () => {
 
     expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_CREATE', 'c1', expect.any(Object));
     expect(socketManager.broadcastToUser).not.toHaveBeenCalled();
+  });
+
+  it('createMessage rejects sticker messages in non-server channels', async () => {
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM' }));
+    await expect(
+      createMessage({ channelId: 'c1', authorId: 'u1', type: 'message/sticker', payload: { stickerId: 'st1' } } as any)
+    ).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('createMessage hydrates sticker payload and broadcasts', async () => {
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'GUILD_TEXT', serverId: mkId('s1') }));
+    vi.mocked((Sticker as any).findOne).mockReturnValue(
+      makeFindByIdQuery({
+        _id: mkId('st1'),
+        serverId: mkId('s1'),
+        name: 'Wave',
+        description: 'hi',
+        tags: ['wave'],
+        format: 'png',
+        contentType: 'image/png',
+        key: 'sticker.png',
+        size: 123,
+      })
+    );
+
+    vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);
+    vi.mocked(extractFirstUrl).mockReturnValue(null);
+
+    vi.mocked(messageRepository.create).mockImplementation((data: any) => {
+      const doc = makeMessageDoc({
+        channelId: mkId('c1'),
+        authorId: { username: 'alice', avatarUrl: 'a.png', isBot: false },
+        content: data.content,
+        attachments: data.attachments,
+        payload: data.payload,
+      });
+      return doc as any;
+    });
+    vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
+
+    const result: any = await createMessage({
+      channelId: 'c1',
+      authorId: 'u1',
+      type: 'message/sticker',
+      payload: { stickerId: 'st1' },
+    } as any);
+
+    expect(messageRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'message/sticker',
+        attachments: [],
+        payload: expect.objectContaining({
+          sticker: expect.objectContaining({
+            name: 'Wave',
+            key: 'sticker.png',
+          }),
+        }),
+      })
+    );
+
+    expect(result.payload.sticker.url).toBe('http://cdn.local/sticker.png');
+    expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_CREATE', 'c1', expect.any(Object));
   });
 
   it('createMessage triggers async metadata embed update and MESSAGE_UPDATE (DM via recipients)', async () => {

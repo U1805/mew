@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
-import { Category } from '../types';
+import { Category, Sticker } from '../types';
 
 export const useServerEvents = (serverId: string | null) => {
   const queryClient = useQueryClient();
@@ -58,12 +58,43 @@ export const useServerEvents = (serverId: string | null) => {
     socket.on('MEMBER_JOIN', handleMemberJoin);
     socket.on('MEMBER_LEAVE', handleMemberLeave);
 
+    const handleStickerCreate = (sticker: Sticker) => {
+      if (sticker.serverId !== serverId) return;
+      queryClient.setQueryData(['stickers', serverId], (old: Sticker[] | undefined) => {
+        const prev = Array.isArray(old) ? old : [];
+        if (prev.some(s => s._id === sticker._id)) return prev;
+        return [sticker, ...prev];
+      });
+    };
+
+    const handleStickerUpdate = (sticker: Sticker) => {
+      if (sticker.serverId !== serverId) return;
+      queryClient.setQueryData(['stickers', serverId], (old: Sticker[] | undefined) => {
+        if (!old) return old;
+        return old.map(s => (s._id === sticker._id ? sticker : s));
+      });
+    };
+
+    const handleStickerDelete = ({ stickerId }: { stickerId: string }) => {
+      queryClient.setQueryData(['stickers', serverId], (old: Sticker[] | undefined) => {
+        if (!old) return old;
+        return old.filter(s => s._id !== stickerId);
+      });
+    };
+
+    socket.on('STICKER_CREATE', handleStickerCreate);
+    socket.on('STICKER_UPDATE', handleStickerUpdate);
+    socket.on('STICKER_DELETE', handleStickerDelete);
+
     return () => {
       socket.off('CATEGORY_UPDATE', handleCategoryUpdate);
       socket.off('CATEGORY_DELETE', handleCategoryDelete);
       socket.off('PERMISSIONS_UPDATE', handlePermissionsUpdate);
       socket.off('MEMBER_JOIN', handleMemberJoin);
       socket.off('MEMBER_LEAVE', handleMemberLeave);
+      socket.off('STICKER_CREATE', handleStickerCreate);
+      socket.off('STICKER_UPDATE', handleStickerUpdate);
+      socket.off('STICKER_DELETE', handleStickerDelete);
     };
   }, [serverId, queryClient]);
 };

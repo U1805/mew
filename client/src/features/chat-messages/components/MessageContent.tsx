@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
@@ -50,15 +49,34 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
     }
 
     return (
-        <div>
+        <div className="w-full">
+            {/* Sticker Display */}
+            {message.payload?.sticker?.url && (
+              <div className="mt-1 mb-1 block">
+                <img
+                  src={message.payload.sticker.url}
+                  alt={message.payload.sticker.name || 'sticker'}
+                  title={message.payload.sticker.name || undefined}
+                  // Discord sticker size + hover effect
+                  className="max-w-[160px] max-h-[160px] w-auto h-auto object-contain select-none cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                  draggable={false}
+                />
+              </div>
+            )}
+
+            {/* Text Content */}
             {message.content && (
-                <p className="whitespace-pre-wrap break-words leading-[1.375rem]">
+                <p className="whitespace-pre-wrap break-words leading-[1.375rem] text-[#DBDEE1]">
                     {parseMessageContent(message.content)}
                 </p>
             )}
+
+            {/* Embeds */}
             {message.payload?.embeds && message.payload.embeds.length > 0 && (
               <UrlEmbed embed={message.payload.embeds[0]} />
             )}
+
+            {/* Attachments */}
             <AttachmentList
                 attachments={message.attachments || []}
                 serverId={serverId}
