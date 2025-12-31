@@ -71,14 +71,23 @@ export const downloadFileHandler = asyncHandler(async (req: Request, res: Respon
     throw new BadRequestError('Channel ID is required.');
   }
 
-  const allowed = await Message.exists({ channelId, 'attachments.key': key.trim() });
+  const trimmedKey = key.trim();
+  const allowed = await Message.exists({
+    channelId,
+    $or: [
+      { 'attachments.key': trimmedKey },
+      // Allow bot-friendly downloads for sticker assets referenced by messages in the channel.
+      // This is important when the public S3/static domain is not reachable from bot containers.
+      { 'payload.sticker.key': trimmedKey },
+    ],
+  });
   if (!allowed) {
     throw new NotFoundError('File not found.');
   }
 
   try {
     const { getObjectStream } = await import('../../utils/s3');
-    const obj = await getObjectStream(key.trim());
+    const obj = await getObjectStream(trimmedKey);
 
     if (!obj?.body) {
       throw new NotFoundError('File not found.');

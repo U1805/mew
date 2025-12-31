@@ -149,11 +149,15 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.Ch
 		}
 
 		if role == "user" {
+			attachments := make([]client.AttachmentRef, 0, len(m.Attachments)+1)
+			attachments = append(attachments, m.Attachments...)
+			attachments = append(attachments, StickerAttachmentsFromPayload(m.ChannelID, m.Payload)...)
+
 			sentAt := m.CreatedAt
 			if opts.Location != nil && !sentAt.IsZero() {
 				sentAt = sentAt.In(opts.Location)
 			}
-			userMsg, err := BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), sentAt, strings.TrimSpace(m.ContextText()), m.Attachments, BuildUserContentOptions{
+			userMsg, err := BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), sentAt, strings.TrimSpace(m.ContextText()), attachments, BuildUserContentOptions{
 				DefaultImagePrompt:    opts.DefaultImagePrompt,
 				MaxImageBytes:         opts.MaxImageBytes,
 				MaxTotalImageBytes:    opts.MaxTotalImageBytes,
