@@ -49,6 +49,11 @@ export const ChannelSettingsModal = () => {
   const [topic, setTopic] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'permissions' | 'integrations'>('overview');
+  
+  // Mobile Nav States
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
+  const [mobilePermissionEditOpen, setMobilePermissionEditOpen] = useState(false);
+
   const permissions = usePermissions(modalData?.channel?._id);
 
   const [selectedOverrideId, setSelectedOverrideId] = useState<string | null>(null);
@@ -57,9 +62,7 @@ export const ChannelSettingsModal = () => {
   const channelId = modalData?.channel?._id;
 
   const { data: serverRoles } = useRoles(currentServerId);
-
   const { data: serverMembers } = useMembers(currentServerId);
-
   const { data: initialOverrides, isLoading: isLoadingOverrides } = usePermissionOverrides(currentServerId, channelId);
 
   const updatePermissionsMutation = useMutation({
@@ -78,15 +81,18 @@ export const ChannelSettingsModal = () => {
     if (initialOverrides) {
       setLocalOverrides(initialOverrides);
       const everyoneRole = serverRoles?.find(r => r.isDefault);
-      if (everyoneRole && !selectedOverrideId) {
-        const everyoneOverride = initialOverrides.find(o => o.targetType === 'role' && o.targetId === everyoneRole._id);
-        setSelectedOverrideId(everyoneOverride ? `role-${everyoneRole._id}` : `role-${everyoneRole._id}-new`);
-      } else if (initialOverrides.length > 0 && !selectedOverrideId) {
-          const first = initialOverrides[0];
-          setSelectedOverrideId(`${first.targetType}-${first.targetId}`);
+      // Auto-select on desktop, wait for user interaction on mobile
+      if (!mobilePermissionEditOpen) {
+          if (everyoneRole && !selectedOverrideId) {
+            const everyoneOverride = initialOverrides.find(o => o.targetType === 'role' && o.targetId === everyoneRole._id);
+            setSelectedOverrideId(everyoneOverride ? `role-${everyoneRole._id}` : `role-${everyoneRole._id}-new`);
+          } else if (initialOverrides.length > 0 && !selectedOverrideId) {
+              const first = initialOverrides[0];
+              setSelectedOverrideId(`${first.targetType}-${first.targetId}`);
+          }
       }
     }
-  }, [initialOverrides, serverRoles, selectedOverrideId]);
+  }, [initialOverrides, serverRoles, selectedOverrideId, mobilePermissionEditOpen]);
 
   useEffect(() => {
     if (modalData?.channel) {
@@ -127,7 +133,9 @@ export const ChannelSettingsModal = () => {
       deny: [],
     };
     setLocalOverrides(prev => [...prev, newOverride]);
-    setSelectedOverrideId(`${target.targetType}-${target.targetId}`);
+    const newId = `${target.targetType}-${target.targetId}`;
+    setSelectedOverrideId(newId);
+    setMobilePermissionEditOpen(true);
   };
 
   const handleAddOverride = () => {
@@ -218,38 +226,62 @@ export const ChannelSettingsModal = () => {
 
   }, [localOverrides, serverRoles, serverMembers, selectedOverrideId]);
 
+  const handleTabClick = (tab: typeof activeTab) => {
+      setActiveTab(tab);
+      setMobileMenuOpen(false);
+  }
+
+  const handleOverrideClick = (overrideId: string) => {
+      setSelectedOverrideId(overrideId);
+      setMobilePermissionEditOpen(true);
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
-         <div className="w-[30%] min-w-[220px] bg-[#2B2D31] flex flex-col items-end pt-[60px] pb-4 px-2">
-             <div className="w-[192px] px-1.5">
-                <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 text-ellipsis overflow-hidden whitespace-nowrap">
+    <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans">
+         
+         {/* Sidebar (Left) */}
+         <div className={clsx(
+             "w-full md:w-[30%] md:min-w-[220px] bg-[#2B2D31] flex-col md:items-end pt-4 md:pt-[60px] pb-4 px-2 z-10",
+             mobileMenuOpen ? "flex" : "hidden md:flex"
+         )}>
+             <div className="w-full md:w-[192px] px-4 md:px-1.5">
+                {/* Mobile Header */}
+                <div className="flex md:hidden items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-white">Channel Settings</h2>
+                    <button onClick={closeModal} className="p-2 text-mew-textMuted hover:text-white">
+                        <Icon icon="mdi:close" width="24" />
+                    </button>
+                </div>
+
+                <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 hidden md:block">
                     {modalData?.channel?.name || 'CHANNEL'} TEXT CHANNELS
                 </h2>
+                
                 <div
                     className={clsx(
-                        "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5",
+                        "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5 transition-colors",
                         activeTab === 'overview' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text"
                     )}
-                    onClick={() => setActiveTab('overview')}
+                    onClick={() => handleTabClick('overview')}
                 >
                     Overview
                 </div>
                 <div
                     className={clsx(
-                        "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5",
+                        "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5 transition-colors",
                         activeTab === 'permissions' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text"
                     )}
-                    onClick={() => setActiveTab('permissions')}
+                    onClick={() => handleTabClick('permissions')}
                 >
                     Permissions
                 </div>
                 {permissions.has('MANAGE_WEBHOOKS') && (
                     <div
                         className={clsx(
-                            "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5",
+                            "px-2.5 py-1.5 rounded-[4px] font-medium text-sm cursor-pointer mb-0.5 transition-colors",
                             activeTab === 'integrations' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text"
                         )}
-                        onClick={() => setActiveTab('integrations')}>
+                        onClick={() => handleTabClick('integrations')}>
                         Integrations
                     </div>
                 )}
@@ -261,16 +293,34 @@ export const ChannelSettingsModal = () => {
                     onClick={() => openModal('deleteChannel', modalData)}
                 >
                     <span className="text-red-400">Delete Channel</span>
-                    <Icon icon="mdi:trash-can-outline" className="hidden group-hover:block text-red-400" />
+                    <Icon icon="mdi:trash-can-outline" className="text-red-400" />
                 </div>
              </div>
          </div>
-         <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[800px] overflow-hidden flex flex-col h-full">
+
+         {/* Content Area (Right) */}
+         <div className={clsx(
+             "flex-1 bg-[#313338] pt-0 md:pt-[60px] px-0 md:px-10 max-w-full md:max-w-[800px] overflow-hidden flex flex-col h-full",
+             !mobileMenuOpen ? "flex" : "hidden md:flex"
+         )}>
+             
+             {/* Mobile Content Header */}
+             <div className="md:hidden h-14 flex items-center px-4 bg-[#313338] border-b border-[#26272D] sticky top-0 z-20 shrink-0">
+                <button 
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="mr-4 text-mew-textMuted hover:text-white"
+                >
+                    <Icon icon="mdi:arrow-left" width="24" />
+                </button>
+                <span className="font-bold text-lg text-white capitalize">
+                    {activeTab}
+                </span>
+            </div>
 
              {/* OVERVIEW */}
              {activeTab === 'overview' && (
-                 <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10">
-                    <h2 className="text-xl font-bold text-white mb-6">Overview</h2>
+                 <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10 p-4 md:p-0">
+                    <h2 className="text-xl font-bold text-white mb-6 hidden md:block">Overview</h2>
                     <div className="space-y-4">
                         <div>
                             <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Channel Name</label>
@@ -326,9 +376,13 @@ export const ChannelSettingsModal = () => {
                     <div className='flex h-full w-full items-center justify-center text-mew-textMuted'>Loading permissions...</div>
                 ) : (
                     <>
-                        <div className="flex h-[calc(100%-60px)] animate-fade-in overflow-hidden">
-                            {/* Override List */}
-                            <div className="w-[220px] flex-shrink-0 flex flex-col pr-4 border-r border-[#3F4147] h-full pb-6">
+                        <div className="flex flex-col md:flex-row h-[calc(100%-60px)] animate-fade-in overflow-hidden relative">
+                            
+                            {/* Override List Column */}
+                            <div className={clsx(
+                                "w-full md:w-[220px] flex-shrink-0 flex flex-col md:pr-4 md:border-r border-[#3F4147] h-full p-4 md:p-0",
+                                mobilePermissionEditOpen ? "hidden md:flex" : "flex"
+                            )}>
                                <div className="flex items-center justify-between mb-4">
                                    <h3 className="text-xs font-bold text-mew-textMuted uppercase">Roles / Members</h3>
                                    <button onClick={handleAddOverride} className="text-mew-textMuted hover:text-white">
@@ -340,10 +394,10 @@ export const ChannelSettingsModal = () => {
                                        <div
                                            key={override.id}
                                            className={clsx(
-                                               "flex items-center px-2 py-1.5 rounded cursor-pointer mb-1",
-                                               selectedOverrideId === override.id ? "bg-[#404249] text-white" : "text-[#B5BAC1] hover:bg-[#35373C]"
+                                               "flex items-center px-2 py-2 md:py-1.5 rounded cursor-pointer mb-1",
+                                               selectedOverrideId === override.id ? "bg-[#404249] text-white" : "text-[#B5BAC1] bg-[#2B2D31] md:bg-transparent hover:bg-[#35373C]"
                                            )}
-                                           onClick={() => setSelectedOverrideId(override.id)}
+                                           onClick={() => handleOverrideClick(override.id)}
                                        >
                                            {override.type === 'role' ? (
                                                <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: override.color || '#99AAB5' }}></div>
@@ -353,22 +407,32 @@ export const ChannelSettingsModal = () => {
                                                </div>
                                            )}
                                            <span className="text-sm font-medium truncate flex-1">{override.name}</span>
+                                           <Icon icon="mdi:chevron-right" className="md:hidden text-mew-textMuted" width="16" />
                                        </div>
                                    ))}
                                </div>
                             </div>
 
-                            {/* Permissions Editor */}
-                            <div className="flex-1 pl-6 flex flex-col overflow-hidden">
+                            {/* Permissions Editor Column */}
+                            <div className={clsx(
+                                "flex-1 md:pl-6 flex flex-col overflow-hidden bg-[#313338] absolute inset-0 md:static z-20 md:z-auto",
+                                mobilePermissionEditOpen ? "flex" : "hidden md:flex"
+                            )}>
                                 {currentDisplayOverride ? (
                                    <div className='h-full flex flex-col'>
-                                       <div className="mb-6 flex-shrink-0">
-                                           <h2 className="text-lg font-bold text-white mb-1">Advanced Permissions</h2>
-                                           <p className="text-sm text-mew-textMuted">
-                                               Override permissions for <strong className="text-white">{currentDisplayOverride.name}</strong> in this specific channel.
-                                           </p>
+                                       <div className="flex items-center mb-6 shrink-0 p-4 md:p-0">
+                                           <button onClick={() => setMobilePermissionEditOpen(false)} className="md:hidden mr-2 text-mew-textMuted hover:text-white">
+                                                <Icon icon="mdi:arrow-left" width="24" />
+                                           </button>
+                                           <div>
+                                                <h2 className="text-lg font-bold text-white mb-1">Advanced Permissions</h2>
+                                                <p className="text-sm text-mew-textMuted leading-tight">
+                                                    Override for <strong className="text-white">{currentDisplayOverride.name}</strong>
+                                                </p>
+                                           </div>
                                        </div>
-                                       <div className='flex-grow overflow-y-auto custom-scrollbar pb-10 pr-2'>
+
+                                       <div className='flex-grow overflow-y-auto custom-scrollbar pb-10 pr-2 px-4 md:px-0'>
                                             {CHANNEL_PERMS.map(group => (
                                                 <div key={group.group} className="mb-6">
                                                     <h3 className="text-xs font-bold text-mew-textMuted uppercase mb-2 border-b border-[#3F4147] pb-1">{group.group} Permissions</h3>
@@ -381,24 +445,24 @@ export const ChannelSettingsModal = () => {
                                                                 state = 'deny';
                                                             }
                                                             return (
-                                                                <div key={perm.id} className="flex items-center justify-between py-2 border-b border-[#3F4147]/30">
-                                                                    <span className="text-sm font-medium text-[#DBDEE1]">{perm.name}</span>
-                                                                    <div className="flex items-center space-x-1">
+                                                                <div key={perm.id} className="flex flex-col sm:flex-row sm:items-center justify-between py-3 sm:py-2 border-b border-[#3F4147]/30">
+                                                                    <span className="text-sm font-medium text-[#DBDEE1] mb-2 sm:mb-0">{perm.name}</span>
+                                                                    <div className="flex items-center space-x-2 sm:space-x-1 self-end sm:self-auto">
                                                                         {/* Deny */}
                                                                         <div
-                                                                           className={clsx("w-8 h-8 flex items-center justify-center rounded cursor-pointer border", state === 'deny' ? "bg-red-500 border-red-500 text-white" : "border-[#4E5058] text-[#B5BAC1] hover:border-red-500")}
+                                                                           className={clsx("w-10 h-8 sm:w-8 flex items-center justify-center rounded cursor-pointer border", state === 'deny' ? "bg-red-500 border-red-500 text-white" : "border-[#4E5058] text-[#B5BAC1] hover:border-red-500")}
                                                                            onClick={() => handleUpdatePermission(perm.id, 'deny')}
                                                                            title="Deny"
                                                                         ><Icon icon="mdi:close" width="20" /></div>
                                                                         {/* Inherit */}
                                                                         <div
-                                                                           className={clsx("w-8 h-8 flex items-center justify-center rounded cursor-pointer border", state === 'inherit' ? "bg-[#4E5058] border-[#4E5058] text-white" : "border-[#4E5058] text-[#B5BAC1]")}
+                                                                           className={clsx("w-10 h-8 sm:w-8 flex items-center justify-center rounded cursor-pointer border", state === 'inherit' ? "bg-[#4E5058] border-[#4E5058] text-white" : "border-[#4E5058] text-[#B5BAC1]")}
                                                                            onClick={() => handleUpdatePermission(perm.id, 'inherit')}
                                                                            title="Inherit"
                                                                         ><span className="text-lg font-bold">/</span></div>
                                                                         {/* Allow */}
                                                                         <div
-                                                                           className={clsx("w-8 h-8 flex items-center justify-center rounded cursor-pointer border", state === 'allow' ? "bg-green-500 border-green-500 text-white" : "border-[#4E5058] text-[#B5BAC1] hover:border-green-500")}
+                                                                           className={clsx("w-10 h-8 sm:w-8 flex items-center justify-center rounded cursor-pointer border", state === 'allow' ? "bg-green-500 border-green-500 text-white" : "border-[#4E5058] text-[#B5BAC1] hover:border-green-500")}
                                                                            onClick={() => handleUpdatePermission(perm.id, 'allow')}
                                                                            title="Allow"
                                                                         ><Icon icon="mdi:check" width="20" /></div>
@@ -412,13 +476,13 @@ export const ChannelSettingsModal = () => {
                                        </div>
                                    </div>
                                 ) : (
-                                   <div className='flex h-full w-full items-center justify-center text-mew-textMuted'>Select a role or member to edit permissions.</div>
+                                   <div className='flex h-full w-full items-center justify-center text-mew-textMuted p-4 text-center'>Select a role or member to edit permissions.</div>
                                 )}
                             </div>
                         </div>
-                        <div className='flex-shrink-0 h-[60px] bg-[#2B2D31] -mx-10 mt-auto flex items-center px-10 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1),0_-4px_6px_-2px_rgba(0,0,0,0.05)]'>
+                        <div className='flex-shrink-0 h-[60px] bg-[#2B2D31] -mx-0 md:-mx-10 mt-auto flex items-center px-4 md:px-10 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.1),0_-4px_6px_-2px_rgba(0,0,0,0.05)]'>
                            <button
-                               className='bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors'
+                               className='bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors w-full md:w-auto'
                                onClick={handleSave}
                                disabled={updatePermissionsMutation.isPending}
                            >
@@ -432,14 +496,14 @@ export const ChannelSettingsModal = () => {
 
              {/* INTEGRATIONS */}
              {activeTab === 'integrations' && permissions.has('MANAGE_WEBHOOKS') && (
-                 <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full">
+                 <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full p-4 md:p-0">
                     <WebhookManager serverId={currentServerId!} channel={modalData.channel} />
                  </div>
              )}
          </div>
 
-         {/* Close */}
-         <div className="w-[18%] min-w-[60px] pt-[60px] pl-5">
+         {/* Close (Desktop) */}
+         <div className="hidden md:block w-[18%] min-w-[60px] pt-[60px] pl-5">
              <div className="flex flex-col items-center cursor-pointer group" onClick={closeModal}>
                  <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
                      <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />

@@ -15,6 +15,7 @@ import {
   parseContentStringToTiptapDoc,
   serializeTiptapDocToContentString,
 } from '../../chat-editor/hooks/chatContent';
+import clsx from 'clsx';
 
 interface MessageInputProps {
   channel: Channel | null;
@@ -295,7 +296,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   };
 
   return (
-    <div className="px-4 pb-6 pt-2 flex-shrink-0 relative">
+    <div className="px-2 md:px-4 pb-2 md:pb-6 pt-2 flex-shrink-0 relative">
       <style>{`
         .mew-chat-editor .ProseMirror p { margin: 0; }
       `}</style>
@@ -378,19 +379,30 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="text-mew-textMuted hover:text-mew-text p-1 mr-2 rounded-full hover:bg-mew-darker"
+            className="text-mew-textMuted hover:text-mew-text p-1 mr-1 md:mr-2 rounded-full hover:bg-mew-darker flex-shrink-0"
             disabled={!canSendMessage || isUploading}
             aria-label="add attachment"
         >
           <Icon icon="mdi:plus-circle" width="24" height="24" />
         </button>
-        <div className="mew-chat-editor bg-transparent flex-1 disabled:cursor-not-allowed">
+        <div className="mew-chat-editor bg-transparent flex-1 disabled:cursor-not-allowed min-w-0">
           {editor ? <EditorContent editor={editor} /> : null}
         </div>
-        <div className="flex items-center space-x-2 mr-2">
-          <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:gift" width="24" height="24" /></button>
-          <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:sticker-emoji" width="24" height="24" /></button>
+        <div className="flex items-center space-x-1 md:space-x-2 mr-1 md:mr-2 flex-shrink-0">
+          <button type="button" className="hidden md:block text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:gift" width="24" height="24" /></button>
+          <button type="button" className="hidden md:block text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:sticker-emoji" width="24" height="24" /></button>
           <button type="button" className="text-mew-textMuted hover:text-mew-text"><Icon icon="mdi:emoticon-happy" width="24" height="24" /></button>
+          <button
+            type="submit"
+            className={clsx(
+                "p-1 rounded-full transition-colors",
+                !canSendMessage || isUploading ? "text-mew-textMuted opacity-50 cursor-not-allowed" : "text-white bg-mew-accent hover:bg-mew-accentHover"
+            )}
+            disabled={!canSendMessage || isUploading}
+            aria-label="send message"
+          >
+            <Icon icon="mdi:send" width="18" height="18" />
+          </button>
         </div>
       </form>
     </div>

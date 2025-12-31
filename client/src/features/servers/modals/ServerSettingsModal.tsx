@@ -44,6 +44,9 @@ export const ServerSettingsModal = () => {
   const queryClient = useQueryClient();
 
   const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'emoji' | 'stickers'>('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(true); // Mobile Nav State
+  const [mobileRoleEditOpen, setMobileRoleEditOpen] = useState(false); // Mobile Role Edit View
+
   const [name, setName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -284,6 +287,7 @@ export const ServerSettingsModal = () => {
     setLocalRoles(prev => [...prev, newRole]);
     setSelectedRoleId(newRole._id);
     setRoleTab('display');
+    setMobileRoleEditOpen(true); // Switch to edit view on mobile
   };
 
   const handleDeleteRole = () => {
@@ -291,7 +295,10 @@ export const ServerSettingsModal = () => {
     openModal('confirm', {
         title: `Delete Role '${selectedRole.name}'`,
         description: 'Are you sure you want to delete this role? This cannot be undone.',
-        onConfirm: () => setLocalRoles(prev => prev.filter(r => r._id !== selectedRoleId))
+        onConfirm: () => {
+            setLocalRoles(prev => prev.filter(r => r._id !== selectedRoleId));
+            setMobileRoleEditOpen(false); // Close edit view
+        }
     });
   };
 
@@ -303,26 +310,49 @@ export const ServerSettingsModal = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-
       if (file.size > 50 * 1024 * 1024) {
           toast.error("Image size must be less than 50MB");
           return;
       }
       setPendingIconFile(file);
       setIconPreview(URL.createObjectURL(file));
-      e.target.value = ''; // Allow re-selecting the same file
+      e.target.value = '';
   };
 
+  const handleTabClick = (tab: typeof activeTab) => {
+      setActiveTab(tab);
+      setMobileMenuOpen(false);
+  };
+
+  const handleRoleSelect = (roleId: string) => {
+      setSelectedRoleId(roleId);
+      setMobileRoleEditOpen(true);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex bg-[#313338] animate-fade-in text-mew-text font-sans">
-         <div className="w-[30%] min-w-[220px] bg-[#2B2D31] flex flex-col items-end pt-[60px] pb-4 px-2">
-             <div className="w-[192px] px-1.5">
-                <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5">Server Settings</h2>
-                <SidebarItem label="Overview" isActive={activeTab === 'overview'} onClick={() => setActiveTab('overview')} />
-                <SidebarItem label="Roles" isActive={activeTab === 'roles'} onClick={() => setActiveTab('roles')} />
-                <SidebarItem label="Emoji" isActive={activeTab === 'emoji'} onClick={() => setActiveTab('emoji')} />
-                <SidebarItem label="Stickers" isActive={activeTab === 'stickers'} onClick={() => setActiveTab('stickers')} />
+    <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans overflow-hidden">
+         
+         {/* Sidebar (Left) - Menu List */}
+         <div className={clsx(
+             "w-full md:w-[30%] md:min-w-[220px] bg-[#2B2D31] flex-col md:items-end pt-4 md:pt-[60px] pb-4 px-2 z-10",
+             "absolute inset-0 md:static transition-transform duration-300 ease-ios will-change-transform", // Animation classes
+             // Logic: On mobile, if menu is open, it's at X=0. If closed (viewing content), slide it left slightly (parallax) and fade
+             !mobileMenuOpen ? "-translate-x-[20%] opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto md:flex" : "translate-x-0 flex"
+         )}>
+             <div className="w-full md:w-[192px] px-4 md:px-1.5">
+                {/* Mobile Header */}
+                <div className="flex md:hidden items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-white">Server Settings</h2>
+                    <button onClick={closeModal} className="p-2 text-mew-textMuted hover:text-white">
+                        <Icon icon="mdi:close" width="24" />
+                    </button>
+                </div>
+
+                <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 hidden md:block">Server Settings</h2>
+                <SidebarItem label="Overview" isActive={activeTab === 'overview'} onClick={() => handleTabClick('overview')} />
+                <SidebarItem label="Roles" isActive={activeTab === 'roles'} onClick={() => handleTabClick('roles')} />
+                <SidebarItem label="Emoji" isActive={activeTab === 'emoji'} onClick={() => handleTabClick('emoji')} />
+                <SidebarItem label="Stickers" isActive={activeTab === 'stickers'} onClick={() => handleTabClick('stickers')} />
 
                 <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50"></div>
 
@@ -336,12 +366,32 @@ export const ServerSettingsModal = () => {
              </div>
          </div>
 
-         <div className="flex-1 bg-[#313338] pt-[60px] px-10 max-w-[800px] overflow-hidden flex flex-col h-full">
+         {/* Content Area (Right) - Settings Details */}
+         <div className={clsx(
+             "flex-1 bg-[#313338] pt-0 md:pt-[60px] px-0 md:px-10 max-w-full md:max-w-[800px] overflow-hidden flex flex-col h-full",
+             "absolute inset-0 md:static transition-transform duration-300 ease-ios will-change-transform z-20", // Animation classes
+             // Logic: On mobile, if menu is open, content is pushed off-screen to the right. If closed, it slides in to X=0.
+             mobileMenuOpen ? "translate-x-[100%] md:translate-x-0 md:flex" : "translate-x-0 flex"
+         )}>
+             
+             {/* Mobile Content Header */}
+             <div className="md:hidden h-14 flex items-center px-4 bg-[#313338] border-b border-[#26272D] sticky top-0 z-20 shrink-0">
+                <button 
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="mr-4 text-mew-textMuted hover:text-white active:scale-90 transition-transform"
+                >
+                    <Icon icon="mdi:arrow-left" width="24" />
+                </button>
+                <span className="font-bold text-lg text-white capitalize animate-fade-in">
+                    {activeTab}
+                </span>
+            </div>
+
              {activeTab === 'overview' && (
                <>
-               <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10">
-                 <h2 className="text-xl font-bold text-white mb-6">Server Overview</h2>
-                 <div className="flex gap-8">
+               <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-20 p-4 md:p-0">
+                 <h2 className="text-xl font-bold text-white mb-6 hidden md:block">Server Overview</h2>
+                 <div className="flex flex-col md:flex-row gap-8">
                      <div className="flex items-center justify-center">
                          <div className="relative group cursor-pointer" onClick={handleIconClick}>
                              <div className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center overflow-hidden relative">
@@ -393,12 +443,12 @@ export const ServerSettingsModal = () => {
                </div>
 
                 {hasOverviewChanges && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up">
-                        <span className="text-sm text-mew-textMuted">You have unsaved changes!</span>
-                        <div>
-                            <button onClick={handleResetOverview} className="text-white hover:underline text-sm font-medium px-4 py-2">Reset</button>
+                    <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up z-30">
+                        <span className="text-sm text-mew-textMuted truncate mr-2">Unsaved changes!</span>
+                        <div className="flex shrink-0">
+                            <button onClick={handleResetOverview} className="text-white hover:underline text-sm font-medium px-3 py-2">Reset</button>
                             <button onClick={handleSaveOverview} disabled={isUploading} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">
-                                {isUploading ? 'Saving...' : 'Save Changes'}
+                                {isUploading ? '...' : 'Save'}
                             </button>
                         </div>
                     </div>
@@ -407,8 +457,14 @@ export const ServerSettingsModal = () => {
              )}
 
              {activeTab === 'roles' && (
-                <div className="flex h-full animate-fade-in relative">
-                  <div className="w-[200px] flex-shrink-0 flex flex-col pr-4 border-r border-[#3F4147] h-full">
+                <div className="flex flex-col md:flex-row h-full relative overflow-hidden">
+                  
+                  {/* Role List */}
+                  <div className={clsx(
+                      "w-full md:w-[200px] flex-shrink-0 flex flex-col md:pr-4 md:border-r border-[#3F4147] h-full p-4 md:p-0",
+                      "absolute inset-0 md:static transition-transform duration-300 ease-ios bg-[#313338]",
+                      mobileRoleEditOpen ? "-translate-x-[20%] opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto md:flex" : "translate-x-0 flex"
+                  )}>
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-xs font-bold text-mew-textMuted uppercase">Roles</h3>
                       <button onClick={handleCreateRole} className="text-mew-textMuted hover:text-white">
@@ -426,77 +482,72 @@ export const ServerSettingsModal = () => {
                           <div
                             key={role._id}
                             className={clsx(
-                              "flex items-center px-2 py-1.5 rounded cursor-pointer group mb-1",
-                              selectedRoleId === role._id ? "bg-[#404249]" : "hover:bg-[#35373C]",
+                              "flex items-center px-2 py-2 md:py-1.5 rounded cursor-pointer group mb-1",
+                              selectedRoleId === role._id ? "bg-[#404249]" : "bg-[#2B2D31] md:bg-transparent hover:bg-[#35373C]",
                               isOver && "ring-1 ring-mew-textMuted/40",
                               isDragging && "opacity-60"
                             )}
-                            onClick={() => setSelectedRoleId(role._id)}
+                            onClick={() => handleRoleSelect(role._id)}
                             draggable={draggable}
-                            onDragStart={(e) => {
-                              if (!draggable) return;
-                              e.dataTransfer.effectAllowed = 'move';
-                              setDraggedRoleId(role._id);
-                            }}
-                            onDragEnd={() => {
-                              setDraggedRoleId(null);
-                              setDragOverRoleId(null);
-                            }}
-                            onDragOver={(e) => {
-                              if (!draggedRoleId) return;
-                              e.preventDefault();
-                              e.dataTransfer.dropEffect = 'move';
-                              setDragOverRoleId(role._id);
-                            }}
-                            onDragLeave={() => {
-                              setDragOverRoleId((prev) => (prev === role._id ? null : prev));
-                            }}
-                            onDrop={(e) => {
-                              e.preventDefault();
-                              handleRoleDrop(role._id);
-                              setDraggedRoleId(null);
-                              setDragOverRoleId(null);
-                            }}
+                            onDragStart={(e) => { if (draggable) { e.dataTransfer.effectAllowed = 'move'; setDraggedRoleId(role._id); }}}
+                            onDragEnd={() => { setDraggedRoleId(null); setDragOverRoleId(null); }}
+                            onDragOver={(e) => { if (draggedRoleId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOverRoleId(role._id); }}}
+                            onDragLeave={() => setDragOverRoleId((prev) => (prev === role._id ? null : prev))}
+                            onDrop={(e) => { e.preventDefault(); handleRoleDrop(role._id); setDraggedRoleId(null); setDragOverRoleId(null); }}
                           >
                             <div className="w-3 h-3 rounded-full mr-2 flex-shrink-0" style={{ backgroundColor: role.color }}></div>
                             <span className={clsx("text-sm font-medium truncate flex-1", selectedRoleId === role._id ? "text-white" : "text-[#B5BAC1]")}>
                               {role.name}
                             </span>
+                            {/* Drag handle visible on desktop hover, or always on mobile? */}
                             <Icon
                               icon="mdi:drag"
                               className={clsx(
-                                "text-mew-textMuted opacity-0 group-hover:opacity-100",
+                                "text-mew-textMuted opacity-0 group-hover:opacity-100 hidden md:block",
                                 draggable ? "cursor-grab" : "cursor-not-allowed opacity-30 group-hover:opacity-30",
                               )}
                               width="16"
                             />
+                            {/* Mobile indicator */}
+                            <Icon icon="mdi:chevron-right" className="md:hidden text-mew-textMuted" width="16" />
                           </div>
                         );
                       })}
                     </div>
                   </div>
 
-                  {selectedRole ? (
-                  <div className="flex-1 pl-6 flex flex-col overflow-hidden">
-                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#3F4147]">
-                       <h2 className="text-lg font-bold text-white">Edit Role — {selectedRole.name}</h2>
-                       <div className="flex bg-[#1E1F22] rounded-[3px] p-0.5">
+                  {/* Role Editor */}
+                  <div className={clsx(
+                      "flex-1 md:pl-6 flex flex-col overflow-hidden h-full bg-[#313338] absolute inset-0 md:static z-20 md:z-auto",
+                      "transition-transform duration-300 ease-ios",
+                      mobileRoleEditOpen ? "translate-x-0 flex" : "translate-x-[100%] md:translate-x-0 md:hidden md:flex"
+                  )}>
+                    {selectedRole ? (
+                    <>
+                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-[#3F4147] p-4 md:p-0">
+                       <div className="flex items-center gap-2">
+                           <button onClick={() => setMobileRoleEditOpen(false)} className="md:hidden text-mew-textMuted hover:text-white">
+                                <Icon icon="mdi:arrow-left" width="24" />
+                           </button>
+                           <h2 className="text-lg font-bold text-white truncate max-w-[150px] md:max-w-none">{selectedRole.name}</h2>
+                       </div>
+                       <div className="flex bg-[#1E1F22] rounded-[3px] p-0.5 shrink-0">
                           <button
-                             className={clsx("px-4 py-1 rounded-[2px] text-sm font-medium transition-colors", roleTab === 'display' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")}
+                             className={clsx("px-3 md:px-4 py-1 rounded-[2px] text-xs md:text-sm font-medium transition-colors", roleTab === 'display' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")}
                              onClick={() => setRoleTab('display')}
                           >
                             Display
                           </button>
                           <button
-                             className={clsx("px-4 py-1 rounded-[2px] text-sm font-medium transition-colors", roleTab === 'permissions' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")}
+                             className={clsx("px-3 md:px-4 py-1 rounded-[2px] text-xs md:text-sm font-medium transition-colors", roleTab === 'permissions' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")}
                              onClick={() => setRoleTab('permissions')}
                           >
-                            Permissions
+                            Perms
                           </button>
                        </div>
                      </div>
 
-                     <div className="flex-1 overflow-y-auto custom-scrollbar pb-24">
+                     <div className="flex-1 overflow-y-auto custom-scrollbar pb-24 p-4 md:p-0">
                         {roleTab === 'display' && (
                           <div className="space-y-6 animate-fade-in">
                             <div>
@@ -523,7 +574,7 @@ export const ServerSettingsModal = () => {
                           <div className="space-y-8 animate-fade-in">
                             <div className="text-sm text-mew-textMuted bg-[#404249] p-3 rounded flex items-start">
                               <Icon icon="mdi:information-outline" className="mr-2 mt-0.5 flex-shrink-0" width="18" />
-                              <span>Roles allow you to group server members and assign permissions to them. <strong>@everyone</strong> applies to all members who do not have a specific role assignment.</span>
+                              <span>Roles allow you to group server members and assign permissions to them.</span>
                             </div>
 
                             {PERMISSION_GROUPS.map(group => (
@@ -533,20 +584,15 @@ export const ServerSettingsModal = () => {
                                   {group.perms.map(perm => {
                                     const hasAdmin = selectedRole.permissions?.includes('ADMINISTRATOR' as Permission);
                                     const isEnabled = hasAdmin ? true : selectedRole.permissions?.includes(perm.id as Permission);
-
-                                    const isDefaultLocked =
-                                      selectedRole.isDefault &&
-                                      (perm.id === 'ADMINISTRATOR' ||
-                                        perm.id === 'KICK_MEMBERS');
-
+                                    const isDefaultLocked = selectedRole.isDefault && (perm.id === 'ADMINISTRATOR' || perm.id === 'KICK_MEMBERS');
                                     const isAdminLocked = hasAdmin && perm.id !== 'ADMINISTRATOR';
-
                                     const isDisabled = isDefaultLocked || isAdminLocked;
+                                    
                                     return (
                                       <div key={perm.id} className={clsx("flex items-center justify-between", isDisabled && 'opacity-50')}>
                                         <div className="mr-4">
                                           <div className="font-medium text-white text-base">{perm.name}</div>
-                                          <div className="text-xs text-[#B5BAC1]">{perm.desc}</div>
+                                          <div className="text-xs text-[#B5BAC1] hidden sm:block">{perm.desc}</div>
                                         </div>
 
                                         <div onClick={() => !isDisabled && togglePermission(perm.id)} className={clsx("w-10 h-6 rounded-full p-1 transition-colors flex-shrink-0 relative", isEnabled ? "bg-green-500" : "bg-[#80848E]", isDisabled ? 'cursor-not-allowed' : 'cursor-pointer' )}>
@@ -562,18 +608,19 @@ export const ServerSettingsModal = () => {
                           </div>
                         )}
                      </div>
+                    </>
+                    ) : (
+                      <div className='flex-1 flex items-center justify-center text-mew-textMuted p-4 text-center'>Select a role to start editing its permissions.</div>
+                    )}
                   </div>
-                  ) : (
-                      <div className='flex-1 flex items-center justify-center text-mew-textMuted'>Select a role to start editing its permissions.</div>
-                  )}
 
                   {hasChanges && (
-                    <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up">
-                        <span className="text-sm text-mew-textMuted">You have unsaved changes!</span>
-                        <div>
-                            <button onClick={handleResetChanges} className="text-white hover:underline text-sm font-medium px-4 py-2">Reset</button>
+                    <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up z-30">
+                        <span className="text-sm text-mew-textMuted truncate mr-2">Unsaved changes!</span>
+                        <div className="flex shrink-0">
+                            <button onClick={handleResetChanges} className="text-white hover:underline text-sm font-medium px-3 py-2">Reset</button>
                             <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">
-                                {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
+                                {saveMutation.isPending ? '...' : 'Save'}
                             </button>
                         </div>
                     </div>
@@ -589,7 +636,8 @@ export const ServerSettingsModal = () => {
              )}
          </div>
 
-         <div className="w-[18%] min-w-[60px] pt-[60px] pl-5">
+         {/* Close (Desktop) */}
+         <div className="hidden md:block w-[18%] min-w-[60px] pt-[60px] pl-5">
              <div className="flex flex-col items-center cursor-pointer group" onClick={closeModal}>
                  <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
                      <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />

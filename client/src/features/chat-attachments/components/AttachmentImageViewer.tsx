@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState, type MouseEvent, type WheelEvent } from 'react';
+import { Fragment, useEffect, useRef, useState, type MouseEvent, type TouchEvent, type WheelEvent } from 'react';
 import { Icon } from '@iconify/react';
 
 interface ImageViewerProps {
@@ -25,6 +25,10 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextClickRef = useRef(false);
+  const minSwipeDistance = 50;
 
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -115,6 +119,10 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
 
   const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
+    if (suppressNextClickRef.current) {
+      suppressNextClickRef.current = false;
+      return;
+    }
     if (isSpacePressed) return;
     if (isAltPressed) setScale(s => Math.max(s / 1.5, 0.5));
     else setScale(s => Math.min(s * 1.5, 5));
@@ -130,6 +138,60 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
 
   const cursorStyle = isSpacePressed ? (isDragging ? 'grabbing' : 'grab') : (isAltPressed ? 'zoom-out' : 'zoom-in');
 
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length !== 1) {
+      touchStartRef.current = null;
+      return;
+    }
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    suppressNextClickRef.current = false;
+  };
+
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
+    if (!start) return;
+    if (e.touches.length !== 1) return;
+
+    const touch = e.touches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) suppressNextClickRef.current = true;
+
+    if (scale === 1 && Math.abs(dx) > Math.abs(dy)) {
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+    const start = touchStartRef.current;
+    if (!start) return;
+
+    const touch = e.changedTouches[0];
+    if (!touch) {
+      touchStartRef.current = null;
+      return;
+    }
+
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+
+    const isHorizontalSwipe = Math.abs(dx) > Math.abs(dy) * 1.25;
+
+    if (scale === 1 && isHorizontalSwipe) {
+      if (dx <= -minSwipeDistance && onNext) onNext();
+      else if (dx >= minSwipeDistance && onPrev) onPrev();
+    }
+
+    touchStartRef.current = null;
+  };
+
+  const handleTouchCancel = () => {
+    touchStartRef.current = null;
+    suppressNextClickRef.current = false;
+  };
+
   return (
     <Fragment>
       <div
@@ -139,7 +201,18 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (suppressNextClickRef.current) {
+            suppressNextClickRef.current = false;
+            return;
+          }
+          onClose();
+        }}
         style={{ cursor: cursorStyle }}
         ref={containerRef}
       >

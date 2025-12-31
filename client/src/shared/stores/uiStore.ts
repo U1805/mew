@@ -5,24 +5,21 @@ import { useHiddenStore } from './hiddenStore';
 interface UIState {
   currentServerId: string | null;
   currentChannelId: string | null;
-  isMemberListOpen: boolean;
+  isMemberListOpen: boolean; // Controls both Desktop toggle and Mobile Drawer
   isSettingsOpen: boolean;
   isSearchOpen: boolean;
   searchQuery: string;
   isDmSearchOpen: boolean;
   dmSearchQuery: string;
   targetMessageId: string | null;
-  replyTo:
-    | {
-        messageId: string;
-        channelId: string;
-        authorUsername?: string;
-        preview?: string;
-      }
-    | null;
+  mobileSidebarOpen: boolean; 
+  replyTo: any;
+
+  // Actions
   setCurrentServer: (id: string | null) => void;
   setCurrentChannel: (id: string | null) => void;
   toggleMemberList: () => void;
+  setMemberListOpen: (isOpen: boolean) => void; // Added setter
   openSettings: () => void;
   closeSettings: () => void;
   setSearchOpen: (isOpen: boolean) => void;
@@ -30,14 +27,15 @@ interface UIState {
   setDmSearchOpen: (isOpen: boolean) => void;
   setDmSearchQuery: (query: string) => void;
   setTargetMessageId: (id: string | null) => void;
-  setReplyTo: (replyTo: UIState['replyTo']) => void;
+  setReplyTo: (replyTo: any) => void;
   clearReplyTo: () => void;
+  toggleMobileSidebar: (isOpen?: boolean) => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>((set, get) => ({
   currentServerId: null,
   currentChannelId: null,
-  isMemberListOpen: true,
+  isMemberListOpen: false, // Default closed, Layout will open for Desktop
   isSettingsOpen: false,
   isSearchOpen: false,
   searchQuery: '',
@@ -45,6 +43,8 @@ export const useUIStore = create<UIState>((set) => ({
   dmSearchQuery: '',
   targetMessageId: null,
   replyTo: null,
+  mobileSidebarOpen: true, 
+
   setCurrentServer: (id) =>
     set({
       currentServerId: id,
@@ -53,15 +53,24 @@ export const useUIStore = create<UIState>((set) => ({
       searchQuery: '',
       isDmSearchOpen: false,
       dmSearchQuery: '',
+      mobileSidebarOpen: true, 
     }),
+
   setCurrentChannel: (id) => {
     if (id) {
       useUnreadStore.getState().removeUnreadChannel(id);
       useHiddenStore.getState().removeHiddenChannel(id);
     }
-    set({ currentChannelId: id, isDmSearchOpen: false, dmSearchQuery: '' });
+    set({ 
+        currentChannelId: id, 
+        isDmSearchOpen: false, 
+        dmSearchQuery: '',
+        mobileSidebarOpen: false 
+    });
   },
+
   toggleMemberList: () => set((state) => ({ isMemberListOpen: !state.isMemberListOpen })),
+  setMemberListOpen: (isOpen) => set({ isMemberListOpen: isOpen }), // Implementation
   openSettings: () => set({ isSettingsOpen: true }),
   closeSettings: () => set({ isSettingsOpen: false }),
   setSearchOpen: (isOpen) => set({ isSearchOpen: isOpen }),
@@ -71,5 +80,8 @@ export const useUIStore = create<UIState>((set) => ({
   setTargetMessageId: (id) => set({ targetMessageId: id }),
   setReplyTo: (replyTo) => set({ replyTo }),
   clearReplyTo: () => set({ replyTo: null }),
+  
+  toggleMobileSidebar: (isOpen) => set((state) => ({ 
+    mobileSidebarOpen: isOpen !== undefined ? isOpen : !state.mobileSidebarOpen 
+  })),
 }));
-
