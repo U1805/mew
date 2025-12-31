@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
-import { stickerApi } from '../../../shared/services/api';
+import { stickerApi, userStickerApi } from '../../../shared/services/api';
 import type { Sticker } from '../../../shared/types';
 
 interface StickerPickerProps {
@@ -11,7 +11,12 @@ interface StickerPickerProps {
   onClose: () => void;
 }
 
-const RECENTS_KEY = 'mew.recentStickers.v1';
+const RECENTS_KEY = 'mew.recentStickers.v2';
+
+const getStickerScope = (sticker: Sticker): 'server' | 'user' => {
+  if (sticker.scope === 'server' || sticker.scope === 'user') return sticker.scope;
+  return sticker.serverId ? 'server' : 'user';
+};
 
 const loadRecents = (): Record<string, string[]> => {
   try {
@@ -24,12 +29,12 @@ const loadRecents = (): Record<string, string[]> => {
   }
 };
 
-const pushRecent = (serverId: string, stickerId: string) => {
+const pushRecent = (contextKey: string, stickerKey: string) => {
   try {
     const all = loadRecents();
-    const prev = Array.isArray(all[serverId]) ? all[serverId] : [];
-    const next = [stickerId, ...prev.filter((id) => id !== stickerId)].slice(0, 24);
-    all[serverId] = next;
+    const prev = Array.isArray(all[contextKey]) ? all[contextKey] : [];
+    const next = [stickerKey, ...prev.filter((k) => k !== stickerKey)].slice(0, 24);
+    all[contextKey] = next;
     localStorage.setItem(RECENTS_KEY, JSON.stringify(all));
   } catch {
     // ignore
@@ -38,41 +43,51 @@ const pushRecent = (serverId: string, stickerId: string) => {
 
 export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProps) => {
   const [query, setQuery] = useState('');
+  const contextKey = serverId || '@dm';
 
-  const { data, isLoading } = useQuery({
+  const { data: serverData, isLoading: isLoadingServer } = useQuery({
     queryKey: ['stickers', serverId],
     queryFn: () => stickerApi.list(serverId!).then((res) => res.data as Sticker[]),
     enabled: !!serverId,
     staleTime: 30_000,
   });
 
-  const stickers = useMemo(() => (Array.isArray(data) ? data : []), [data]);
+  const { data: userData, isLoading: isLoadingUser } = useQuery({
+    queryKey: ['userStickers', 'me'],
+    queryFn: () => userStickerApi.listMine().then((res) => res.data as Sticker[]),
+    staleTime: 30_000,
+  });
+
+  const serverStickers = useMemo(() => (Array.isArray(serverData) ? serverData : []), [serverData]);
+  const userStickers = useMemo(() => (Array.isArray(userData) ? userData : []), [userData]);
+  const allStickers = useMemo(() => [...userStickers, ...serverStickers], [serverStickers, userStickers]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return stickers;
-    return stickers.filter((s) => {
+    if (!q) return allStickers;
+    return allStickers.filter((s) => {
       const name = (s.name || '').toLowerCase();
       const tags = Array.isArray(s.tags) ? s.tags.join(' ').toLowerCase() : '';
       return name.includes(q) || tags.includes(q);
     });
-  }, [query, stickers]);
+  }, [allStickers, query]);
 
   const recent = useMemo(() => {
-    if (!serverId) return [];
-    const ids = loadRecents()[serverId] || [];
-    if (ids.length === 0) return [];
-    const byId = new Map(stickers.map((s) => [s._id, s] as const));
-    return ids.map((id) => byId.get(id)).filter(Boolean) as Sticker[];
-  }, [serverId, stickers]);
+    const keys = loadRecents()[contextKey] || [];
+    if (keys.length === 0) return [];
+    const byKey = new Map(allStickers.map((s) => [`${getStickerScope(s)}:${s._id}`, s] as const));
+    return keys.map((k) => byKey.get(k)).filter(Boolean) as Sticker[];
+  }, [allStickers, contextKey]);
 
   const handlePick = (sticker: Sticker) => {
-    if (serverId) pushRecent(serverId, sticker._id);
+    pushRecent(contextKey, `${getStickerScope(sticker)}:${sticker._id}`);
     onSelect(sticker);
     // Optional: Keep open on select if you want multiselect style, Discord usually closes or keeps open. 
     // Usually closing is better for single interactions.
     onClose(); 
   };
+
+  const isLoading = isLoadingUser || (serverId ? isLoadingServer : false);
 
   return (
     <>
@@ -105,7 +120,7 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
               placeholder="Search stickers"
               className="w-full bg-[#1E1F22] text-mew-text placeholder-mew-textMuted rounded-[4px] pl-2 pr-8 py-1.5 text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-mew-accent"
               autoFocus
-              disabled={!serverId}
+              disabled={isLoading}
             />
             <Icon 
                 icon="mdi:magnify" 
@@ -117,15 +132,7 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 bg-[#2B2D31]">
-          {!serverId ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-               <div className="w-16 h-16 bg-[#1E1F22] rounded-full flex items-center justify-center mb-3">
-                  <Icon icon="mdi:server-off" className="text-mew-textMuted" width="32" />
-               </div>
-               <p className="text-mew-text text-sm font-semibold">Stickers Unavailable</p>
-               <p className="text-mew-textMuted text-xs mt-1">Stickers are currently only available inside servers.</p>
-            </div>
-          ) : isLoading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center h-full">
                <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="32" />
             </div>
@@ -150,33 +157,100 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
                 </div>
               )}
 
-              {/* Main Grid */}
-              <div>
-                <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
-                    {query ? 'Search Results' : 'Server Stickers'}
+              {/* Search Results */}
+              {query.trim() ? (
+                <div>
+                  <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
+                    Search Results
+                  </div>
+                  {filtered.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="flex justify-center mb-2">
+                        <Icon icon="mdi:sticker-emoji" className="text-[#404249]" width="48" />
+                      </div>
+                      <p className="text-mew-textMuted text-sm">No stickers found.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2">
+                      {filtered.map((s) => (
+                        <button
+                          key={`${getStickerScope(s)}-${s._id}`}
+                          className="aspect-square rounded-[4px] flex items-center justify-center hover:bg-[#36383E] transition-colors p-1 relative group"
+                          onClick={() => handlePick(s)}
+                          title={s.name}
+                        >
+                          <img
+                            src={s.url}
+                            alt={s.name}
+                            className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {filtered.length === 0 ? (
-                  <div className="text-center py-8">
-                     <div className="flex justify-center mb-2">
-                       <Icon icon="mdi:sticker-emoji" className="text-[#404249]" width="48" />
-                     </div>
-                     <p className="text-mew-textMuted text-sm">No stickers found.</p>
+              ) : (
+                <>
+                  {/* Personal Stickers */}
+                  <div>
+                    <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
+                      {serverId ? 'Personal Stickers' : 'My Stickers'}
+                    </div>
+                    {userStickers.length === 0 ? (
+                      <div className="text-center py-6 text-mew-textMuted text-sm">
+                        You don&apos;t have any stickers yet.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-4 gap-2">
+                        {userStickers.map((s) => (
+                          <button
+                            key={`user-${s._id}`}
+                            className="aspect-square rounded-[4px] flex items-center justify-center hover:bg-[#36383E] transition-colors p-1 relative group"
+                            onClick={() => handlePick(s)}
+                            title={s.name}
+                          >
+                            <img
+                              src={s.url}
+                              alt={s.name}
+                              className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2">
-                    {filtered.map((s) => (
-                      <button
-                        key={s._id}
-                        className="aspect-square rounded-[4px] flex items-center justify-center hover:bg-[#36383E] transition-colors p-1 relative group"
-                        onClick={() => handlePick(s)}
-                        title={s.name}
-                      >
-                        <img src={s.url} alt={s.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-200" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+
+                  {/* Server Stickers */}
+                  {serverId && (
+                    <div>
+                      <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
+                        Server Stickers
+                      </div>
+                      {serverStickers.length === 0 ? (
+                        <div className="text-center py-6 text-mew-textMuted text-sm">No server stickers.</div>
+                      ) : (
+                        <div className="grid grid-cols-4 gap-2">
+                          {serverStickers.map((s) => (
+                            <button
+                              key={`server-${s._id}`}
+                              className="aspect-square rounded-[4px] flex items-center justify-center hover:bg-[#36383E] transition-colors p-1 relative group"
+                              onClick={() => handlePick(s)}
+                              title={s.name}
+                            >
+                              <img
+                                src={s.url}
+                                alt={s.name}
+                                className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-200"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
             </div>
           )}
         </div>

@@ -116,7 +116,9 @@ export interface Embed {
 
 export interface Sticker {
   _id: string;
-  serverId: string;
+  scope: 'server' | 'user';
+  serverId?: string;
+  ownerId?: string;
   name: string;
   description?: string;
   tags: string[];

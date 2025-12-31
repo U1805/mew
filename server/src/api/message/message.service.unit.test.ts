@@ -42,6 +42,12 @@ vi.mock('../sticker/sticker.model', () => ({
   },
 }));
 
+vi.mock('../userSticker/userSticker.model', () => ({
+  default: {
+    findOne: vi.fn(),
+  },
+}));
+
 vi.mock('./mention.service', () => ({
   default: {
     processMentions: vi.fn(),
@@ -74,6 +80,7 @@ import Member from '../member/member.model';
 import Role from '../role/role.model';
 import Server from '../server/server.model';
 import Sticker from '../sticker/sticker.model';
+import UserSticker from '../userSticker/userSticker.model';
 import mentionService from './mention.service';
 import { extractFirstUrl, getLinkPreviewWithSafety } from '../metadata/metadata.service';
 import { calculateEffectivePermissions } from '../../utils/permission.service';
@@ -304,11 +311,64 @@ describe('message.service (unit)', () => {
     expect(socketManager.broadcastToUser).not.toHaveBeenCalled();
   });
 
-  it('createMessage rejects sticker messages in non-server channels', async () => {
+  it('createMessage rejects server-scope sticker messages in DMs', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM' }));
     await expect(
-      createMessage({ channelId: 'c1', authorId: 'u1', type: 'message/sticker', payload: { stickerId: 'st1' } } as any)
+      createMessage({
+        channelId: 'c1',
+        authorId: 'u1',
+        type: 'message/sticker',
+        payload: { stickerId: 'st1', stickerScope: 'server' },
+      } as any)
     ).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('createMessage allows user stickers in DMs and hydrates payload', async () => {
+    vi.mocked((Channel as any).findById).mockReturnValue(
+      makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] })
+    );
+
+    vi.mocked((UserSticker as any).findOne).mockReturnValue(
+      makeFindByIdQuery({
+        _id: mkId('ust1'),
+        userId: mkId('u1'),
+        name: 'Wave',
+        description: 'hi',
+        tags: ['wave'],
+        format: 'png',
+        contentType: 'image/png',
+        key: 'user-sticker.png',
+        size: 123,
+      })
+    );
+
+    vi.mocked(mentionService.processMentions).mockResolvedValue([] as any);
+    vi.mocked(extractFirstUrl).mockReturnValue(null);
+
+    vi.mocked(messageRepository.create).mockImplementation((data: any) => {
+      const doc = makeMessageDoc({
+        channelId: mkId('c1'),
+        authorId: { username: 'alice', avatarUrl: 'a.png', isBot: false },
+        content: data.content,
+        attachments: data.attachments,
+        payload: data.payload,
+      });
+      return doc as any;
+    });
+    vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
+
+    const result: any = await createMessage({
+      channelId: 'c1',
+      authorId: 'u1',
+      type: 'message/sticker',
+      payload: { stickerId: 'ust1', stickerScope: 'user' },
+    } as any);
+
+    expect(result.payload.sticker.url).toBe('http://cdn.local/user-sticker.png');
+    expect(result.payload.sticker.scope).toBe('user');
+    expect(socketManager.broadcast).not.toHaveBeenCalled();
+    expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u1', 'MESSAGE_CREATE', expect.any(Object));
+    expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u2', 'MESSAGE_CREATE', expect.any(Object));
   });
 
   it('createMessage hydrates sticker payload and broadcasts', async () => {
@@ -357,6 +417,7 @@ describe('message.service (unit)', () => {
           sticker: expect.objectContaining({
             name: 'Wave',
             key: 'sticker.png',
+            scope: 'server',
           }),
         }),
       })

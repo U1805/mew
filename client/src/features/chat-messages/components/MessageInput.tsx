@@ -140,7 +140,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       try {
         await messageApi.send(serverId || undefined, channelId, {
           type: 'message/sticker',
-          payload: { stickerId: sticker._id },
+          payload: { stickerId: sticker._id, stickerScope: sticker.scope },
         });
         setShowStickerPicker(false);
       } catch (err) {

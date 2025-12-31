@@ -1,20 +1,19 @@
 import { Types } from 'mongoose';
-import Sticker, { ISticker, StickerFormat } from './sticker.model';
+import UserSticker, { IUserSticker, UserStickerFormat } from './userSticker.model';
 import { BadRequestError, NotFoundError } from '../../utils/errors';
 import { getS3PublicUrl } from '../../utils/s3';
 
-export type StickerForClient = Omit<
-  ISticker,
-  'serverId' | 'createdBy' | 'toObject' | 'populate' | 'save' | 'validate' | 'validateSync' | '$locals' | '$where' | 'collection'
+export type UserStickerForClient = Omit<
+  IUserSticker,
+  'userId' | 'toObject' | 'populate' | 'save' | 'validate' | 'validateSync' | '$locals' | '$where' | 'collection'
 > & {
   _id: any;
-  scope: 'server';
-  serverId: any;
-  createdBy: any;
+  scope: 'user';
+  ownerId: any;
   url: string;
 };
 
-const inferFormat = (contentType: string, filename: string): StickerFormat => {
+const inferFormat = (contentType: string, filename: string): UserStickerFormat => {
   const ct = (contentType || '').toLowerCase();
   if (ct === 'image/gif') return 'gif';
   if (ct === 'image/webp') return 'webp';
@@ -26,23 +25,23 @@ const inferFormat = (contentType: string, filename: string): StickerFormat => {
   return 'png';
 };
 
-export const stickerToClient = (sticker: any) => {
+export const userStickerToClient = (sticker: any): UserStickerForClient => {
   const obj = typeof sticker?.toObject === 'function' ? sticker.toObject() : sticker;
   return {
     ...obj,
-    scope: 'server',
+    scope: 'user',
+    ownerId: obj?.userId,
     url: obj?.key ? getS3PublicUrl(obj.key) : '',
   };
 };
 
-export const listStickers = async (serverId: string) => {
-  const stickers = await Sticker.find({ serverId: new Types.ObjectId(serverId) }).sort({ createdAt: -1 }).lean();
-  return stickers.map(stickerToClient);
+export const listUserStickers = async (userId: string) => {
+  const stickers = await UserSticker.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).lean();
+  return stickers.map(userStickerToClient);
 };
 
-export const createStickerFromUpload = async (options: {
-  serverId: string;
-  createdBy: string;
+export const createUserStickerFromUpload = async (options: {
+  userId: string;
   name: string;
   description?: string;
   tags?: string[];
@@ -56,9 +55,8 @@ export const createStickerFromUpload = async (options: {
 
   const format = inferFormat(options.contentType, options.originalname);
 
-  const doc = await Sticker.create({
-    serverId: new Types.ObjectId(options.serverId),
-    createdBy: new Types.ObjectId(options.createdBy),
+  const doc = await UserSticker.create({
+    userId: new Types.ObjectId(options.userId),
     name,
     description: options.description?.trim() || undefined,
     tags: (options.tags || []).map(t => t.trim()).filter(Boolean).slice(0, 20),
@@ -68,19 +66,19 @@ export const createStickerFromUpload = async (options: {
     size: options.size,
   });
 
-  return stickerToClient(doc);
+  return userStickerToClient(doc);
 };
 
-export const updateSticker = async (options: {
-  serverId: string;
+export const updateUserSticker = async (options: {
+  userId: string;
   stickerId: string;
   name?: string;
   description?: string | null;
   tags?: string[];
 }) => {
-  const sticker = await Sticker.findOne({
+  const sticker = await UserSticker.findOne({
     _id: new Types.ObjectId(options.stickerId),
-    serverId: new Types.ObjectId(options.serverId),
+    userId: new Types.ObjectId(options.userId),
   });
   if (!sticker) throw new NotFoundError('Sticker not found');
 
@@ -101,18 +99,18 @@ export const updateSticker = async (options: {
   }
 
   await sticker.save();
-  return stickerToClient(sticker);
+  return userStickerToClient(sticker);
 };
 
-export const deleteSticker = async (options: { serverId: string; stickerId: string }) => {
-  const sticker = await Sticker.findOne({
+export const deleteUserSticker = async (options: { userId: string; stickerId: string }) => {
+  const sticker = await UserSticker.findOne({
     _id: new Types.ObjectId(options.stickerId),
-    serverId: new Types.ObjectId(options.serverId),
+    userId: new Types.ObjectId(options.userId),
   }).lean();
 
   if (!sticker) throw new NotFoundError('Sticker not found');
 
-  await Sticker.deleteOne({ _id: sticker._id } as any);
+  await UserSticker.deleteOne({ _id: sticker._id } as any);
   return { stickerId: options.stickerId, key: sticker.key };
 };
 

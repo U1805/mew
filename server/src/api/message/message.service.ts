@@ -12,6 +12,7 @@ import mongoose from 'mongoose';
 import { getS3PublicUrl } from '../../utils/s3';
 import config from '../../config';
 import Sticker from '../sticker/sticker.model';
+import UserSticker from '../userSticker/userSticker.model';
 
 // Convert stored attachment keys into client-consumable URLs.
 function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
@@ -278,33 +279,69 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
       throw new BadRequestError('stickerId is required for sticker messages');
     }
 
-    if (!channel.serverId) {
-      throw new BadRequestError('Stickers are only available in server channels');
-    }
-
-    const sticker = await Sticker.findOne({ _id: stickerId, serverId: channel.serverId }).lean();
-    if (!sticker) {
-      throw new NotFoundError('Sticker not found');
-    }
+    const scopeRaw = payload?.stickerScope ?? payload?.stickerSource;
+    const scopeStr = typeof scopeRaw === 'string' ? scopeRaw.trim() : '';
+    const scope: 'server' | 'user' =
+      scopeStr === 'user' || scopeStr === 'server' ? (scopeStr as any) : channel.serverId ? 'server' : 'user';
 
     // Sticker messages are allowed to have no content/attachments.
     data.content = typeof data.content === 'string' ? data.content : '';
     data.attachments = [];
-    data.payload = {
-      ...(data.payload && typeof data.payload === 'object' ? data.payload : {}),
-      sticker: {
-        _id: sticker._id,
-        serverId: sticker.serverId,
-        name: sticker.name,
-        description: sticker.description,
-        tags: sticker.tags,
-        format: sticker.format,
-        contentType: sticker.contentType,
-        key: sticker.key,
-        size: sticker.size,
-        url: getS3PublicUrl(sticker.key),
-      },
-    };
+
+    if (scope === 'server') {
+      if (!channel.serverId) {
+        throw new BadRequestError('Server stickers are only available in server channels');
+      }
+
+      const sticker = await Sticker.findOne({ _id: stickerId, serverId: channel.serverId }).lean();
+      if (!sticker) {
+        throw new NotFoundError('Sticker not found');
+      }
+
+      data.payload = {
+        ...(data.payload && typeof data.payload === 'object' ? data.payload : {}),
+        sticker: {
+          _id: sticker._id,
+          scope: 'server',
+          serverId: sticker.serverId,
+          name: sticker.name,
+          description: sticker.description,
+          tags: sticker.tags,
+          format: sticker.format,
+          contentType: sticker.contentType,
+          key: sticker.key,
+          size: sticker.size,
+          url: getS3PublicUrl(sticker.key),
+        },
+      };
+    } else {
+      const authorIdStr = typeof data.authorId === 'string' ? data.authorId : (data.authorId as any)?.toString?.();
+      if (!authorIdStr) {
+        throw new BadRequestError('authorId is required for sticker messages');
+      }
+
+      const sticker = await UserSticker.findOne({ _id: stickerId, userId: authorIdStr }).lean();
+      if (!sticker) {
+        throw new NotFoundError('Sticker not found');
+      }
+
+      data.payload = {
+        ...(data.payload && typeof data.payload === 'object' ? data.payload : {}),
+        sticker: {
+          _id: sticker._id,
+          scope: 'user',
+          ownerId: sticker.userId,
+          name: sticker.name,
+          description: sticker.description,
+          tags: sticker.tags,
+          format: sticker.format,
+          contentType: sticker.contentType,
+          key: sticker.key,
+          size: sticker.size,
+          url: getS3PublicUrl(sticker.key),
+        },
+      };
+    }
   }
 
   if (data.referencedMessageId) {
