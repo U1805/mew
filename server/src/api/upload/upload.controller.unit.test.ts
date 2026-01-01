@@ -154,7 +154,10 @@ describe('api/upload/upload.controller', () => {
 
       await downloadFileHandler({ params: { channelId: 'c1', key: 'k1' } } as any, res, next);
 
-      expect(exists).toHaveBeenCalledWith({ channelId: 'c1', 'attachments.key': 'k1' });
+      expect(exists).toHaveBeenCalledWith({
+        channelId: 'c1',
+        $or: [{ 'attachments.key': 'k1' }, { 'payload.sticker.key': 'k1' }],
+      });
       expect(next.mock.calls[0][0]).toBeInstanceOf(NotFoundError);
     });
 
@@ -185,6 +188,36 @@ describe('api/upload/upload.controller', () => {
       expect(resStream.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, max-age=3600');
       expect(resStream.setHeader).toHaveBeenCalledWith('X-Content-Type-Options', 'nosniff');
       expect(resStream.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment');
+      expect(body.pipe).toHaveBeenCalledWith(resStream);
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('allows sticker keys referenced in payload', async () => {
+      vi.spyOn(Message, 'exists').mockResolvedValue({ _id: 'm1' } as any);
+      const body = new PassThrough();
+      vi.spyOn(body, 'pipe');
+
+      vi.mocked(getObjectStream).mockResolvedValue({
+        body,
+        contentType: 'image/png',
+        contentLength: 3,
+      } as any);
+
+      const resStream: any = new PassThrough();
+      resStream.setHeader = vi.fn();
+      resStream.headersSent = false;
+      resStream.status = vi.fn().mockReturnThis();
+      resStream.json = vi.fn();
+
+      const next = vi.fn();
+
+      await downloadFileHandler({ params: { channelId: 'c1', key: 'sticker.png' } } as any, resStream, next);
+
+      expect(Message.exists).toHaveBeenCalledWith({
+        channelId: 'c1',
+        $or: [{ 'attachments.key': 'sticker.png' }, { 'payload.sticker.key': 'sticker.png' }],
+      });
+      expect(getObjectStream).toHaveBeenCalledWith('sticker.png');
       expect(body.pipe).toHaveBeenCalledWith(resStream);
       expect(next).not.toHaveBeenCalled();
     });

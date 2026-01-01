@@ -8,6 +8,8 @@ export { inviteApi } from './invite.api';
 export { categoryApi } from './category.api';
 export { channelApi } from './channel.api';
 export { messageApi } from './message.api';
+export { stickerApi } from './sticker.api';
+export { userStickerApi } from './userSticker.api';
 export { searchApi } from './search.api';
 export { webhookApi } from './webhook.api';
 export { uploadApi } from './upload.api';

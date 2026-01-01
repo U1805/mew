@@ -114,6 +114,24 @@ export interface Embed {
   favicons?: string[];
 }
 
+export interface Sticker {
+  _id: string;
+  scope: 'server' | 'user';
+  serverId?: string;
+  ownerId?: string;
+  name: string;
+  description?: string;
+  tags: string[];
+  format: 'png' | 'gif' | 'webp';
+  contentType: string;
+  size: number;
+  key?: string;
+  url: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface MessagePayload {
   webhookName?: string;
   title?: string;
@@ -128,6 +146,7 @@ export interface MessagePayload {
     avatarUrl?: string;
   };
   embeds?: Embed[];
+  sticker?: Sticker;
   [key: string]: any;
 }
 

@@ -10,6 +10,7 @@ import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 import { BotManagementPanel } from './BotManagementPanel';
 import { PluginManagementPanel } from './PluginManagementPanel';
+import { UserStickerPanel } from './UserStickerPanel';
 
 const UserSettings: React.FC = () => {
   const { isSettingsOpen, closeSettings } = useUIStore();
@@ -144,6 +145,7 @@ const UserSettings: React.FC = () => {
             
             <SidebarItem label="My Account" isActive={activeTab === 'account'} onClick={() => handleTabClick('account')} />
             <SidebarItem label="Profiles" />
+            <SidebarItem label="Stickers" isActive={activeTab === 'stickers'} onClick={() => handleTabClick('stickers')} />
             <SidebarItem label="Plugins" isActive={activeTab === 'plugins'} onClick={() => handleTabClick('plugins')} />
             <SidebarItem label="Bots" isActive={activeTab === 'bots'} onClick={() => handleTabClick('bots')} />
             <SidebarItem label="Privacy & Safety" />
@@ -320,6 +322,7 @@ const UserSettings: React.FC = () => {
 
             {activeTab === 'plugins' && <PluginManagementPanel />}
             {activeTab === 'bots' && <BotManagementPanel />}
+            {activeTab === 'stickers' && <UserStickerPanel />}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client, PutBucketCorsCommand } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import config from '../config';
@@ -195,4 +195,15 @@ export const getObjectStream = async (key: string) => {
     contentType: resp.ContentType,
     contentLength: resp.ContentLength,
   };
+};
+
+export const deleteObject = async (key: string) => {
+  if (!key || !key.trim()) return;
+
+  const command = new DeleteObjectCommand({
+    Bucket: config.s3.bucketName,
+    Key: key.trim(),
+  });
+
+  await s3Client.send(command);
 };

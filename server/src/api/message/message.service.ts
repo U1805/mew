@@ -11,6 +11,8 @@ import mentionService from './mention.service';
 import mongoose from 'mongoose';
 import { getS3PublicUrl } from '../../utils/s3';
 import config from '../../config';
+import Sticker from '../sticker/sticker.model';
+import UserSticker from '../userSticker/userSticker.model';
 
 // Convert stored attachment keys into client-consumable URLs.
 function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
@@ -57,6 +59,10 @@ function buildMessageContext(messageObject: any): string {
 
   // Common card-style payload fields.
   if (payload) {
+    const sticker = payload?.sticker && typeof payload.sticker === 'object' ? payload.sticker : undefined;
+    const stickerName = typeof sticker?.name === 'string' ? sticker.name.trim() : '';
+    if (stickerName) parts.push(`sticker: ${stickerName}`);
+
     const title = typeof payload.title === 'string' ? payload.title.trim() : '';
     const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
     const url = typeof payload.url === 'string' ? payload.url.trim() : '';
@@ -170,6 +176,14 @@ function processMessageForClient(message: any): object {
   // Finally, hydrate any attachments in the message
   messageObject = hydrateAttachmentUrls(messageObject);
 
+  // Hydrate sticker URLs (if any).
+  if (messageObject?.payload?.sticker && typeof messageObject.payload.sticker === 'object') {
+    const key = (messageObject.payload.sticker as any).key;
+    if (typeof key === 'string' && key) {
+      (messageObject.payload.sticker as any).url = getS3PublicUrl(key);
+    }
+  }
+
   // Provide a unified plain-text context string for bots/LLM consumers.
   messageObject.context = buildMessageContext(messageObject);
 
@@ -255,6 +269,79 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
             : undefined,
       },
     };
+  }
+
+  if (data.type === 'message/sticker') {
+    const payload = data.payload && typeof data.payload === 'object' ? (data.payload as any) : {};
+    const stickerIdRaw = payload?.stickerId;
+    const stickerId = typeof stickerIdRaw === 'string' ? stickerIdRaw.trim() : '';
+    if (!stickerId) {
+      throw new BadRequestError('stickerId is required for sticker messages');
+    }
+
+    const scopeRaw = payload?.stickerScope ?? payload?.stickerSource;
+    const scopeStr = typeof scopeRaw === 'string' ? scopeRaw.trim() : '';
+    const scope: 'server' | 'user' =
+      scopeStr === 'user' || scopeStr === 'server' ? (scopeStr as any) : channel.serverId ? 'server' : 'user';
+
+    // Sticker messages are allowed to have no content/attachments.
+    data.content = typeof data.content === 'string' ? data.content : '';
+    data.attachments = [];
+
+    if (scope === 'server') {
+      if (!channel.serverId) {
+        throw new BadRequestError('Server stickers are only available in server channels');
+      }
+
+      const sticker = await Sticker.findOne({ _id: stickerId, serverId: channel.serverId }).lean();
+      if (!sticker) {
+        throw new NotFoundError('Sticker not found');
+      }
+
+      data.payload = {
+        ...(data.payload && typeof data.payload === 'object' ? data.payload : {}),
+        sticker: {
+          _id: sticker._id,
+          scope: 'server',
+          serverId: sticker.serverId,
+          name: sticker.name,
+          description: sticker.description,
+          tags: sticker.tags,
+          format: sticker.format,
+          contentType: sticker.contentType,
+          key: sticker.key,
+          size: sticker.size,
+          url: getS3PublicUrl(sticker.key),
+        },
+      };
+    } else {
+      const authorIdStr = typeof data.authorId === 'string' ? data.authorId : (data.authorId as any)?.toString?.();
+      if (!authorIdStr) {
+        throw new BadRequestError('authorId is required for sticker messages');
+      }
+
+      const sticker = await UserSticker.findOne({ _id: stickerId, userId: authorIdStr }).lean();
+      if (!sticker) {
+        throw new NotFoundError('Sticker not found');
+      }
+
+      data.payload = {
+        ...(data.payload && typeof data.payload === 'object' ? data.payload : {}),
+        sticker: {
+          _id: sticker._id,
+          scope: 'user',
+          ownerId: sticker.userId,
+          name: sticker.name,
+          description: sticker.description,
+          tags: sticker.tags,
+          format: sticker.format,
+          contentType: sticker.contentType,
+          key: sticker.key,
+          size: sticker.size,
+          url: getS3PublicUrl(sticker.key),
+        },
+      };
+    }
   }
 
   if (data.referencedMessageId) {
