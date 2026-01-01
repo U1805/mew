@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import toast from 'react-hot-toast';
 import type { Sticker } from '../../../shared/types';
 import { userStickerApi } from '../../../shared/services/api';
-import { useUIStore } from '../../../shared/stores';
+import { useModalStore } from '../../../shared/stores';
 
 const parseTags = (raw: string): string[] => {
   const s = (raw || '').trim();
@@ -16,7 +16,7 @@ const parseTags = (raw: string): string[] => {
 
 export const UserStickerPanel = () => {
   const queryClient = useQueryClient();
-  const { openModal } = useUIStore();
+  const { openModal } = useModalStore();
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [newStickerFile, setNewStickerFile] = useState<File | null>(null);
