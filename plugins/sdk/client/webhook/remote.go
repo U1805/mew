@@ -2,8 +2,10 @@ package webhook
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"path"
@@ -38,6 +40,49 @@ func isNonFileURLExt(ext string) bool {
 	}
 }
 
+func isRetryableDownloadErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	msg := strings.ToLower(strings.TrimSpace(err.Error()))
+	if strings.Contains(msg, "i/o timeout") {
+		return true
+	}
+	if strings.Contains(msg, "connection refused") {
+		return true
+	}
+	return false
+}
+
+func isLikelyImageURL(rawURL, fallbackFilename string) bool {
+	ext := strings.ToLower(strings.TrimSpace(path.Ext(FilenameFromURL(rawURL, fallbackFilename))))
+	switch ext {
+	case ".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tiff", ".tif", ".avif":
+		return true
+	default:
+		return false
+	}
+}
+
+func wsrvFallbackURL(remoteURL string) string {
+	u := &url.URL{
+		Scheme: "https",
+		Host:   "wsrv.nl",
+		Path:   "/",
+	}
+	q := u.Query()
+	q.Set("url", strings.TrimSpace(remoteURL))
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
 // UploadRemote downloads a remote file and uploads it to the webhook /upload endpoint.
 // It returns the uploaded Attachment (its Key can be used in later messages).
 func UploadRemote(
@@ -58,16 +103,29 @@ func UploadRemote(
 		downloadClient = &http.Client{Timeout: 30 * time.Second}
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, src, nil)
-	if err != nil {
-		return Attachment{}, err
+	doDownload := func(downloadURL string) (*http.Response, error) {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		if ua := strings.TrimSpace(userAgent); ua != "" {
+			req.Header.Set("User-Agent", ua)
+		}
+		req.Header.Set("Accept", "*/*")
+		return downloadClient.Do(req)
 	}
-	if ua := strings.TrimSpace(userAgent); ua != "" {
-		req.Header.Set("User-Agent", ua)
-	}
-	req.Header.Set("Accept", "*/*")
 
-	resp, err := downloadClient.Do(req)
+	resp, err := doDownload(src)
+	if err != nil && isRetryableDownloadErr(err) && isLikelyImageURL(src, fallbackFilename) {
+		primaryErr := err
+		fallbackURL := wsrvFallbackURL(src)
+		if strings.TrimSpace(fallbackURL) != "" {
+			resp, err = doDownload(fallbackURL)
+			if err != nil {
+				return Attachment{}, fmt.Errorf("download failed: primary=%v fallback=%w", primaryErr, err)
+			}
+		}
+	}
 	if err != nil {
 		return Attachment{}, err
 	}
@@ -77,6 +135,7 @@ func UploadRemote(
 		return Attachment{}, fmt.Errorf("download failed: %s", resp.Status)
 	}
 
+	// Keep the original filename even if we downloaded through a proxy.
 	filename := FilenameFromURL(src, fallbackFilename)
 	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
 	if contentType == "" {
