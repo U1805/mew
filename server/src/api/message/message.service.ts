@@ -190,6 +190,15 @@ function processMessageForClient(message: any): object {
   return messageObject;
 }
 
+function attachServerId(messageForClient: any, channel: any) {
+  if (!messageForClient || typeof messageForClient !== 'object') return messageForClient;
+  if (!channel || typeof channel !== 'object') return messageForClient;
+  if (channel.type === 'DM') return messageForClient;
+  const sid = channel.serverId ? channel.serverId.toString() : undefined;
+  if (!sid) return messageForClient;
+  return { ...messageForClient, serverId: sid };
+}
+
 interface GetMessagesOptions {
   channelId: string;
   limit: number;
@@ -199,8 +208,12 @@ interface GetMessagesOptions {
 import { messageRepository } from './message.repository';
 
 export const getMessagesByChannel = async (options: GetMessagesOptions) => {
-  const messages = await messageRepository.findByChannel(options);
-  return messages.map(processMessageForClient);
+  const [messages, channel] = await Promise.all([
+    messageRepository.findByChannel(options),
+    Channel.findById(options.channelId).select('type serverId').lean(),
+  ]);
+  const processed = messages.map(processMessageForClient);
+  return channel ? processed.map((m) => attachServerId(m, channel)) : processed;
 };
 
 export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> => {
@@ -368,7 +381,7 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
 
-  const messageForClient = processMessageForClient(populatedMessage);
+  const messageForClient = attachServerId(processMessageForClient(populatedMessage), channel);
 
   const channelIdStr = populatedMessage.channelId.toString();
 
@@ -401,7 +414,7 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
           populatedMessage.payload = { ...(populatedMessage.payload || {}), embeds: [embed] };
           await messageRepository.save(populatedMessage);
 
-          const updatedMessageForClient = processMessageForClient(populatedMessage);
+          const updatedMessageForClient = attachServerId(processMessageForClient(populatedMessage), channel);
 
           if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
             for (const recipient of channel.recipients) {
@@ -456,7 +469,7 @@ export const getMessageById = async (messageId: string) => {
 
     const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
 
-    const messageForClient = processMessageForClient(populatedMessage);
+    const messageForClient = attachServerId(processMessageForClient(populatedMessage), channel);
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
 
     return messageForClient as IMessage;
@@ -465,6 +478,8 @@ export const getMessageById = async (messageId: string) => {
   export const deleteMessage = async (messageId: string, userId: string) => {
     await checkMessagePermissions(messageId, userId);
     const message = await getMessageById(messageId);
+
+    const channel = await Channel.findById(message.channelId).select('type serverId').lean();
 
     // Retraction keeps history stable for clients and avoids hard deletes.
     message.content = '此消息已撤回';
@@ -478,7 +493,9 @@ export const getMessageById = async (messageId: string) => {
 
     const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
 
-    const messageForClient = processMessageForClient(populatedMessage);
+    const messageForClient = channel
+      ? attachServerId(processMessageForClient(populatedMessage), channel)
+      : processMessageForClient(populatedMessage);
 
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
 
@@ -491,12 +508,15 @@ export const addReaction = async (
       emoji: string
     ) => {
       const message = await getMessageById(messageId);
+      const channel = await Channel.findById(message.channelId).select('type serverId').lean();
       const existingReaction = (message.reactions || []).find((reaction) =>
         (reaction.userIds || []).some((id) => id.toString() === userId)
       );
 
       if (existingReaction && existingReaction.emoji === emoji) {
-        return processMessageForClient(await message.populate('authorId', 'username discriminator avatarUrl isBot'));
+        const populated = await message.populate('authorId', 'username discriminator avatarUrl isBot');
+        const processed = processMessageForClient(populated);
+        return channel ? attachServerId(processed, channel) : processed;
       }
 
       const finalMessage = await messageRepository.addReaction(messageId, userId, emoji, existingReaction?.emoji);
@@ -505,7 +525,9 @@ export const addReaction = async (
           throw new NotFoundError('Message not found');
       }
 
-      const messageForClient = processMessageForClient(finalMessage);
+      const messageForClient = channel
+        ? attachServerId(processMessageForClient(finalMessage), channel)
+        : processMessageForClient(finalMessage);
       socketManager.broadcast('MESSAGE_REACTION_ADD', finalMessage.channelId.toString(), messageForClient);
       return messageForClient;
     };
@@ -521,7 +543,10 @@ export const addReaction = async (
           throw new NotFoundError('Message not found or reaction could not be removed');
       }
 
-      const messageForClient = processMessageForClient(finalMessage);
+      const channel = await Channel.findById(finalMessage.channelId).select('type serverId').lean();
+      const messageForClient = channel
+        ? attachServerId(processMessageForClient(finalMessage), channel)
+        : processMessageForClient(finalMessage);
       socketManager.broadcast('MESSAGE_REACTION_REMOVE', finalMessage.channelId.toString(), messageForClient);
       return messageForClient;
     };

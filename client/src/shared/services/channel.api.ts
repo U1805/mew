@@ -19,6 +19,9 @@ export const channelApi = {
     api.get(`/servers/${serverId}/channels/${channelId}/permissions`),
   updatePermissionOverrides: (serverId: string, channelId: string, data: any) =>
     api.put(`/servers/${serverId}/channels/${channelId}/permissions`, data),
+  getMyNotificationSettings: (channelId: string) => api.get(`/channels/${channelId}/notification-settings`),
+  updateMyNotificationSettings: (channelId: string, data: { level: 'DEFAULT' | 'ALL_MESSAGES' | 'MENTIONS_ONLY' | 'MUTE' }) =>
+    api.put(`/channels/${channelId}/notification-settings`, data),
 };
 
 export default channelApi;

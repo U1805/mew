@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Channel, Message } from '../types';
-import { useHiddenStore, useUnreadStore, useAuthStore, useUIStore } from '../stores';
+import { useHiddenStore, useUnreadStore, useAuthStore, useUIStore, useNotificationSettingsStore } from '../stores';
+import { playMessageSound, showDesktopNotification } from '../services/notifications';
 
 export const useGlobalSocketEvents = () => {
   const queryClient = useQueryClient();
@@ -29,6 +30,7 @@ export const useGlobalSocketEvents = () => {
         const { currentChannelId } = useUIStore.getState();
         const { user } = useAuthStore.getState();
         const { addUnreadChannel, addUnreadMention } = useUnreadStore.getState();
+        const notif = useNotificationSettingsStore.getState();
 
         const isViewingChannel = message.channelId === currentChannelId && document.hasFocus();
 
@@ -50,6 +52,57 @@ export const useGlobalSocketEvents = () => {
 
         if (isMentioned) {
           addUnreadMention(message._id);
+        }
+
+        // --- Notifications (sound + browser) ---
+        const authorId = (message as any).authorId;
+        const authorObject = authorId && typeof authorId === 'object' ? authorId : undefined;
+        const authorUserId = authorObject?._id || (typeof authorId === 'string' ? authorId : undefined);
+        if (user && authorUserId && authorUserId === user._id) {
+          // Ignore self
+        } else {
+          const channelLevel = notif.channel[message.channelId] || 'DEFAULT';
+          const serverLevel = message.serverId ? (notif.server[message.serverId] || 'ALL_MESSAGES') : 'ALL_MESSAGES';
+          const effectiveLevel = channelLevel === 'DEFAULT' ? serverLevel : channelLevel;
+
+          const shouldNotify =
+            effectiveLevel !== 'MUTE' &&
+            (effectiveLevel !== 'MENTIONS_ONLY' || isMentioned);
+
+          if (shouldNotify) {
+            if (notif.user.soundEnabled) {
+              void playMessageSound(notif.user.soundVolume);
+            }
+
+            if (notif.user.desktopEnabled && !document.hasFocus()) {
+              const dmChannels = queryClient.getQueryData<Channel[]>(['dmChannels']);
+              const serverChannels = message.serverId ? queryClient.getQueryData<Channel[]>(['channels', message.serverId]) : undefined;
+
+              const channel =
+                dmChannels?.find(c => c._id === message.channelId) ||
+                serverChannels?.find(c => c._id === message.channelId);
+
+              const authorName = authorObject?.username || 'New message';
+              const bodyText = (() => {
+                const raw = (message as any).content;
+                if (typeof raw === 'string' && raw.trim()) return raw.trim();
+                if (Array.isArray((message as any).attachments) && (message as any).attachments.length > 0) return 'Sent an attachment';
+                return 'Sent a message';
+              })();
+
+              const title = message.serverId
+                ? `${authorName} in #${channel?.name || 'channel'}`
+                : `${authorName}`;
+
+              showDesktopNotification({
+                title,
+                body: bodyText,
+                icon: authorObject?.avatarUrl,
+                tag: `mew:${message.channelId}`,
+                data: { serverId: message.serverId, channelId: message.channelId },
+              });
+            }
+          }
         }
 
         // Update the last message in the channel list cache

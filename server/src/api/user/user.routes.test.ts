@@ -50,6 +50,50 @@ describe('User Routes', () => {
     });
   });
 
+  describe('Notification settings', () => {
+    it('GET /api/users/@me/notification-settings returns defaults', async () => {
+      const res = await request(app)
+        .get('/api/users/@me/notification-settings')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body).toEqual({ soundEnabled: true, soundVolume: 0.6, desktopEnabled: false });
+    });
+
+    it('PUT /api/users/@me/notification-settings updates and persists', async () => {
+      const putRes = await request(app)
+        .put('/api/users/@me/notification-settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ soundEnabled: false, soundVolume: 0.2, desktopEnabled: true });
+
+      expect(putRes.statusCode).toBe(200);
+      expect(putRes.body).toEqual({ soundEnabled: false, soundVolume: 0.2, desktopEnabled: true });
+
+      const getRes = await request(app)
+        .get('/api/users/@me/notification-settings')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(getRes.statusCode).toBe(200);
+      expect(getRes.body).toEqual({ soundEnabled: false, soundVolume: 0.2, desktopEnabled: true });
+    });
+
+    it('PUT /api/users/@me/notification-settings supports partial updates', async () => {
+      const putRes1 = await request(app)
+        .put('/api/users/@me/notification-settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ soundVolume: 0.9 });
+      expect(putRes1.statusCode).toBe(200);
+      expect(putRes1.body).toEqual({ soundEnabled: true, soundVolume: 0.9, desktopEnabled: false });
+
+      const putRes2 = await request(app)
+        .put('/api/users/@me/notification-settings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ desktopEnabled: true });
+      expect(putRes2.statusCode).toBe(200);
+      expect(putRes2.body).toEqual({ soundEnabled: true, soundVolume: 0.9, desktopEnabled: true });
+    });
+  });
+
   describe('POST /api/users/@me/channels', () => {
     let recipientId: string;
 

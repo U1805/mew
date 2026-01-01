@@ -2,7 +2,9 @@ import { useModalStore } from '../../shared/stores';
 import { CreateInviteModal } from '../../features/servers/modals/CreateInviteModal';
 import { JoinServerModal } from '../../features/servers/modals/JoinServerModal';
 import { ServerSettingsModal } from '../../features/servers/modals/ServerSettingsModal';
+import { ServerNotificationSettingsModal } from '../../features/servers/modals/ServerNotificationSettingsModal';
 import { ChannelSettingsModal } from '../../features/channels/modals/ChannelSettingsModal';
+import { ChannelNotificationSettingsModal } from '../../features/channels/modals/ChannelNotificationSettingsModal';
 import { EditCategoryModal } from '../../features/channels/modals/EditCategoryModal';
 import { FindUserModal } from '../../features/users/modals/FindUserModal';
 import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
@@ -52,8 +54,12 @@ const ModalManager = () => {
       return <JoinServerModal />;
     case 'serverSettings':
       return <ServerSettingsModal />;
+    case 'serverNotifications':
+      return <ServerNotificationSettingsModal />;
     case 'channelSettings':
       return <ChannelSettingsModal />;
+    case 'channelNotifications':
+      return <ChannelNotificationSettingsModal />;
     case 'editCategory':
       return <EditCategoryModal />;
     case 'findUser':

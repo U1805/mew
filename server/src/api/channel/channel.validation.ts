@@ -51,3 +51,12 @@ export const ackChannelSchema = z.object({
     channelId: z.string().min(1, 'channelId is required'),
   }),
 });
+
+export const updateMyChannelNotificationSettingsSchema = z.object({
+  body: z.object({
+    level: z.enum(['DEFAULT', 'ALL_MESSAGES', 'MENTIONS_ONLY', 'MUTE']),
+  }),
+  params: z.object({
+    channelId: z.string().min(1, 'channelId is required'),
+  }),
+});

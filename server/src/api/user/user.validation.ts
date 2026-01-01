@@ -14,3 +14,11 @@ export const updateMeSchema = z.object({
     })
     .default({}),
 });
+
+export const updateMyNotificationSettingsSchema = z.object({
+  body: z.object({
+    soundEnabled: z.boolean().optional(),
+    soundVolume: z.number().min(0).max(1).optional(),
+    desktopEnabled: z.boolean().optional(),
+  }),
+});

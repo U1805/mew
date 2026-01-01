@@ -92,3 +92,20 @@ export const updateMeHandler = asyncHandler(async (req: Request, res: Response) 
   const updatedUser = await userService.updateMe(req.user.id, updateData);
   res.status(200).json(updatedUser);
 });
+
+export const getMyNotificationSettingsHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
+  }
+  const settings = await userService.getMyNotificationSettings(req.user.id);
+  res.status(200).json(settings);
+});
+
+export const updateMyNotificationSettingsHandler = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) {
+    throw new UnauthorizedError('Not authenticated');
+  }
+
+  const updated = await userService.updateMyNotificationSettings(req.user.id, req.body);
+  res.status(200).json(updated);
+});

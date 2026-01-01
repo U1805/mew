@@ -10,9 +10,10 @@ interface ChannelItemProps {
     isActive: boolean;
     onClick: () => void;
     onSettingsClick?: (e: React.MouseEvent) => void;
+    onNotificationClick?: (e: React.MouseEvent) => void;
 }
 
-export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick }) => {
+export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick, onNotificationClick }) => {
     const permissions = usePermissions(channel._id);
     const canManageChannel = permissions.has('MANAGE_CHANNEL');
     const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
@@ -39,16 +40,28 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
                 )}
             </div>
 
-            {/* Settings Icon - Shows on hover or if active */}
-            {canManageChannel && onSettingsClick && (
-                <div
-                    className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white ml-1 flex-shrink-0 transition-opacity"
-                    title="Edit Channel"
-                    onClick={onSettingsClick}
-                >
-                    <Icon icon="mdi:cog" width="16" height="16" />
-                </div>
-            )}
+            <div className="flex items-center gap-1 flex-shrink-0">
+                {onNotificationClick && (
+                    <div
+                        className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white transition-opacity"
+                        title="Notification Settings"
+                        onClick={onNotificationClick}
+                    >
+                        <Icon icon="mdi:bell-outline" width="16" height="16" />
+                    </div>
+                )}
+
+                {/* Settings Icon - Shows on hover or if active */}
+                {canManageChannel && onSettingsClick && (
+                    <div
+                        className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white transition-opacity"
+                        title="Edit Channel"
+                        onClick={onSettingsClick}
+                    >
+                        <Icon icon="mdi:cog" width="16" height="16" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

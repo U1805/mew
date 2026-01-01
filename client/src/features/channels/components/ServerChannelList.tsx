@@ -85,6 +85,14 @@ export const ServerChannelList: React.FC = () => {
                     </div>
                 )}
 
+                <div
+                    className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group mb-1"
+                    onClick={() => openModal('serverNotifications', { server, serverId: currentServerId })}
+                >
+                    <span className="text-sm font-medium">Notification Settings</span>
+                    <Icon icon="mdi:bell-outline" />
+                </div>
+
                 {isOwner && (
                     <div
                         className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group mb-1"
@@ -152,6 +160,7 @@ export const ServerChannelList: React.FC = () => {
                 isActive={currentChannelId === channel._id}
                 onClick={() => setCurrentChannel(channel._id)}
                 onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
+                onNotificationClick={(e) => { e.stopPropagation(); openModal('channelNotifications', { channel }); }}
             />
         ))}
 
@@ -209,6 +218,7 @@ export const ServerChannelList: React.FC = () => {
                         isActive={currentChannelId === channel._id}
                         onClick={() => setCurrentChannel(channel._id)}
                         onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
+                        onNotificationClick={(e) => { e.stopPropagation(); openModal('channelNotifications', { channel }); }}
                     />
                 ))}
             </div>
