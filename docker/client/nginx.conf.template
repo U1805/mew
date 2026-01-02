@@ -44,6 +44,18 @@ server {
     proxy_pass http://garage:3902;
   }
 
+  # Proxy pre-signed PUT uploads through the same exposed port to avoid mixed-content / internal hostnames.
+  # The server can issue URLs under MEW_STATIC_URL, e.g. http://localhost:151/presign/<bucket>/<key>?...
+  location /presign/ {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    rewrite ^/presign/(.*)$ /$1 break;
+    proxy_pass http://garage:3900;
+  }
+
   location / {
     try_files $uri $uri/ /index.html;
   }
@@ -62,13 +74,17 @@ server {
 
   # If MEW_STATIC_URL is configured, redirect bucket-style URLs to the path-based URL.
   # Example: http://mew-bucket.web.garage.localhost/<key> -> http://localhost:151/static/<key>
-  set $static_url "${MEW_STATIC_URL}";
-  set $static_url_trimmed $static_url;
-  if ($static_url_trimmed ~* ^(.+)/$) {
-    set $static_url_trimmed $1;
+  set $static_base "${MEW_STATIC_URL}";
+  set $static_base_trimmed $static_base;
+  if ($static_base_trimmed ~* ^(.+)/$) {
+    set $static_base_trimmed $1;
   }
-  if ($static_url_trimmed != "") {
-    return 302 $static_url_trimmed$request_uri;
+  # Backward compatibility: older configs used MEW_STATIC_URL=http://host:port/static/
+  if ($static_base_trimmed ~* ^(.+)/static$) {
+    set $static_base_trimmed $1;
+  }
+  if ($static_base_trimmed != "") {
+    return 302 $static_base_trimmed/static$request_uri;
   }
 
   location / {

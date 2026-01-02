@@ -44,7 +44,7 @@ docker compose --env-file docker-compose.env up --build
 -   **Garage Web**: `http://<bucket>.web.garage.localhost/<key>` (由 Nginx 代理)
 
 如果您将 `client` 的端口映射为非 `80`（例如 `151:80`），建议在 `docker-compose.env` 中设置：
-- `MEW_STATIC_URL=http://localhost:151/static/`（API 返回的文件 URL 会使用该前缀）
+- `MEW_STATIC_URL=http://localhost:151`（API 返回的文件 URL 会使用该前缀：`/static/`；预签名上传 URL 会使用 `/presign/`，避免浏览器混合内容拦截）
 - 并通过 `http://localhost:151/static/<key>` 访问文件
 
 :::info 关于 `*.localhost` 域名

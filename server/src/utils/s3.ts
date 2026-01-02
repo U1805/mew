@@ -17,12 +17,21 @@ const buildBaseUrl = (host: string, port: number): string => {
 const normalizeStaticBaseUrl = (raw: string | undefined): string | null => {
   const trimmed = (raw || '').trim();
   if (!trimmed) return null;
-  return trimmed.replace(/\/+$/, '');
+
+  const withoutTrailingSlash = trimmed.replace(/\/+$/, '');
+  // Backward compatibility:
+  // - older versions used MEW_STATIC_URL=http://host:port/static/
+  // - newer versions use MEW_STATIC_URL=http://host:port (suffixes are fixed)
+  const withoutStaticSuffix = withoutTrailingSlash.replace(/\/static$/i, '');
+  const withoutPresignSuffix = withoutStaticSuffix.replace(/\/presign$/i, '');
+  return withoutPresignSuffix;
 };
 
 const S3_ENDPOINT = buildBaseUrl(config.s3.endpoint, config.s3.port);
 const S3_PUBLIC_BASE = buildBaseUrl(`${config.s3.bucketName}.${config.s3.webEndpoint}`, config.s3.webPort);
-const STATIC_PUBLIC_BASE = normalizeStaticBaseUrl((config as any).staticUrl);
+const PUBLIC_BASE = normalizeStaticBaseUrl((config as any).staticUrl);
+const STATIC_PUBLIC_BASE = PUBLIC_BASE ? `${PUBLIC_BASE}/static` : null;
+const PRESIGN_PUBLIC_BASE = PUBLIC_BASE ? `${PUBLIC_BASE}/presign` : null;
 
 const rewriteS3PublicUrlToStaticUrl = (rawUrl: string): string | null => {
   if (!STATIC_PUBLIC_BASE) return null;
@@ -33,7 +42,7 @@ const rewriteS3PublicUrlToStaticUrl = (rawUrl: string): string | null => {
     if (u.search || u.hash) return null;
 
     // If the URL is already on the configured static base (even if protocol/port differs),
-    // normalize it to exactly `${MEW_STATIC_URL}/<key>` so callers always get the reachable external URL.
+    // normalize it to exactly `${MEW_STATIC_URL}/static/<key>` so callers always get the reachable external URL.
     const staticBase = new URL(`${STATIC_PUBLIC_BASE}/`);
     if (u.hostname === staticBase.hostname && u.pathname.startsWith(staticBase.pathname)) {
       const key = u.pathname.slice(staticBase.pathname.length).replace(/^\/+/, '');
@@ -61,6 +70,31 @@ const s3Client = new S3Client({
   },
   forcePathStyle: true, // Necessary for MinIO, Garage, etc.
 });
+
+const createPresignClient = () => {
+  if (!PRESIGN_PUBLIC_BASE) return null;
+  try {
+    const base = new URL(`${PRESIGN_PUBLIC_BASE}/`);
+    const endpoint = `${base.protocol}//${base.host}`;
+
+    return {
+      client: new S3Client({
+        endpoint,
+        region: config.s3.region,
+        credentials: {
+          accessKeyId: config.s3.accessKeyId,
+          secretAccessKey: config.s3.secretAccessKey,
+        },
+        forcePathStyle: true,
+      }),
+      basePath: base.pathname.replace(/\/+$/, '').replace(/\/{2,}/g, '/'),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const presignClientInfo = createPresignClient();
 
 export const configureBucketCors = async () => {
   try {
@@ -139,11 +173,23 @@ export const createPresignedPutUrl = async (opts: { key: string; contentType?: s
     ContentType: opts.contentType || undefined,
   });
 
+  const client = presignClientInfo?.client ?? s3Client;
+
   // Some AWS SDK packages can pull in mismatched `@smithy/types` versions under pnpm, which breaks TS assignability.
   // Runtime compatibility is unaffected; cast to unblock compilation.
-  const url = await getSignedUrl(s3Client as any, command as any, {
+  const url = await getSignedUrl(client as any, command as any, {
     expiresIn: Math.max(5, Math.min(config.s3.presignExpiresSeconds, 3600)),
   });
+
+  if (presignClientInfo?.basePath && presignClientInfo.basePath !== '/') {
+    try {
+      const signed = new URL(url);
+      signed.pathname = `${presignClientInfo.basePath}${signed.pathname}`.replace(/\/{2,}/g, '/');
+      return signed.toString();
+    } catch {
+      // ignore
+    }
+  }
 
   return url;
 };
