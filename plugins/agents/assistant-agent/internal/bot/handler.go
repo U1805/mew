@@ -176,7 +176,7 @@ func (r *Runner) processDMMessage(
 	}
 
 	l1l4, l5 := r.buildPrompt(ctx, meta, facts, summaries, sessionMsgs, logPrefix)
-	reply, finalMood, gotMood, err := r.reply(ctx, channelID, l1l4, l5)
+	reply, finalMood, gotMood, err := r.reply(ctx, emit, channelID, userID, l1l4, l5, logPrefix)
 	if err != nil {
 		return err
 	}
@@ -203,7 +203,7 @@ func (r *Runner) processDMMessage(
 		}
 		l5More = append(l5More, openaigo.UserMessage("(you want to say more)"))
 
-		more, moreMood, moreGotMood, moreErr := r.reply(ctx, channelID, l1l4, l5More)
+		more, moreMood, moreGotMood, moreErr := r.reply(ctx, emit, channelID, userID, l1l4, l5More, logPrefix)
 		if moreErr != nil {
 			return moreErr
 		}
@@ -354,7 +354,15 @@ func (r *Runner) buildPrompt(
 	return l1l4, l5
 }
 
-func (r *Runner) reply(ctx context.Context, channelID string, l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) (reply string, finalMood store.Mood, gotMood bool, err error) {
+func (r *Runner) reply(
+	ctx context.Context,
+	emit socketio.EmitFunc,
+	channelID string,
+	userID string,
+	l1l4 string,
+	l5 []openaigo.ChatCompletionMessageParamUnion,
+	logPrefix string,
+) (reply string, finalMood store.Mood, gotMood bool, err error) {
 	return ai.ChatWithTools(ctx, r.llmHTTPClient, r.aiConfig, strings.TrimSpace(r.persona), l1l4, l5, ai.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
 			return r.runHistorySearch(ctx, channelID, keyword)
@@ -370,10 +378,44 @@ func (r *Runner) reply(ctx context.Context, channelID string, l1l4 string, l5 []
 		ChannelID:              channelID,
 		LLMPreviewLen:          assistantLogLLMPreviewLen,
 		ToolResultPreviewLen:   assistantLogToolResultPreviewLen,
+		OnToolCallAssistantText: func(text string) error {
+			return r.sendToolPrelude(ctx, emit, channelID, userID, text, logPrefix)
+		},
+		SilenceToken:         assistantSilenceToken,
+		WantMoreToken:        assistantWantMoreToken,
+		ProactiveTokenPrefix: assistantProactiveTokenPrefix,
+		StickerTokenPrefix:   assistantStickerTokenPrefix,
 		MaxLLMRetries:          assistantMaxLLMRetries,
 		LLMRetryInitialBackoff: assistantLLMRetryInitialBackoff,
 		LLMRetryMaxBackoff:     assistantLLMRetryMaxBackoff,
 	})
+}
+
+func (r *Runner) sendToolPrelude(
+	ctx context.Context,
+	emit socketio.EmitFunc,
+	channelID string,
+	userID string,
+	text string,
+	logPrefix string,
+) error {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return nil
+	}
+
+	sendErr := emit(assistantUpstreamMessageCreate, map[string]any{
+		"channelId": channelID,
+		"content":   text,
+	})
+	if sendErr != nil {
+		// Fallback: if the gateway is disconnected, use REST API.
+		if err := r.postMessageHTTP(ctx, channelID, text); err != nil {
+			return fmt.Errorf("send tool prelude failed (gateway=%v http=%v)", sendErr, err)
+		}
+		log.Printf("%s gateway send prelude failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
+	}
+	return nil
 }
 
 func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelID, userID, reply string, controls replyControls, logPrefix string) error {

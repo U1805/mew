@@ -30,6 +30,14 @@ type ChatWithToolsOptions struct {
 	ChannelID             string
 	LLMPreviewLen         int
 	ToolResultPreviewLen  int
+	// OnToolCallAssistantText is called when the model emits tool directives along with user-visible text.
+	// This can be used to surface the "thinking / searching" message to the frontend before tools run.
+	OnToolCallAssistantText func(text string) error
+	// Control directives (used to strip from tool-call prelude text).
+	SilenceToken         string
+	WantMoreToken        string
+	ProactiveTokenPrefix string
+	StickerTokenPrefix   string
 
 	// LLM call retries (for flaky upstreams returning errors or empty choices).
 	MaxLLMRetries          int
@@ -113,6 +121,17 @@ func ChatWithTools(
 		}
 
 		if len(toolCalls) > 0 {
+			cleanText = stripTrailingControlLines(cleanText, stripTrailingControlLinesOpts{
+				SilenceToken:         opts.SilenceToken,
+				WantMoreToken:        opts.WantMoreToken,
+				ProactiveTokenPrefix: opts.ProactiveTokenPrefix,
+				StickerTokenPrefix:   opts.StickerTokenPrefix,
+			})
+			if opts.OnToolCallAssistantText != nil && strings.TrimSpace(cleanText) != "" {
+				if err := opts.OnToolCallAssistantText(strings.TrimSpace(cleanText)); err != nil {
+					return "", store.Mood{}, false, err
+				}
+			}
 			if strings.TrimSpace(cleanText) != "" {
 				messages = append(messages, openaigo.AssistantMessage(strings.TrimSpace(cleanText)))
 			}
@@ -187,6 +206,48 @@ func ChatWithTools(
 type textToolCall struct {
 	Name string
 	Args map[string]any
+}
+
+type stripTrailingControlLinesOpts struct {
+	SilenceToken         string
+	WantMoreToken        string
+	ProactiveTokenPrefix string
+	StickerTokenPrefix   string
+}
+
+func stripTrailingControlLines(text string, opts stripTrailingControlLinesOpts) string {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	for {
+		last := -1
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.TrimSpace(lines[i]) != "" {
+				last = i
+				break
+			}
+		}
+		if last < 0 {
+			break
+		}
+
+		t := strings.TrimSpace(lines[last])
+		switch {
+		case opts.SilenceToken != "" && t == strings.TrimSpace(opts.SilenceToken):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.WantMoreToken != "" && t == strings.TrimSpace(opts.WantMoreToken):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.ProactiveTokenPrefix != "" && strings.HasPrefix(t, strings.TrimSpace(opts.ProactiveTokenPrefix)):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.StickerTokenPrefix != "" && strings.HasPrefix(t, strings.TrimSpace(opts.StickerTokenPrefix)):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		default:
+		}
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func extractTrailingToolCalls(text string, prefix string) (clean string, calls []textToolCall) {

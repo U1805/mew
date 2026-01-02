@@ -47,3 +47,13 @@ func TestExtractTrailingToolCalls_ShorthandArgs(t *testing.T) {
 	}
 }
 
+func TestStripTrailingControlLines_RemovesKnownTokens(t *testing.T) {
+	in := "hello\n<STICKER>{\"name\":\"Wave\"}\n<WANT_MORE>\n"
+	got := stripTrailingControlLines(in, stripTrailingControlLinesOpts{
+		WantMoreToken:      "<WANT_MORE>",
+		StickerTokenPrefix: "<STICKER>",
+	})
+	if got != "hello" {
+		t.Fatalf("got=%q", got)
+	}
+}
