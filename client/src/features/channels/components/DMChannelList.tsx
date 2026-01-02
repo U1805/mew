@@ -93,12 +93,21 @@ export const DMChannelList = () => {
                           )}
                       </div>
 
-                      <div
-                         className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white"
-                         title="Remove DM"
-                         onClick={(e) => handleRemoveDm(e, dm._id)}
-                      >
-                         <Icon icon="mdi:close" width="16" />
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div
+                              className="cursor-pointer text-mew-textMuted hover:text-white"
+                              title="Notification Settings"
+                              onClick={(e) => { e.stopPropagation(); openModal('channelNotifications', { channel: dm }); }}
+                          >
+                              <Icon icon="mdi:bell-outline" width="16" />
+                          </div>
+                          <div
+                             className="cursor-pointer text-mew-textMuted hover:text-white"
+                             title="Remove DM"
+                             onClick={(e) => handleRemoveDm(e, dm._id)}
+                          >
+                             <Icon icon="mdi:close" width="16" />
+                          </div>
                       </div>
                   </div>
                )

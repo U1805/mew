@@ -6,4 +6,5 @@ export type { UnreadServerState } from './unreadServerStore';
 export { useUIStore } from './uiStore';
 export { useModalStore } from './modalStore';
 export { useHiddenStore } from './hiddenStore';
+export { useNotificationSettingsStore } from './notificationSettingsStore';
 

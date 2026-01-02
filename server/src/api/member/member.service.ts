@@ -108,6 +108,37 @@ const memberService = {
     }
     return memberObject;
   },
+
+  async getMyNotificationSettings(serverId: string, requesterId: string) {
+    const member = await memberRepository.findOne({ serverId, userId: requesterId });
+    if (!member) {
+      throw new ForbiddenError('You are not a member of this server.');
+    }
+
+    return {
+      notificationLevel: (member as any).notificationLevel || 'ALL_MESSAGES',
+    };
+  },
+
+  async updateMyNotificationSettings(
+    serverId: string,
+    requesterId: string,
+    update: Partial<{ notificationLevel: 'ALL_MESSAGES' | 'MENTIONS_ONLY' | 'MUTE' }>
+  ) {
+    const member = await memberRepository.findOne({ serverId, userId: requesterId });
+    if (!member) {
+      throw new ForbiddenError('You are not a member of this server.');
+    }
+
+    if (update.notificationLevel) {
+      (member as any).notificationLevel = update.notificationLevel;
+      await memberRepository.save(member);
+    }
+
+    return {
+      notificationLevel: (member as any).notificationLevel || 'ALL_MESSAGES',
+    };
+  },
 };
 
 export default memberService;

@@ -1,5 +1,14 @@
 import { Permission } from '../constants/permissions';
 
+export type NotificationLevel = 'ALL_MESSAGES' | 'MENTIONS_ONLY' | 'MUTE';
+export type ChannelNotificationLevel = 'DEFAULT' | NotificationLevel;
+
+export interface UserNotificationSettings {
+  soundEnabled: boolean;
+  soundVolume: number; // 0..1
+  desktopEnabled: boolean;
+}
+
 export interface User {
   _id: string;
   username: string;
@@ -8,6 +17,7 @@ export interface User {
   avatarUrl?: string;
   isBot: boolean;
   dmEnabled?: boolean;
+  notificationSettings?: UserNotificationSettings;
   createdAt: string;
 }
 

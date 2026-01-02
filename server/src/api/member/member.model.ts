@@ -6,6 +6,7 @@ export interface IServerMember extends Document {
   roleIds: Types.ObjectId[];
   isOwner: boolean;
   nickname?: string;
+  notificationLevel?: 'ALL_MESSAGES' | 'MENTIONS_ONLY' | 'MUTE';
 }
 
 const ServerMemberSchema = new Schema<IServerMember>(
@@ -15,6 +16,11 @@ const ServerMemberSchema = new Schema<IServerMember>(
     roleIds: [{ type: Schema.Types.ObjectId, ref: 'Role' }],
     isOwner: { type: Boolean, default: false, index: true },
     nickname: { type: String },
+    notificationLevel: {
+      type: String,
+      enum: ['ALL_MESSAGES', 'MENTIONS_ONLY', 'MUTE'],
+      default: 'ALL_MESSAGES',
+    },
   },
   { timestamps: true }
 );

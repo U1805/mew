@@ -7,6 +7,11 @@ export interface IUser extends Document {
   password?: string;
   avatarUrl?: string;
   isBot: boolean;
+  notificationSettings?: {
+    soundEnabled: boolean;
+    soundVolume: number; // 0..1
+    desktopEnabled: boolean;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,6 +31,11 @@ const UserSchema: Schema = new Schema(
     password: { type: String, required: true, select: false },
     avatarUrl: { type: String },
     isBot: { type: Boolean, default: false },
+    notificationSettings: {
+      soundEnabled: { type: Boolean, default: true },
+      soundVolume: { type: Number, default: 0.6, min: 0, max: 1 },
+      desktopEnabled: { type: Boolean, default: false },
+    },
   },
   { timestamps: true }
 );

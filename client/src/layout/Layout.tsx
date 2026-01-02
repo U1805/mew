@@ -9,6 +9,7 @@ import { usePresenceEvents } from '../shared/hooks/usePresenceEvents';
 import { useGlobalSocketEvents } from '../shared/hooks/useGlobalSocketEvents';
 import { useUnreadInitialization } from '../shared/hooks/useUnreadInitialization';
 import useTabNotifier from '../shared/hooks/useTabNotifier';
+import { useNotificationSettingsHydration } from '../shared/hooks/useNotificationSettingsHydration';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore, useUnreadServerStore } from '../shared/stores';
 import { useMembers } from '../shared/hooks/useMembers';
@@ -23,6 +24,7 @@ const Layout = () => {
   const initializeNotifier = useUnreadServerStore(state => state.initializeNotifier);
 
   const { data: servers } = useServers();
+  useNotificationSettingsHydration(servers);
   const { currentServerId, mobileSidebarOpen, toggleMobileSidebar, setMemberListOpen } = useUIStore(); // Destructure setMemberListOpen
   useMembers(currentServerId);
 

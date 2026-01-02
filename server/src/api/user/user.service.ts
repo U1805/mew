@@ -18,6 +18,38 @@ const userService = {
     return userObject;
   },
 
+  async getMyNotificationSettings(userId: string) {
+    const user = await UserModel.findById(userId).select('notificationSettings').lean();
+    if (!user) throw new NotFoundError('User not found');
+
+    const settings = (user as any).notificationSettings || {};
+    return {
+      soundEnabled: settings.soundEnabled ?? true,
+      soundVolume: typeof settings.soundVolume === 'number' ? settings.soundVolume : 0.6,
+      desktopEnabled: settings.desktopEnabled ?? false,
+    };
+  },
+
+  async updateMyNotificationSettings(
+    userId: string,
+    update: Partial<{ soundEnabled: boolean; soundVolume: number; desktopEnabled: boolean }>
+  ) {
+    const user = await UserModel.findById(userId).select('notificationSettings');
+    if (!user) throw new NotFoundError('User not found');
+
+    const current = (user as any).notificationSettings || {};
+    const next = {
+      soundEnabled: typeof update.soundEnabled === 'boolean' ? update.soundEnabled : (current.soundEnabled ?? true),
+      soundVolume: typeof update.soundVolume === 'number' ? update.soundVolume : (typeof current.soundVolume === 'number' ? current.soundVolume : 0.6),
+      desktopEnabled: typeof update.desktopEnabled === 'boolean' ? update.desktopEnabled : (current.desktopEnabled ?? false),
+    };
+
+    (user as any).notificationSettings = next;
+    await user.save();
+
+    return next;
+  },
+
   async searchUsers(query: string, currentUserId: string) {
     const users = await userRepository.find({
       username: { $regex: query, $options: 'i' },
@@ -69,7 +101,7 @@ const userService = {
 
   async updateMe(userId: string, updateData: { username?: string; avatarUrl?: string }) {
     try {
-      const user = await UserModel.findById(userId).select('username discriminator avatarUrl isBot email createdAt updatedAt');
+      const user = await UserModel.findById(userId).select('username discriminator avatarUrl isBot email createdAt updatedAt notificationSettings');
       if (!user) throw new NotFoundError('User not found');
 
       if (typeof updateData.username === 'string' && updateData.username.trim()) {

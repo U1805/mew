@@ -1,6 +1,16 @@
 import { Router } from 'express';
-import { createDmChannelHandler, getDmChannelsHandler, getMeHandler, searchUsersHandler, getUserByIdHandler, updateMeHandler, changePasswordHandler } from './user.controller';
-import { changePasswordSchema, updateMeSchema } from './user.validation';
+import {
+  createDmChannelHandler,
+  getDmChannelsHandler,
+  getMeHandler,
+  getMyNotificationSettingsHandler,
+  searchUsersHandler,
+  getUserByIdHandler,
+  updateMeHandler,
+  updateMyNotificationSettingsHandler,
+  changePasswordHandler
+} from './user.controller';
+import { changePasswordSchema, updateMeSchema, updateMyNotificationSettingsSchema } from './user.validation';
 import validate from '../../middleware/validate';
 import { getUserServersHandler } from '../server/server.controller';
 import { protect } from '../../middleware/auth';
@@ -14,6 +24,9 @@ const router = Router();
 router.use(protect);
 
 router.route('/@me').get(getMeHandler).patch(uploadImage.single('avatar'), validate(updateMeSchema), updateMeHandler);
+router.route('/@me/notification-settings')
+  .get(getMyNotificationSettingsHandler)
+  .put(validate(updateMyNotificationSettingsSchema), updateMyNotificationSettingsHandler);
 router.get('/@me/servers', getUserServersHandler);
 router.get('/@me/channels', getDmChannelsHandler);
 router.post('/@me/channels', createDmChannelHandler);

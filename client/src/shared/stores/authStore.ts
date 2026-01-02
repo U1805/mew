@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { usePresenceStore } from './presenceStore';
 import { disconnectSocket } from '../services/socket';
 import { User } from '../types';
+import { useNotificationSettingsStore } from './notificationSettingsStore';
 
 export interface AuthState {
   token: string | null;
@@ -29,6 +30,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     otherStorage.removeItem('mew_user');
 
     set({ token, user });
+    useNotificationSettingsStore.getState().hydrateFromUser(user);
   },
 
   logout: () => {
@@ -39,6 +41,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ token: null, user: null });
     disconnectSocket();
     usePresenceStore.getState().clearOnlineStatus();
+    useNotificationSettingsStore.getState().clear();
   },
 }));
 

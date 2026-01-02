@@ -143,6 +143,8 @@ const makeMessageDoc = (overrides: Partial<any> = {}) => {
 describe('message.service (unit)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default channel lookup for getMessagesByChannel tests.
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM' }));
   });
 
   it('getMessagesByChannel includes unified context for normal messages', async () => {
