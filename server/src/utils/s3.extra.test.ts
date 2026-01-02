@@ -77,6 +77,45 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     expect(getSignedUrl).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), expect.objectContaining({ expiresIn: 3600 }));
   });
 
+  it('createPresignedPutUrl rewrites to MEW_STATIC_URL/presign when set', async () => {
+    const getSignedUrl = vi.fn().mockResolvedValue('https://public.local/b/k.png?X-Amz-Signature=1');
+    const S3Client = vi.fn().mockImplementation(function (this: any) {
+      this.send = vi.fn();
+    });
+
+    vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl }));
+    vi.doMock('@aws-sdk/client-s3', () => ({
+      S3Client,
+      PutObjectCommand: vi.fn(),
+      GetObjectCommand: vi.fn(),
+      PutBucketCorsCommand: vi.fn(),
+    }));
+    vi.doMock('@aws-sdk/lib-storage', () => ({ Upload: vi.fn() }));
+    vi.doMock('../config', () => ({
+      default: {
+        staticUrl: 'https://public.local',
+        s3: {
+          endpoint: 'api.local',
+          webEndpoint: 'web.local',
+          port: 3900,
+          webPort: 3902,
+          accessKeyId: 'k',
+          secretAccessKey: 's',
+          bucketName: 'b',
+          useSsl: false,
+          region: 'r',
+          presignExpiresSeconds: 60,
+          corsAllowedOrigins: ['*'],
+        },
+      },
+    }));
+
+    const mod = await import('./s3');
+    await expect(mod.createPresignedPutUrl({ key: 'k.png', contentType: 'image/png' })).resolves.toBe(
+      'https://public.local/presign/b/k.png?X-Amz-Signature=1'
+    );
+  });
+
   it('uploadStream counts bytes and returns metadata', async () => {
     const done = vi.fn();
     const Upload = vi.fn().mockImplementation(function (this: any, { params }: any) {
@@ -230,7 +269,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
-        staticUrl: 'http://localhost:151/static/',
+        staticUrl: 'http://localhost:151',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.local',
@@ -266,7 +305,7 @@ describe('utils/s3 (presign, stream upload, get object, cors skip)', () => {
     vi.doMock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn() }));
     vi.doMock('../config', () => ({
       default: {
-        staticUrl: 'http://localhost:151/static/',
+        staticUrl: 'http://localhost:151',
         s3: {
           endpoint: 'api.local',
           webEndpoint: 'web.garage.localhost',
