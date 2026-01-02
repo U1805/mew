@@ -26,16 +26,16 @@ type Fetcher struct {
 func (f *Fetcher) withDefaults() *Fetcher {
 	out := *f
 	if out.PageSize <= 0 {
-		out.PageSize = 100
+		out.PageSize = defaultPageSize
 	}
 	if out.MaxPages <= 0 {
-		out.MaxPages = 20
+		out.MaxPages = defaultMaxPages
 	}
 	if out.SessionGap <= 0 {
-		out.SessionGap = 10 * time.Minute
+		out.SessionGap = defaultSessionGap
 	}
 	if out.MaxSessionMessages <= 0 {
-		out.MaxSessionMessages = 40
+		out.MaxSessionMessages = defaultMaxSessionMessages
 	}
 	return &out
 }
@@ -157,14 +157,13 @@ func (f *Fetcher) SearchHistory(ctx context.Context, channelID, keyword string, 
 
 func (f *Fetcher) UserActivityFrequency(ctx context.Context, channelID, userID string, asOf time.Time) (string, error) {
 	f = f.withDefaults()
-	const maxWindowDays = 30
-	windows := []int{1, 7, 30}
+	windows := userActivityWindows
 	if asOf.IsZero() {
 		asOf = time.Now()
 	}
 	loc := asOf.Location()
 	startOfToday := time.Date(asOf.Year(), asOf.Month(), asOf.Day(), 0, 0, 0, 0, loc)
-	windowStart := startOfToday.AddDate(0, 0, -(maxWindowDays - 1))
+	windowStart := startOfToday.AddDate(0, 0, -(maxUserActivityWindowDays - 1))
 
 	activeDayStarts := map[string]time.Time{}
 	before := ""

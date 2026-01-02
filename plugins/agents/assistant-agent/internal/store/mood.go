@@ -13,13 +13,6 @@ type Mood struct {
 	Arousal float64 `json:"arousal"`
 }
 
-const (
-	DefaultBaselineValence = 0.2
-	DefaultBaselineArousal = 0.1
-
-	MoodDecayKPerHour = 0.25
-)
-
 func DefaultBaselineMood() Mood {
 	return Mood{Valence: DefaultBaselineValence, Arousal: DefaultBaselineArousal}
 }

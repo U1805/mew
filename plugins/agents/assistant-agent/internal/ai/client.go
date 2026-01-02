@@ -5,19 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 
 	"mew/plugins/assistant-agent/internal/config"
-)
-
-const (
-	DefaultBaseURL         = "https://api.openai.com/v1"
-	DefaultModel           = "gpt-4o-mini"
-	MaxRetries             = 5
-	DefaultChatHTTPTimeout = 75 * time.Second
 )
 
 func NewHTTPClient() *http.Client {

@@ -27,7 +27,7 @@ const (
 	assistantIncomingQueueSize = 256
 	assistantWorkerCount       = 4
 
-	assistantSessionGap = 10 * time.Minute
+	assistantSessionGap = 30 * time.Minute
 
 	assistantLogPrefix = "[assistant-agent]"
 
