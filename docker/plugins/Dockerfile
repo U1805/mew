@@ -1,10 +1,14 @@
-FROM golang:1.25.5-alpine AS build
+ARG GO_IMAGE=golang:1.25.5-alpine
+ARG RUNTIME_IMAGE=alpine:3.20
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS build
 
 WORKDIR /src
 
 COPY plugins ./plugins
 
 ARG GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
+ARG TARGETOS
+ARG TARGETARCH
 
 RUN set -eux; \
     mkdir -p /out; \
@@ -42,11 +46,11 @@ RUN set -eux; \
             fi; \
           fi; \
         fi; \
-        CGO_ENABLED=0 go build -o "/out/mew-${name}-bot" "$pkg"; \
+        GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" CGO_ENABLED=0 go build -o "/out/mew-${name}-bot" "$pkg"; \
       ); \
     done
 
-FROM alpine:3.20
+FROM --platform=$TARGETPLATFORM ${RUNTIME_IMAGE}
 
 RUN apk add --no-cache ca-certificates tini
 

@@ -48,6 +48,9 @@ type Runner struct {
 
 	knownUsersMu sync.RWMutex
 	knownUsers   map[string]struct{}
+
+	stickersMu    sync.RWMutex
+	stickersCache stickerCache
 }
 
 func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*Runner, error) {

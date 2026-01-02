@@ -3,8 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import type { Sticker } from '../../../shared/types';
-import { userStickerApi } from '../../../shared/services/api';
+import type { Bot, Sticker } from '../../../shared/types';
+import { botApi, botStickerApi, userStickerApi } from '../../../shared/services/api';
 import { useModalStore } from '../../../shared/stores';
 
 const parseTags = (raw: string): string[] => {
@@ -18,15 +18,30 @@ export const UserStickerPanel = () => {
   const queryClient = useQueryClient();
   const { openModal } = useModalStore();
 
+  const [target, setTarget] = useState<{ kind: 'me' } | { kind: 'bot'; botId: string }>({ kind: 'me' });
+
   const inputRef = useRef<HTMLInputElement>(null);
   const [newStickerFile, setNewStickerFile] = useState<File | null>(null);
   const [newStickerPreview, setNewStickerPreview] = useState<string | null>(null);
   const [newStickerName, setNewStickerName] = useState('');
   const [newStickerTags, setNewStickerTags] = useState('');
 
+  const { data: botsData } = useQuery({
+    queryKey: ['bots', 'me'],
+    queryFn: () => botApi.list().then((res) => res.data as Bot[]),
+    staleTime: 30_000,
+  });
+  const bots = useMemo(() => (Array.isArray(botsData) ? botsData : []), [botsData]);
+
+  const stickerQueryKey = useMemo(() => {
+    if (target.kind === 'bot') return ['userStickers', 'bot', target.botId] as const;
+    return ['userStickers', 'me'] as const;
+  }, [target]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['userStickers', 'me'],
-    queryFn: () => userStickerApi.listMine().then((res) => res.data as Sticker[]),
+    queryKey: stickerQueryKey,
+    queryFn: () =>
+      (target.kind === 'bot' ? botStickerApi.list(target.botId) : userStickerApi.listMine()).then((res) => res.data as Sticker[]),
     staleTime: 30_000,
   });
 
@@ -75,12 +90,12 @@ export const UserStickerPanel = () => {
       fd.append('file', newStickerFile);
       fd.append('name', name);
       if (newStickerTags.trim()) fd.append('tags', newStickerTags.trim());
-      const res = await userStickerApi.createMine(fd);
+      const res = await (target.kind === 'bot' ? botStickerApi.create(target.botId, fd) : userStickerApi.createMine(fd));
       return res.data as Sticker;
     },
     onSuccess: (sticker) => {
       toast.success('Sticker uploaded');
-      queryClient.setQueryData(['userStickers', 'me'], (old: Sticker[] | undefined) => {
+      queryClient.setQueryData(stickerQueryKey, (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         if (prev.some(s => s._id === sticker._id)) return prev;
         return [sticker, ...prev];
@@ -98,16 +113,19 @@ export const UserStickerPanel = () => {
 
   const updateMutation = useMutation({
     mutationFn: async (input: { stickerId: string; name: string; tags: string; description: string }) => {
-      const res = await userStickerApi.updateMine(input.stickerId, {
+      const payload = {
         name: input.name,
         description: input.description?.trim() ? input.description.trim() : null,
         tags: parseTags(input.tags),
-      });
+      };
+      const res = await (target.kind === 'bot'
+        ? botStickerApi.update(target.botId, input.stickerId, payload)
+        : userStickerApi.updateMine(input.stickerId, payload));
       return res.data as Sticker;
     },
     onSuccess: (sticker) => {
       toast.success('Sticker updated');
-      queryClient.setQueryData(['userStickers', 'me'], (old: Sticker[] | undefined) => {
+      queryClient.setQueryData(stickerQueryKey, (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         return prev.map(s => (s._id === sticker._id ? sticker : s));
       });
@@ -119,12 +137,12 @@ export const UserStickerPanel = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (stickerId: string) => {
-      await userStickerApi.removeMine(stickerId);
+      await (target.kind === 'bot' ? botStickerApi.remove(target.botId, stickerId) : userStickerApi.removeMine(stickerId));
       return stickerId;
     },
     onSuccess: (stickerId) => {
       toast.success('Sticker deleted');
-      queryClient.setQueryData(['userStickers', 'me'], (old: Sticker[] | undefined) => {
+      queryClient.setQueryData(stickerQueryKey, (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         return prev.filter(s => s._id !== stickerId);
       });
@@ -139,6 +157,26 @@ export const UserStickerPanel = () => {
       <div className="pb-4 border-b border-[#3F4147] shrink-0">
         <h2 className="text-xl font-bold text-white mb-2">Stickers</h2>
         <p className="text-sm text-mew-textMuted">Upload and manage your personal stickers. You can use them in DMs and servers.</p>
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2">
+          <div className="text-xs font-bold text-mew-textMuted uppercase">Manage For</div>
+          <select
+            value={target.kind === 'bot' ? `bot:${target.botId}` : 'me'}
+            onChange={(e) => {
+              const v = e.target.value;
+              setDrafts({});
+              if (v === 'me') setTarget({ kind: 'me' });
+              else if (v.startsWith('bot:')) setTarget({ kind: 'bot', botId: v.slice(4) });
+            }}
+            className="bg-[#1E1F22] text-white px-3 py-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all w-full sm:w-auto"
+          >
+            <option value="me">Me</option>
+            {bots.map((b) => (
+              <option key={b._id} value={`bot:${b._id}`}>
+                Bot: {b.name}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar py-6 space-y-8">

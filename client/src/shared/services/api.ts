@@ -10,6 +10,7 @@ export { channelApi } from './channel.api';
 export { messageApi } from './message.api';
 export { stickerApi } from './sticker.api';
 export { userStickerApi } from './userSticker.api';
+export { botStickerApi } from './botSticker.api';
 export { searchApi } from './search.api';
 export { webhookApi } from './webhook.api';
 export { uploadApi } from './upload.api';

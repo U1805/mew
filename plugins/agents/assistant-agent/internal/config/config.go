@@ -31,8 +31,6 @@ func ParseAssistantConfig(raw string) (AssistantConfig, error) {
 	return cfg, nil
 }
 
-const DefaultTimezone = "+08:00"
-
 func (c AssistantConfig) TimeLocation() (*time.Location, error) {
 	return ResolveTimezoneLocation(c.Timezone)
 }

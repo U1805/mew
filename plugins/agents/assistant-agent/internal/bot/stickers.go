@@ -1,0 +1,106 @@
+package bot
+
+import (
+	"context"
+	"log"
+	"sort"
+	"strings"
+	"time"
+
+	"mew/plugins/sdk/client"
+)
+
+type stickerCache struct {
+	FetchedAt time.Time
+	Stickers  []client.Sticker
+}
+
+const stickerCacheTTL = 60 * time.Second
+
+func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) ([]client.Sticker, error) {
+	now := time.Now()
+	r.stickersMu.RLock()
+	if !r.stickersCache.FetchedAt.IsZero() && now.Sub(r.stickersCache.FetchedAt) < stickerCacheTTL {
+		out := append([]client.Sticker(nil), r.stickersCache.Stickers...)
+		r.stickersMu.RUnlock()
+		return out, nil
+	}
+	r.stickersMu.RUnlock()
+
+	stickers, err := client.ListMyStickers(ctx, r.mewHTTPClient, r.apiBase, r.userToken)
+	if err != nil {
+		log.Printf("%s sticker list fetch failed: err=%v", logPrefix, err)
+		return nil, err
+	}
+
+	r.stickersMu.Lock()
+	r.stickersCache = stickerCache{
+		FetchedAt: now,
+		Stickers:  append([]client.Sticker(nil), stickers...),
+	}
+	r.stickersMu.Unlock()
+
+	return stickers, nil
+}
+
+func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) string {
+	stickers, err := r.listConfiguredStickers(ctx, logPrefix)
+	if err != nil || len(stickers) == 0 {
+		return ""
+	}
+
+	names := make([]string, 0, len(stickers))
+	seen := map[string]struct{}{}
+	for _, s := range stickers {
+		name := strings.TrimSpace(s.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	if len(names) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("Available sticker names:\n")
+	for _, n := range names {
+		b.WriteString("- ")
+		b.WriteString(n)
+		b.WriteString("\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func (r *Runner) resolveStickerIDByName(ctx context.Context, logPrefix, name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", nil
+	}
+	stickers, err := r.listConfiguredStickers(ctx, logPrefix)
+	if err != nil {
+		return "", err
+	}
+
+	// Case-insensitive exact match first.
+	target := strings.ToLower(name)
+	for _, s := range stickers {
+		if strings.ToLower(strings.TrimSpace(s.Name)) == target && strings.TrimSpace(s.ID) != "" {
+			return strings.TrimSpace(s.ID), nil
+		}
+	}
+
+	// Fallback: substring match (first hit).
+	for _, s := range stickers {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(s.Name)), target) && strings.TrimSpace(s.ID) != "" {
+			return strings.TrimSpace(s.ID), nil
+		}
+	}
+
+	return "", nil
+}

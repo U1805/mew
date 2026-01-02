@@ -11,8 +11,6 @@ import (
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
-	"github.com/openai/openai-go/v3/packages/param"
-	"github.com/openai/openai-go/v3/shared"
 
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/assistant-agent/internal/store"
@@ -32,6 +30,14 @@ type ChatWithToolsOptions struct {
 	ChannelID             string
 	LLMPreviewLen         int
 	ToolResultPreviewLen  int
+	// OnToolCallAssistantText is called when the model emits tool directives along with user-visible text.
+	// This can be used to surface the "thinking / searching" message to the frontend before tools run.
+	OnToolCallAssistantText func(text string) error
+	// Control directives (used to strip from tool-call prelude text).
+	SilenceToken         string
+	WantMoreToken        string
+	ProactiveTokenPrefix string
+	StickerTokenPrefix   string
 
 	// LLM call retries (for flaky upstreams returning errors or empty choices).
 	MaxLLMRetries          int
@@ -59,35 +65,6 @@ func ChatWithTools(
 		opts.RecordSearchToolName = "RecordSearch"
 	}
 
-	tools := []openaigo.ChatCompletionToolUnionParam{
-		openaigo.ChatCompletionFunctionTool(shared.FunctionDefinitionParam{
-			Name:        opts.HistorySearchToolName,
-			Description: param.NewOpt("Search recent channel history by keyword and return matching messages + Session Record IDs."),
-			Strict:      param.NewOpt(true),
-			Parameters: shared.FunctionParameters{
-				"type": "object",
-				"properties": map[string]any{
-					"keyword": map[string]any{"type": "string", "description": "Search keyword."},
-				},
-				"required":             []string{"keyword"},
-				"additionalProperties": false,
-			},
-		}),
-		openaigo.ChatCompletionFunctionTool(shared.FunctionDefinitionParam{
-			Name:        opts.RecordSearchToolName,
-			Description: param.NewOpt("Load a full Session Record text by record_id from the current channel."),
-			Strict:      param.NewOpt(true),
-			Parameters: shared.FunctionParameters{
-				"type": "object",
-				"properties": map[string]any{
-					"record_id": map[string]any{"type": "string", "description": "Session Record ID."},
-				},
-				"required":             []string{"record_id"},
-				"additionalProperties": false,
-			},
-		}),
-	}
-
 	messages := make([]openaigo.ChatCompletionMessageParamUnion, 0, 2+len(l5)+opts.MaxToolCalls*4)
 	messages = append(messages,
 		openaigo.SystemMessage(strings.TrimSpace(personaSystem)),
@@ -97,7 +74,6 @@ func ChatWithTools(
 
 	type pendingRecordSearchResult struct {
 		index    int
-		callID   string
 		recordID string
 	}
 	var pendingRecordSearch []pendingRecordSearchResult
@@ -107,12 +83,7 @@ func ChatWithTools(
 			if rid == "" {
 				rid = "unknown"
 			}
-			payload := map[string]any{
-				"recordId": rid,
-				"text":     fmt.Sprintf("[Session Record %s has read]", rid),
-			}
-			b, _ := json.Marshal(payload)
-			messages[p.index] = openaigo.ToolMessage(string(b), p.callID)
+			messages[p.index] = openaigo.UserMessage(fmt.Sprintf(`<tool_result name="%s">[Session Record %s has read]</tool_result>`, opts.RecordSearchToolName, rid))
 		}
 		pendingRecordSearch = nil
 	}
@@ -122,7 +93,7 @@ func ChatWithTools(
 			log.Printf("%s llm call: channel=%s attempt=%d messages=%d", opts.LogPrefix, opts.ChannelID, i+1, len(messages))
 		}
 		logLLMMessages(opts.LogPrefix, opts.ChannelID, messages)
-		resp, err := CallChatCompletionWithRetry(ctx, httpClient, cfg, messages, tools, CallChatCompletionWithRetryOptions{
+		resp, err := CallChatCompletionWithRetry(ctx, httpClient, cfg, messages, nil, CallChatCompletionWithRetryOptions{
 			MaxRetries:     opts.MaxLLMRetries,
 			InitialBackoff: opts.LLMRetryInitialBackoff,
 			MaxBackoff:     opts.LLMRetryMaxBackoff,
@@ -141,25 +112,35 @@ func ChatWithTools(
 			log.Printf("%s llm output preview: channel=%s %q", opts.LogPrefix, opts.ChannelID, sdk.PreviewString(out, opts.LLMPreviewLen))
 		}
 
-		if len(msg.ToolCalls) > 0 {
-			messages = append(messages, msg.ToParam())
+		// Strip mood line (can appear before/after tool directives).
+		outNoMood, _, _ := store.ExtractAndStripFinalMood(out)
 
-			for _, tc := range msg.ToolCalls {
-				if strings.TrimSpace(tc.Type) != "function" {
-					b, _ := json.Marshal(tc)
-					messages = append(messages, openaigo.ToolMessage(string(b), tc.ID))
-					continue
+		cleanText, toolCalls := extractTrailingToolCalls(outNoMood, "<TOOL>")
+		if len(toolCalls) > 0 && len(toolCalls) > opts.MaxToolCalls {
+			toolCalls = toolCalls[:opts.MaxToolCalls]
+		}
+
+		if len(toolCalls) > 0 {
+			cleanText = stripTrailingControlLines(cleanText, stripTrailingControlLinesOpts{
+				SilenceToken:         opts.SilenceToken,
+				WantMoreToken:        opts.WantMoreToken,
+				ProactiveTokenPrefix: opts.ProactiveTokenPrefix,
+				StickerTokenPrefix:   opts.StickerTokenPrefix,
+			})
+			if opts.OnToolCallAssistantText != nil && strings.TrimSpace(cleanText) != "" {
+				if err := opts.OnToolCallAssistantText(strings.TrimSpace(cleanText)); err != nil {
+					return "", store.Mood{}, false, err
 				}
-				call := tc.AsFunction()
-				toolName := strings.TrimSpace(call.Function.Name)
+			}
+			if strings.TrimSpace(cleanText) != "" {
+				messages = append(messages, openaigo.AssistantMessage(strings.TrimSpace(cleanText)))
+			}
+
+			for _, tc := range toolCalls {
+				toolName := strings.TrimSpace(tc.Name)
 				if strings.TrimSpace(opts.LogPrefix) != "" {
-					log.Printf("%s tool call: channel=%s tool=%s args_json=%q", opts.LogPrefix, opts.ChannelID, toolName, sdk.PreviewString(call.Function.Arguments, opts.LLMPreviewLen))
-				}
-
-				var args map[string]any
-				_ = json.Unmarshal([]byte(call.Function.Arguments), &args)
-				if args == nil {
-					args = map[string]any{}
+					b, _ := json.Marshal(tc.Args)
+					log.Printf("%s tool call(text): channel=%s tool=%s args_json=%q", opts.LogPrefix, opts.ChannelID, toolName, sdk.PreviewString(string(b), opts.LLMPreviewLen))
 				}
 
 				var payload any
@@ -170,9 +151,9 @@ func ChatWithTools(
 						payload = map[string]any{"error": "tool handler not configured"}
 						break
 					}
-					keyword, _ := args["keyword"].(string)
+					keyword, _ := tc.Args["keyword"].(string)
 					if strings.TrimSpace(keyword) == "" {
-						keyword, _ = args["query"].(string)
+						keyword, _ = tc.Args["query"].(string)
 					}
 					payload, toolErr = handlers.HistorySearch(ctx, keyword)
 				case opts.RecordSearchToolName:
@@ -180,15 +161,14 @@ func ChatWithTools(
 						payload = map[string]any{"error": "tool handler not configured"}
 						break
 					}
-					recordID, _ := args["record_id"].(string)
+					recordID, _ := tc.Args["record_id"].(string)
 					if strings.TrimSpace(recordID) == "" {
-						recordID, _ = args["recordId"].(string)
+						recordID, _ = tc.Args["recordId"].(string)
 					}
 					payload, toolErr = handlers.RecordSearch(ctx, recordID)
 					if toolErr == nil {
 						pendingRecordSearch = append(pendingRecordSearch, pendingRecordSearchResult{
 							index:    len(messages),
-							callID:   tc.ID,
 							recordID: recordID,
 						})
 					}
@@ -200,9 +180,10 @@ func ChatWithTools(
 				}
 
 				b, _ := json.Marshal(payload)
-				messages = append(messages, openaigo.ToolMessage(string(b), tc.ID))
+				toolResultText := fmt.Sprintf(`<tool_result name="%s">%s</tool_result>`, toolName, string(b))
+				messages = append(messages, openaigo.UserMessage(toolResultText))
 				if strings.TrimSpace(opts.LogPrefix) != "" {
-					log.Printf("%s tool result: channel=%s tool=%s preview=%q",
+					log.Printf("%s tool result(text): channel=%s tool=%s preview=%q",
 						opts.LogPrefix, opts.ChannelID, toolName, sdk.PreviewString(string(b), opts.ToolResultPreviewLen),
 					)
 				}
@@ -220,6 +201,121 @@ func ChatWithTools(
 	}
 
 	return "", store.Mood{}, false, fmt.Errorf("tool loop exceeded")
+}
+
+type textToolCall struct {
+	Name string
+	Args map[string]any
+}
+
+type stripTrailingControlLinesOpts struct {
+	SilenceToken         string
+	WantMoreToken        string
+	ProactiveTokenPrefix string
+	StickerTokenPrefix   string
+}
+
+func stripTrailingControlLines(text string, opts stripTrailingControlLinesOpts) string {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	for {
+		last := -1
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.TrimSpace(lines[i]) != "" {
+				last = i
+				break
+			}
+		}
+		if last < 0 {
+			break
+		}
+
+		t := strings.TrimSpace(lines[last])
+		switch {
+		case opts.SilenceToken != "" && t == strings.TrimSpace(opts.SilenceToken):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.WantMoreToken != "" && t == strings.TrimSpace(opts.WantMoreToken):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.ProactiveTokenPrefix != "" && strings.HasPrefix(t, strings.TrimSpace(opts.ProactiveTokenPrefix)):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.StickerTokenPrefix != "" && strings.HasPrefix(t, strings.TrimSpace(opts.StickerTokenPrefix)):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		default:
+		}
+		break
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func extractTrailingToolCalls(text string, prefix string) (clean string, calls []textToolCall) {
+	lines := strings.Split(strings.ReplaceAll(text, "\r\n", "\n"), "\n")
+	calls = nil
+
+	for {
+		last := -1
+		for i := len(lines) - 1; i >= 0; i-- {
+			if strings.TrimSpace(lines[i]) != "" {
+				last = i
+				break
+			}
+		}
+		if last < 0 {
+			break
+		}
+
+		t := strings.TrimSpace(lines[last])
+		if !strings.HasPrefix(t, strings.TrimSpace(prefix)) {
+			break
+		}
+		raw := strings.TrimSpace(strings.TrimPrefix(t, strings.TrimSpace(prefix)))
+		if raw == "" {
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		}
+
+		var obj map[string]any
+		if json.Unmarshal([]byte(raw), &obj) != nil || obj == nil {
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		}
+
+		name, _ := obj["name"].(string)
+		if strings.TrimSpace(name) == "" {
+			name, _ = obj["tool"].(string)
+		}
+		name = strings.TrimSpace(name)
+		if name == "" {
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		}
+
+		args := map[string]any{}
+		if a, ok := obj["args"].(map[string]any); ok && a != nil {
+			args = a
+		} else {
+			// Allow shorthand: {"name":"HistorySearch","keyword":"x"}
+			for k, v := range obj {
+				if k == "name" || k == "tool" || k == "args" {
+					continue
+				}
+				args[k] = v
+			}
+		}
+
+		calls = append(calls, textToolCall{Name: name, Args: args})
+		lines = append(lines[:last], lines[last+1:]...)
+		continue
+	}
+
+	// The scan is from the end, so calls are reversed (last -> first).
+	for i, j := 0, len(calls)-1; i < j; i, j = i+1, j-1 {
+		calls[i], calls[j] = calls[j], calls[i]
+	}
+	clean = strings.TrimSpace(strings.Join(lines, "\n"))
+	return clean, calls
 }
 
 func logLLMMessages(logPrefix, channelID string, messages []openaigo.ChatCompletionMessageParamUnion) {

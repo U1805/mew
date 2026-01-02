@@ -11,9 +11,14 @@ type proactiveDirective struct {
 	Reason       string `json:"reason"`
 }
 
+type stickerDirective struct {
+	Name string `json:"name"`
+}
+
 type replyControls struct {
 	wantMore  bool
 	proactive *proactiveDirective
+	sticker   *stickerDirective
 }
 
 func parseReplyControls(reply string) (clean string, controls replyControls) {
@@ -52,6 +57,26 @@ func parseReplyControls(reply string) (clean string, controls replyControls) {
 					}
 					d.Reason = strings.TrimSpace(d.Reason)
 					controls.proactive = &d
+				}
+			}
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case strings.HasPrefix(t, assistantStickerTokenPrefix):
+			raw := strings.TrimSpace(strings.TrimPrefix(t, assistantStickerTokenPrefix))
+			if raw != "" && controls.sticker == nil {
+				var d stickerDirective
+				if json.Unmarshal([]byte(raw), &d) == nil {
+					d.Name = strings.TrimSpace(d.Name)
+					if d.Name != "" {
+						controls.sticker = &d
+					}
+				} else {
+					// Best-effort fallback: treat the raw string as a name.
+					rawName := strings.TrimSpace(raw)
+					rawName = strings.Trim(rawName, "\"")
+					if rawName != "" {
+						controls.sticker = &stickerDirective{Name: rawName}
+					}
 				}
 			}
 			lines = append(lines[:last], lines[last+1:]...)

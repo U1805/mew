@@ -11,7 +11,6 @@ func Run() error {
 		BaseURL:  "https://api.openai.com/v1",
 		APIKey:   "",
 		Model:    "gpt-4o-mini",
-		Timezone: config.DefaultTimezone,
 	})
 	if err != nil {
 		return err

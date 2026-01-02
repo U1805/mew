@@ -19,6 +19,7 @@ import * as userStickerService from './userSticker.service';
 
 const makeFindQuery = (leanValue: any) => {
   const query: any = {
+    select: vi.fn().mockReturnThis(),
     sort: vi.fn().mockReturnThis(),
     lean: vi.fn().mockResolvedValue(leanValue),
   };

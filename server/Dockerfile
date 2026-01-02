@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:20-alpine AS base
+# Run dependency install/build on the build machine to avoid QEMU emulation crashes
+# during multi-arch builds (e.g. `--platform=linux/arm64` on amd64 builders).
+ARG NODE_IMAGE=node:20-alpine
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS base
 WORKDIR /app
 RUN corepack enable
 
@@ -27,7 +30,7 @@ COPY client/package.json client/package.json
 COPY website/package.json website/package.json
 RUN pnpm install --frozen-lockfile --filter server... --prod
 
-FROM node:20-alpine AS runtime
+FROM --platform=$TARGETPLATFORM ${NODE_IMAGE} AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
