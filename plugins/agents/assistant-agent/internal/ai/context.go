@@ -39,7 +39,16 @@ func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
 var developerInstructionsOnce sync.Once
 var developerInstructionsTemplate string
 
-func DeveloperInstructionsText(silenceToken, wantMoreToken, proactiveTokenPrefix, relPath, embeddedName string) string {
+func DeveloperInstructionsText(
+	silenceToken string,
+	wantMoreToken string,
+	proactiveTokenPrefix string,
+	toolCallTokenPrefix string,
+	stickerTokenPrefix string,
+	availableStickerNames string,
+	relPath string,
+	embeddedName string,
+) string {
 	developerInstructionsOnce.Do(func() {
 		s, err := ReadPromptWithOverrides(relPath, embeddedName)
 		if err != nil {
@@ -55,6 +64,9 @@ func DeveloperInstructionsText(silenceToken, wantMoreToken, proactiveTokenPrefix
 	out = strings.ReplaceAll(out, "{{SILENCE_TOKEN}}", silenceToken)
 	out = strings.ReplaceAll(out, "{{WANT_MORE_TOKEN}}", wantMoreToken)
 	out = strings.ReplaceAll(out, "{{PROACTIVE_TOKEN_PREFIX}}", proactiveTokenPrefix)
+	out = strings.ReplaceAll(out, "{{TOOL_CALL_TOKEN_PREFIX}}", toolCallTokenPrefix)
+	out = strings.ReplaceAll(out, "{{STICKER_TOKEN_PREFIX}}", stickerTokenPrefix)
+	out = strings.ReplaceAll(out, "{{AVAILABLE_STICKER_NAMES}}", strings.TrimSpace(availableStickerNames))
 	return out
 }
 

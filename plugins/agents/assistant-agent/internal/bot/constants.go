@@ -14,6 +14,16 @@ const (
 	//   <PROACTIVE>{"delay_seconds":180,"reason":"..."}
 	assistantProactiveTokenPrefix = "<PROACTIVE>"
 
+	// assistantStickerTokenPrefix is a single-line control directive emitted by the LLM.
+	// Expected format (one line):
+	//   <STICKER>{"name":"Wave"}
+	assistantStickerTokenPrefix = "<STICKER>"
+
+	// assistantToolCallTokenPrefix is a single-line control directive emitted by the LLM.
+	// Expected format (one line):
+	//   <TOOL>{"name":"HistorySearch","args":{"keyword":"..."}}`
+	assistantToolCallTokenPrefix = "<TOOL>"
+
 	assistantMaxSessionMessages = 40
 	assistantFetchPageSize      = 100
 	assistantMaxFetchPages      = 20

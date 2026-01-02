@@ -11,6 +11,7 @@ import {
   deleteBotHandler,
   regenerateTokenHandler,
 } from './bot.controller';
+import botStickerRoutes from './bot.sticker.routes';
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.route('/:botId')
   .delete(deleteBotHandler);
 
 router.post('/:botId/token', regenerateTokenHandler);
+router.use('/:botId/stickers', botStickerRoutes);
 
 export default router;

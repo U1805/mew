@@ -189,7 +189,7 @@ func (r *Runner) processDMMessage(
 	}
 
 	clean, controls := parseReplyControls(reply)
-	if err := r.sendReply(ctx, emit, channelID, userID, clean, logPrefix); err != nil {
+	if err := r.sendReply(ctx, emit, channelID, userID, clean, controls, logPrefix); err != nil {
 		return err
 	}
 	r.maybeEnqueueProactive(now, paths, channelID, recordID, controls.proactive, logPrefix)
@@ -215,7 +215,7 @@ func (r *Runner) processDMMessage(
 		}
 
 		moreClean, moreControls := parseReplyControls(more)
-		if err := r.sendReply(ctx, emit, channelID, userID, moreClean, logPrefix); err != nil {
+		if err := r.sendReply(ctx, emit, channelID, userID, moreClean, moreControls, logPrefix); err != nil {
 			return err
 		}
 		r.maybeEnqueueProactive(now, paths, channelID, recordID, moreControls.proactive, logPrefix)
@@ -323,10 +323,14 @@ func (r *Runner) buildPrompt(
 	sessionMsgs []mewacl.Message,
 	logPrefix string,
 ) (l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) {
+	stickerNames := strings.TrimSpace(r.stickerPromptAddon(ctx, logPrefix))
 	l1l4 = ai.BuildL1L4UserPrompt(ai.DeveloperInstructionsText(
 		assistantSilenceToken,
 		assistantWantMoreToken,
 		assistantProactiveTokenPrefix,
+		assistantToolCallTokenPrefix,
+		assistantStickerTokenPrefix,
+		stickerNames,
 		DeveloperInstructionsPromptRelPath,
 		DeveloperInstructionsEmbeddedName,
 	), meta, facts, summaries)
@@ -372,9 +376,14 @@ func (r *Runner) reply(ctx context.Context, channelID string, l1l4 string, l5 []
 	})
 }
 
-func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelID, userID, reply, logPrefix string) error {
+func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelID, userID, reply string, controls replyControls, logPrefix string) error {
 	reply = strings.TrimSpace(reply)
-	if reply == "" {
+	stickerName := ""
+	if controls.sticker != nil {
+		stickerName = strings.TrimSpace(controls.sticker.Name)
+	}
+
+	if reply == "" && stickerName == "" {
 		log.Printf("%s empty reply: channel=%s user=%s", logPrefix, channelID, userID)
 		return nil
 	}
@@ -383,41 +392,71 @@ func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelI
 		return nil
 	}
 
-	log.Printf("%s reply ready: channel=%s user=%s preview=%q",
-		logPrefix, channelID, userID, sdk.PreviewString(reply, assistantLogContentPreviewLen),
-	)
+	if reply != "" {
+		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
+			logPrefix, channelID, userID, sdk.PreviewString(reply, assistantLogContentPreviewLen),
+		)
 
-	lines := make([]string, 0, assistantMaxReplyLines)
-	for _, line := range strings.Split(reply, "\n") {
-		if len(lines) >= assistantMaxReplyLines {
-			break
+		lines := make([]string, 0, assistantMaxReplyLines)
+		for _, line := range strings.Split(reply, "\n") {
+			if len(lines) >= assistantMaxReplyLines {
+				break
+			}
+			t := strings.TrimSpace(line)
+			if t == "" {
+				continue
+			}
+			lines = append(lines, t)
 		}
-		t := strings.TrimSpace(line)
-		if t == "" {
-			continue
+
+		linesSent := 0
+		for i, t := range lines {
+			sendErr := emit(assistantUpstreamMessageCreate, map[string]any{
+				"channelId": channelID,
+				"content":   t,
+			})
+			if sendErr != nil {
+				// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
+				if err := r.postMessageHTTP(ctx, channelID, t); err != nil {
+					return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
+				}
+				log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
+			}
+			linesSent++
+			if i < len(lines)-1 {
+				sleepWithContext(ctx, assistantReplyDelayForLine(t))
+			}
 		}
-		lines = append(lines, t)
+		log.Printf("%s reply sent: channel=%s user=%s lines=%d", logPrefix, channelID, userID, linesSent)
 	}
 
-	linesSent := 0
-	for i, t := range lines {
+	if stickerName != "" {
+		stickerID, err := r.resolveStickerIDByName(ctx, logPrefix, stickerName)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(stickerID) == "" {
+			log.Printf("%s sticker not found in group: channel=%s user=%s name=%q", logPrefix, channelID, userID, stickerName)
+			return nil
+		}
+
 		sendErr := emit(assistantUpstreamMessageCreate, map[string]any{
 			"channelId": channelID,
-			"content":   t,
+			"type":      "message/sticker",
+			"payload": map[string]any{
+				"stickerId":    stickerID,
+				"stickerScope": "user",
+			},
 		})
 		if sendErr != nil {
-			// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
-			if err := r.postMessageHTTP(ctx, channelID, t); err != nil {
-				return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
+			if err := r.postStickerHTTP(ctx, channelID, stickerID); err != nil {
+				return fmt.Errorf("send sticker failed (gateway=%v http=%v)", sendErr, err)
 			}
-			log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
+			log.Printf("%s gateway sticker send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
 		}
-		linesSent++
-		if i < len(lines)-1 {
-			sleepWithContext(ctx, assistantReplyDelayForLine(t))
-		}
+		log.Printf("%s sticker sent: channel=%s user=%s name=%q", logPrefix, channelID, userID, stickerName)
 	}
-	log.Printf("%s reply sent: channel=%s user=%s lines=%d", logPrefix, channelID, userID, linesSent)
+
 	return nil
 }
 
@@ -438,6 +477,53 @@ func (r *Runner) postMessageHTTP(ctx context.Context, channelID, content string)
 
 	u := strings.TrimRight(r.apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
 	body, _ := json.Marshal(map[string]any{"content": content})
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(r.userToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := r.mewHTTPClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+		return fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return nil
+}
+
+func (r *Runner) postStickerHTTP(ctx context.Context, channelID, stickerID string) error {
+	if r.mewHTTPClient == nil {
+		return fmt.Errorf("missing mew http client")
+	}
+	if strings.TrimSpace(r.userToken) == "" {
+		return fmt.Errorf("missing user token")
+	}
+	if strings.TrimSpace(r.apiBase) == "" {
+		return fmt.Errorf("missing api base")
+	}
+	channelID = strings.TrimSpace(channelID)
+	if channelID == "" {
+		return fmt.Errorf("missing channel id")
+	}
+	stickerID = strings.TrimSpace(stickerID)
+	if stickerID == "" {
+		return fmt.Errorf("missing sticker id")
+	}
+
+	u := strings.TrimRight(r.apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
+	body, _ := json.Marshal(map[string]any{
+		"type": "message/sticker",
+		"payload": map[string]any{
+			"stickerId":    stickerID,
+			"stickerScope": "user",
+		},
+	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
 		return err
