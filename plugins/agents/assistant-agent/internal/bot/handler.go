@@ -370,21 +370,25 @@ func (r *Runner) reply(
 		RecordSearch: func(ctx context.Context, recordID string) (any, error) {
 			return r.runRecordSearch(ctx, channelID, recordID)
 		},
+		WebSearch: func(ctx context.Context, query string) (any, error) {
+			return r.runWebSearch(ctx, query)
+		},
 	}, ai.ChatWithToolsOptions{
-		MaxToolCalls:           assistantMaxToolCalls,
-		HistorySearchToolName:  DefaultHistorySearchToolName,
-		RecordSearchToolName:   DefaultRecordSearchToolName,
-		LogPrefix:              assistantLogPrefix,
-		ChannelID:              channelID,
-		LLMPreviewLen:          assistantLogLLMPreviewLen,
-		ToolResultPreviewLen:   assistantLogToolResultPreviewLen,
+		MaxToolCalls:          assistantMaxToolCalls,
+		HistorySearchToolName: DefaultHistorySearchToolName,
+		RecordSearchToolName:  DefaultRecordSearchToolName,
+		WebSearchToolName:     DefaultWebSearchToolName,
+		LogPrefix:             assistantLogPrefix,
+		ChannelID:             channelID,
+		LLMPreviewLen:         assistantLogLLMPreviewLen,
+		ToolResultPreviewLen:  assistantLogToolResultPreviewLen,
 		OnToolCallAssistantText: func(text string) error {
 			return r.sendToolPrelude(ctx, emit, channelID, userID, text, logPrefix)
 		},
-		SilenceToken:         assistantSilenceToken,
-		WantMoreToken:        assistantWantMoreToken,
-		ProactiveTokenPrefix: assistantProactiveTokenPrefix,
-		StickerTokenPrefix:   assistantStickerTokenPrefix,
+		SilenceToken:           assistantSilenceToken,
+		WantMoreToken:          assistantWantMoreToken,
+		ProactiveTokenPrefix:   assistantProactiveTokenPrefix,
+		StickerTokenPrefix:     assistantStickerTokenPrefix,
 		MaxLLMRetries:          assistantMaxLLMRetries,
 		LLMRetryInitialBackoff: assistantLLMRetryInitialBackoff,
 		LLMRetryMaxBackoff:     assistantLLMRetryMaxBackoff,

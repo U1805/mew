@@ -8,9 +8,18 @@ import (
 
 func Run() error {
 	cfgTemplate, err := sdk.ConfigTemplateJSON(config.AssistantConfig{
-		BaseURL:  "https://api.openai.com/v1",
-		APIKey:   "",
-		Model:    "gpt-4o-mini",
+		ChatModel: config.ChatModelConfig{
+			BaseURL: "https://api.openai.com/v1",
+			APIKey:  "",
+			Model:   "gpt-4o-mini",
+		},
+		User: config.UserConfig{
+			UserInterests: "游戏/摇滚乐",
+			Timezone:      config.DefaultTimezone,
+		},
+		Tool: config.ToolConfig{
+			ExaAPIKey: "",
+		},
 	})
 	if err != nil {
 		return err

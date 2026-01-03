@@ -68,6 +68,7 @@ const (
 
 	DefaultHistorySearchToolName = "HistorySearch"
 	DefaultRecordSearchToolName  = "RecordSearch"
+	DefaultWebSearchToolName     = "WebSearch"
 
 	DefaultImagePrompt              = "请识别图片中的内容，并结合上下文回复。"
 	DefaultMaxImageBytes      int64 = 5 * 1024 * 1024

@@ -1,16 +1,22 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 )
 
-type AssistantConfig struct {
+type ChatModelConfig struct {
 	BaseURL string `json:"base_url"`
 	APIKey  string `json:"api_key"`
 	Model   string `json:"model"`
+}
+
+type UserConfig struct {
+	// UserInterests is injected into the persona prompt template as {{USER_INTERESTS}}.
+	UserInterests string `json:"user_interests"`
 	// Timezone controls how timestamps are presented to the LLM (e.g. <mew_speaker time="HH:MM"/>).
 	// Supported values:
 	// - IANA TZ name, e.g. "Asia/Shanghai"
@@ -19,20 +25,36 @@ type AssistantConfig struct {
 	Timezone string `json:"timezone"`
 }
 
+type ToolConfig struct {
+	ExaAPIKey string `json:"exa_api_key"`
+}
+
+type AssistantConfig struct {
+	ChatModel ChatModelConfig `json:"chat_model"`
+	User      UserConfig      `json:"user"`
+	Tool      ToolConfig      `json:"tool"`
+}
+
 func ParseAssistantConfig(raw string) (AssistantConfig, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" || raw == "null" || raw == "{}" {
 		return AssistantConfig{}, nil
 	}
+
 	var cfg AssistantConfig
-	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+	dec := json.NewDecoder(bytes.NewReader([]byte(raw)))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&cfg); err != nil {
 		return AssistantConfig{}, fmt.Errorf("invalid config JSON: %w", err)
+	}
+	if dec.More() {
+		return AssistantConfig{}, fmt.Errorf("invalid config JSON: trailing data")
 	}
 	return cfg, nil
 }
 
 func (c AssistantConfig) TimeLocation() (*time.Location, error) {
-	return ResolveTimezoneLocation(c.Timezone)
+	return ResolveTimezoneLocation(c.User.Timezone)
 }
 
 func ResolveTimezoneLocation(tz string) (*time.Location, error) {

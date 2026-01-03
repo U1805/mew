@@ -6,18 +6,28 @@
 
 ```json
 {
-  "base_url": "https://api.openai.com/v1",
-  "api_key": "sk-***",
-  "model": "gpt-4o-mini",
-  "timezone": "+08:00"
+  "chat_model": {
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "sk-***",
+    "model": "gpt-4o-mini"
+  },
+  "user": {
+    "user_interests": "游戏/摇滚乐/……",
+    "timezone": "+08:00"
+  },
+  "tool": {
+    "exa_api_key": "1a3e***"
+  }
 }
 ```
 
 字段说明：
-- `base_url`：上游 Chat Completions API Base URL（例如 OpenAI 兼容接口）
-- `api_key`：上游密钥
-- `model`：模型名
-- `timezone`：用于把时间戳呈现给模型（默认 `UTC+8`）
+- `chat_model.base_url`：上游 Chat Completions API Base URL（例如 OpenAI 兼容接口）
+- `chat_model.api_key`：上游密钥
+- `chat_model.model`：模型名
+- `user.user_interests`：用于替换 persona 提示词中的 `{{USER_INTERESTS}}`
+- `user.timezone`：用于把时间戳呈现给模型（默认 `UTC+8`）
+- `tool.exa_api_key`：[Exa](https://exa.ai/) WebSearch API Key（用于网络搜索工具）
 
 ## Sticker 管理（由 Bot 创建者配置）
 
