@@ -78,6 +78,11 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 	if err != nil {
 		return nil, fmt.Errorf("read persona failed: %w", err)
 	}
+	userInterests := strings.TrimSpace(llmCfg.User.UserInterests)
+	if userInterests == "" {
+		userInterests = "(未配置)"
+	}
+	persona = strings.ReplaceAll(persona, "{{USER_INTERESTS}}", userInterests)
 
 	llmTransport := http.DefaultTransport.(*http.Transport).Clone()
 	llmTransport.Proxy = nil

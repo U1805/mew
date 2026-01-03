@@ -17,17 +17,17 @@ func NewHTTPClient() *http.Client {
 }
 
 func CallChatCompletion(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, messages []openaigo.ChatCompletionMessageParamUnion, tools []openaigo.ChatCompletionToolUnionParam) (*openaigo.ChatCompletion, error) {
-	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
+	baseURL := strings.TrimRight(strings.TrimSpace(cfg.ChatModel.BaseURL), "/")
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
-	model := strings.TrimSpace(cfg.Model)
+	model := strings.TrimSpace(cfg.ChatModel.Model)
 	if model == "" {
 		model = DefaultModel
 	}
 
-	if strings.TrimSpace(cfg.APIKey) == "" {
-		return nil, fmt.Errorf("assistant-agent config incomplete: api_key is required")
+	if strings.TrimSpace(cfg.ChatModel.APIKey) == "" {
+		return nil, fmt.Errorf("assistant-agent config incomplete: chat_model.api_key is required")
 	}
 	if httpClient == nil {
 		httpClient = NewHTTPClient()
@@ -35,7 +35,7 @@ func CallChatCompletion(ctx context.Context, httpClient *http.Client, cfg config
 
 	client := openaigo.NewClient(
 		option.WithBaseURL(baseURL),
-		option.WithAPIKey(strings.TrimSpace(cfg.APIKey)),
+		option.WithAPIKey(strings.TrimSpace(cfg.ChatModel.APIKey)),
 		option.WithHTTPClient(httpClient),
 		option.WithMaxRetries(MaxRetries),
 		option.WithRequestTimeout(DefaultChatHTTPTimeout),

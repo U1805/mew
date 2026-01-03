@@ -45,8 +45,11 @@ func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) (
 
 func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) string {
 	stickers, err := r.listConfiguredStickers(ctx, logPrefix)
-	if err != nil || len(stickers) == 0 {
+	if err != nil {
 		return ""
+	}
+	if len(stickers) == 0 {
+		return "(none)"
 	}
 
 	names := make([]string, 0, len(stickers))
@@ -64,7 +67,7 @@ func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) strin
 	}
 	sort.Strings(names)
 	if len(names) == 0 {
-		return ""
+		return "(none)"
 	}
 
 	var b strings.Builder

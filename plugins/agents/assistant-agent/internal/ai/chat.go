@@ -20,12 +20,14 @@ import (
 type ToolHandlers struct {
 	HistorySearch func(ctx context.Context, keyword string) (any, error)
 	RecordSearch  func(ctx context.Context, recordID string) (any, error)
+	WebSearch     func(ctx context.Context, query string) (any, error)
 }
 
 type ChatWithToolsOptions struct {
 	MaxToolCalls          int
 	HistorySearchToolName string
 	RecordSearchToolName  string
+	WebSearchToolName     string
 	LogPrefix             string
 	ChannelID             string
 	LLMPreviewLen         int
@@ -63,6 +65,9 @@ func ChatWithTools(
 	}
 	if strings.TrimSpace(opts.RecordSearchToolName) == "" {
 		opts.RecordSearchToolName = "RecordSearch"
+	}
+	if strings.TrimSpace(opts.WebSearchToolName) == "" {
+		opts.WebSearchToolName = "WebSearch"
 	}
 
 	messages := make([]openaigo.ChatCompletionMessageParamUnion, 0, 2+len(l5)+opts.MaxToolCalls*4)
@@ -172,6 +177,16 @@ func ChatWithTools(
 							recordID: recordID,
 						})
 					}
+				case opts.WebSearchToolName:
+					if handlers.WebSearch == nil {
+						payload = map[string]any{"error": "tool handler not configured"}
+						break
+					}
+					query, _ := tc.Args["query"].(string)
+					if strings.TrimSpace(query) == "" {
+						query, _ = tc.Args["keyword"].(string)
+					}
+					payload, toolErr = handlers.WebSearch(ctx, query)
 				default:
 					payload = map[string]any{"error": "unknown tool: " + toolName}
 				}
