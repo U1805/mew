@@ -2,6 +2,7 @@ package bot
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -79,11 +80,13 @@ func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) strin
 	}
 
 	var b strings.Builder
-	for _, e := range entries {
-		b.WriteString("- ")
+	b.WriteString(fmt.Sprintf("stickers[%d]{id,sticker_name,description}\n", len(entries)))
+	for i, e := range entries {
+		b.WriteString("  ")
+		b.WriteString(fmt.Sprintf("%d,", i))
 		b.WriteString(e.Name)
+		b.WriteString(",")
 		if e.Description != "" {
-			b.WriteString(": ")
 			b.WriteString(e.Description)
 		}
 		b.WriteString("\n")
