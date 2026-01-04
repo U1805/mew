@@ -27,8 +27,9 @@ const inferFormat = (contentType: string, filename: string): UserStickerFormat =
 
 export const userStickerToClient = (sticker: any): UserStickerForClient => {
   const obj = typeof sticker?.toObject === 'function' ? sticker.toObject() : sticker;
+  const { tags: _tags, ...rest } = obj || {};
   return {
-    ...obj,
+    ...rest,
     scope: 'user',
     ownerId: obj?.userId,
     url: obj?.key ? getS3PublicUrl(obj.key) : '',
@@ -44,7 +45,6 @@ export const createUserStickerFromUpload = async (options: {
   userId: string;
   name: string;
   description?: string;
-  tags?: string[];
   originalname: string;
   key: string;
   contentType: string;
@@ -59,7 +59,6 @@ export const createUserStickerFromUpload = async (options: {
     userId: new Types.ObjectId(options.userId),
     name,
     description: options.description?.trim() || undefined,
-    tags: (options.tags || []).map(t => t.trim()).filter(Boolean).slice(0, 20),
     format,
     contentType: options.contentType,
     key: options.key,
@@ -74,7 +73,6 @@ export const updateUserSticker = async (options: {
   stickerId: string;
   name?: string;
   description?: string | null;
-  tags?: string[];
 }) => {
   const sticker = await UserSticker.findOne({
     _id: new Types.ObjectId(options.stickerId),
@@ -92,10 +90,6 @@ export const updateUserSticker = async (options: {
     sticker.description = undefined;
   } else if (typeof options.description === 'string') {
     sticker.description = options.description.trim() || undefined;
-  }
-
-  if (Array.isArray(options.tags)) {
-    sticker.tags = options.tags.map(t => t.trim()).filter(Boolean).slice(0, 20);
   }
 
   await sticker.save();

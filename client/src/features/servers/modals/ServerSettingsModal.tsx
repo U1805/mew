@@ -56,9 +56,8 @@ export const ServerSettingsModal = () => {
   // Sticker State
   const [newStickerFile, setNewStickerFile] = useState<File | null>(null);
   const [newStickerName, setNewStickerName] = useState('');
-  const [newStickerTags, setNewStickerTags] = useState('');
   const [newStickerPreview, setNewStickerPreview] = useState<string | null>(null); // Added preview state
-  const [stickerDrafts, setStickerDrafts] = useState<Record<string, { name: string; tags: string; description: string }>>({});
+  const [stickerDrafts, setStickerDrafts] = useState<Record<string, { name: string; description: string }>>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const stickerInputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +111,6 @@ export const ServerSettingsModal = () => {
         if (!next[s._id]) {
           next[s._id] = {
             name: s.name || '',
-            tags: Array.isArray(s.tags) ? s.tags.join(' ') : '',
             description: s.description || '',
           };
         }
@@ -171,7 +169,6 @@ export const ServerSettingsModal = () => {
       const fd = new FormData();
       fd.append('file', newStickerFile);
       fd.append('name', name);
-      if (newStickerTags.trim()) fd.append('tags', newStickerTags.trim());
       const res = await stickerApi.create(currentServerId, fd);
       return res.data as Sticker;
     },
@@ -185,7 +182,6 @@ export const ServerSettingsModal = () => {
       setNewStickerFile(null);
       setNewStickerPreview(null);
       setNewStickerName('');
-      setNewStickerTags('');
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || err?.message || 'Failed to upload sticker');
@@ -193,11 +189,10 @@ export const ServerSettingsModal = () => {
   });
 
   const updateStickerMutation = useMutation({
-    mutationFn: async (input: { stickerId: string; name: string; tags: string; description: string }) => {
+    mutationFn: async (input: { stickerId: string; name: string; description: string }) => {
       if (!currentServerId) throw new Error('No server ID');
       const payload = {
         name: input.name.trim(),
-        tags: input.tags.trim() ? input.tags.trim().split(/\s+/g).filter(Boolean) : [],
         description: input.description.trim() || null,
       };
       const res = await stickerApi.update(currentServerId, input.stickerId, payload);
@@ -552,7 +547,7 @@ export const ServerSettingsModal = () => {
 
                         {/* Upload Form Inputs */}
                         <div className="flex-1 space-y-3">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 gap-3">
                                 <div>
                                     <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
                                     <input 
@@ -560,16 +555,6 @@ export const ServerSettingsModal = () => {
                                         onChange={e => setNewStickerName(e.target.value)} 
                                         className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
                                         placeholder="Give it a name"
-                                        disabled={!canManageStickers}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Related Emoji / Tags</label>
-                                    <input 
-                                        value={newStickerTags} 
-                                        onChange={e => setNewStickerTags(e.target.value)} 
-                                        className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
-                                        placeholder="e.g. :smile: happy"
                                         disabled={!canManageStickers}
                                     />
                                 </div>
@@ -608,7 +593,7 @@ export const ServerSettingsModal = () => {
                     ) : (
                         <div className="space-y-1">
                             {stickers.map(s => {
-                                const draft = stickerDrafts[s._id] || { name: s.name || '', tags: (s.tags || []).join(' '), description: s.description || '' };
+                                const draft = stickerDrafts[s._id] || { name: s.name || '', description: s.description || '' };
                                 return (
                                     <div key={s._id} className="group flex items-center p-2 rounded hover:bg-[#2B2D31] hover:shadow-sm border border-transparent hover:border-[#26272D] transition-all">
                                         <div className="w-16 h-16 bg-[#202225] rounded flex items-center justify-center shrink-0 mr-4">
@@ -627,10 +612,10 @@ export const ServerSettingsModal = () => {
                                             </div>
                                             <div>
                                                 <input 
-                                                    value={draft.tags} 
-                                                    onChange={(e) => setStickerDrafts(prev => ({ ...prev, [s._id]: { ...draft, tags: e.target.value } }))}
+                                                    value={draft.description} 
+                                                    onChange={(e) => setStickerDrafts(prev => ({ ...prev, [s._id]: { ...draft, description: e.target.value } }))}
                                                     className="bg-transparent text-mew-textMuted text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                                                    placeholder="Tags"
+                                                    placeholder="Description (optional)"
                                                     disabled={!canManageStickers}
                                                 />
                                             </div>

@@ -6,7 +6,6 @@ export interface IUserSticker extends Document {
   userId: mongoose.Types.ObjectId;
   name: string;
   description?: string;
-  tags: string[];
   format: UserStickerFormat;
   contentType: string;
   key: string;
@@ -20,7 +19,6 @@ const UserStickerSchema = new Schema<IUserSticker>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     name: { type: String, required: true },
     description: { type: String },
-    tags: { type: [String], default: [] },
     format: { type: String, required: true, enum: ['png', 'gif', 'webp'] },
     contentType: { type: String, required: true },
     key: { type: String, required: true },

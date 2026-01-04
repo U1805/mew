@@ -6,7 +6,6 @@ export interface ISticker extends Document {
   serverId: mongoose.Types.ObjectId;
   name: string;
   description?: string;
-  tags: string[];
   format: StickerFormat;
   contentType: string;
   key: string;
@@ -21,7 +20,6 @@ const StickerSchema = new Schema<ISticker>(
     serverId: { type: Schema.Types.ObjectId, ref: 'Server', required: true, index: true },
     name: { type: String, required: true },
     description: { type: String },
-    tags: { type: [String], default: [] },
     format: { type: String, required: true, enum: ['png', 'gif', 'webp'] },
     contentType: { type: String, required: true },
     key: { type: String, required: true },

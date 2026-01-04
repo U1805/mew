@@ -17,7 +17,6 @@ type Sticker struct {
 	Name        string   `json:"name"`
 	Group       string   `json:"group,omitempty"`
 	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
 	Format      string   `json:"format,omitempty"`
 	ContentType string   `json:"contentType,omitempty"`
 	Size        int64    `json:"size,omitempty"`

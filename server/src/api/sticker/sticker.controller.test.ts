@@ -62,7 +62,7 @@ describe('api/sticker/sticker.controller', () => {
     await expect(createStickerHandler(req, res)).rejects.toBeInstanceOf(BadRequestError);
   });
 
-  it('createStickerHandler parses tags and broadcasts', async () => {
+  it('createStickerHandler forwards upload fields and broadcasts', async () => {
     vi.mocked(stickerService.createStickerFromUpload).mockResolvedValue({ _id: 'st1', serverId: 'sv' } as any);
     const req: any = {
       params: { serverId: 'sv' },
@@ -73,13 +73,9 @@ describe('api/sticker/sticker.controller', () => {
     const res = makeRes();
     await createStickerHandler(req, res);
 
-    expect(stickerService.createStickerFromUpload).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tags: ['hi', 'hello'],
-        name: 'Wave',
-        key: 'k.png',
-      })
-    );
+    const callArg = vi.mocked(stickerService.createStickerFromUpload).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ name: 'Wave', description: 'd', key: 'k.png' }));
+    expect(callArg.tags).toBeUndefined();
     expect(socketManager.broadcast).toHaveBeenCalledWith('STICKER_CREATE', 'sv', expect.any(Object));
     expect(res.status).toHaveBeenCalledWith(201);
   });
@@ -95,25 +91,24 @@ describe('api/sticker/sticker.controller', () => {
     const res = makeRes();
     await createStickerHandler(req, res);
 
-    // tags: number => parseTags returns []
-    expect(stickerService.createStickerFromUpload).toHaveBeenCalledWith(
-      expect.objectContaining({ tags: [], key: 'up.png' })
-    );
+    const callArg = vi.mocked(stickerService.createStickerFromUpload).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ key: 'up.png' }));
+    expect(callArg.tags).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  it('updateStickerHandler accepts comma-separated tags', async () => {
+  it('updateStickerHandler forwards update fields and broadcasts', async () => {
     vi.mocked(stickerService.updateSticker).mockResolvedValue({ _id: 'st1', serverId: 'sv' } as any);
-    const req: any = { params: { serverId: 'sv', stickerId: 'st1' }, body: { tags: 'a,b, c', name: 'N' } };
+    const req: any = {
+      params: { serverId: 'sv', stickerId: 'st1' },
+      body: { tags: 'a,b, c', name: 'N', description: 'd' },
+    };
     const res = makeRes();
     await updateStickerHandler(req, res);
 
-    expect(stickerService.updateSticker).toHaveBeenCalledWith(
-      expect.objectContaining({
-        tags: ['a', 'b', 'c'],
-        name: 'N',
-      })
-    );
+    const callArg = vi.mocked(stickerService.updateSticker).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ serverId: 'sv', stickerId: 'st1', name: 'N', description: 'd' }));
+    expect(callArg.tags).toBeUndefined();
     expect(socketManager.broadcast).toHaveBeenCalledWith('STICKER_UPDATE', 'sv', expect.any(Object));
     expect(res.status).toHaveBeenCalledWith(200);
   });

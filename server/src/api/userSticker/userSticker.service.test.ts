@@ -63,7 +63,6 @@ describe('api/userSticker/userSticker.service', () => {
     const res: any = await userStickerService.createUserStickerFromUpload({
       userId,
       name: 'Wave',
-      tags: [' hi ', ''],
       originalname: 'wave.gif',
       key: 'k.gif',
       contentType: 'image/gif',
@@ -74,7 +73,6 @@ describe('api/userSticker/userSticker.service', () => {
       expect.objectContaining({
         name: 'Wave',
         format: 'gif',
-        tags: ['hi'],
         key: 'k.gif',
       })
     );
@@ -120,9 +118,8 @@ describe('api/userSticker/userSticker.service', () => {
     const doc: any = {
       name: 'Old',
       description: 'd',
-      tags: ['a'],
       save: vi.fn().mockResolvedValue(undefined),
-      toObject: () => ({ _id: 'st1', userId, key: 'k.webp', name: doc.name, description: doc.description, tags: doc.tags }),
+      toObject: () => ({ _id: 'st1', userId, key: 'k.webp', name: doc.name, description: doc.description, tags: ['a'] }),
     };
     vi.mocked((UserSticker as any).findOne).mockResolvedValue(doc);
 
@@ -131,12 +128,11 @@ describe('api/userSticker/userSticker.service', () => {
       stickerId,
       name: ' New ',
       description: null,
-      tags: [' x ', 'y'],
     });
 
     expect(doc.name).toBe('New');
     expect(doc.description).toBeUndefined();
-    expect(doc.tags).toEqual(['x', 'y']);
+    expect((res as any).tags).toBeUndefined();
     expect(res.url).toBe('http://cdn.local/k.webp');
   });
 

@@ -7,13 +7,6 @@ import type { Bot, Sticker } from '../../../shared/types';
 import { botApi, botStickerApi, userStickerApi } from '../../../shared/services/api';
 import { useModalStore } from '../../../shared/stores';
 
-const parseTags = (raw: string): string[] => {
-  const s = (raw || '').trim();
-  if (!s) return [];
-  const parts = s.includes(',') ? s.split(',') : s.split(/\s+/g);
-  return parts.map(t => t.trim()).filter(Boolean);
-};
-
 export const UserStickerPanel = () => {
   const queryClient = useQueryClient();
   const { openModal } = useModalStore();
@@ -25,7 +18,6 @@ export const UserStickerPanel = () => {
   const [newStickerPreview, setNewStickerPreview] = useState<string | null>(null);
   const [newStickerName, setNewStickerName] = useState('');
   const [newStickerDescription, setNewStickerDescription] = useState('');
-  const [newStickerTags, setNewStickerTags] = useState('');
 
   const { data: botsData } = useQuery({
     queryKey: ['bots', 'me'],
@@ -47,7 +39,7 @@ export const UserStickerPanel = () => {
   });
 
   const stickers = useMemo(() => (Array.isArray(data) ? data : []), [data]);
-  const [drafts, setDrafts] = useState<Record<string, { name: string; tags: string; description: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, { name: string; description: string }>>({});
 
   useEffect(() => {
     if (!Array.isArray(stickers)) return;
@@ -57,7 +49,6 @@ export const UserStickerPanel = () => {
         if (!next[s._id]) {
           next[s._id] = {
             name: s.name || '',
-            tags: Array.isArray(s.tags) ? s.tags.join(' ') : '',
             description: s.description || '',
           };
         }
@@ -91,7 +82,6 @@ export const UserStickerPanel = () => {
       fd.append('file', newStickerFile);
       fd.append('name', name);
       if (newStickerDescription.trim()) fd.append('description', newStickerDescription.trim());
-      if (newStickerTags.trim()) fd.append('tags', newStickerTags.trim());
       const res = await (target.kind === 'bot' ? botStickerApi.create(target.botId, fd) : userStickerApi.createMine(fd));
       return res.data as Sticker;
     },
@@ -107,7 +97,6 @@ export const UserStickerPanel = () => {
       setNewStickerPreview(null);
       setNewStickerName('');
       setNewStickerDescription('');
-      setNewStickerTags('');
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || err?.message || 'Failed to upload sticker');
@@ -115,11 +104,10 @@ export const UserStickerPanel = () => {
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (input: { stickerId: string; name: string; tags: string; description: string }) => {
+    mutationFn: async (input: { stickerId: string; name: string; description: string }) => {
       const payload = {
         name: input.name,
         description: input.description?.trim() ? input.description.trim() : null,
-        tags: parseTags(input.tags),
       };
       const res = await (target.kind === 'bot'
         ? botStickerApi.update(target.botId, input.stickerId, payload)
@@ -212,11 +200,11 @@ export const UserStickerPanel = () => {
             </div>
 
             <div className="flex-1 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
-                    <input
-                      value={newStickerName}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
+                  <input
+                    value={newStickerName}
                     onChange={e => setNewStickerName(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
                     placeholder="Give it a name"
@@ -231,16 +219,6 @@ export const UserStickerPanel = () => {
                     className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all resize-none"
                     placeholder="Optional: when should the assistant use this sticker?"
                     rows={2}
-                    disabled={createMutation.isPending}
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Related Emoji / Tags</label>
-                  <input
-                    value={newStickerTags}
-                    onChange={e => setNewStickerTags(e.target.value)}
-                    className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
-                    placeholder="e.g. :wave:"
                     disabled={createMutation.isPending}
                   />
                 </div>
@@ -277,7 +255,7 @@ export const UserStickerPanel = () => {
           ) : (
             <div className="space-y-2">
               {stickers.map((s) => {
-                const draft = drafts[s._id] || { name: s.name || '', tags: (s.tags || []).join(' '), description: s.description || '' };
+                const draft = drafts[s._id] || { name: s.name || '', description: s.description || '' };
                 return (
                   <div
                     key={s._id}
@@ -294,14 +272,6 @@ export const UserStickerPanel = () => {
                           onChange={(e) => setDrafts(prev => ({ ...prev, [s._id]: { ...draft, name: e.target.value } }))}
                           className="bg-transparent text-white font-medium text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
                           placeholder="Name"
-                        />
-                      </div>
-                      <div>
-                        <input
-                          value={draft.tags}
-                          onChange={(e) => setDrafts(prev => ({ ...prev, [s._id]: { ...draft, tags: e.target.value } }))}
-                          className="bg-transparent text-mew-textMuted text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                          placeholder="Tags"
                         />
                       </div>
                       <div className="sm:col-span-2">
