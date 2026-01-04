@@ -21,6 +21,16 @@ interface SearchMessagesInChannelParams {
 }
 
 const normalizeMessageForClient = (message: any) => {
+  if (message?.retractedAt) {
+    return {
+      ...message,
+      content: '此消息已撤回',
+      attachments: [],
+      payload: {},
+      mentions: [],
+    };
+  }
+
   if (
     message.payload?.overrides &&
     message.authorId &&
@@ -72,6 +82,7 @@ export const searchMessagesInServer = async ({
   const matchQuery: any = {
     content: { $regex: safeNeedle, $options: 'i' },
     channelId: { $in: channelIds },
+    retractedAt: null,
   };
 
   if (channelId) {
@@ -111,6 +122,7 @@ export const searchMessagesInChannel = async ({
   const matchQuery: any = {
     content: { $regex: safeNeedle, $options: 'i' },
     channelId,
+    retractedAt: null,
   };
 
   const [total, messages] = await Promise.all([

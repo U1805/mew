@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import app from '../../app';
 import { ChannelType } from '../channel/channel.model';
-import { createMessage } from './message.service';
+import { createMessage, getMessageById } from './message.service';
 import Server from '../server/server.model';
 import Role from '../role/role.model';
 
@@ -298,6 +298,10 @@ describe('Message Routes', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.content).toBe('此消息已撤回');
       expect(res.body.retractedAt).toBeDefined();
+
+      const raw = await getMessageById(messageId);
+      expect(raw.content).toBe('Message to delete');
+      expect(raw.retractedAt).toBeDefined();
 
       const getRes = await request(app)
         .get(`/api/servers/${serverId}/channels/${channelId}/messages`)

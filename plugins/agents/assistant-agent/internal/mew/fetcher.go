@@ -53,8 +53,9 @@ func (f *Fetcher) FetchSessionMessages(ctx context.Context, channelID string) (s
 		if len(msgs) == 0 {
 			break
 		}
-		desc = append(desc, msgs...)
 		before = msgs[len(msgs)-1].ID
+		msgs = filterRetractedMessages(msgs)
+		desc = append(desc, msgs...)
 
 		curCount, boundaryFound := client.CurrentSessionCountInDesc(desc, f.SessionGap, f.MaxSessionMessages)
 		if curCount >= f.MaxSessionMessages || boundaryFound {
@@ -96,8 +97,9 @@ func (f *Fetcher) RecordSearch(ctx context.Context, channelID, recordID string) 
 		if len(msgs) == 0 {
 			break
 		}
-		desc = append(desc, msgs...)
 		before = msgs[len(msgs)-1].ID
+		msgs = filterRetractedMessages(msgs)
+		desc = append(desc, msgs...)
 
 		chrono := append([]Message(nil), desc...)
 		client.ReverseMessagesInPlace(chrono)
@@ -125,8 +127,9 @@ func (f *Fetcher) RecordIDForMessage(ctx context.Context, channelID, messageID s
 		if len(msgs) == 0 {
 			break
 		}
-		desc = append(desc, msgs...)
 		before = msgs[len(msgs)-1].ID
+		msgs = filterRetractedMessages(msgs)
+		desc = append(desc, msgs...)
 
 		chrono := append([]Message(nil), desc...)
 		client.ReverseMessagesInPlace(chrono)
@@ -152,7 +155,11 @@ func (f *Fetcher) SearchHistory(ctx context.Context, channelID, keyword string, 
 	if limit <= 0 {
 		limit = 10
 	}
-	return sdk.SearchChannelMessages(ctx, f.HTTPClient, f.APIBase, f.UserToken, channelID, keyword, limit, 1)
+	msgs, err := sdk.SearchChannelMessages(ctx, f.HTTPClient, f.APIBase, f.UserToken, channelID, keyword, limit, 1)
+	if err != nil {
+		return nil, err
+	}
+	return filterRetractedMessages(msgs), nil
 }
 
 func (f *Fetcher) UserActivityFrequency(ctx context.Context, channelID, userID string, asOf time.Time) (string, error) {
@@ -177,7 +184,7 @@ func (f *Fetcher) UserActivityFrequency(ctx context.Context, channelID, userID s
 		}
 		before = msgs[len(msgs)-1].ID
 
-		for _, m := range msgs {
+		for _, m := range filterRetractedMessages(msgs) {
 			if strings.TrimSpace(m.AuthorID()) != strings.TrimSpace(userID) {
 				continue
 			}
@@ -224,4 +231,18 @@ func pluralize(n int, singular, plural string) string {
 		return singular
 	}
 	return plural
+}
+
+func filterRetractedMessages(msgs []Message) []Message {
+	if len(msgs) == 0 {
+		return msgs
+	}
+	out := msgs[:0]
+	for _, m := range msgs {
+		if m.RetractedAt != nil {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out
 }

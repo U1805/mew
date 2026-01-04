@@ -1,6 +1,9 @@
 package ai
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestExtractTrailingToolCalls_Single(t *testing.T) {
 	in := "hello\n<TOOL>{\"name\":\"HistorySearch\",\"args\":{\"keyword\":\"cats\"}}\n"
@@ -54,6 +57,31 @@ func TestStripTrailingControlLines_RemovesKnownTokens(t *testing.T) {
 		StickerTokenPrefix: "<STICKER>",
 	})
 	if got != "hello" {
+		t.Fatalf("got=%q", got)
+	}
+}
+
+func TestStripLeadingMalformedToolDirectives_StripsPreludeToolBlock(t *testing.T) {
+	in := "<TOOL>{\"name\":\"WebSearch\",\"args\":{\"query\":\"q\"}}\n</TOOL>\nhello\nfinal_mood: {\"valence\": 0.1, \"arousal\": 0.2}\n"
+	got := stripLeadingMalformedToolDirectives(in, "<TOOL>")
+	if got == in {
+		t.Fatalf("expected leading tool block to be stripped")
+	}
+	if strings.Contains(got, "<TOOL>") || strings.Contains(got, "</TOOL>") {
+		t.Fatalf("got=%q", got)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(got), "hello") {
+		t.Fatalf("got=%q", got)
+	}
+}
+
+func TestStripInvalidToolCloseLines_StripsStandaloneCloseTagLines(t *testing.T) {
+	in := "hello\n</TOOL>\nworld\n</TOOL>\n"
+	got := stripInvalidToolCloseLines(in)
+	if strings.Contains(got, "</TOOL>") {
+		t.Fatalf("got=%q", got)
+	}
+	if got != "hello\nworld\n" {
 		t.Fatalf("got=%q", got)
 	}
 }

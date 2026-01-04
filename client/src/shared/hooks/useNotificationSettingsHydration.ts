@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { memberApi, userApi } from '../services/api';
 import { useAuthStore, useNotificationSettingsStore } from '../stores';
-import type { Server, UserNotificationSettings } from '../types';
+import type { ChannelNotificationLevel, Server, UserNotificationSettings } from '../types';
 
 export const useNotificationSettingsHydration = (servers: Server[] | undefined) => {
   const token = useAuthStore((s) => s.token);
@@ -10,6 +10,7 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
 
   const setUserSettings = useNotificationSettingsStore((s) => s.setUserSettings);
   const setServerLevel = useNotificationSettingsStore((s) => s.setServerLevel);
+  const setChannelLevels = useNotificationSettingsStore((s) => s.setChannelLevels);
 
   useEffect(() => {
     if (!token) return;
@@ -36,6 +37,30 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
       cancelled = true;
     };
   }, [token, setAuth, setUserSettings, user]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await userApi.getChannelNotificationSettings();
+        if (cancelled) return;
+        const rows = (Array.isArray(res.data) ? res.data : []) as Array<{ channelId: string; level: ChannelNotificationLevel }>;
+        const next: Record<string, ChannelNotificationLevel> = {};
+        rows.forEach((r) => {
+          if (r?.channelId && r?.level) next[r.channelId] = r.level;
+        });
+        setChannelLevels(next);
+      } catch {
+        // best-effort
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, setChannelLevels]);
 
   useEffect(() => {
     if (!token) return;

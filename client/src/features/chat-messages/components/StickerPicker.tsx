@@ -67,8 +67,8 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
     if (!q) return allStickers;
     return allStickers.filter((s) => {
       const name = (s.name || '').toLowerCase();
-      const tags = Array.isArray(s.tags) ? s.tags.join(' ').toLowerCase() : '';
-      return name.includes(q) || tags.includes(q);
+      const description = (s.description || '').toLowerCase();
+      return name.includes(q) || description.includes(q);
     });
   }, [allStickers, query]);
 

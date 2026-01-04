@@ -75,6 +75,28 @@ describe('Channel Search Routes: GET /api/channels/:channelId/search', () => {
     expect(res.body.messages[0].channelId).toBe(dmChannelId);
   });
 
+  it('should not return retracted messages or leak their original content', async () => {
+    const postRes = await request(app)
+      .post(`/api/channels/${dmChannelId}/messages`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ content: 'secret cats' });
+    const messageId = postRes.body?._id;
+
+    const delRes = await request(app)
+      .delete(`/api/channels/${dmChannelId}/messages/${messageId}`)
+      .set('Authorization', `Bearer ${tokenA}`);
+    expect(delRes.statusCode).toBe(200);
+    expect(delRes.body.retractedAt).toBeDefined();
+
+    const res = await request(app)
+      .get(`/api/channels/${dmChannelId}/search?q=secret`)
+      .set('Authorization', `Bearer ${tokenA}`);
+
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body.messages)).toBe(true);
+    expect(res.body.messages.some((m: any) => m._id === messageId)).toBe(false);
+  });
+
   it('should allow the other recipient to search', async () => {
     const res = await request(app)
       .get(`/api/channels/${dmChannelId}/search?q=hello`)

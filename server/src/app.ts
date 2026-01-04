@@ -37,7 +37,7 @@ const enableRateLimit = process.env.NODE_ENV === 'production' || process.env.MEW
 const apiLimiter = enableRateLimit
   ? rateLimit({
       windowMs: 5 * 60 * 1000,
-      limit: 300,
+      limit: 3000,
       standardHeaders: true,
       legacyHeaders: false,
     })
@@ -46,7 +46,7 @@ const apiLimiter = enableRateLimit
 const authLimiter = enableRateLimit
   ? rateLimit({
       windowMs: 15 * 60 * 1000,
-      limit: 20,
+      limit: 200,
       standardHeaders: true,
       legacyHeaders: false,
     })

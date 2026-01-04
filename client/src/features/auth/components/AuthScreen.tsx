@@ -11,7 +11,7 @@ export const AuthScreen = () => {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const setAuth = useAuthStore((state) => state.setAuth);

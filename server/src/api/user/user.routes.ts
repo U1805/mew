@@ -3,6 +3,7 @@ import {
   createDmChannelHandler,
   getDmChannelsHandler,
   getMeHandler,
+  getMyChannelNotificationSettingsHandler,
   getMyNotificationSettingsHandler,
   searchUsersHandler,
   getUserByIdHandler,
@@ -27,6 +28,7 @@ router.route('/@me').get(getMeHandler).patch(uploadImage.single('avatar'), valid
 router.route('/@me/notification-settings')
   .get(getMyNotificationSettingsHandler)
   .put(validate(updateMyNotificationSettingsSchema), updateMyNotificationSettingsHandler);
+router.get('/@me/channel-notification-settings', getMyChannelNotificationSettingsHandler);
 router.get('/@me/servers', getUserServersHandler);
 router.get('/@me/channels', getDmChannelsHandler);
 router.post('/@me/channels', createDmChannelHandler);

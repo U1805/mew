@@ -61,7 +61,7 @@ describe('api/userSticker/userSticker.controller', () => {
     await expect(createMyStickerHandler(req, res)).rejects.toBeInstanceOf(BadRequestError);
   });
 
-  it('createMyStickerHandler parses tags', async () => {
+  it('createMyStickerHandler forwards upload fields', async () => {
     vi.mocked(userStickerService.createUserStickerFromUpload).mockResolvedValue({ _id: 'st1' } as any);
     const req: any = {
       user: { id: 'u1' },
@@ -71,14 +71,9 @@ describe('api/userSticker/userSticker.controller', () => {
     const res = makeRes();
     await createMyStickerHandler(req, res);
 
-    expect(userStickerService.createUserStickerFromUpload).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: 'u1',
-        tags: ['hi', 'hello'],
-        name: 'Wave',
-        key: 'k.png',
-      })
-    );
+    const callArg = vi.mocked(userStickerService.createUserStickerFromUpload).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ userId: 'u1', name: 'Wave', description: 'd', key: 'k.png' }));
+    expect(callArg.tags).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
@@ -92,26 +87,25 @@ describe('api/userSticker/userSticker.controller', () => {
     const res = makeRes();
     await createMyStickerHandler(req, res);
 
-    expect(userStickerService.createUserStickerFromUpload).toHaveBeenCalledWith(
-      expect.objectContaining({ tags: [], key: 'up.png' })
-    );
+    const callArg = vi.mocked(userStickerService.createUserStickerFromUpload).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ key: 'up.png' }));
+    expect(callArg.tags).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  it('updateMyStickerHandler accepts comma-separated tags', async () => {
+  it('updateMyStickerHandler forwards update fields', async () => {
     vi.mocked(userStickerService.updateUserSticker).mockResolvedValue({ _id: 'st1' } as any);
-    const req: any = { user: { id: 'u1' }, params: { stickerId: 'st1' }, body: { tags: 'a,b, c', name: 'N' } };
+    const req: any = {
+      user: { id: 'u1' },
+      params: { stickerId: 'st1' },
+      body: { tags: 'a,b, c', name: 'N', description: null },
+    };
     const res = makeRes();
     await updateMyStickerHandler(req, res);
 
-    expect(userStickerService.updateUserSticker).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: 'u1',
-        stickerId: 'st1',
-        tags: ['a', 'b', 'c'],
-        name: 'N',
-      })
-    );
+    const callArg = vi.mocked(userStickerService.updateUserSticker).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ userId: 'u1', stickerId: 'st1', name: 'N', description: null }));
+    expect(callArg.tags).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 

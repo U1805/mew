@@ -156,6 +156,7 @@ describe('api/upload/upload.controller', () => {
 
       expect(exists).toHaveBeenCalledWith({
         channelId: 'c1',
+        retractedAt: null,
         $or: [{ 'attachments.key': 'k1' }, { 'payload.sticker.key': 'k1' }],
       });
       expect(next.mock.calls[0][0]).toBeInstanceOf(NotFoundError);
@@ -215,6 +216,7 @@ describe('api/upload/upload.controller', () => {
 
       expect(Message.exists).toHaveBeenCalledWith({
         channelId: 'c1',
+        retractedAt: null,
         $or: [{ 'attachments.key': 'sticker.png' }, { 'payload.sticker.key': 'sticker.png' }],
       });
       expect(getObjectStream).toHaveBeenCalledWith('sticker.png');

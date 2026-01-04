@@ -131,8 +131,7 @@ export interface Sticker {
   ownerId?: string;
   name: string;
   description?: string;
-  tags: string[];
-  format: 'png' | 'gif' | 'webp';
+  format: 'png' | 'gif' | 'webp' | 'jpg';
   contentType: string;
   size: number;
   key?: string;

@@ -74,6 +74,7 @@ export const downloadFileHandler = asyncHandler(async (req: Request, res: Respon
   const trimmedKey = key.trim();
   const allowed = await Message.exists({
     channelId,
+    retractedAt: null,
     $or: [
       { 'attachments.key': trimmedKey },
       // Allow bot-friendly downloads for sticker assets referenced by messages in the channel.

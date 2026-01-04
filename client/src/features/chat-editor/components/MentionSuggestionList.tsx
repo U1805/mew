@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import clsx from 'clsx';
 
 export type MentionSuggestionItem = {
@@ -22,10 +22,19 @@ const MentionSuggestionList = forwardRef(function MentionSuggestionList(
   ref,
 ) {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const listContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [items]);
+
+  useEffect(() => {
+    const container = listContainerRef.current;
+    if (!container) return;
+
+    const el = container.querySelector<HTMLElement>(`[data-mention-index="${selectedIndex}"]`);
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [selectedIndex, items.length]);
 
   const selectItem = (index: number) => {
     const item = items[index];
@@ -66,10 +75,11 @@ const MentionSuggestionList = forwardRef(function MentionSuggestionList(
       <div className="text-xs font-bold text-mew-textMuted uppercase px-3 py-2 bg-[#1E1F22]">
         Members
       </div>
-      <div className="max-h-[200px] overflow-y-auto custom-scrollbar p-1">
+      <div ref={listContainerRef} className="max-h-[200px] overflow-y-auto custom-scrollbar p-1">
         {items.map((item, index) => (
           <div
             key={`${item.id}-${index}`}
+            data-mention-index={index}
             onClick={() => selectItem(index)}
             className={clsx(
               'flex items-center px-2 py-1.5 rounded cursor-pointer',

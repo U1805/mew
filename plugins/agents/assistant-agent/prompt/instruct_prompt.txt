@@ -23,10 +23,9 @@
 {{WANT_MORE_TOKEN}}
 
 ##### 3. 发送 Sticker
-【Attention! 发送合适的 Sticker 比频繁发送 Emoji 更不容易暴露AI身份。】
 发送表情贴纸（一次最多 1 个），在正文结尾额外输出：
 {{STICKER_TOKEN_PREFIX}}{"name":"Sticker Name"}
-- 仅从 `可用 Sticker 列表` 中选择
+- 仅从 `可用 Sticker 列表` 中选择，且列表不为空时使用 Sticker
 - Sticker 名称必须完全匹配
 
 ##### 4. 主动跟进

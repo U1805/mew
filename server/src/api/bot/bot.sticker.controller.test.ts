@@ -73,24 +73,24 @@ describe('api/bot/bot.sticker.controller', () => {
     const res = makeRes();
     await createBotStickerHandler(req, res);
 
-    expect(userStickerService.createUserStickerFromUpload).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'u-bot', name: 'Wave', key: 'up.png', tags: ['hi'] })
-    );
+    const callArg = vi.mocked(userStickerService.createUserStickerFromUpload).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ userId: 'u-bot', name: 'Wave', key: 'up.png' }));
+    expect(callArg.tags).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(201);
   });
 
-  it('updateBotStickerHandler passes tags/name', async () => {
+  it('updateBotStickerHandler forwards update fields', async () => {
     vi.mocked(userStickerService.updateUserSticker).mockResolvedValue({ _id: 'st1' } as any);
     const req: any = {
       user: { id: 'u1' },
       params: { botId: 'b1', stickerId: 'st1' },
-      body: { name: 'N', tags: 'a,b' },
+      body: { name: 'N', tags: 'a,b', description: 'd' },
     };
     const res = makeRes();
     await updateBotStickerHandler(req, res);
-    expect(userStickerService.updateUserSticker).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'u-bot', stickerId: 'st1', name: 'N', tags: ['a', 'b'] })
-    );
+    const callArg = vi.mocked(userStickerService.updateUserSticker).mock.calls[0]?.[0] as any;
+    expect(callArg).toEqual(expect.objectContaining({ userId: 'u-bot', stickerId: 'st1', name: 'N', description: 'd' }));
+    expect(callArg.tags).toBeUndefined();
     expect(res.status).toHaveBeenCalledWith(200);
   });
 
