@@ -376,6 +376,30 @@ describe('User Routes', () => {
       expect(channel.lastReadMessageId).toBe(messageId);
     });
 
+    it('should not leak retracted lastMessage content', async () => {
+      const messageRes = await request(app)
+        .post(`/api/channels/${dmChannelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'secret dm message' });
+      const messageId = messageRes.body._id;
+
+      const delRes = await request(app)
+        .delete(`/api/channels/${dmChannelId}/messages/${messageId}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(delRes.statusCode).toBe(200);
+      expect(delRes.body.retractedAt).toBeDefined();
+      expect(delRes.body.content).toBe('此消息已撤回');
+
+      const res = await request(app)
+        .get('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`);
+
+      const channel = res.body.find((c: any) => c._id === dmChannelId);
+      expect(channel).toBeDefined();
+      expect(channel.lastMessage._id).toBe(messageId);
+      expect(channel.lastMessage.content).toBe('此消息已撤回');
+    });
+
     it('should have null lastMessage if no messages sent', async () => {
       const res = await request(app)
         .get('/api/users/@me/channels')

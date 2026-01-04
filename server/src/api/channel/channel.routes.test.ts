@@ -460,6 +460,30 @@ describe('Channel Routes', () => {
       expect(channel.lastMessage._id).toBe(messageId);
       expect(channel.lastReadMessageId).toBe(messageId);
     });
+
+    it('should not leak retracted lastMessage content', async () => {
+      const messageRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'secret server message' });
+      const messageId = messageRes.body._id;
+
+      const delRes = await request(app)
+        .delete(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}`)
+        .set('Authorization', `Bearer ${token}`);
+      expect(delRes.statusCode).toBe(200);
+      expect(delRes.body.retractedAt).toBeDefined();
+      expect(delRes.body.content).toBe('此消息已撤回');
+
+      const res = await request(app)
+        .get(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`);
+
+      const channel = res.body.find((c: any) => c._id === channelId);
+      expect(channel).toBeDefined();
+      expect(channel.lastMessage._id).toBe(messageId);
+      expect(channel.lastMessage.content).toBe('此消息已撤回');
+    });
   });
 
   describe('PUT /api/servers/:serverId/channels/:channelId/permissions', () => {

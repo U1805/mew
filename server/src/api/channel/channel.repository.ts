@@ -3,6 +3,18 @@ import Channel, { IChannel } from './channel.model';
 import { ChannelReadState } from './readState.model';
 import { DM_PERMISSIONS } from '../../constants/permissions';
 
+function sanitizeRetractedMessage<T extends { retractedAt?: any; content?: any; attachments?: any; payload?: any; mentions?: any }>(msg: T | null | undefined): T | null {
+  if (!msg) return null;
+  if (!msg.retractedAt) return msg;
+  return {
+    ...msg,
+    content: '此消息已撤回',
+    attachments: [],
+    payload: {},
+    mentions: [],
+  };
+}
+
 class ChannelRepository {
   async findVisibleChannelsForUser(serverId: string, userId: string): Promise<any[]> {
     const userObjectId = new mongoose.Types.ObjectId(userId);
@@ -52,6 +64,9 @@ class ChannelRepository {
       { $sort: { position: 1 } },
     ]);
 
+    for (const c of channels) {
+      c.lastMessage = sanitizeRetractedMessage(c.lastMessage);
+    }
     return channels;
   }
 
@@ -94,7 +109,18 @@ class ChannelRepository {
       { $match: { type: 'DM', recipients: userObjectId } },
       { $lookup: { from: 'users', localField: 'recipients', foreignField: '_id', as: 'recipientsInfo' } },
       { $addFields: { recipients: '$recipientsInfo' } },
-      { $lookup: { from: 'messages', localField: '_id', foreignField: 'channelId', as: 'lastMessageArr' } },
+      {
+        $lookup: {
+          from: 'messages',
+          let: { channelId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$channelId', '$$channelId'] } } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+          ],
+          as: 'lastMessageArr',
+        },
+      },
       { $lookup: { from: ChannelReadState.collection.name, let: { channelId: '$_id' }, pipeline: [ { $match: { $expr: { $and: [ { $eq: ['$channelId', '$$channelId'] }, { $eq: ['$userId', userObjectId] } ] } } }, { $project: { lastReadMessageId: 1, _id: 0 } } ], as: 'readState' } },
       { $addFields: { lastReadMessageId: { $ifNull: [{ $first: '$readState.lastReadMessageId' }, null] } } },
       { $project: { recipientsInfo: 0, readState: 0 } }
@@ -102,11 +128,11 @@ class ChannelRepository {
 
     channels.forEach(channel => {
       if (channel.lastMessageArr && channel.lastMessageArr.length > 0) {
-        channel.lastMessageArr.sort((a: any, b: any) => b.createdAt.getTime() - a.createdAt.getTime());
         channel.lastMessage = channel.lastMessageArr[0];
       } else {
         channel.lastMessage = null;
       }
+      channel.lastMessage = sanitizeRetractedMessage(channel.lastMessage);
       delete channel.lastMessageArr;
 
       channel.permissions = DM_PERMISSIONS;
