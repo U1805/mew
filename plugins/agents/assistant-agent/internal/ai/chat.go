@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -112,13 +113,14 @@ func ChatWithTools(
 			return "", store.Mood{}, false, fmt.Errorf("llm returned empty choices")
 		}
 		msg := resp.Choices[0].Message
-		out := msg.Content
+		out := stripLeadingMalformedToolDirectives(msg.Content, "<TOOL>")
 		if strings.TrimSpace(opts.LogPrefix) != "" {
 			log.Printf("%s llm output preview: channel=%s %q", opts.LogPrefix, opts.ChannelID, sdk.PreviewString(out, opts.LLMPreviewLen))
 		}
 
 		// Strip mood line (can appear before/after tool directives).
 		outNoMood, _, _ := store.ExtractAndStripFinalMood(out)
+		outNoMood = stripInvalidToolCloseLines(outNoMood)
 
 		cleanText, toolCalls := extractTrailingToolCalls(outNoMood, "<TOOL>")
 		if len(toolCalls) > 0 && len(toolCalls) > opts.MaxToolCalls {
@@ -221,6 +223,47 @@ func ChatWithTools(
 type textToolCall struct {
 	Name string
 	Args map[string]any
+}
+
+var toolCloseTagLineRe = regexp.MustCompile(`(?m)^[\t ]*</TOOL>[\t ]*(\r?\n)?`)
+
+func stripInvalidToolCloseLines(text string) string {
+	if strings.TrimSpace(text) == "" {
+		return text
+	}
+	return toolCloseTagLineRe.ReplaceAllString(text, "")
+}
+
+func stripLeadingMalformedToolDirectives(text string, toolPrefix string) string {
+	s := text
+	for {
+		trimmed := strings.TrimLeft(s, " \t\r\n")
+		if strings.HasPrefix(trimmed, "</TOOL>") {
+			s = consumeFirstLine(trimmed)
+			continue
+		}
+		if toolPrefix != "" && strings.HasPrefix(trimmed, toolPrefix) {
+			s = consumeFirstLine(trimmed)
+			// Also strip an immediate closing tag line (common malformed variant).
+			trimmed2 := strings.TrimLeft(s, " \t\r\n")
+			if strings.HasPrefix(trimmed2, "</TOOL>") {
+				s = consumeFirstLine(trimmed2)
+			}
+			continue
+		}
+		break
+	}
+	return stripInvalidToolCloseLines(s)
+}
+
+func consumeFirstLine(s string) string {
+	if s == "" {
+		return ""
+	}
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[i+1:]
+	}
+	return ""
 }
 
 type stripTrailingControlLinesOpts struct {
