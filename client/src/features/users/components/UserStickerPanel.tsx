@@ -185,7 +185,7 @@ export const UserStickerPanel = () => {
                 type="file"
                 ref={inputRef}
                 className="hidden"
-                accept="image/png,image/gif,image/webp"
+                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
                 onChange={handleStickerSelect}
                 disabled={createMutation.isPending}
               />

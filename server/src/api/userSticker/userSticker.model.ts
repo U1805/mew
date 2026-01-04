@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export type UserStickerFormat = 'png' | 'gif' | 'webp';
+export type UserStickerFormat = 'png' | 'gif' | 'webp' | 'jpg';
 
 export interface IUserSticker extends Document {
   userId: mongoose.Types.ObjectId;
@@ -19,7 +19,7 @@ const UserStickerSchema = new Schema<IUserSticker>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     name: { type: String, required: true },
     description: { type: String },
-    format: { type: String, required: true, enum: ['png', 'gif', 'webp'] },
+    format: { type: String, required: true, enum: ['png', 'gif', 'webp', 'jpg'] },
     contentType: { type: String, required: true },
     key: { type: String, required: true },
     size: { type: Number, required: true },

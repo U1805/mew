@@ -109,6 +109,37 @@ describe('api/sticker/sticker.service', () => {
     expect((Sticker as any).create).toHaveBeenCalledWith(expect.objectContaining({ format: 'webp' }));
   });
 
+  it('createStickerFromUpload infers jpg from contentType/extension', async () => {
+    vi.mocked((Sticker as any).create).mockResolvedValue({
+      toObject: () => ({ _id: 'st3', key: 'k.jpg', name: 'J' }),
+    });
+
+    await stickerService.createStickerFromUpload({
+      serverId,
+      createdBy: userId,
+      name: 'J',
+      originalname: 'j.jpg',
+      key: 'k.jpg',
+      contentType: 'image/jpeg',
+      size: 1,
+    });
+
+    expect((Sticker as any).create).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpg' }));
+
+    vi.mocked((Sticker as any).create).mockClear();
+    await stickerService.createStickerFromUpload({
+      serverId,
+      createdBy: userId,
+      name: 'J2',
+      originalname: 'j2.jpeg',
+      key: 'k2.jpeg',
+      contentType: 'application/octet-stream',
+      size: 1,
+    });
+
+    expect((Sticker as any).create).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpg' }));
+  });
+
   it('updateSticker throws NotFoundError when missing', async () => {
     vi.mocked((Sticker as any).findOne).mockResolvedValue(null);
     await expect(stickerService.updateSticker({ serverId, stickerId, name: 'x' })).rejects.toBeInstanceOf(

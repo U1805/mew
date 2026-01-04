@@ -18,10 +18,12 @@ const inferFormat = (contentType: string, filename: string): UserStickerFormat =
   if (ct === 'image/gif') return 'gif';
   if (ct === 'image/webp') return 'webp';
   if (ct === 'image/png') return 'png';
+  if (ct === 'image/jpeg' || ct === 'image/jpg') return 'jpg';
 
   const ext = (filename.split('.').pop() || '').toLowerCase();
   if (ext === 'gif') return 'gif';
   if (ext === 'webp') return 'webp';
+  if (ext === 'jpg' || ext === 'jpeg') return 'jpg';
   return 'png';
 };
 

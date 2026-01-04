@@ -531,7 +531,7 @@ export const ServerSettingsModal = () => {
                                 type="file" 
                                 ref={stickerInputRef} 
                                 className="hidden" 
-                                accept="image/png,image/gif,image/webp" 
+                                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" 
                                 onChange={handleStickerSelect}
                                 disabled={!canManageStickers}
                             />

@@ -107,6 +107,35 @@ describe('api/userSticker/userSticker.service', () => {
     expect((UserSticker as any).create).toHaveBeenCalledWith(expect.objectContaining({ format: 'webp' }));
   });
 
+  it('createUserStickerFromUpload infers jpg from contentType/extension', async () => {
+    vi.mocked((UserSticker as any).create).mockResolvedValue({
+      toObject: () => ({ _id: 'st3', userId, key: 'k.jpg', name: 'J' }),
+    });
+
+    await userStickerService.createUserStickerFromUpload({
+      userId,
+      name: 'J',
+      originalname: 'j.jpg',
+      key: 'k.jpg',
+      contentType: 'image/jpeg',
+      size: 1,
+    });
+
+    expect((UserSticker as any).create).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpg' }));
+
+    vi.mocked((UserSticker as any).create).mockClear();
+    await userStickerService.createUserStickerFromUpload({
+      userId,
+      name: 'J2',
+      originalname: 'j2.jpeg',
+      key: 'k2.jpeg',
+      contentType: 'application/octet-stream',
+      size: 1,
+    });
+
+    expect((UserSticker as any).create).toHaveBeenCalledWith(expect.objectContaining({ format: 'jpg' }));
+  });
+
   it('updateUserSticker throws NotFoundError when missing', async () => {
     vi.mocked((UserSticker as any).findOne).mockResolvedValue(null);
     await expect(userStickerService.updateUserSticker({ userId, stickerId, name: 'x' })).rejects.toBeInstanceOf(
