@@ -52,7 +52,7 @@ RUN set -eux; \
 
 FROM --platform=$TARGETPLATFORM ${RUNTIME_IMAGE}
 
-RUN apk add --no-cache ca-certificates tini
+RUN apk add --no-cache ca-certificates tini libwebp-tools
 
 ENV HOME=/root
 

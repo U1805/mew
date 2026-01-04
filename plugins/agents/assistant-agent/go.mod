@@ -5,7 +5,6 @@ go 1.22
 toolchain go1.25.5
 
 require (
-	github.com/chai2010/webp v1.4.0
 	github.com/openai/openai-go/v3 v3.15.0
 	golang.org/x/image v0.0.0-20211028202545-6944b10bf410
 	mew/plugins/sdk v0.0.0

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"image"
 	"image/png"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -84,8 +85,15 @@ func TestBuildL5MessagesWithAttachments_IncludesStickerAsImage(t *testing.T) {
 	if !(strings.Contains(s, "\"image_url\"") || strings.Contains(s, "\"type\":\"image_url\"")) {
 		t.Fatalf("expected image_url content part in message json, got: %s", s)
 	}
-	if !strings.Contains(s, "data:image/webp;base64,") {
-		t.Fatalf("expected data url image, got: %s", s)
+	_, cwebpErr := exec.LookPath("cwebp")
+	if cwebpErr == nil {
+		if !strings.Contains(s, "data:image/webp;base64,") {
+			t.Fatalf("expected data url image/webp when cwebp exists, got: %s", s)
+		}
+	} else {
+		if !strings.Contains(s, "data:image/png;base64,") {
+			t.Fatalf("expected data url image/png when cwebp missing, got: %s", s)
+		}
 	}
 
 	// Also ensure it is a user message union (basic sanity).
