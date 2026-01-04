@@ -89,15 +89,25 @@ func BuildUserMessageParam(ctx context.Context, speakerUsername, speakerUserID s
 		if err != nil {
 			continue
 		}
-		total += int64(len(data))
-		if total > opts.MaxTotalImageBytes {
-			break
-		}
 
 		mime := strings.TrimSpace(img.ContentType)
 		if mime == "" {
 			mime = "image/png"
 		}
+
+		if webpData, err := compressImageToWebP(data, 720); err == nil && len(webpData) > 0 {
+			data = webpData
+			mime = "image/webp"
+		}
+		if int64(len(data)) > opts.MaxImageBytes {
+			continue
+		}
+
+		total += int64(len(data))
+		if total > opts.MaxTotalImageBytes {
+			break
+		}
+
 		dataURL := "data:" + mime + ";base64," + base64.StdEncoding.EncodeToString(data)
 		parts = append(parts, openaigo.ImageContentPart(openaigo.ChatCompletionContentPartImageImageURLParam{
 			URL: dataURL,

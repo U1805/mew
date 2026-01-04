@@ -1,8 +1,11 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"image"
+	"image/png"
 	"strings"
 	"testing"
 	"time"
@@ -58,7 +61,11 @@ func TestBuildL5MessagesWithAttachments_IncludesStickerAsImage(t *testing.T) {
 			if att.ChannelID != "c1" {
 				t.Fatalf("unexpected channelID: %q", att.ChannelID)
 			}
-			return []byte("abc"), nil
+			var buf bytes.Buffer
+			if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 1, 1))); err != nil {
+				t.Fatalf("png encode error: %v", err)
+			}
+			return buf.Bytes(), nil
 		},
 	})
 	if err != nil {
@@ -77,7 +84,7 @@ func TestBuildL5MessagesWithAttachments_IncludesStickerAsImage(t *testing.T) {
 	if !(strings.Contains(s, "\"image_url\"") || strings.Contains(s, "\"type\":\"image_url\"")) {
 		t.Fatalf("expected image_url content part in message json, got: %s", s)
 	}
-	if !strings.Contains(s, "data:image/png;base64,") {
+	if !strings.Contains(s, "data:image/webp;base64,") {
 		t.Fatalf("expected data url image, got: %s", s)
 	}
 
