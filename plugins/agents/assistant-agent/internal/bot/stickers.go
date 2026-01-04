@@ -52,7 +52,11 @@ func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) strin
 		return "(none)"
 	}
 
-	names := make([]string, 0, len(stickers))
+	type entry struct {
+		Name        string
+		Description string
+	}
+	entries := make([]entry, 0, len(stickers))
 	seen := map[string]struct{}{}
 	for _, s := range stickers {
 		name := strings.TrimSpace(s.Name)
@@ -63,18 +67,25 @@ func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) strin
 			continue
 		}
 		seen[name] = struct{}{}
-		names = append(names, name)
+		desc := strings.TrimSpace(s.Description)
+		if desc != "" {
+			desc = strings.Join(strings.Fields(desc), " ")
+		}
+		entries = append(entries, entry{Name: name, Description: desc})
 	}
-	sort.Strings(names)
-	if len(names) == 0 {
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	if len(entries) == 0 {
 		return "(none)"
 	}
 
 	var b strings.Builder
-	b.WriteString("Available sticker names:\n")
-	for _, n := range names {
+	for _, e := range entries {
 		b.WriteString("- ")
-		b.WriteString(n)
+		b.WriteString(e.Name)
+		if e.Description != "" {
+			b.WriteString(": ")
+			b.WriteString(e.Description)
+		}
 		b.WriteString("\n")
 	}
 	return strings.TrimSpace(b.String())
