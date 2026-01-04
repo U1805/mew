@@ -4,6 +4,8 @@ import { getS3PublicUrl } from '../../utils/s3';
 import { userRepository } from './user.repository';
 import BotModel from '../bot/bot.model';
 import UserModel from './user.model';
+import { Types } from 'mongoose';
+import { UserChannelNotificationSetting } from '../channel/channelNotificationSetting.model';
 
 const userService = {
   async getMe(userId: string) {
@@ -48,6 +50,17 @@ const userService = {
     await user.save();
 
     return next;
+  },
+
+  async listMyChannelNotificationSettings(userId: string) {
+    const rows = await UserChannelNotificationSetting.find({ userId: new Types.ObjectId(userId) })
+      .select('channelId level')
+      .sort({ updatedAt: -1 })
+      .lean();
+    return rows.map((r: any) => ({
+      channelId: String(r.channelId),
+      level: r.level,
+    }));
   },
 
   async searchUsers(query: string, currentUserId: string) {

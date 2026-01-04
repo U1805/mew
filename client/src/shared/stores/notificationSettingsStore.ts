@@ -32,6 +32,7 @@ interface NotificationSettingsState {
   setUserSettings: (next: Partial<UserNotificationSettings>) => void;
   setServerLevel: (serverId: string, level: NotificationLevel) => void;
   setChannelLevel: (channelId: string, level: ChannelNotificationLevel) => void;
+  setChannelLevels: (levels: Record<string, ChannelNotificationLevel | undefined>) => void;
   clear: () => void;
 }
 
@@ -60,6 +61,7 @@ export const useNotificationSettingsStore = create<NotificationSettingsState>((s
 
   setServerLevel: (serverId, level) => set((state) => ({ server: { ...state.server, [serverId]: level } })),
   setChannelLevel: (channelId, level) => set((state) => ({ channel: { ...state.channel, [channelId]: level } })),
+  setChannelLevels: (levels) => set(() => ({ channel: { ...levels } })),
 
   clear: () => set({ user: DEFAULT_USER_SETTINGS, server: {}, channel: {} }),
 }));

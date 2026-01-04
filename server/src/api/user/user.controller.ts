@@ -109,3 +109,8 @@ export const updateMyNotificationSettingsHandler = asyncHandler(async (req: Requ
   const updated = await userService.updateMyNotificationSettings(req.user.id, req.body);
   res.status(200).json(updated);
 });
+
+export const getMyChannelNotificationSettingsHandler = asyncHandler(async (req: Request, res: Response) => {
+  const settings = await userService.listMyChannelNotificationSettings(req.user!.id);
+  res.status(200).json(settings);
+});

@@ -92,6 +92,34 @@ describe('User Routes', () => {
       expect(putRes2.statusCode).toBe(200);
       expect(putRes2.body).toEqual({ soundEnabled: true, soundVolume: 0.9, desktopEnabled: true });
     });
+
+    it('GET /api/users/@me/channel-notification-settings returns channel overrides', async () => {
+      const serverRes = await request(app)
+        .post('/api/servers')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'Notif Overrides Server' });
+      const serverId = serverRes.body._id;
+
+      const channelRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'general', type: 'GUILD_TEXT' });
+      const channelId = channelRes.body._id;
+
+      const putRes = await request(app)
+        .put(`/api/channels/${channelId}/notification-settings`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ level: 'MUTE' });
+      expect(putRes.statusCode).toBe(200);
+
+      const listRes = await request(app)
+        .get('/api/users/@me/channel-notification-settings')
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(listRes.statusCode).toBe(200);
+      expect(Array.isArray(listRes.body)).toBe(true);
+      expect(listRes.body).toEqual(expect.arrayContaining([{ channelId, level: 'MUTE' }]));
+    });
   });
 
   describe('POST /api/users/@me/channels', () => {

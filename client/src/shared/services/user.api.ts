@@ -6,6 +6,7 @@ export const userApi = {
   updateProfile: (data: FormData | { username: string }) => api.patch('/users/@me', data),
   changePassword: (data: { oldPassword, newPassword }) => api.post('/users/@me/password', data),
   getNotificationSettings: () => api.get('/users/@me/notification-settings'),
+  getChannelNotificationSettings: () => api.get('/users/@me/channel-notification-settings'),
   updateNotificationSettings: (data: { soundEnabled?: boolean; soundVolume?: number; desktopEnabled?: boolean }) =>
     api.put('/users/@me/notification-settings', data),
 };
