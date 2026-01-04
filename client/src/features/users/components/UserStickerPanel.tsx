@@ -24,6 +24,7 @@ export const UserStickerPanel = () => {
   const [newStickerFile, setNewStickerFile] = useState<File | null>(null);
   const [newStickerPreview, setNewStickerPreview] = useState<string | null>(null);
   const [newStickerName, setNewStickerName] = useState('');
+  const [newStickerDescription, setNewStickerDescription] = useState('');
   const [newStickerTags, setNewStickerTags] = useState('');
 
   const { data: botsData } = useQuery({
@@ -89,6 +90,7 @@ export const UserStickerPanel = () => {
       const fd = new FormData();
       fd.append('file', newStickerFile);
       fd.append('name', name);
+      if (newStickerDescription.trim()) fd.append('description', newStickerDescription.trim());
       if (newStickerTags.trim()) fd.append('tags', newStickerTags.trim());
       const res = await (target.kind === 'bot' ? botStickerApi.create(target.botId, fd) : userStickerApi.createMine(fd));
       return res.data as Sticker;
@@ -104,6 +106,7 @@ export const UserStickerPanel = () => {
       if (newStickerPreview) URL.revokeObjectURL(newStickerPreview);
       setNewStickerPreview(null);
       setNewStickerName('');
+      setNewStickerDescription('');
       setNewStickerTags('');
     },
     onError: (err: any) => {
@@ -209,14 +212,25 @@ export const UserStickerPanel = () => {
             </div>
 
             <div className="flex-1 space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
-                  <input
-                    value={newStickerName}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
+                    <input
+                      value={newStickerName}
                     onChange={e => setNewStickerName(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
                     placeholder="Give it a name"
+                    disabled={createMutation.isPending}
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Description</label>
+                  <textarea
+                    value={newStickerDescription}
+                    onChange={e => setNewStickerDescription(e.target.value)}
+                    className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all resize-none"
+                    placeholder="Optional: when should the assistant use this sticker?"
+                    rows={2}
                     disabled={createMutation.isPending}
                   />
                 </div>
