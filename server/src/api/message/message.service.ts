@@ -173,6 +173,16 @@ function processMessageForClient(message: any): object {
     (messageObject.authorId as any).avatarUrl = getS3PublicUrl((messageObject.authorId as any).avatarUrl);
   }
 
+  // If message is retracted, hide its content/payload from clients (keep DB intact).
+  if (messageObject?.retractedAt) {
+    messageObject = {
+      ...messageObject,
+      content: '此消息已撤回',
+      attachments: [],
+      payload: {},
+      mentions: [],
+    };
+  } else {
   // Finally, hydrate any attachments in the message
   messageObject = hydrateAttachmentUrls(messageObject);
 
@@ -182,6 +192,7 @@ function processMessageForClient(message: any): object {
     if (typeof key === 'string' && key) {
       (messageObject.payload.sticker as any).url = getS3PublicUrl(key);
     }
+  }
   }
 
   // Provide a unified plain-text context string for bots/LLM consumers.
@@ -480,12 +491,8 @@ export const getMessageById = async (messageId: string) => {
     const channel = await Channel.findById(message.channelId).select('type serverId').lean();
 
     // Retraction keeps history stable for clients and avoids hard deletes.
-    message.content = '此消息已撤回';
     message.editedAt = new Date();
     message.retractedAt = new Date();
-    message.attachments = [];
-    message.payload = {};
-    message.mentions = [];
 
     await messageRepository.save(message);
 
