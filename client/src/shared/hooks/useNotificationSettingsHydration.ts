@@ -1,16 +1,42 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { memberApi, userApi } from '../services/api';
 import { useAuthStore, useNotificationSettingsStore } from '../stores';
 import type { ChannelNotificationLevel, Server, UserNotificationSettings } from '../types';
 
+const sameUserNotificationSettings = (a?: UserNotificationSettings, b?: UserNotificationSettings) => {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return a.soundEnabled === b.soundEnabled && a.soundVolume === b.soundVolume && a.desktopEnabled === b.desktopEnabled;
+};
+
+const sameChannelLevels = (
+  a: Record<string, ChannelNotificationLevel | undefined>,
+  b: Record<string, ChannelNotificationLevel | undefined>
+) => {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+};
+
 export const useNotificationSettingsHydration = (servers: Server[] | undefined) => {
   const token = useAuthStore((s) => s.token);
-  const user = useAuthStore((s) => s.user);
   const setAuth = useAuthStore((s) => s.setAuth);
 
   const setUserSettings = useNotificationSettingsStore((s) => s.setUserSettings);
   const setServerLevel = useNotificationSettingsStore((s) => s.setServerLevel);
   const setChannelLevels = useNotificationSettingsStore((s) => s.setChannelLevels);
+
+  const serverIdsKey = useMemo(() => {
+    return (servers || [])
+      .map((s) => s?._id)
+      .filter(Boolean)
+      .sort()
+      .join('|');
+  }, [servers]);
 
   useEffect(() => {
     if (!token) return;
@@ -22,11 +48,15 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
         if (cancelled) return;
 
         const settings = res.data as UserNotificationSettings;
-        setUserSettings(settings);
+        const currentNotif = useNotificationSettingsStore.getState().user;
+        if (!sameUserNotificationSettings(currentNotif, settings)) {
+          setUserSettings(settings);
+        }
 
-        if (user) {
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser && !sameUserNotificationSettings(currentUser.notificationSettings, settings)) {
           const remember = !!localStorage.getItem('mew_token');
-          setAuth(token, { ...user, notificationSettings: settings }, remember);
+          setAuth(token, { ...currentUser, notificationSettings: settings }, remember);
         }
       } catch {
         // best-effort
@@ -36,7 +66,7 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
     return () => {
       cancelled = true;
     };
-  }, [token, setAuth, setUserSettings, user]);
+  }, [token, setAuth, setUserSettings]);
 
   useEffect(() => {
     if (!token) return;
@@ -51,7 +81,8 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
         rows.forEach((r) => {
           if (r?.channelId && r?.level) next[r.channelId] = r.level;
         });
-        setChannelLevels(next);
+        const current = useNotificationSettingsStore.getState().channel;
+        if (!sameChannelLevels(current, next)) setChannelLevels(next);
       } catch {
         // best-effort
       }
@@ -64,16 +95,17 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
 
   useEffect(() => {
     if (!token) return;
-    if (!servers || servers.length === 0) return;
+    if (!serverIdsKey) return;
 
     let cancelled = false;
     (async () => {
       try {
+        const serverIds = serverIdsKey.split('|').filter(Boolean);
         const results = await Promise.all(
-          servers.map(async (s) => {
+          serverIds.map(async (serverId) => {
             try {
-              const res = await memberApi.getMyNotificationSettings(s._id);
-              return { serverId: s._id, notificationLevel: res.data?.notificationLevel };
+              const res = await memberApi.getMyNotificationSettings(serverId);
+              return { serverId, notificationLevel: res.data?.notificationLevel };
             } catch {
               return null;
             }
@@ -81,9 +113,12 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
         );
 
         if (cancelled) return;
+        const currentServerLevels = useNotificationSettingsStore.getState().server;
         results.filter(Boolean).forEach((r: any) => {
           if (r?.serverId && r?.notificationLevel) {
-            setServerLevel(r.serverId, r.notificationLevel);
+            if (currentServerLevels[r.serverId] !== r.notificationLevel) {
+              setServerLevel(r.serverId, r.notificationLevel);
+            }
           }
         });
       } catch {
@@ -94,6 +129,6 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
     return () => {
       cancelled = true;
     };
-  }, [token, servers, setServerLevel]);
+  }, [token, serverIdsKey, setServerLevel]);
 };
 
