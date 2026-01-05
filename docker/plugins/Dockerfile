@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 ARG GO_IMAGE=golang:1.25.5-alpine
 ARG RUNTIME_IMAGE=alpine:3.20
 FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS build
@@ -10,7 +12,9 @@ ARG GOPROXY=https://mirrors.aliyun.com/goproxy/,direct
 ARG TARGETOS
 ARG TARGETARCH
 
-RUN set -eux; \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    set -eux; \
     mkdir -p /out; \
     for d in /src/plugins/fetchers/* /src/plugins/agents/*; do \
       if [ ! -d "$d" ]; then \
