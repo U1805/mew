@@ -14,24 +14,85 @@ env:
   IMAGE_PREFIX: ${{ github.repository }}
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            server:
+              - 'server/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+            client:
+              - 'client/**'
+              - 'docker/client/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+            plugins:
+              - 'plugins/**'
+              - 'docker/plugins/**'
+            garage-init:
+              - 'docker/garage/**'
+            workflow:
+              - '.github/workflows/docker-ghcr.yml'
+
+      - name: Build matrix from changes
+        id: matrix
+        uses: actions/github-script@v7
+        env:
+          CHANGES: ${{ steps.filter.outputs.changes }}
+          SERVER: ${{ steps.filter.outputs.server }}
+          CLIENT: ${{ steps.filter.outputs.client }}
+          PLUGINS: ${{ steps.filter.outputs.plugins }}
+          GARAGE_INIT: ${{ steps.filter.outputs['garage-init'] }}
+          WORKFLOW: ${{ steps.filter.outputs.workflow }}
+        with:
+          script: |
+            const include = [];
+            const all = {
+              server: { dockerfile: 'server/Dockerfile', context: '.' },
+              client: { dockerfile: 'client/Dockerfile', context: '.' },
+              plugins: { dockerfile: 'docker/plugins/Dockerfile', context: '.' },
+              'garage-init': { dockerfile: 'docker/garage/Dockerfile.init', context: '.' },
+            };
+
+            const changed = JSON.parse(process.env.CHANGES || '[]');
+            const rebuildAll = process.env.WORKFLOW === 'true';
+
+            for (const name of Object.keys(all)) {
+              const shouldBuild =
+                rebuildAll ||
+                changed.includes(name) ||
+                (name === 'server' && process.env.SERVER === 'true') ||
+                (name === 'client' && process.env.CLIENT === 'true') ||
+                (name === 'plugins' && process.env.PLUGINS === 'true') ||
+                (name === 'garage-init' && process.env.GARAGE_INIT === 'true');
+
+              if (shouldBuild) include.push({ name, ...all[name] });
+            }
+
+            if (include.length === 0) {
+              include.push({ name: 'noop', dockerfile: 'server/Dockerfile', context: '.', skip: true });
+            }
+
+            core.setOutput('matrix', JSON.stringify({ include }));
+
   build:
+    needs: changes
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: server
-            dockerfile: server/Dockerfile
-            context: .
-          - name: client
-            dockerfile: client/Dockerfile
-            context: .
-          - name: plugins
-            dockerfile: docker/plugins/Dockerfile
-            context: .
-          - name: garage-init
-            dockerfile: docker/garage/Dockerfile.init
-            context: .
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
     permissions:
       contents: read
@@ -67,6 +128,7 @@ jobs:
             type=sha,format=short
 
       - name: Build and push
+        if: ${{ !matrix.skip }}
         uses: docker/build-push-action@v6
         with:
           context: ${{ matrix.context }}
@@ -74,8 +136,10 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha,scope=${{ matrix.name }}
+          cache-to: |
+            type=gha,scope=${{ matrix.name }},mode=max
           platforms: linux/amd64,linux/arm64
           build-args: |
             GOPROXY=https://proxy.golang.org,direct
