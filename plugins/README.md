@@ -29,6 +29,14 @@
 
 `serviceType` 不通过环境变量设置，而是自动使用插件目录名（例如 `plugins/fetchers/test-fetcher` 的 `serviceType` 为 `test-fetcher`）。
 
+## Fetcher 代理池
+
+Fetcher 类插件（`plugins/fetchers/*`）的外网请求默认会使用内置 SOCKS5 代理池进行轮询，以降低触发4xx的概率。
+
+- `proxy_list_urls`：代理列表来源（支持逗号/空格/换行分隔多个 URL）；默认：
+  - `https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt`
+  - 设为空字符串可禁用代理池（直接直连）。
+
 ## `.env.local` / `.env` 加载规则
 
 `plugins/sdk` 会在启动时尝试从以下位置加载环境变量（仅在变量尚未设置时才会写入）：

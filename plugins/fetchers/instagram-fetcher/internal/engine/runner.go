@@ -9,6 +9,7 @@ import (
 	"mew/plugins/instagram-fetcher/internal/config"
 	"mew/plugins/instagram-fetcher/internal/source"
 	"mew/plugins/sdk"
+	"mew/plugins/sdk/util/proxy"
 )
 
 type Runner struct {
@@ -39,8 +40,8 @@ func (r *Runner) Run(ctx context.Context) error {
 		return err
 	}
 	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:     45 * time.Second,
-		UseMEWProxy: true,
+		Timeout:   45 * time.Second,
+		Transport: proxy.NewTransport(nil),
 	})
 	if err != nil {
 		return err

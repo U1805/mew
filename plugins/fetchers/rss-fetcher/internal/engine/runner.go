@@ -9,6 +9,7 @@ import (
 	"mew/plugins/rss-fetcher/internal/config"
 	"mew/plugins/rss-fetcher/internal/source"
 	"mew/plugins/sdk"
+	"mew/plugins/sdk/util/proxy"
 )
 
 type Runner struct {
@@ -35,8 +36,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
 	rssHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:     20 * time.Second,
-		UseMEWProxy: true,
+		Timeout:   20 * time.Second,
+		Transport: proxy.NewTransport(nil),
 	})
 	if err != nil {
 		return err

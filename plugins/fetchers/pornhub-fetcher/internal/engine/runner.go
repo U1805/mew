@@ -9,6 +9,7 @@ import (
 	"mew/plugins/pornhub-fetcher/internal/config"
 	"mew/plugins/pornhub-fetcher/internal/source"
 	"mew/plugins/sdk"
+	"mew/plugins/sdk/util/proxy"
 )
 
 type Runner struct {
@@ -36,8 +37,8 @@ func (r *Runner) Run(ctx context.Context) error {
 	group := sdk.NewGroup(ctx)
 
 	phClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:     30 * time.Second,
-		UseMEWProxy: true,
+		Timeout:   30 * time.Second,
+		Transport: proxy.NewTransport(nil),
 	})
 	if err != nil {
 		return err
