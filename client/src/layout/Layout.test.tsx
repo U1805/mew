@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './Layout';
 import { useUIStore } from '../shared/stores';
 
-vi.mock('../features/servers/components/ServerList', () => ({
+vi.mock('../features/server/components/ServerList', () => ({
   default: () => <div data-testid="serverList" />,
 }));
-vi.mock('../features/channels/components/ChannelList', () => ({
+vi.mock('../features/channel/components/ChannelList', () => ({
   default: () => <div data-testid="channelList" />,
 }));
 vi.mock('../features/chat/components/ChatArea', () => ({
@@ -36,7 +36,7 @@ vi.mock('../shared/hooks/useTabNotifier', () => ({
 vi.mock('../shared/hooks/useMembers', () => ({
   useMembers: () => {},
 }));
-vi.mock('../features/servers/hooks/useServers', () => ({
+vi.mock('../features/server/hooks/useServers', () => ({
   useServers: () => ({ data: undefined }),
 }));
 

@@ -6,8 +6,8 @@ import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores'
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { messageApi } from '../../../shared/services/api';
 import { Channel, ChannelType, Message } from '../../../shared/types';
-import { useDmChannels } from '../../channels/hooks/useDmChannels';
-import { useServersWithChannels } from '../../servers/hooks/useServersWithChannels';
+import { useDmChannels } from '../../channel/hooks/useDmChannels';
+import { useServersWithChannels } from '../../server/hooks/useServersWithChannels';
 
 type ForwardTarget = {
   channelId: string;

@@ -1,10 +1,12 @@
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from '../stores';
 
 let socket: Socket | null = null;
 
+const readTokenFromStorage = (): string | null =>
+  localStorage.getItem('mew_token') || sessionStorage.getItem('mew_token');
+
 export const getSocket = (): Socket | null => {
-  const token = useAuthStore.getState().token;
+  const token = readTokenFromStorage();
 
   if (!token) return null;
 

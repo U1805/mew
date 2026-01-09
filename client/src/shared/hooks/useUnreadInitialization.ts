@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUnreadStore } from '../stores/unreadStore';
-import { useServersWithChannels } from '../../features/servers/hooks/useServersWithChannels';
-import { useDmChannels } from '../../features/channels/hooks/useDmChannels';
+import { useServersWithChannels } from '../../features/server/hooks/useServersWithChannels';
+import { useDmChannels } from '../../features/channel/hooks/useDmChannels';
 import type { Channel } from '../types';
 
 const areSetsEqual = <T>(a: Set<T>, b: Set<T>): boolean => {

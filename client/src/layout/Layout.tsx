@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import clsx from 'clsx';
-import ServerList from '../features/servers/components/ServerList';
-import ChannelList from '../features/channels/components/ChannelList';
+import ServerList from '../features/server/components/ServerList';
+import ChannelList from '../features/channel/components/ChannelList';
 import ChatArea from '../features/chat/components/ChatArea';
 import UserSettings from '../features/users/components/UserSettings';
 import ModalManager from './modals/ModalManager';
@@ -13,7 +13,7 @@ import { useNotificationSettingsHydration } from '../shared/hooks/useNotificatio
 import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore, useUnreadServerStore } from '../shared/stores';
 import { useMembers } from '../shared/hooks/useMembers';
-import { useServers } from '../features/servers/hooks/useServers';
+import { useServers } from '../features/server/hooks/useServers';
 
 const Layout = () => {
   usePresenceEvents();

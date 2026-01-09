@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-type ModalType =
+export type ModalType =
   | 'createServer'
   | 'createChannel'
   | 'createCategory'

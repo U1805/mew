@@ -10,35 +10,9 @@ import { Permission } from '../../../shared/constants/permissions';
 import { useRoles } from '../../../shared/hooks/useRoles';
 import { roleApi, serverApi, stickerApi } from '../../../shared/services/api';
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
-
-const PERMISSION_GROUPS = [
-  { group: 'General Server Permissions', perms: [
-    { id: 'ADMINISTRATOR', name: 'Administrator', desc: 'Grants all permissions and bypasses all permission checks.' },
-    { id: 'MANAGE_CHANNEL', name: 'Manage Channels', desc: 'Allows members to create, edit, or delete channels.' },
-    { id: 'MANAGE_ROLES', name: 'Manage Roles', desc: 'Allows members to create new roles and edit/delete roles lower than their highest role.' },
-    { id: 'MANAGE_SERVER', name: 'Manage Server', desc: "Allows members to change this server's name or move its region." },
-    { id: 'MANAGE_STICKERS', name: 'Manage Stickers', desc: 'Allows members to upload, edit, or delete stickers in this server.' },
-  ]},
-  { group: 'Membership Permissions', perms: [
-    { id: 'CREATE_INVITE', name: 'Create Invite', desc: 'Allows members to invite new people to this server.' },
-    { id: 'CHANGE_NICKNAME', name: 'Change Nickname', desc: 'Allows members to change their own nickname.' },
-    { id: 'MANAGE_NICKNAMES', name: 'Manage Nicknames', desc: "Allows members to change other members' nicknames." },
-    { id: 'KICK_MEMBERS', name: 'Kick Members', desc: 'Allows members to remove other members from this server.' },
-  ]},
-  { group: 'Text Channel Permissions', perms: [
-    { id: 'SEND_MESSAGES', name: 'Send Messages', desc: 'Allows members to send messages in text channels.' },
-    { id: 'EMBED_LINKS', name: 'Embed Links', desc: 'Allows links that are pasted into the chat window to embed.' },
-    { id: 'ATTACH_FILES', name: 'Attach Files', desc: 'Allows members to upload files or media in the chat.' },
-    { id: 'ADD_REACTIONS', name: 'Add Reactions', desc: 'Allows members to add new emoji reactions to a message.' },
-    { id: 'MENTION_EVERYONE', name: 'Mention @everyone', desc: 'Allows members to use @everyone or @here.' },
-    { id: 'MANAGE_MESSAGES', name: 'Manage Messages', desc: 'Allows members to delete messages by other members or pin any message.' },
-    { id: 'READ_MESSAGE_HISTORY', name: 'Read Message History', desc: 'Allows members to read previous messages sent in channels.' },
-  ]},
-];
-
-const PRESET_COLORS = [
-  '#99AAB5', '#1ABC9C', '#2ECC71', '#3498DB', '#9B59B6', '#E91E63', '#F1C40F', '#E67E22', '#E74C3C', '#95A5A6', '#607D8B'
-];
+import { PERMISSION_GROUPS, PRESET_COLORS } from '../../server-settings/model/constants';
+import { ServerSettingsSidebar, type ServerSettingsTab } from '../../server-settings/components/ServerSettingsSidebar';
+import { ServerSettingsStickersTab } from '../../server-settings/components/ServerSettingsStickersTab';
 
 export const ServerSettingsModal = () => {
   const { closeModal, openModal } = useModalStore();
@@ -47,7 +21,7 @@ export const ServerSettingsModal = () => {
   const { permissions: serverPermissions } = useServerPermissions();
   const canManageStickers = serverPermissions.has('ADMINISTRATOR') || serverPermissions.has('MANAGE_STICKERS');
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'roles' | 'emoji' | 'stickers'>('overview');
+  const [activeTab, setActiveTab] = useState<ServerSettingsTab>('overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
   const [mobileRoleEditOpen, setMobileRoleEditOpen] = useState(false);
 
@@ -327,6 +301,14 @@ export const ServerSettingsModal = () => {
   const handleTabClick = (tab: typeof activeTab) => { setActiveTab(tab); setMobileMenuOpen(false); };
   const handleRoleSelect = (roleId: string) => { setSelectedRoleId(roleId); setMobileRoleEditOpen(true); };
 
+  const requestDeleteSticker = (sticker: Sticker) => {
+    openModal('confirm', {
+      title: `Delete sticker '${sticker.name}'`,
+      description: 'Are you sure you want to delete this sticker? This cannot be undone.',
+      onConfirm: () => deleteStickerMutation.mutate(sticker._id),
+    });
+  };
+
   // New: Handle sticker file selection for upload area
   const handleStickerSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0] || null;
@@ -348,27 +330,13 @@ export const ServerSettingsModal = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans overflow-hidden">
-         <div className={clsx(
-             "w-full md:w-[30%] md:min-w-[220px] bg-[#2B2D31] flex-col md:items-end pt-4 md:pt-[60px] pb-4 px-2 z-10",
-             "absolute inset-0 md:static transition-transform duration-300 ease-ios will-change-transform",
-             !mobileMenuOpen ? "-translate-x-[20%] opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto md:flex" : "translate-x-0 flex"
-         )}>
-             <div className="w-full md:w-[192px] px-4 md:px-1.5">
-                <div className="flex md:hidden items-center justify-between mb-4">
-                    <h2 className="text-lg font-bold text-white">Server Settings</h2>
-                    <button onClick={closeModal} className="p-2 text-mew-textMuted hover:text-white"><Icon icon="mdi:close" width="24" /></button>
-                </div>
-                <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 hidden md:block">Server Settings</h2>
-                <SidebarItem label="Overview" isActive={activeTab === 'overview'} onClick={() => handleTabClick('overview')} />
-                <SidebarItem label="Roles" isActive={activeTab === 'roles'} onClick={() => handleTabClick('roles')} />
-                <SidebarItem label="Emoji" isActive={activeTab === 'emoji'} onClick={() => handleTabClick('emoji')} />
-                <SidebarItem label="Stickers" isActive={activeTab === 'stickers'} onClick={() => handleTabClick('stickers')} />
-                <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50"></div>
-                <div className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] font-medium text-sm cursor-pointer mb-0.5 flex justify-between group text-red-400" onClick={() => openModal('deleteServer', { server })}>
-                    <span>Delete Server</span><Icon icon="mdi:trash-can-outline" />
-                </div>
-             </div>
-         </div>
+         <ServerSettingsSidebar
+           activeTab={activeTab}
+           mobileMenuOpen={mobileMenuOpen}
+           onClose={closeModal}
+           onTabClick={handleTabClick}
+           onDeleteServer={() => openModal('deleteServer', { server })}
+         />
 
          {/* Content Area (Right) */}
          <div className={clsx(
@@ -503,155 +471,30 @@ export const ServerSettingsModal = () => {
                 </div>
              )}
 
-             {activeTab === 'emoji' && <div className="flex flex-col items-center justify-center h-full text-mew-textMuted"><Icon icon="mdi:hammer-wrench" width="48" className="mb-2 opacity-50" /><p>This setting is coming soon.</p></div>}
+              {activeTab === 'emoji' && <div className="flex flex-col items-center justify-center h-full text-mew-textMuted"><Icon icon="mdi:hammer-wrench" width="48" className="mb-2 opacity-50" /><p>This setting is coming soon.</p></div>}
 
-             {/* STICKERS - IMPROVED UI */}
-             {activeTab === 'stickers' && (
-              <div className="h-full flex flex-col p-4 md:p-0 overflow-hidden">
-                <div className="pb-4 border-b border-[#3F4147] shrink-0">
-                  <h2 className="text-xl font-bold text-white mb-2">Stickers</h2>
-                  <p className="text-sm text-mew-textMuted">Upload and manage server stickers. The first 30 stickers are free!</p>
-                </div>
-
-                <div className="flex-1 overflow-y-auto custom-scrollbar py-6 space-y-8">
-                  {/* Upload Section */}
-                  <div>
-                    {!canManageStickers && <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 text-sm p-3 rounded mb-4">You do not have permission to manage stickers.</div>}
-                    
-                    <div className="flex gap-4 items-start">
-                        {/* Drag/Drop Zone Lookalike */}
-                        <div 
-                            onClick={() => canManageStickers && stickerInputRef.current?.click()}
-                            className={clsx(
-                                "w-24 h-24 rounded-lg border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-colors shrink-0",
-                                canManageStickers ? "border-[#4E5058] hover:border-mew-textMuted bg-[#1E1F22] hover:bg-[#232428]" : "border-[#2F3136] bg-[#202225] opacity-50 cursor-not-allowed"
-                            )}
-                        >
-                            <input 
-                                type="file" 
-                                ref={stickerInputRef} 
-                                className="hidden" 
-                                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" 
-                                onChange={handleStickerSelect}
-                                disabled={!canManageStickers}
-                            />
-                            {newStickerPreview ? (
-                                <img src={newStickerPreview} className="w-full h-full object-contain p-1" />
-                            ) : (
-                                <>
-                                    <Icon icon="mdi:plus" className="text-mew-textMuted mb-1" width="24" />
-                                    <span className="text-[10px] font-bold text-mew-textMuted uppercase">Upload</span>
-                                </>
-                            )}
-                        </div>
-
-                        {/* Upload Form Inputs */}
-                        <div className="flex-1 space-y-3">
-                            <div className="grid grid-cols-1 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
-                                    <input 
-                                        value={newStickerName} 
-                                        onChange={e => setNewStickerName(e.target.value)} 
-                                        className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
-                                        placeholder="Give it a name"
-                                        disabled={!canManageStickers}
-                                    />
-                                </div>
-                            </div>
-                            
-                            {newStickerFile && (
-                                <div className="flex justify-end">
-                                    <button 
-                                        onClick={() => createStickerMutation.mutate()} 
-                                        disabled={createStickerMutation.isPending || !newStickerName.trim()}
-                                        className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        {createStickerMutation.isPending ? 'Uploading...' : 'Upload Sticker'}
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                  </div>
-
-                  <div className="h-[1px] bg-[#3F4147]"></div>
-
-                  {/* Existing Stickers List */}
-                  <div>
-                    <h3 className="text-xs font-bold text-mew-textMuted uppercase mb-4">
-                        {stickers?.length || 0} Stickers
-                    </h3>
-                    
-                    {isLoadingStickers ? (
-                        <div className="flex justify-center py-8"><Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="24" /></div>
-                    ) : !stickers?.length ? (
-                        <div className="text-center py-10 bg-[#2B2D31] rounded-lg border border-dashed border-[#3F4147]">
-                            <Icon icon="mdi:sticker-emoji" className="text-[#4E5058] mx-auto mb-2" width="40" />
-                            <p className="text-mew-textMuted text-sm">No stickers found.</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-1">
-                            {stickers.map(s => {
-                                const draft = stickerDrafts[s._id] || { name: s.name || '', description: s.description || '' };
-                                return (
-                                    <div key={s._id} className="group flex items-center p-2 rounded hover:bg-[#2B2D31] hover:shadow-sm border border-transparent hover:border-[#26272D] transition-all">
-                                        <div className="w-16 h-16 bg-[#202225] rounded flex items-center justify-center shrink-0 mr-4">
-                                            <img src={s.url} alt={s.name} className="w-full h-full object-contain p-1" />
-                                        </div>
-                                        
-                                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-4 mr-4">
-                                            <div>
-                                                <input 
-                                                    value={draft.name} 
-                                                    onChange={(e) => setStickerDrafts(prev => ({ ...prev, [s._id]: { ...draft, name: e.target.value } }))}
-                                                    className="bg-transparent text-white font-medium text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                                                    placeholder="Name"
-                                                    disabled={!canManageStickers}
-                                                />
-                                            </div>
-                                            <div>
-                                                <input 
-                                                    value={draft.description} 
-                                                    onChange={(e) => setStickerDrafts(prev => ({ ...prev, [s._id]: { ...draft, description: e.target.value } }))}
-                                                    className="bg-transparent text-mew-textMuted text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                                                    placeholder="Description (optional)"
-                                                    disabled={!canManageStickers}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button 
-                                                onClick={() => updateStickerMutation.mutate({ stickerId: s._id, ...draft })}
-                                                disabled={updateStickerMutation.isPending}
-                                                className="p-1.5 text-mew-textMuted hover:text-green-400 hover:bg-[#202225] rounded transition-colors"
-                                                title="Save Changes"
-                                            >
-                                                <Icon icon="mdi:check" width="20" />
-                                            </button>
-                                            <button 
-                                                onClick={() => openModal('confirm', {
-                                                    title: `Delete sticker '${s.name}'`,
-                                                    description: 'Are you sure you want to delete this sticker? This cannot be undone.',
-                                                    onConfirm: () => deleteStickerMutation.mutate(s._id),
-                                                })}
-                                                disabled={deleteStickerMutation.isPending}
-                                                className="p-1.5 text-mew-textMuted hover:text-red-400 hover:bg-[#202225] rounded transition-colors"
-                                                title="Delete Sticker"
-                                            >
-                                                <Icon icon="mdi:trash-can-outline" width="20" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-             )}
+              {/* STICKERS - IMPROVED UI */}
+              {activeTab === 'stickers' && (
+               <ServerSettingsStickersTab
+                 canManageStickers={canManageStickers}
+                 stickerInputRef={stickerInputRef}
+                 newStickerPreview={newStickerPreview}
+                 newStickerName={newStickerName}
+                 setNewStickerName={setNewStickerName}
+                 newStickerFile={newStickerFile}
+                 onStickerSelect={handleStickerSelect}
+                 onUpload={() => createStickerMutation.mutate()}
+                 isUploading={createStickerMutation.isPending}
+                 stickers={stickers}
+                 isLoadingStickers={isLoadingStickers}
+                 stickerDrafts={stickerDrafts}
+                 setStickerDrafts={setStickerDrafts}
+                 onUpdateSticker={(input) => updateStickerMutation.mutate(input)}
+                 isUpdatingSticker={updateStickerMutation.isPending}
+                 onRequestDeleteSticker={requestDeleteSticker}
+                 isDeletingSticker={deleteStickerMutation.isPending}
+               />
+              )}
          </div>
 
          {/* Close Button (Desktop) */}
@@ -665,12 +508,4 @@ export const ServerSettingsModal = () => {
          </div>
     </div>
   )
-}
-
-const SidebarItem = ({ label, isActive, onClick }: { label: string; isActive?: boolean; onClick: () => void }) => {
-    return (
-        <div onClick={onClick} className={clsx("px-2.5 py-1.5 rounded-[4px] cursor-pointer mb-0.5 font-medium text-sm transition-colors", isActive ? "bg-[#404249] text-white" : "text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text")}>
-            {label}
-        </div>
-    )
 }
