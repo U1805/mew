@@ -341,7 +341,7 @@ func (r *Runner) buildPrompt(
 		KeepEmptyWhenNoImages: true,
 		Location:              r.timeLoc,
 		Download: func(ctx context.Context, att mewacl.Attachment, limit int64) ([]byte, error) {
-			return mewacl.DownloadAttachmentBytes(ctx, r.mewHTTPClient, r.apiBase, r.userToken, att, limit)
+			return mewacl.DownloadAttachmentBytes(ctx, r.session.HTTPClient(), r.apiBase, att, limit)
 		},
 	})
 	if err != nil {
@@ -507,11 +507,9 @@ func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelI
 }
 
 func (r *Runner) postMessageHTTP(ctx context.Context, channelID, content string) error {
-	if r.mewHTTPClient == nil {
+	httpClient := r.session.HTTPClient()
+	if httpClient == nil {
 		return fmt.Errorf("missing mew http client")
-	}
-	if strings.TrimSpace(r.userToken) == "" {
-		return fmt.Errorf("missing user token")
 	}
 	if strings.TrimSpace(r.apiBase) == "" {
 		return fmt.Errorf("missing api base")
@@ -527,10 +525,9 @@ func (r *Runner) postMessageHTTP(ctx context.Context, channelID, content string)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(r.userToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := r.mewHTTPClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -544,11 +541,9 @@ func (r *Runner) postMessageHTTP(ctx context.Context, channelID, content string)
 }
 
 func (r *Runner) postStickerHTTP(ctx context.Context, channelID, stickerID string) error {
-	if r.mewHTTPClient == nil {
+	httpClient := r.session.HTTPClient()
+	if httpClient == nil {
 		return fmt.Errorf("missing mew http client")
-	}
-	if strings.TrimSpace(r.userToken) == "" {
-		return fmt.Errorf("missing user token")
 	}
 	if strings.TrimSpace(r.apiBase) == "" {
 		return fmt.Errorf("missing api base")
@@ -574,10 +569,9 @@ func (r *Runner) postStickerHTTP(ctx context.Context, channelID, stickerID strin
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(r.userToken))
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := r.mewHTTPClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
 	}

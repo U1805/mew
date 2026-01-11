@@ -17,7 +17,7 @@ type TestAgentRunner struct {
 	botID       string
 	botName     string
 	accessToken string // bot access token from bootstrap (not a JWT)
-	userToken   string // JWT issued by /api/auth/bot
+	session     *sdk.BotSession
 
 	apiBase string
 	mewURL  string
@@ -47,7 +47,7 @@ func NewTestAgentRunner(botID, botName, accessToken, rawConfig string, cfg sdk.R
 		botID:       botID,
 		botName:     botName,
 		accessToken: accessToken,
-		userToken:   "",
+		session:     nil,
 		apiBase:     strings.TrimRight(cfg.APIBase, "/"),
 		mewURL:      mewURL,
 		wsURL:       wsURL,
@@ -60,18 +60,18 @@ func NewTestAgentRunner(botID, botName, accessToken, rawConfig string, cfg sdk.R
 func (r *TestAgentRunner) Run(ctx context.Context) error {
 	logPrefix := fmt.Sprintf("[test-agent] bot=%s name=%q", r.botID, r.botName)
 
-	me, token, err := sdk.LoginBot(ctx, r.httpClient, r.apiBase, r.accessToken)
+	r.session = sdk.NewBotSession(r.apiBase, r.accessToken, r.httpClient)
+	me, err := r.session.User(ctx)
 	if err != nil {
 		return fmt.Errorf("%s bot auth failed: %w", logPrefix, err)
 	}
 	r.botUserID = me.ID
-	r.userToken = token
 
-	if err := r.dmChannels.Refresh(ctx, r.httpClient, r.apiBase, r.userToken); err != nil {
+	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
 		log.Printf("%s refresh DM channels failed (will retry later): %v", logPrefix, err)
 	}
 
-	return socketio.RunGatewayWithReconnect(ctx, r.wsURL, r.userToken, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
+	return socketio.RunGatewayWithReconnectSession(ctx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
 		if eventName != "MESSAGE_CREATE" {
 			return nil
 		}

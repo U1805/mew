@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { usePresenceStore } from './presenceStore';
-import { disconnectSocket } from '../services/socket';
+import { disconnectSocket, updateSocketAuthToken } from '../services/socket';
 import { User } from '../types';
 import { useNotificationSettingsStore } from './notificationSettingsStore';
 
@@ -11,11 +11,12 @@ export interface AuthState {
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   token: localStorage.getItem('mew_token') || sessionStorage.getItem('mew_token'),
   user: JSON.parse(localStorage.getItem('mew_user') || sessionStorage.getItem('mew_user') || 'null'),
 
   setAuth: (token: string, user: User | null, remember: boolean = true) => {
+    const prevToken = get().token;
     const storage = remember ? localStorage : sessionStorage;
     const otherStorage = remember ? sessionStorage : localStorage;
 
@@ -31,6 +32,10 @@ export const useAuthStore = create<AuthState>((set) => ({
 
     set({ token, user });
     useNotificationSettingsStore.getState().hydrateFromUser(user);
+
+    if (prevToken && prevToken !== token) {
+      updateSocketAuthToken(token);
+    }
   },
 
   logout: () => {

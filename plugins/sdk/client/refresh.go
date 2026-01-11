@@ -10,19 +10,8 @@ import (
 	"strings"
 )
 
-type User struct {
-	ID       string `json:"_id"`
-	Username string `json:"username"`
-	IsBot    bool   `json:"isBot"`
-}
-
-func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken string) (me User, token string, err error) {
-	reqBody, err := json.Marshal(map[string]any{"accessToken": accessToken})
-	if err != nil {
-		return User{}, "", err
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(apiBase, "/")+"/auth/bot", bytes.NewReader(reqBody))
+func Refresh(ctx context.Context, httpClient *http.Client, apiBase string) (me User, token string, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(apiBase, "/")+"/auth/refresh", bytes.NewReader([]byte("{}")))
 	if err != nil {
 		return User{}, "", err
 	}
@@ -47,7 +36,7 @@ func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken
 		return User{}, "", err
 	}
 	if strings.TrimSpace(parsed.User.ID) == "" || strings.TrimSpace(parsed.Token) == "" {
-		return User{}, "", fmt.Errorf("invalid /auth/bot response: missing user/token")
+		return User{}, "", fmt.Errorf("invalid /auth/refresh response: missing user/token")
 	}
 
 	return parsed.User, parsed.Token, nil

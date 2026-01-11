@@ -34,7 +34,7 @@ func (r *TestAgentRunner) maybeEcho(ctx context.Context, channelID, content stri
 	}
 
 	// DM channels can be created after the bot connects; refresh once on demand.
-	if err := r.dmChannels.Refresh(ctx, r.httpClient, r.apiBase, r.userToken); err != nil {
+	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
 		return "", false, err
 	}
 	if r.dmChannels.Has(channelID) {

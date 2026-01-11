@@ -32,7 +32,9 @@ func ListMyStickers(ctx context.Context, httpClient *http.Client, apiBase, userT
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(userToken))
+	if strings.TrimSpace(userToken) != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(userToken))
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -42,7 +44,7 @@ func ListMyStickers(ctx context.Context, httpClient *http.Client, apiBase, userT
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Body: strings.TrimSpace(string(body))}
 	}
 
 	var stickers []Sticker

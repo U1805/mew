@@ -8,6 +8,9 @@ import { getS3PublicUrl } from '../../utils/s3';
 import * as botRepository from '../bot/bot.repository';
 import { ensureBotUserExists } from '../bot/bot.service';
 
+export const signAccessToken = (payload: { id: any; username: string; discriminator?: string }) =>
+  jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+
 export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const { email, password } = loginData;
 
@@ -30,7 +33,7 @@ export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   }
 
   const payload = { id: user._id, username: user.username, discriminator: (user as any).discriminator };
-  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+  const token = signAccessToken(payload);
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { password: _, ...userWithoutPassword } = user.toObject();
@@ -69,7 +72,7 @@ export const loginBot = async (data: { accessToken?: string }) => {
   }
 
   const payload = { id: user._id, username: user.username, discriminator: (user as any).discriminator };
-  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+  const token = signAccessToken(payload);
 
   const userObj: any = user.toObject ? user.toObject() : user;
   if (userObj.avatarUrl) {
@@ -100,7 +103,7 @@ export const register = async (userData: Partial<IUser>) => {
     const { password: _, ...userWithoutPassword } = newUser.toObject();
 
     const payload = { id: newUser._id, username: newUser.username, discriminator: (newUser as any).discriminator };
-    const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+    const token = signAccessToken(payload);
 
     if (userWithoutPassword.avatarUrl) {
       userWithoutPassword.avatarUrl = getS3PublicUrl(userWithoutPassword.avatarUrl);

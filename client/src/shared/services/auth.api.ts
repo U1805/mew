@@ -9,6 +9,8 @@ export const authApi = {
   register: (data: any) => api.post('/auth/register', data),
   getConfig: () => api.get('/auth/config'),
   getMe: () => api.get('/users/@me'),
+  refresh: () => api.post('/auth/refresh', {}),
+  logout: () => api.post('/auth/logout', {}),
 };
 
 export default authApi;

@@ -96,6 +96,12 @@ func NewMewClient(apiBase, adminSecret string) (*MewClient, error) {
 	return client.NewClient(apiBase, adminSecret)
 }
 
+type BotSession = client.BotSession
+
+func NewBotSession(apiBase, accessToken string, httpClient *http.Client) *BotSession {
+	return client.NewBotSession(apiBase, accessToken, httpClient)
+}
+
 // ---- bot manager ----
 
 type Runner = engine.Runner
@@ -272,6 +278,10 @@ func NewMewUserHTTPClient() (*http.Client, error) { return client.NewUserHTTPCli
 
 func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken string) (User, string, error) {
 	return client.LoginBot(ctx, httpClient, apiBase, accessToken)
+}
+
+func Refresh(ctx context.Context, httpClient *http.Client, apiBase string) (User, string, error) {
+	return client.Refresh(ctx, httpClient, apiBase)
 }
 
 func FetchDMChannels(ctx context.Context, httpClient *http.Client, apiBase, userToken string) (map[string]struct{}, error) {

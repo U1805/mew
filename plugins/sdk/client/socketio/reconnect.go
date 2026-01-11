@@ -2,6 +2,7 @@ package socketio
 
 import (
 	"context"
+	"errors"
 	"time"
 )
 
@@ -11,9 +12,47 @@ type ReconnectOptions struct {
 	OnDisconnect   func(err error, nextBackoff time.Duration)
 }
 
+type Session interface {
+	Token(ctx context.Context) (string, error)
+}
+
 func RunGatewayWithReconnect(
 	ctx context.Context,
 	wsURL, token string,
+	handler EventHandler,
+	gatewayOpts GatewayOptions,
+	reconnectOpts ReconnectOptions,
+) error {
+	return RunGatewayWithReconnectTokenProvider(
+		ctx,
+		wsURL,
+		func(ctx context.Context) (string, error) { return token, nil },
+		handler,
+		gatewayOpts,
+		reconnectOpts,
+	)
+}
+
+func RunGatewayWithReconnectSession(
+	ctx context.Context,
+	wsURL string,
+	session Session,
+	handler EventHandler,
+	gatewayOpts GatewayOptions,
+	reconnectOpts ReconnectOptions,
+) error {
+	if session == nil {
+		return errors.New("session is required")
+	}
+	return RunGatewayWithReconnectTokenProvider(ctx, wsURL, func(ctx context.Context) (string, error) {
+		return session.Token(ctx)
+	}, handler, gatewayOpts, reconnectOpts)
+}
+
+func RunGatewayWithReconnectTokenProvider(
+	ctx context.Context,
+	wsURL string,
+	tokenProvider func(ctx context.Context) (string, error),
 	handler EventHandler,
 	gatewayOpts GatewayOptions,
 	reconnectOpts ReconnectOptions,
@@ -33,7 +72,11 @@ func RunGatewayWithReconnect(
 			return ctx.Err()
 		}
 
-		err := RunGatewayOnce(ctx, wsURL, token, handler, gatewayOpts)
+		token, err := tokenProvider(ctx)
+		if err != nil {
+			return err
+		}
+		err = RunGatewayOnce(ctx, wsURL, token, handler, gatewayOpts)
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}

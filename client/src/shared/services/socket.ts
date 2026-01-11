@@ -45,3 +45,11 @@ export const disconnectSocket = () => {
     socket = null;
   }
 };
+
+export const updateSocketAuthToken = (token: string) => {
+  if (!socket) return;
+  socket.auth = { token };
+  // Auth is only used during handshake; reconnect to apply.
+  socket.disconnect();
+  socket.connect();
+};

@@ -52,7 +52,7 @@ export const AuthScreen = () => {
     const shouldRemember = isLogin ? rememberMe : true;
     try {
       if (isLogin) {
-        const res = await authApi.login({ email, password });
+        const res = await authApi.login({ email, password, rememberMe: rememberMe });
         const token = res.data.token as string;
         const user = res.data.user ?? null;
         setAuth(token, user, shouldRemember);

@@ -14,11 +14,41 @@ const parsePort = (raw: string | undefined, fallback: number): number => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-const parseJwtExpiresIn = (raw: string | undefined): NonNullable<SignOptions['expiresIn']> => {
-  if (!raw) return 86400;
+const parseJwtExpiresIn = (raw: string | undefined, fallbackSeconds: number): NonNullable<SignOptions['expiresIn']> => {
+  if (!raw) return fallbackSeconds;
   const trimmed = raw.trim();
   if (/^\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10);
   return trimmed as NonNullable<SignOptions['expiresIn']>;
+};
+
+const parseDurationSeconds = (raw: string | undefined, fallbackSeconds: number): number => {
+  if (!raw) return fallbackSeconds;
+  const trimmed = raw.trim();
+  if (trimmed === '') return fallbackSeconds;
+
+  if (/^\d+$/.test(trimmed)) {
+    const n = Number.parseInt(trimmed, 10);
+    return Number.isFinite(n) ? n : fallbackSeconds;
+  }
+
+  const m = trimmed.match(/^(\d+)\s*([smhdw])$/i);
+  if (!m) return fallbackSeconds;
+
+  const n = Number.parseInt(m[1], 10);
+  const unit = m[2].toLowerCase();
+  const mult =
+    unit === 's'
+      ? 1
+      : unit === 'm'
+        ? 60
+        : unit === 'h'
+          ? 60 * 60
+          : unit === 'd'
+            ? 60 * 60 * 24
+            : unit === 'w'
+              ? 60 * 60 * 24 * 7
+              : 1;
+  return Number.isFinite(n) ? n * mult : fallbackSeconds;
 };
 
 const parseBoolean = (raw: string | undefined, fallback: boolean): boolean => {
@@ -77,7 +107,10 @@ export const createConfig = (env: ConfigEnv = process.env, deps?: { fs?: typeof 
     port: parsePort(env.PORT, 3000),
     staticUrl: (env.MEW_STATIC_URL || '').trim(),
     jwtSecret: env.JWT_SECRET || (isProduction ? '' : 'dev-jwt-secret'),
-    jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN),
+    // Access token expiry. Default: 30 minutes.
+    jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN, 60 * 30),
+    // Refresh token expiry (in seconds). Default: 30 days.
+    refreshTokenExpiresSeconds: parseDurationSeconds(env.REFRESH_TOKEN_EXPIRES_IN, 60 * 60 * 24 * 30),
     allowUserRegistration: parseBoolean(env.MEW_ALLOW_USER_REGISTRATION, true),
     adminSecret: env.MEW_ADMIN_SECRET || '',
     trustProxy: parseTrustProxy(env.MEW_TRUST_PROXY || env.TRUST_PROXY),

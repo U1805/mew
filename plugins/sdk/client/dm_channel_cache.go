@@ -43,3 +43,27 @@ func (c *DMChannelCache) Refresh(ctx context.Context, httpClient *http.Client, a
 	c.mu.Unlock()
 	return nil
 }
+
+func (c *DMChannelCache) RefreshWithBotSession(ctx context.Context, session *BotSession) error {
+	if c == nil {
+		return nil
+	}
+	if session == nil {
+		return nil
+	}
+
+	httpClient := session.HTTPClient()
+	if httpClient == nil {
+		return nil
+	}
+
+	dm, err := FetchDMChannels(ctx, httpClient, session.apiBase, "")
+	if err != nil {
+		return err
+	}
+
+	c.mu.Lock()
+	c.channels = dm
+	c.mu.Unlock()
+	return nil
+}
