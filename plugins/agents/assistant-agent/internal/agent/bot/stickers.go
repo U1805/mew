@@ -9,25 +9,25 @@ import (
 	"time"
 
 	"mew/plugins/assistant-agent/internal/config"
-	"mew/plugins/sdk/client"
+	apistickers "mew/plugins/sdk/api/stickers"
 )
 
 type stickerCache struct {
 	FetchedAt time.Time
-	Stickers  []client.Sticker
+	Stickers  []apistickers.Sticker
 }
 
-func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) ([]client.Sticker, error) {
+func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) ([]apistickers.Sticker, error) {
 	now := time.Now()
 	r.stickersMu.RLock()
 	if !r.stickersCache.FetchedAt.IsZero() && now.Sub(r.stickersCache.FetchedAt) < config.StickerCacheTTL {
-		out := append([]client.Sticker(nil), r.stickersCache.Stickers...)
+		out := append([]apistickers.Sticker(nil), r.stickersCache.Stickers...)
 		r.stickersMu.RUnlock()
 		return out, nil
 	}
 	r.stickersMu.RUnlock()
 
-	stickers, err := client.ListMyStickers(ctx, r.session.HTTPClient(), r.apiBase, "")
+	stickers, err := apistickers.ListMyStickers(ctx, r.session.HTTPClient(), r.apiBase, "")
 	if err != nil {
 		log.Printf("%s sticker list fetch failed: err=%v", logPrefix, err)
 		return nil, err
@@ -36,7 +36,7 @@ func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) (
 	r.stickersMu.Lock()
 	r.stickersCache = stickerCache{
 		FetchedAt: now,
-		Stickers:  append([]client.Sticker(nil), stickers...),
+		Stickers:  append([]apistickers.Sticker(nil), stickers...),
 	}
 	r.stickersMu.Unlock()
 

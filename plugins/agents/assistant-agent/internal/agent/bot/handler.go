@@ -18,8 +18,9 @@ import (
 	"mew/plugins/assistant-agent/internal/agent/store"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/client"
-	"mew/plugins/sdk/client/socketio"
+	sdkapi "mew/plugins/sdk/api"
+	"mew/plugins/sdk/api/attachment"
+	"mew/plugins/sdk/api/gateway/socketio"
 )
 
 func (r *Runner) handleMessageCreate(
@@ -28,7 +29,7 @@ func (r *Runner) handleMessageCreate(
 	payload json.RawMessage,
 	emit socketio.EmitFunc,
 ) error {
-	var msg client.ChannelMessage
+	var msg sdkapi.ChannelMessage
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return err
 	}
@@ -141,7 +142,7 @@ func sleepWithContext(ctx context.Context, d time.Duration) {
 func (r *Runner) processDMMessage(
 	ctx context.Context,
 	logPrefix string,
-	socketMsg client.ChannelMessage,
+	socketMsg sdkapi.ChannelMessage,
 	emit socketio.EmitFunc,
 ) error {
 	userID := socketMsg.AuthorID()
@@ -321,7 +322,7 @@ func (r *Runner) buildPrompt(
 	meta store.Metadata,
 	facts store.FactsFile,
 	summaries store.SummariesFile,
-	sessionMsgs []client.ChannelMessage,
+	sessionMsgs []sdkapi.ChannelMessage,
 	logPrefix string,
 ) (l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) {
 	stickerNames := strings.TrimSpace(r.stickerPromptAddon(ctx, logPrefix))
@@ -341,9 +342,9 @@ func (r *Runner) buildPrompt(
 		MaxTotalImageBytes:    config.DefaultMaxTotalImageBytes,
 		KeepEmptyWhenNoImages: true,
 		Location:              r.timeLoc,
-		Download: func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error) {
+		Download: func(ctx context.Context, att sdkapi.AttachmentRef, limit int64) ([]byte, error) {
 			httpClient := r.session.HTTPClient()
-			return client.DownloadAttachmentBytes(ctx, httpClient, httpClient, r.apiBase, "", att, limit)
+			return attachment.DownloadAttachmentBytes(ctx, httpClient, httpClient, r.apiBase, "", att, limit)
 		},
 	})
 	if err != nil {
@@ -589,7 +590,7 @@ func (r *Runner) postStickerHTTP(ctx context.Context, channelID, stickerID strin
 func (r *Runner) maybeOnDemandRemember(
 	ctx context.Context,
 	userContent string,
-	sessionMsgs []client.ChannelMessage,
+	sessionMsgs []sdkapi.ChannelMessage,
 	facts store.FactsFile,
 	paths store.UserStatePaths,
 	userID, channelID string,

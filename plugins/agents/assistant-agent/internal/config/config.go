@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"mew/plugins/sdk/util/llm"
+	"mew/plugins/sdk/x/llm"
 )
 
 type ChatModelConfig struct {

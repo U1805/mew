@@ -9,7 +9,8 @@ import (
 	openaigo "github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 
-	"mew/plugins/sdk/client"
+	sdkapi "mew/plugins/sdk/api"
+	"mew/plugins/sdk/api/attachment"
 )
 
 const (
@@ -85,9 +86,9 @@ func (r *JpdictRunner) queryLLM(ctx context.Context, text string, attachments []
 	userMsg, err := buildUserMessageParam(ctx, strings.TrimSpace(text), attachments, buildUserContentOptions{
 		DefaultTextPrompt:  jpdictDefaultTextPrompt,
 		DefaultImagePrompt: jpdictDefaultImagePrompt,
-		Download: func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error) {
+		Download: func(ctx context.Context, att sdkapi.AttachmentRef, limit int64) ([]byte, error) {
 			// Use SDK-managed auth (refresh/login) via the MEW HTTP client's cookie jar + auth transport.
-			return client.DownloadAttachmentBytes(ctx, r.session.HTTPClient(), r.llmHTTPClient, r.apiBase, "", att, limit)
+			return attachment.DownloadAttachmentBytes(ctx, r.session.HTTPClient(), r.llmHTTPClient, r.apiBase, "", att, limit)
 		},
 	})
 	if err != nil {

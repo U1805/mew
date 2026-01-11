@@ -12,7 +12,7 @@ import (
 	"mew/plugins/assistant-agent/internal/agent/store"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/util/llm"
+	"mew/plugins/sdk/x/llm"
 )
 
 func (r *Runner) proactiveDecideAndCompose(

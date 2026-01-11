@@ -9,7 +9,7 @@ import (
 	"mew/plugins/sdk"
 	"mew/plugins/twitter-fetcher/internal/config"
 	"mew/plugins/twitter-fetcher/internal/source"
-	"mew/plugins/sdk/util/proxy"
+	"mew/plugins/sdk/x/httpx"
 )
 
 type Runner struct {
@@ -38,7 +38,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	twitterClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 		Timeout:   25 * time.Second,
 		CookieJar: true,
-		Transport: proxy.NewTransport(nil),
+		Transport: httpx.NewTransport(nil),
 	})
 	if err != nil {
 		return err
@@ -49,7 +49,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 		Timeout:   45 * time.Second,
-		Transport: proxy.NewTransport(nil),
+		Transport: httpx.NewTransport(nil),
 	})
 	if err != nil {
 		return err

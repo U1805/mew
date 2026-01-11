@@ -13,7 +13,7 @@ import (
 
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/assistant-agent/internal/agent/store"
-	"mew/plugins/sdk/util/llm"
+	"mew/plugins/sdk/x/llm"
 )
 
 type FactEngineResult struct {

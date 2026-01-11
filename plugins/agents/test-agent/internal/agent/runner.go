@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/client/socketio"
+	"mew/plugins/sdk/api/gateway/socketio"
 )
 
 type TestAgentRunner struct {

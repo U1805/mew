@@ -17,12 +17,16 @@
 ## 包结构
 
 - `mew/plugins/sdk`：门面（对外稳定 API）
-- `mew/plugins/sdk/engine`：运行时引擎（dotenv/config/service 主循环/BotManager）
-- `mew/plugins/sdk/client`：后端 API client（含 message/session 辅助）
-- `mew/plugins/sdk/client/socketio`：socket.io gateway client
-- `mew/plugins/sdk/client/webhook`：webhook post + 文件上传（S3 存储）
-- `mew/plugins/sdk/store`：本地 state 文件路径 + JSON 读写 + seen/media cache
-- `mew/plugins/sdk/util`：通用工具（以及 `util/devmode`、`util/html`、`util/httpclient`、`util/time`）
+- `mew/plugins/sdk/api`：通信层（通用 types + 错误定义）
+- `mew/plugins/sdk/api/client`：后端 REST client（Admin bootstrap / service-type register）
+- `mew/plugins/sdk/api/auth`：登录 / refresh / 自动带 Token 的 RoundTripper
+- `mew/plugins/sdk/api/messages`：消息相关 API
+- `mew/plugins/sdk/api/gateway`：长连接相关（infra presence）
+- `mew/plugins/sdk/api/gateway/socketio`：socket.io gateway client
+- `mew/plugins/sdk/api/webhook`：webhook post + 文件上传（S3 存储）
+- `mew/plugins/sdk/runtime`：运行层（dotenv/config/service 主循环/BotManager/session/cache）
+- `mew/plugins/sdk/state`：持久层（本地 state 文件路径 + JSON 读写 + seen/media cache）
+- `mew/plugins/sdk/x`：扩展层（`httpx`/`llm`/`devmode`/`htmlutil`/`timeutil`/`callerx`/`misc`/`ptr`/`syncx` 等）
 
 
 ## Runner 接口

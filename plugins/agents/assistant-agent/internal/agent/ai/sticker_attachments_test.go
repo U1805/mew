@@ -13,13 +13,13 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/sdk/client"
+	sdkapi "mew/plugins/sdk/api"
 )
 
 func TestBuildL5MessagesWithAttachments_IncludesStickerAsImage(t *testing.T) {
 	ctx := context.Background()
 
-	msgs := []client.ChannelMessage{
+	msgs := []sdkapi.ChannelMessage{
 		{
 			ID:        "m1",
 			ChannelID: "c1",
@@ -35,7 +35,7 @@ func TestBuildL5MessagesWithAttachments_IncludesStickerAsImage(t *testing.T) {
 		KeepEmptyWhenNoImages: true,
 		MaxImageBytes:         1024,
 		MaxTotalImageBytes:    1024,
-		Download: func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error) {
+		Download: func(ctx context.Context, att sdkapi.AttachmentRef, limit int64) ([]byte, error) {
 			if att.URL != "http://cdn.local/sticker.png" {
 				t.Fatalf("unexpected download url: %q", att.URL)
 			}

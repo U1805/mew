@@ -16,8 +16,8 @@ import (
 	"mew/plugins/assistant-agent/internal/agent/store"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/client"
-	"mew/plugins/sdk/client/socketio"
+	"mew/plugins/sdk/api/gateway/socketio"
+	"mew/plugins/sdk/api/history"
 )
 
 type Runner struct {
@@ -41,7 +41,7 @@ type Runner struct {
 
 	dmChannels *sdk.DMChannelCache
 	store      *store.Store
-	fetcher    *client.Fetcher
+	fetcher    *history.Fetcher
 
 	userMu   sync.Mutex
 	userLock map[string]*sync.Mutex
@@ -109,7 +109,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		persona:       persona,
 		dmChannels:    sdk.NewDMChannelCache(),
 		store:         store.NewStore(serviceType, botID),
-		fetcher: &client.Fetcher{
+		fetcher: &history.Fetcher{
 			HTTPClient:         mewHTTPClient,
 			APIBase:            strings.TrimRight(cfg.APIBase, "/"),
 			UserToken:          "",

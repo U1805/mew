@@ -13,8 +13,8 @@ import (
 	"mew/plugins/assistant-agent/internal/agent/store"
 	"mew/plugins/assistant-agent/prompt"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/client"
-	"mew/plugins/sdk/util/llm"
+	sdkapi "mew/plugins/sdk/api"
+	"mew/plugins/sdk/x/llm"
 )
 
 func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
@@ -94,7 +94,7 @@ func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, fact
 	return strings.TrimSpace(b.String())
 }
 
-func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string, loc *time.Location) []openaigo.ChatCompletionMessageParamUnion {
+func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc *time.Location) []openaigo.ChatCompletionMessageParamUnion {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
 	for _, m := range sessionMsgs {
 		content := strings.TrimSpace(m.ContextText())
@@ -120,7 +120,7 @@ func BuildL5Messages(sessionMsgs []client.ChannelMessage, botUserID string, loc 
 	return out
 }
 
-func FormatSessionRecordForContext(msgs []client.ChannelMessage) string {
+func FormatSessionRecordForContext(msgs []sdkapi.ChannelMessage) string {
 	if len(msgs) == 0 {
 		return "(empty)"
 	}
@@ -153,7 +153,7 @@ type UserContentPartsOptions struct {
 	Location              *time.Location
 }
 
-func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.ChannelMessage, botUserID string, opts UserContentPartsOptions) ([]openaigo.ChatCompletionMessageParamUnion, error) {
+func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []sdkapi.ChannelMessage, botUserID string, opts UserContentPartsOptions) ([]openaigo.ChatCompletionMessageParamUnion, error) {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
 	for _, m := range sessionMsgs {
 		role := "user"
@@ -162,7 +162,7 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []client.Ch
 		}
 
 		if role == "user" {
-			attachments := make([]client.AttachmentRef, 0, len(m.Attachments)+1)
+			attachments := make([]sdkapi.AttachmentRef, 0, len(m.Attachments)+1)
 			attachments = append(attachments, m.Attachments...)
 			attachments = append(attachments, llm.StickerAttachmentsFromPayload(m.ChannelID, m.Payload)...)
 
