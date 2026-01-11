@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"mew/plugins/sdk/x/llm"
 )
 
 type ChatModelConfig struct {
@@ -33,6 +35,17 @@ type AssistantConfig struct {
 	ChatModel ChatModelConfig `json:"chat_model"`
 	User      UserConfig      `json:"user"`
 	Tool      ToolConfig      `json:"tool"`
+}
+
+func (c AssistantConfig) OpenAIChatConfig() (llm.OpenAIChatConfig, error) {
+	if strings.TrimSpace(c.ChatModel.APIKey) == "" {
+		return llm.OpenAIChatConfig{}, fmt.Errorf("assistant-agent config incomplete: chat_model.api_key is required")
+	}
+	return llm.OpenAIChatConfig{
+		BaseURL: strings.TrimSpace(c.ChatModel.BaseURL),
+		APIKey:  strings.TrimSpace(c.ChatModel.APIKey),
+		Model:   strings.TrimSpace(c.ChatModel.Model),
+	}, nil
 }
 
 func ParseAssistantConfig(raw string) (AssistantConfig, error) {

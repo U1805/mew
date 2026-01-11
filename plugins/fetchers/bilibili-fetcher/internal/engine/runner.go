@@ -9,7 +9,7 @@ import (
 	"mew/plugins/bilibili-fetcher/internal/config"
 	"mew/plugins/bilibili-fetcher/internal/source"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/util/proxy"
+	"mew/plugins/sdk/x/httpx"
 )
 
 type Runner struct {
@@ -35,7 +35,7 @@ func NewRunner(botID, botName, accessToken string, cfg sdk.RuntimeConfig, tasks 
 func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
-	biliHTTP, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 20 * time.Second, Transport: proxy.NewTransport(nil)})
+	biliHTTP, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 20 * time.Second, Transport: httpx.NewTransport(nil)})
 	if err != nil {
 		return err
 	}

@@ -12,8 +12,9 @@ import (
 
 	"mew/plugins/jpdict-agent/internal/config"
 	"mew/plugins/sdk"
-	"mew/plugins/sdk/client"
-	"mew/plugins/sdk/client/socketio"
+	sdkapi "mew/plugins/sdk/api"
+	"mew/plugins/sdk/api/gateway/socketio"
+	"mew/plugins/sdk/api/messages"
 )
 
 type JpdictRunner struct {
@@ -113,15 +114,12 @@ func (r *JpdictRunner) Run(ctx context.Context) error {
 			return nil
 		}
 
-		var msg socketMessage
-		if err := json.Unmarshal(payload, &msg); err != nil {
-			return err
-		}
-		for i := range msg.Attachments {
-			msg.Attachments[i].ChannelID = msg.ChannelID
+		msg, ok := messages.ParseChannelMessage(payload)
+		if !ok {
+			return nil
 		}
 
-		if r.isOwnMessage(msg.AuthorID) {
+		if msg.AuthorID() == r.botUserID {
 			return nil
 		}
 
@@ -152,7 +150,7 @@ func (r *JpdictRunner) Run(ctx context.Context) error {
 	})
 }
 
-func (r *JpdictRunner) maybeHandleMessage(ctx context.Context, msg socketMessage) (out outboundMessage, ok bool, err error) {
+func (r *JpdictRunner) maybeHandleMessage(ctx context.Context, msg sdkapi.ChannelMessage) (out outboundMessage, ok bool, err error) {
 	trimmed := strings.TrimSpace(msg.Content)
 	attachments := msg.Attachments
 
@@ -171,22 +169,6 @@ func (r *JpdictRunner) maybeHandleMessage(ctx context.Context, msg socketMessage
 		}
 	}
 	return r.handleQuery(ctx, trimmed, attachments)
-}
-
-// ---- MEW / gateway helpers (mostly copied from test-agent) ----
-
-type socketMessage struct {
-	ChannelID    string             `json:"channelId"`
-	Content      string             `json:"content"`
-	Attachments  []socketAttachment `json:"attachments"`
-	AuthorID     json.RawMessage    `json:"authorId"`
-	ReferencedID string             `json:"referencedMessageId,omitempty"`
-}
-
-type socketAttachment = client.AttachmentRef
-
-func (r *JpdictRunner) isOwnMessage(authorRaw json.RawMessage) bool {
-	return sdk.IsOwnMessage(authorRaw, r.botUserID)
 }
 
 func (r *JpdictRunner) isDMChannel(channelID string) bool {

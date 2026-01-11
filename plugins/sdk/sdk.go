@@ -9,42 +9,48 @@ import (
 	"strings"
 	"time"
 
-	"mew/plugins/sdk/client"
-	"mew/plugins/sdk/client/webhook"
-	"mew/plugins/sdk/engine"
-	"mew/plugins/sdk/store"
-	"mew/plugins/sdk/util"
-	"mew/plugins/sdk/util/devmode"
-	"mew/plugins/sdk/util/html"
-	"mew/plugins/sdk/util/httpclient"
-	timeutil "mew/plugins/sdk/util/time"
+	sdkapi "mew/plugins/sdk/api"
+	"mew/plugins/sdk/api/auth"
+	"mew/plugins/sdk/api/channels"
+	apiclient "mew/plugins/sdk/api/client"
+	"mew/plugins/sdk/api/messages"
+	"mew/plugins/sdk/api/webhook"
+	"mew/plugins/sdk/runtime"
+	"mew/plugins/sdk/state"
+	"mew/plugins/sdk/x/devmode"
+	"mew/plugins/sdk/x/htmlutil"
+	"mew/plugins/sdk/x/httpx"
+	"mew/plugins/sdk/x/misc"
+	"mew/plugins/sdk/x/ptr"
+	"mew/plugins/sdk/x/syncx"
+	timeutil "mew/plugins/sdk/x/timeutil"
 )
 
 // ---- dotenv / config ----
 
-type RuntimeConfig = engine.RuntimeConfig
+type RuntimeConfig = runtime.RuntimeConfig
 
-func ServiceTypeFromCaller() string { return engine.ServiceTypeFromCaller() }
+func ServiceTypeFromCaller() string { return runtime.ServiceTypeFromCaller() }
 
 func ServiceTypeFromCallerSkip(callerSkip int) string {
-	return engine.ServiceTypeFromCallerSkip(callerSkip)
+	return runtime.ServiceTypeFromCallerSkip(callerSkip)
 }
 
 func MewURLFromEnvOrAPIBase(apiBase, fallback string) string {
-	return engine.MewURLFromEnvOrAPIBase(apiBase, fallback)
+	return runtime.MewURLFromEnvOrAPIBase(apiBase, fallback)
 }
 
 func LoadRuntimeConfig(serviceType string) (RuntimeConfig, error) {
-	return engine.LoadRuntimeConfig(serviceType)
+	return runtime.LoadRuntimeConfig(serviceType)
 }
 
-func LoadDotEnv(logPrefix string) { engine.LoadDotEnv(logPrefix) }
+func LoadDotEnv(logPrefix string) { runtime.LoadDotEnv(logPrefix) }
 
 func LoadDotEnvFromCaller(logPrefix string, callerSkip int) {
-	engine.LoadDotEnvFromCaller(logPrefix, callerSkip)
+	runtime.LoadDotEnvFromCaller(logPrefix, callerSkip)
 }
 
-func IsDotEnvDisabled() bool { return engine.IsDotEnvDisabled() }
+func IsDotEnvDisabled() bool { return runtime.IsDotEnvDisabled() }
 
 // ---- dev mode ----
 
@@ -54,85 +60,85 @@ func DevModeDir() string { return devmode.Dir() }
 
 // ---- service runtime ----
 
-type ServiceOptions = engine.ServiceOptions
+type ServiceOptions = runtime.ServiceOptions
 
-func RunService(ctx context.Context, opts ServiceOptions) error { return engine.RunService(ctx, opts) }
+func RunService(ctx context.Context, opts ServiceOptions) error { return runtime.RunService(ctx, opts) }
 
-func RunServiceWithSignals(opts ServiceOptions) error { return engine.RunServiceWithSignals(opts) }
+func RunServiceWithSignals(opts ServiceOptions) error { return runtime.RunServiceWithSignals(opts) }
 
-var ErrInvalidRunnerFactory = engine.ErrInvalidRunnerFactory
+var ErrInvalidRunnerFactory = runtime.ErrInvalidRunnerFactory
 
 // ---- goroutine group ----
 
-type Group = util.Group
+type Group = syncx.Group
 
-func NewGroup(parent context.Context) *Group { return util.NewGroup(parent) }
+func NewGroup(parent context.Context) *Group { return syncx.NewGroup(parent) }
 
 func RunInterval(ctx context.Context, interval time.Duration, immediate bool, fn func(ctx context.Context)) {
-	util.RunInterval(ctx, interval, immediate, fn)
+	syncx.RunInterval(ctx, interval, immediate, fn)
 }
 
-func BoolOrDefault(v *bool, def bool) bool { return util.BoolOrDefault(v, def) }
-func IsEnabled(v *bool) bool               { return util.IsEnabled(v) }
+func BoolOrDefault(v *bool, def bool) bool { return ptr.BoolOrDefault(v, def) }
+func IsEnabled(v *bool) bool               { return ptr.IsEnabled(v) }
 
-func PreviewString(s string, maxRunes int) string { return util.PreviewString(s, maxRunes) }
-func CleanText(s string) string                   { return html.CleanText(s) }
+func PreviewString(s string, maxRunes int) string { return misc.PreviewString(s, maxRunes) }
+func CleanText(s string) string                   { return htmlutil.CleanText(s) }
 func FirstImageURLFromHTML(htmlStr, baseURL string) string {
-	return html.FirstImageURLFromHTML(htmlStr, baseURL)
+	return htmlutil.FirstImageURLFromHTML(htmlStr, baseURL)
 }
-func NormalizeMaybeURL(raw, baseURL string) string { return html.NormalizeMaybeURL(raw, baseURL) }
+func NormalizeMaybeURL(raw, baseURL string) string { return htmlutil.NormalizeMaybeURL(raw, baseURL) }
 
 func HumanizeDuration(d time.Duration) string { return timeutil.HumanizeDuration(d) }
 
-func CandidateDataFilePaths(filename string) []string { return util.CandidateDataFilePaths(filename) }
+func CandidateDataFilePaths(filename string) []string { return misc.CandidateDataFilePaths(filename) }
 
 // ---- MEW client ----
 
-type MewClient = client.Client
+type MewClient = apiclient.Client
 
-type BootstrapBot = client.BootstrapBot
+type BootstrapBot = apiclient.BootstrapBot
 
 func NewMewClient(apiBase, adminSecret string) (*MewClient, error) {
-	return client.NewClient(apiBase, adminSecret)
+	return apiclient.NewClient(apiBase, adminSecret)
 }
 
-type BotSession = client.BotSession
+type BotSession = runtime.BotSession
 
 func NewBotSession(apiBase, accessToken string, httpClient *http.Client) *BotSession {
-	return client.NewBotSession(apiBase, accessToken, httpClient)
+	return runtime.NewBotSession(apiBase, accessToken, httpClient)
 }
 
 // ---- bot manager ----
 
-type Runner = engine.Runner
+type Runner = runtime.Runner
 
-type RunnerFactory = engine.RunnerFactory
+type RunnerFactory = runtime.RunnerFactory
 
-type BotManager = engine.BotManager
+type BotManager = runtime.BotManager
 
 func NewBotManager(client *MewClient, serviceType, logPrefix string, factory RunnerFactory) *BotManager {
-	return engine.NewBotManager(client, serviceType, logPrefix, factory)
+	return runtime.NewBotManager(client, serviceType, logPrefix, factory)
 }
 
-type ServiceTypeRegistration = engine.ServiceTypeRegistration
+type ServiceTypeRegistration = runtime.ServiceTypeRegistration
 
 func NewBotManagerWithRegistration(client *MewClient, reg ServiceTypeRegistration, logPrefix string, factory RunnerFactory) *BotManager {
-	return engine.NewBotManagerWithRegistration(client, reg, logPrefix, factory)
+	return runtime.NewBotManagerWithRegistration(client, reg, logPrefix, factory)
 }
 
 // ---- config helpers ----
 
-func DecodeTasks[T any](rawConfig string) ([]T, error) { return engine.DecodeTasks[T](rawConfig) }
+func DecodeTasks[T any](rawConfig string) ([]T, error) { return runtime.DecodeTasks[T](rawConfig) }
 
-func ValidateHTTPURL(raw string) error { return engine.ValidateHTTPURL(raw) }
+func ValidateHTTPURL(raw string) error { return runtime.ValidateHTTPURL(raw) }
 
-func ConfigTemplateJSON(v any) (string, error) { return engine.TemplateJSON(v) }
+func ConfigTemplateJSON(v any) (string, error) { return runtime.TemplateJSON(v) }
 
-func TaskConfigTemplateJSON[T any]() (string, error) { return engine.TaskTemplateJSON[T]() }
+func TaskConfigTemplateJSON[T any]() (string, error) { return runtime.TaskTemplateJSON[T]() }
 
 // ---- http helpers ----
 
-type HTTPClientOptions = httpclient.ClientOptions
+type HTTPClientOptions = httpx.ClientOptions
 
 type stripUserAgentRoundTripper struct {
 	base http.RoundTripper
@@ -152,7 +158,7 @@ func (t *stripUserAgentRoundTripper) RoundTrip(req *http.Request) (*http.Respons
 }
 
 func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
-	c, err := httpclient.NewClient(opts)
+	c, err := httpx.NewClient(opts)
 	if err != nil {
 		return nil, err
 	}
@@ -166,44 +172,44 @@ func NewHTTPClient(opts HTTPClientOptions) (*http.Client, error) {
 }
 
 func ProxyFuncFromString(raw string) (func(*http.Request) (*url.URL, error), error) {
-	return httpclient.ProxyFuncFromString(raw)
+	return httpx.ProxyFuncFromString(raw)
 }
 
-func RandomBrowserUserAgent() string { return httpclient.RandomBrowserUserAgent() }
+func RandomBrowserUserAgent() string { return httpx.RandomBrowserUserAgent() }
 
 // ---- state helpers ----
 
-func StateBaseDir() string { return store.BaseDir() }
+func StateBaseDir() string { return state.BaseDir() }
 
-func BotStateDir(serviceType, botID string) string { return store.BotDir(serviceType, botID) }
+func BotStateDir(serviceType, botID string) string { return state.BotDir(serviceType, botID) }
 
 func TaskStateFile(serviceType, botID string, idx int, identity string) string {
-	return store.TaskFile(serviceType, botID, idx, identity)
+	return state.TaskFile(serviceType, botID, idx, identity)
 }
 
-func LoadJSONFile[T any](path string) (T, error) { return store.LoadJSONFile[T](path) }
+func LoadJSONFile[T any](path string) (T, error) { return state.LoadJSONFile[T](path) }
 
-func SaveJSONFile(path string, v any) error { return store.SaveJSONFile(path, v) }
+func SaveJSONFile(path string, v any) error { return state.SaveJSONFile(path, v) }
 
-func SaveJSONFileIndented(path string, v any) error { return store.SaveJSONFileIndented(path, v) }
+func SaveJSONFileIndented(path string, v any) error { return state.SaveJSONFileIndented(path, v) }
 
 type TaskStateStore[T any] struct {
 	Path string
 }
 
 func OpenTaskState[T any](serviceType, botID string, idx int, identity string) TaskStateStore[T] {
-	return TaskStateStore[T]{Path: store.TaskFile(serviceType, botID, idx, identity)}
+	return TaskStateStore[T]{Path: state.TaskFile(serviceType, botID, idx, identity)}
 }
 
-func (s TaskStateStore[T]) Load() (T, error) { return store.LoadJSONFile[T](s.Path) }
+func (s TaskStateStore[T]) Load() (T, error) { return state.LoadJSONFile[T](s.Path) }
 
-func (s TaskStateStore[T]) Save(v T) error { return store.SaveJSONFile(s.Path, v) }
+func (s TaskStateStore[T]) Save(v T) error { return state.SaveJSONFile(s.Path, v) }
 
 // ---- collections ----
 
-type SeenSet = store.SeenSet
+type SeenSet = state.SeenSet
 
-func NewSeenSet(max int) *SeenSet { return store.NewSeenSet(max) }
+func NewSeenSet(max int) *SeenSet { return state.NewSeenSet(max) }
 
 // ---- webhook ----
 
@@ -272,23 +278,23 @@ func FilenameFromURL(rawURL, fallback string) string {
 
 // ---- MEW user helpers ----
 
-type User = client.User
+	type User = sdkapi.User
 
-func NewMewUserHTTPClient() (*http.Client, error) { return client.NewUserHTTPClient() }
+func NewMewUserHTTPClient() (*http.Client, error) { return apiclient.NewUserHTTPClient() }
 
 func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken string) (User, string, error) {
-	return client.LoginBot(ctx, httpClient, apiBase, accessToken)
+	return auth.LoginBot(ctx, httpClient, apiBase, accessToken)
 }
 
 func Refresh(ctx context.Context, httpClient *http.Client, apiBase string) (User, string, error) {
-	return client.Refresh(ctx, httpClient, apiBase)
+	return auth.Refresh(ctx, httpClient, apiBase)
 }
 
 func FetchDMChannels(ctx context.Context, httpClient *http.Client, apiBase, userToken string) (map[string]struct{}, error) {
-	return client.FetchDMChannels(ctx, httpClient, apiBase, userToken)
+	return channels.FetchDMChannels(ctx, httpClient, apiBase, userToken)
 }
 
-type ChannelMessage = client.ChannelMessage
+type ChannelMessage = sdkapi.ChannelMessage
 
 func FetchChannelMessages(
 	ctx context.Context,
@@ -297,7 +303,7 @@ func FetchChannelMessages(
 	limit int,
 	before string,
 ) ([]ChannelMessage, error) {
-	return client.FetchChannelMessages(ctx, httpClient, apiBase, userToken, channelID, limit, before)
+	return messages.FetchChannelMessages(ctx, httpClient, apiBase, userToken, channelID, limit, before)
 }
 
 func SearchChannelMessages(
@@ -306,17 +312,17 @@ func SearchChannelMessages(
 	apiBase, userToken, channelID, query string,
 	limit, page int,
 ) ([]ChannelMessage, error) {
-	return client.SearchChannelMessages(ctx, httpClient, apiBase, userToken, channelID, query, limit, page)
+	return messages.SearchChannelMessages(ctx, httpClient, apiBase, userToken, channelID, query, limit, page)
 }
 
-func AuthorID(authorRaw json.RawMessage) string { return client.AuthorID(authorRaw) }
+func AuthorID(authorRaw json.RawMessage) string { return sdkapi.AuthorID(authorRaw) }
 
-func AuthorUsername(authorRaw json.RawMessage) string { return client.AuthorUsername(authorRaw) }
+func AuthorUsername(authorRaw json.RawMessage) string { return sdkapi.AuthorUsername(authorRaw) }
 
 func IsOwnMessage(authorRaw json.RawMessage, botUserID string) bool {
-	return client.IsOwnMessage(authorRaw, botUserID)
+	return sdkapi.IsOwnMessage(authorRaw, botUserID)
 }
 
-type DMChannelCache = client.DMChannelCache
+type DMChannelCache = runtime.DMChannelCache
 
-func NewDMChannelCache() *DMChannelCache { return client.NewDMChannelCache() }
+func NewDMChannelCache() *DMChannelCache { return runtime.NewDMChannelCache() }

@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
-	"github.com/openai/openai-go/v3/option"
 
-	"mew/plugins/sdk/client"
+	sdkapi "mew/plugins/sdk/api"
+	"mew/plugins/sdk/api/attachment"
+	"mew/plugins/sdk/x/llm"
 )
 
 const (
@@ -38,7 +40,7 @@ func loadJpdictSystemPrompt() (string, error) {
 	return strings.TrimSpace(s), nil
 }
 
-func (r *JpdictRunner) handleQuery(ctx context.Context, input string, attachments []socketAttachment) (outboundMessage, bool, error) {
+func (r *JpdictRunner) handleQuery(ctx context.Context, input string, attachments []sdkapi.AttachmentRef) (outboundMessage, bool, error) {
 	text := strings.TrimSpace(input)
 	if text == "" && len(attachments) == 0 {
 		return outboundMessage{
@@ -64,7 +66,7 @@ func (r *JpdictRunner) handleQuery(ctx context.Context, input string, attachment
 	}, true, nil
 }
 
-func (r *JpdictRunner) queryLLM(ctx context.Context, text string, attachments []socketAttachment) (string, error) {
+func (r *JpdictRunner) queryLLM(ctx context.Context, text string, attachments []sdkapi.AttachmentRef) (string, error) {
 	r.cfgMu.RLock()
 	cfg := r.cfg
 	r.cfgMu.RUnlock()
@@ -73,39 +75,38 @@ func (r *JpdictRunner) queryLLM(ctx context.Context, text string, attachments []
 	apiKey := strings.TrimSpace(cfg.APIKey)
 	model := strings.TrimSpace(cfg.Model)
 	if baseURL == "" {
-		baseURL = "https://api.openai.com/v1"
+		baseURL = llm.DefaultOpenAIBaseURL
 	}
 	if model == "" {
-		model = "gpt-4o-mini"
+		model = llm.DefaultOpenAIModel
 	}
 	if apiKey == "" {
 		return "", fmt.Errorf("jpdict-agent config incomplete: api_key is required")
 	}
 
-	userMsg, err := buildUserMessageParam(ctx, strings.TrimSpace(text), attachments, buildUserContentOptions{
+	userMsg, err := llm.BuildUserMessageParam(ctx, "", "", time.Time{}, strings.TrimSpace(text), attachments, llm.BuildUserContentOptions{
 		DefaultTextPrompt:  jpdictDefaultTextPrompt,
 		DefaultImagePrompt: jpdictDefaultImagePrompt,
-		Download: func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error) {
+		Download: func(ctx context.Context, att sdkapi.AttachmentRef, limit int64) ([]byte, error) {
 			// Use SDK-managed auth (refresh/login) via the MEW HTTP client's cookie jar + auth transport.
-			return client.DownloadAttachmentBytes(ctx, r.session.HTTPClient(), r.llmHTTPClient, r.apiBase, "", att, limit)
+			return attachment.DownloadAttachmentBytes(ctx, r.session.HTTPClient(), r.llmHTTPClient, r.apiBase, "", att, limit)
 		},
 	})
 	if err != nil {
 		return "", err
 	}
 
-	client := openaigo.NewClient(
-		option.WithBaseURL(baseURL),
-		option.WithAPIKey(apiKey),
-		option.WithHTTPClient(r.llmHTTPClient),
-	)
-
-	resp, err := client.Chat.Completions.New(ctx, openaigo.ChatCompletionNewParams{
-		Model: openaigo.ChatModel(model),
-		Messages: []openaigo.ChatCompletionMessageParamUnion{
-			openaigo.SystemMessage(r.systemPrompt),
-			userMsg,
-		},
+	resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, r.llmHTTPClient, llm.OpenAIChatConfig{
+		BaseURL:        baseURL,
+		APIKey:         apiKey,
+		Model:          model,
+		MaxRetries:     1, // avoid double-retry: we retry at this wrapper level
+		RequestTimeout: 75 * time.Second,
+	}, []openaigo.ChatCompletionMessageParamUnion{
+		openaigo.SystemMessage(r.systemPrompt),
+		userMsg,
+	}, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
+		LogPrefix: "[jpdict-agent]",
 	})
 	if err != nil {
 		return "", err

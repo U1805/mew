@@ -1,0 +1,137 @@
+package tools
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+
+	"mew/plugins/assistant-agent/internal/config"
+	apistickers "mew/plugins/sdk/api/stickers"
+)
+
+type stickerCache struct {
+	FetchedAt time.Time
+	Stickers  []apistickers.Sticker
+}
+
+type StickerService struct {
+	mu    sync.RWMutex
+	cache stickerCache
+}
+
+func NewStickerService() *StickerService {
+	return &StickerService{}
+}
+
+func (s *StickerService) listConfiguredStickers(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix string) ([]apistickers.Sticker, error) {
+	now := time.Now()
+	s.mu.RLock()
+	if !s.cache.FetchedAt.IsZero() && now.Sub(s.cache.FetchedAt) < config.StickerCacheTTL {
+		out := append([]apistickers.Sticker(nil), s.cache.Stickers...)
+		s.mu.RUnlock()
+		return out, nil
+	}
+	s.mu.RUnlock()
+
+	if httpClient == nil {
+		return nil, fmt.Errorf("missing http client")
+	}
+
+	stickers, err := apistickers.ListMyStickers(ctx, httpClient, apiBase, "")
+	if err != nil {
+		log.Printf("%s sticker list fetch failed: err=%v", logPrefix, err)
+		return nil, err
+	}
+
+	s.mu.Lock()
+	s.cache = stickerCache{
+		FetchedAt: now,
+		Stickers:  append([]apistickers.Sticker(nil), stickers...),
+	}
+	s.mu.Unlock()
+
+	return stickers, nil
+}
+
+func (s *StickerService) StickerPromptAddon(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix string) string {
+	stickers, err := s.listConfiguredStickers(ctx, httpClient, apiBase, logPrefix)
+	if err != nil {
+		return ""
+	}
+	if len(stickers) == 0 {
+		return "(none)"
+	}
+
+	type entry struct {
+		Name        string
+		Description string
+	}
+	entries := make([]entry, 0, len(stickers))
+	seen := map[string]struct{}{}
+	for _, s := range stickers {
+		name := strings.TrimSpace(s.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		desc := strings.TrimSpace(s.Description)
+		if desc != "" {
+			desc = strings.Join(strings.Fields(desc), " ")
+		}
+		entries = append(entries, entry{Name: name, Description: desc})
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	if len(entries) == 0 {
+		return "(none)"
+	}
+
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("stickers[%d]{id,sticker_name,description}\n", len(entries)))
+	for i, e := range entries {
+		b.WriteString("  ")
+		b.WriteString(fmt.Sprintf("%d,", i))
+		b.WriteString(e.Name)
+		b.WriteString(",")
+		if e.Description != "" {
+			b.WriteString(e.Description)
+		}
+		b.WriteString("\n")
+	}
+	return strings.TrimSpace(b.String())
+}
+
+func (s *StickerService) ResolveStickerIDByName(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix, name string) (string, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return "", nil
+	}
+	stickers, err := s.listConfiguredStickers(ctx, httpClient, apiBase, logPrefix)
+	if err != nil {
+		return "", err
+	}
+
+	// Case-insensitive exact match first.
+	target := strings.ToLower(name)
+	for _, s := range stickers {
+		if strings.ToLower(strings.TrimSpace(s.Name)) == target && strings.TrimSpace(s.ID) != "" {
+			return strings.TrimSpace(s.ID), nil
+		}
+	}
+
+	// Fallback: substring match (first hit).
+	for _, s := range stickers {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(s.Name)), target) && strings.TrimSpace(s.ID) != "" {
+			return strings.TrimSpace(s.ID), nil
+		}
+	}
+
+	return "", nil
+}
