@@ -28,6 +28,7 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
 
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const suppressNextClickRef = useRef(false);
+  const suppressNextImageClickAfterAltMouseDownRef = useRef(false);
   const minSwipeDistance = 50;
 
   const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
@@ -117,10 +118,34 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
 
   const handleMouseUp = () => setIsDragging(false);
 
+  // Some browsers/OS combos can swallow Alt+Click (e.g., when Alt triggers menu focus),
+  // so handle zoom-out on mouse down as a more reliable fallback.
+  const handleImageMouseDown = (e: MouseEvent) => {
+    if (e.button !== 0) return;
+    if (isSpacePressed) return;
+
+    const altPressed = e.altKey || isAltPressed;
+    if (!altPressed) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    suppressNextImageClickAfterAltMouseDownRef.current = true;
+    setTimeout(() => {
+      suppressNextImageClickAfterAltMouseDownRef.current = false;
+    }, 0);
+
+    setScale(s => Math.max(s / 1.5, 0.5));
+  };
+
   const handleClick = (e: MouseEvent) => {
     e.stopPropagation();
     if (suppressNextClickRef.current) {
       suppressNextClickRef.current = false;
+      return;
+    }
+    if (suppressNextImageClickAfterAltMouseDownRef.current) {
+      suppressNextImageClickAfterAltMouseDownRef.current = false;
       return;
     }
     if (isSpacePressed) return;
@@ -251,6 +276,7 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
           ref={imageRef}
           src={src}
           alt="Preview"
+          onMouseDown={handleImageMouseDown}
           onClick={handleClick}
           onLoad={(e) => {
             const img = e.currentTarget;
