@@ -36,6 +36,7 @@ Fetcher 类插件（`plugins/fetchers/*`）的外网请求默认会使用内置 
 - `proxy_list_urls`：代理列表来源（支持逗号/空格/换行分隔多个 URL）；默认：
   - `https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt`
   - 设为空字符串可禁用代理池（直接直连）。
+- `proxy_list_cache_ttl`：代理列表本地缓存 TTL（默认 `5m`；设为 `0` 可禁用缓存）。
 
 ## `.env.local` / `.env` 加载规则
 
