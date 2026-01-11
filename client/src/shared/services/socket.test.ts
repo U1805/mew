@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-let token: string | null = null;
 const on = vi.fn();
 const disconnect = vi.fn();
 const io = vi.fn(() => ({ on, disconnect }));
@@ -9,15 +8,10 @@ vi.mock('socket.io-client', () => ({
   io: (...args: any[]) => (io as any)(...args),
 }));
 
-vi.mock('../stores', () => ({
-  useAuthStore: {
-    getState: () => ({ token }),
-  },
-}));
-
 describe('shared/services/socket', () => {
   beforeEach(() => {
-    token = null;
+    localStorage.removeItem('mew_token');
+    sessionStorage.removeItem('mew_token');
     io.mockClear();
     on.mockClear();
     disconnect.mockClear();
@@ -31,7 +25,7 @@ describe('shared/services/socket', () => {
   });
 
   it('creates a singleton socket when token exists', async () => {
-    token = 'abc';
+    localStorage.setItem('mew_token', 'abc');
     const { getSocket, disconnectSocket } = await import('./socket');
 
     const s1 = getSocket();

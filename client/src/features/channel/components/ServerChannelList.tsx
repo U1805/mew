@@ -7,7 +7,7 @@ import { useUIStore, useModalStore } from '../../../shared/stores';
 import { Channel, ChannelType } from '../../../shared/types';
 import { useServerEvents } from '../../../shared/hooks/useServerEvents';
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
-import { useServer } from '../../servers/hooks/useServer';
+import { useServer } from '../../server/hooks/useServer';
 import { useCategories } from '../hooks/useCategories';
 import { useServerChannels } from '../hooks/useServerChannels';
 

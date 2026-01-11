@@ -1,80 +1,79 @@
+import { Suspense, lazy, type ReactNode } from 'react';
+import { ConfirmModal } from '../../shared/components/ConfirmModal';
 import { useModalStore } from '../../shared/stores';
-import { CreateInviteModal } from '../../features/servers/modals/CreateInviteModal';
-import { JoinServerModal } from '../../features/servers/modals/JoinServerModal';
-import { ServerSettingsModal } from '../../features/servers/modals/ServerSettingsModal';
-import { ServerNotificationSettingsModal } from '../../features/servers/modals/ServerNotificationSettingsModal';
-import { ChannelSettingsModal } from '../../features/channels/modals/ChannelSettingsModal';
-import { ChannelNotificationSettingsModal } from '../../features/channels/modals/ChannelNotificationSettingsModal';
-import { EditCategoryModal } from '../../features/channels/modals/EditCategoryModal';
-import { FindUserModal } from '../../features/users/modals/FindUserModal';
-import { UserProfileModal } from '../../features/users/modals/UserProfileModal';
-import { KickUserModal } from '../../features/servers/modals/KickUserModal';
-import { AddPermissionOverrideModal } from '../../features/channels/modals/AddPermissionOverrideModal';
-import { CreateServerModal } from '../../features/servers/modals/CreateServerModal';
-import { CreateCategoryModal } from '../../features/channels/modals/CreateCategoryModal';
-import { CreateChannelModal } from '../../features/channels/modals/CreateChannelModal';
-import { DeleteChannelModal } from '../../features/channels/modals/DeleteChannelModal';
-import { DeleteMessageModal } from '../../features/chat-messages/modals/DeleteMessageModal';
-import { ForwardMessageModal } from '../../features/chat-messages/modals/ForwardMessageModal';
-import { DeleteCategoryModal } from '../../features/channels/modals/DeleteCategoryModal';
-import { DeleteServerModal } from '../../features/servers/modals/DeleteServerModal';
-import { LeaveServerModal } from '../../features/servers/modals/LeaveServerModal';
-import { BotEditorModal } from '../../features/users/modals/BotEditorModal';
-import { InviteBotModal } from '../../features/servers/modals/InviteBotModal';
+import type { ModalType } from '../../shared/stores/modalStore';
+
+const modals = {
+  createServer: lazy(() => import('../../features/server/modals/CreateServerModal').then(m => ({ default: m.CreateServerModal }))),
+  createCategory: lazy(() => import('../../features/channel/modals/CreateCategoryModal').then(m => ({ default: m.CreateCategoryModal }))),
+  createChannel: lazy(() => import('../../features/channel/modals/CreateChannelModal').then(m => ({ default: m.CreateChannelModal }))),
+  deleteChannel: lazy(() => import('../../features/channel/modals/DeleteChannelModal').then(m => ({ default: m.DeleteChannelModal }))),
+  deleteMessage: lazy(() => import('../../features/chat-messages/modals/DeleteMessageModal').then(m => ({ default: m.DeleteMessageModal }))),
+  forwardMessage: lazy(() => import('../../features/chat-messages/modals/ForwardMessageModal').then(m => ({ default: m.ForwardMessageModal }))),
+  deleteCategory: lazy(() => import('../../features/channel/modals/DeleteCategoryModal').then(m => ({ default: m.DeleteCategoryModal }))),
+  deleteServer: lazy(() => import('../../features/server/modals/DeleteServerModal').then(m => ({ default: m.DeleteServerModal }))),
+  leaveServer: lazy(() => import('../../features/server/modals/LeaveServerModal').then(m => ({ default: m.LeaveServerModal }))),
+  createInvite: lazy(() => import('../../features/server/modals/CreateInviteModal').then(m => ({ default: m.CreateInviteModal }))),
+  inviteBot: lazy(() => import('../../features/server/modals/InviteBotModal').then(m => ({ default: m.InviteBotModal }))),
+  joinServer: lazy(() => import('../../features/server/modals/JoinServerModal').then(m => ({ default: m.JoinServerModal }))),
+  serverSettings: lazy(() => import('../../features/server/modals/ServerSettingsModal').then(m => ({ default: m.ServerSettingsModal }))),
+  serverNotifications: lazy(() => import('../../features/server/modals/ServerNotificationSettingsModal').then(m => ({ default: m.ServerNotificationSettingsModal }))),
+  channelSettings: lazy(() => import('../../features/channel/modals/ChannelSettingsModal').then(m => ({ default: m.ChannelSettingsModal }))),
+  channelNotifications: lazy(() => import('../../features/channel/modals/ChannelNotificationSettingsModal').then(m => ({ default: m.ChannelNotificationSettingsModal }))),
+  editCategory: lazy(() => import('../../features/channel/modals/EditCategoryModal').then(m => ({ default: m.EditCategoryModal }))),
+  findUser: lazy(() => import('../../features/users/modals/FindUserModal').then(m => ({ default: m.FindUserModal }))),
+  userProfile: lazy(() => import('../../features/users/modals/UserProfileModal').then(m => ({ default: m.UserProfileModal }))),
+  kickUser: lazy(() => import('../../features/server/modals/KickUserModal').then(m => ({ default: m.KickUserModal }))),
+  addPermissionOverride: lazy(() => import('../../features/channel/modals/AddPermissionOverrideModal').then(m => ({ default: m.AddPermissionOverrideModal }))),
+  manageBot: lazy(() => import('../../features/users/modals/BotEditorModal').then(m => ({ default: m.BotEditorModal }))),
+} satisfies Record<Exclude<ModalType, 'confirm'>, ReturnType<typeof lazy>>;
 
 const ModalManager = () => {
-  const { activeModal } = useModalStore();
+  const { activeModal, modalData, closeModal } = useModalStore();
 
   if (!activeModal) return null;
 
-  switch (activeModal) {
-    case 'createServer':
-      return <CreateServerModal />;
-    case 'createCategory':
-      return <CreateCategoryModal />;
-    case 'createChannel':
-      return <CreateChannelModal />;
-    case 'deleteChannel':
-      return <DeleteChannelModal />;
-    case 'deleteMessage':
-      return <DeleteMessageModal />;
-    case 'forwardMessage':
-      return <ForwardMessageModal />;
-    case 'deleteCategory':
-      return <DeleteCategoryModal />;
-    case 'deleteServer':
-      return <DeleteServerModal />;
-    case 'leaveServer':
-      return <LeaveServerModal />;
-    case 'createInvite':
-      return <CreateInviteModal />;
-    case 'inviteBot':
-      return <InviteBotModal />;
-    case 'joinServer':
-      return <JoinServerModal />;
-    case 'serverSettings':
-      return <ServerSettingsModal />;
-    case 'serverNotifications':
-      return <ServerNotificationSettingsModal />;
-    case 'channelSettings':
-      return <ChannelSettingsModal />;
-    case 'channelNotifications':
-      return <ChannelNotificationSettingsModal />;
-    case 'editCategory':
-      return <EditCategoryModal />;
-    case 'findUser':
-      return <FindUserModal />;
-    case 'userProfile':
-      return <UserProfileModal />;
-    case 'kickUser':
-      return <KickUserModal />;
-    case 'addPermissionOverride':
-      return <AddPermissionOverrideModal />;
-    case 'manageBot':
-      return <BotEditorModal />;
-    default:
-      return null;
+  if (activeModal === 'confirm') {
+    const data = (modalData ?? {}) as {
+      title?: string;
+      description?: string;
+      confirmText?: string;
+      cancelText?: string;
+      onConfirm?: () => void;
+      confirmDisabled?: boolean;
+      isLoading?: boolean;
+      isDestructive?: boolean;
+      children?: ReactNode;
+    };
+
+    return (
+      <ConfirmModal
+        title={data.title ?? 'Confirm'}
+        description={data.description ?? ''}
+        confirmText={data.confirmText}
+        cancelText={data.cancelText}
+        confirmDisabled={data.confirmDisabled}
+        isLoading={data.isLoading}
+        isDestructive={data.isDestructive}
+        onCancel={closeModal}
+        onConfirm={() => {
+          data.onConfirm?.();
+          closeModal();
+        }}
+      >
+        {data.children}
+      </ConfirmModal>
+    );
   }
+
+  const ActiveModal = modals[activeModal];
+  if (!ActiveModal) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <ActiveModal />
+    </Suspense>
+  );
 };
 
 export default ModalManager;

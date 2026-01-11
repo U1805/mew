@@ -1,12 +1,13 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthScreen } from './features/auth/components/AuthScreen';
-import Layout from './layout/Layout';
-import ModalManager from './layout/modals/ModalManager';
 import { getSocket } from './shared/services/socket';
 import { useAuthStore, useModalStore, useUIStore } from './shared/stores';
 
 const queryClient = new QueryClient();
+
+const AuthScreen = lazy(() => import('./features/auth/components/AuthScreen').then(m => ({ default: m.AuthScreen })));
+const Layout = lazy(() => import('./layout/Layout'));
+const ModalManager = lazy(() => import('./layout/modals/ModalManager'));
 
 const App = () => {
   const token = useAuthStore((state) => state.token);
@@ -53,12 +54,16 @@ const App = () => {
     return () => {
       socket.off('SERVER_KICK', handleServerKick);
     };
-  }, [token, queryClient]);
+  }, [token]);
 
   return (
     <QueryClientProvider client={queryClient}>
-      {token ? <Layout /> : <AuthScreen />}
-      <ModalManager />
+      <Suspense fallback={null}>
+        {token ? <Layout /> : <AuthScreen />}
+      </Suspense>
+      <Suspense fallback={null}>
+        <ModalManager />
+      </Suspense>
     </QueryClientProvider>
   );
 };

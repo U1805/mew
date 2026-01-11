@@ -124,7 +124,8 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
       return;
     }
     if (isSpacePressed) return;
-    if (isAltPressed) setScale(s => Math.max(s / 1.5, 0.5));
+    const altPressed = e.altKey || isAltPressed;
+    if (altPressed) setScale(s => Math.max(s / 1.5, 0.5));
     else setScale(s => Math.min(s * 1.5, 5));
   };
 
