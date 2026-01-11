@@ -2,7 +2,9 @@ package proxy
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -11,7 +13,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,6 +25,7 @@ import (
 )
 
 const defaultProxyListURL = "https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt"
+const defaultProxyListCacheTTL = 5 * time.Minute
 
 var ipPortRegex = regexp.MustCompile(`([0-9]{1,3}(?:\.[0-9]{1,3}){3}):([0-9]{1,5})`)
 
@@ -293,6 +298,199 @@ func (d timeoutDialer) Dial(network, addr string) (net.Conn, error) {
 	return net.DialTimeout(network, addr, timeout)
 }
 
+func proxyListCacheTTL() time.Duration {
+	ttl := defaultProxyListCacheTTL
+	if raw := strings.TrimSpace(os.Getenv("proxy_list_cache_ttl")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil {
+			ttl = parsed
+		}
+	}
+	return ttl
+}
+
+func proxyListCacheDir() string {
+	// Keep consistent with plugin state directory layout: <base>/mew/plugins/<serviceType-or-shared>.
+	if d, err := os.UserCacheDir(); err == nil && strings.TrimSpace(d) != "" {
+		return filepath.Join(d, "mew", "plugins", "proxy")
+	}
+	// Fallback if user cache dir cannot be determined.
+	return filepath.Join(os.TempDir(), "mew", "plugins", "proxy")
+}
+
+func proxyListCachePathForURL(url string) (cacheFile, lockFile string) {
+	sum := sha256.Sum256([]byte(url))
+	key := fmt.Sprintf("%x", sum[:])
+	dir := proxyListCacheDir()
+	return filepath.Join(dir, key+".txt"), filepath.Join(dir, key+".lock")
+}
+
+func readProxyListCacheIfFresh(cacheFile string, ttl time.Duration) ([]byte, bool) {
+	info, err := os.Stat(cacheFile)
+	if err != nil || info.IsDir() {
+		return nil, false
+	}
+	if ttl > 0 && time.Since(info.ModTime()) > ttl {
+		return nil, false
+	}
+	b, err := os.ReadFile(cacheFile)
+	if err != nil || len(b) == 0 {
+		return nil, false
+	}
+	return b, true
+}
+
+func readProxyListCacheAny(cacheFile string) ([]byte, bool) {
+	b, err := os.ReadFile(cacheFile)
+	if err != nil || len(b) == 0 {
+		return nil, false
+	}
+	return b, true
+}
+
+func writeProxyListCache(cacheFile string, body []byte) error {
+	dir := filepath.Dir(cacheFile)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+
+	tmp, err := os.CreateTemp(dir, filepath.Base(cacheFile)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+
+	_, writeErr := tmp.Write(body)
+	closeErr := tmp.Close()
+	if writeErr != nil {
+		_ = os.Remove(tmpName)
+		return writeErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmpName)
+		return closeErr
+	}
+
+	// Best-effort: set mod time to now (used as fetchedAt).
+	now := time.Now()
+	_ = os.Chtimes(tmpName, now, now)
+
+	// Windows can't rename over existing files; remove first.
+	_ = os.Remove(cacheFile)
+	if err := os.Rename(tmpName, cacheFile); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	return nil
+}
+
+func tryAcquireCacheLock(lockFile string) (release func(), ok bool) {
+	dir := filepath.Dir(lockFile)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return func() {}, false
+	}
+
+	f, err := os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		// Best-effort: clear stale locks (e.g. a crashed process).
+		if os.IsExist(err) {
+			if info, statErr := os.Stat(lockFile); statErr == nil && !info.IsDir() && time.Since(info.ModTime()) > 30*time.Second {
+				_ = os.Remove(lockFile)
+				f, err = os.OpenFile(lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+			}
+		}
+		if err != nil {
+			return func() {}, false
+		}
+	}
+	_, _ = f.WriteString(strconv.FormatInt(time.Now().UnixNano(), 10))
+	_ = f.Close()
+
+	return func() { _ = os.Remove(lockFile) }, true
+}
+
+func fetchProxyListURLWithCache(ctx context.Context, client *http.Client, url string) ([]byte, error) {
+	ttl := proxyListCacheTTL()
+	cacheFile, lockFile := proxyListCachePathForURL(url)
+
+	if ttl != 0 {
+		if cached, ok := readProxyListCacheIfFresh(cacheFile, ttl); ok {
+			return cached, nil
+		}
+	}
+
+	// If caching is disabled, just fetch directly.
+	if ttl == 0 {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			_ = resp.Body.Close()
+			return nil, fmt.Errorf("fetch %s status=%d", url, resp.StatusCode)
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024))
+		_ = resp.Body.Close()
+		return body, err
+	}
+
+	release, locked := tryAcquireCacheLock(lockFile)
+	if locked {
+		defer release()
+		// Re-check after acquiring the lock in case another process updated the cache
+		// between our first read and lock acquisition.
+		if cached, ok := readProxyListCacheIfFresh(cacheFile, ttl); ok {
+			return cached, nil
+		}
+	} else {
+		// If another process is already fetching, wait briefly for its cache write.
+		deadline := time.Now().Add(2 * time.Second)
+		for time.Now().Before(deadline) {
+			if cached, ok := readProxyListCacheIfFresh(cacheFile, ttl); ok {
+				return cached, nil
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		// On fetch failure, fall back to any cached body (even stale).
+		if cached, ok := readProxyListCacheAny(cacheFile); ok {
+			return cached, nil
+		}
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		_ = resp.Body.Close()
+		if cached, ok := readProxyListCacheAny(cacheFile); ok {
+			return cached, nil
+		}
+		return nil, fmt.Errorf("fetch %s status=%d", url, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024))
+	_ = resp.Body.Close()
+	if err != nil {
+		if cached, ok := readProxyListCacheAny(cacheFile); ok {
+			return cached, nil
+		}
+		return nil, err
+	}
+
+	if ttl != 0 {
+		_ = writeProxyListCache(cacheFile, body) // best-effort
+	}
+	return body, nil
+}
+
 func fetchProxyLists(ctx context.Context, urls []string) ([]string, error) {
 	if len(urls) == 0 {
 		return nil, nil
@@ -310,30 +508,14 @@ func fetchProxyLists(ctx context.Context, urls []string) ([]string, error) {
 			continue
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			continue
-		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			lastErr = fmt.Errorf("fetch %s status=%d", u, resp.StatusCode)
-			_ = resp.Body.Close()
-			continue
-		}
-
-		body, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024))
-		_ = resp.Body.Close()
+		body, err := fetchProxyListURLWithCache(ctx, client, u)
 		if err != nil {
 			lastErr = err
 			continue
 		}
 
-		scanner := bufio.NewScanner(strings.NewReader(string(body)))
+		scanner := bufio.NewScanner(bytes.NewReader(body))
+		scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
 			if line == "" || strings.HasPrefix(line, "#") {
@@ -469,4 +651,3 @@ func NewTransport(base *http.Transport) *http.Transport {
 
 	return t
 }
-

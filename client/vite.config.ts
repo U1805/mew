@@ -14,7 +14,6 @@ export default defineConfig(() => {
               if (id.includes('socket.io-client')) return 'socket';
               if (id.includes('@iconify')) return 'iconify';
               if (id.includes('marked') || id.includes('dompurify')) return 'markdown';
-              if (id.includes('/react/') || id.includes('/react-dom/')) return 'react';
               return 'vendor';
             },
           },
