@@ -205,6 +205,7 @@ func BuildL1L4UserPrompt(developerInstructions string, meta memory.Metadata, fac
 
 func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc *time.Location) []openaigo.ChatCompletionMessageParamUnion {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
+	coalescer := assistantMessageCoalescer{out: &out}
 	for _, m := range sessionMsgs {
 		content := strings.TrimSpace(m.ContextText())
 		if content == "" {
@@ -217,8 +218,9 @@ func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc 
 		}
 
 		if role == "assistant" {
-			out = append(out, openaigo.AssistantMessage(content))
+			coalescer.Append(content)
 		} else {
+			coalescer.Flush()
 			sentAt := m.CreatedAt
 			if loc != nil && !sentAt.IsZero() {
 				sentAt = sentAt.In(loc)
@@ -226,6 +228,7 @@ func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc 
 			out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMeta(m.AuthorUsername(), m.AuthorID(), sentAt, content)))
 		}
 	}
+	coalescer.Flush()
 	return out
 }
 
@@ -264,6 +267,7 @@ type UserContentPartsOptions struct {
 
 func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []sdkapi.ChannelMessage, botUserID string, opts UserContentPartsOptions) ([]openaigo.ChatCompletionMessageParamUnion, error) {
 	out := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(sessionMsgs))
+	coalescer := assistantMessageCoalescer{out: &out}
 	for _, m := range sessionMsgs {
 		role := "user"
 		if strings.TrimSpace(m.AuthorID()) == strings.TrimSpace(botUserID) {
@@ -271,6 +275,7 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []sdkapi.Ch
 		}
 
 		if role == "user" {
+			coalescer.Flush()
 			attachments := make([]sdkapi.AttachmentRef, 0, len(m.Attachments)+1)
 			attachments = append(attachments, m.Attachments...)
 			attachments = append(attachments, llm.StickerAttachmentsFromPayload(m.ChannelID, m.Payload)...)
@@ -298,7 +303,34 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []sdkapi.Ch
 		if content == "" {
 			continue
 		}
-		out = append(out, openaigo.AssistantMessage(content))
+		coalescer.Append(content)
 	}
+	coalescer.Flush()
 	return out, nil
+}
+
+type assistantMessageCoalescer struct {
+	out     *[]openaigo.ChatCompletionMessageParamUnion
+	pending string
+}
+
+func (c *assistantMessageCoalescer) Append(content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	if c.pending == "" {
+		c.pending = content
+		return
+	}
+	c.pending += "\n" + content
+}
+
+func (c *assistantMessageCoalescer) Flush() {
+	if strings.TrimSpace(c.pending) == "" {
+		c.pending = ""
+		return
+	}
+	*c.out = append(*c.out, openaigo.AssistantMessage(c.pending))
+	c.pending = ""
 }
