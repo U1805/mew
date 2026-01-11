@@ -2,7 +2,9 @@ package bot
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -41,19 +43,36 @@ func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
 				log.Printf("%s load metadata failed (proactive): user=%s err=%v", logPrefix, userID, err)
 				return
 			}
-			if strings.TrimSpace(meta.ChannelID) == "" || strings.TrimSpace(meta.RecordID) == "" {
-				return
+			hasDue := false
+			for _, req := range q.Requests {
+				if !req.RequestAt.After(now) {
+					hasDue = true
+					break
+				}
+			}
+
+			var summaries store.SummariesFile
+			if hasDue {
+				if s, err := store.LoadSummaries(paths.SummariesPath); err == nil {
+					summaries = s
+				}
+			}
+
+			var currentSessionStartAt time.Time
+			var currentChannelID, currentRecordID, currentRecordText string
+			if hasDue && strings.TrimSpace(meta.ChannelID) != "" {
+				if msgs, rid, startAt, err := r.fetcher.FetchSessionMessages(ctx, meta.ChannelID); err == nil && len(msgs) > 0 {
+					currentChannelID = meta.ChannelID
+					currentRecordID = rid
+					currentSessionStartAt = startAt
+					currentRecordText = ai.FormatSessionRecordForContext(msgs)
+				}
 			}
 
 			kept := make([]store.ProactiveRequest, 0, len(q.Requests))
 			for _, req := range q.Requests {
 				if req.RequestAt.After(now) {
 					kept = append(kept, req)
-					continue
-				}
-
-				// If the conversation has already moved on to another record/channel, this request is no longer relevant.
-				if strings.TrimSpace(req.ChannelID) != strings.TrimSpace(meta.ChannelID) || strings.TrimSpace(req.RecordID) != strings.TrimSpace(meta.RecordID) {
 					continue
 				}
 
@@ -75,7 +94,8 @@ func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
 				}
 				recordText := ai.FormatSessionRecordForContext(msgs)
 
-				out, err := r.proactiveDecideAndCompose(ctx, req, recordText, logPrefix)
+				intermediate := formatSummariesBetween(summaries, req.AddedAt, currentSessionStartAt, now, 12)
+				out, err := r.proactiveDecideAndCompose(ctx, req, recordText, currentChannelID, currentRecordID, currentRecordText, intermediate, logPrefix)
 				if err != nil {
 					log.Printf("%s proactive llm failed: user=%s channel=%s record=%s err=%v", logPrefix, userID, req.ChannelID, req.RecordID, err)
 					kept = append(kept, req)
@@ -110,6 +130,64 @@ func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
 			}
 		}()
 	}
+}
+
+func formatSummariesBetween(s store.SummariesFile, start time.Time, end time.Time, fallbackEnd time.Time, max int) string {
+	if len(s.Summaries) == 0 {
+		return ""
+	}
+	if end.IsZero() {
+		end = fallbackEnd
+	}
+	if end.IsZero() {
+		return ""
+	}
+	if max <= 0 {
+		max = 12
+	}
+
+	items := make([]store.Summary, 0, len(s.Summaries))
+	for _, it := range s.Summaries {
+		if it.CreatedAt.IsZero() {
+			continue
+		}
+		if !start.IsZero() && it.CreatedAt.Before(start) {
+			continue
+		}
+		if it.CreatedAt.After(end) {
+			continue
+		}
+		if strings.TrimSpace(it.Summary) == "" {
+			continue
+		}
+		items = append(items, it)
+	}
+	if len(items) == 0 {
+		return ""
+	}
+	sort.SliceStable(items, func(i, j int) bool { return items[i].CreatedAt.Before(items[j].CreatedAt) })
+	if len(items) > max {
+		items = items[len(items)-max:]
+	}
+
+	var b strings.Builder
+	for _, it := range items {
+		id := strings.TrimSpace(it.SummaryID)
+		if id == "" {
+			id = "S??"
+		}
+		rid := strings.TrimSpace(it.RecordID)
+		if rid == "" {
+			rid = "unknown"
+		}
+		b.WriteString(fmt.Sprintf("%s [%s] (RecordID=%s): %s\n",
+			id,
+			it.CreatedAt.Format(time.RFC3339),
+			rid,
+			strings.TrimSpace(it.Summary),
+		))
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func sendReplyHTTP(ctx context.Context, channelID string, reply string, postLine func(line string) error) error {
