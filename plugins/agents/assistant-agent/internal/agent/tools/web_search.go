@@ -1,4 +1,4 @@
-package bot
+package tools
 
 import (
 	"bytes"
@@ -23,12 +23,12 @@ type exaSearchResponse struct {
 	} `json:"results"`
 }
 
-func (r *Runner) runWebSearch(ctx context.Context, query string) (any, error) {
+func RunWebSearch(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, query string) (any, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return map[string]any{"results": []any{}}, nil
 	}
-	if strings.TrimSpace(r.aiConfig.Tool.ExaAPIKey) == "" {
+	if strings.TrimSpace(cfg.Tool.ExaAPIKey) == "" {
 		return nil, fmt.Errorf("assistant-agent config incomplete: tool.exa_api_key is required for WebSearch")
 	}
 
@@ -50,9 +50,7 @@ func (r *Runner) runWebSearch(ctx context.Context, query string) (any, error) {
 		return nil, err
 	}
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("x-api-key", strings.TrimSpace(r.aiConfig.Tool.ExaAPIKey))
-
-	httpClient := r.llmHTTPClient
+	req.Header.Set("x-api-key", strings.TrimSpace(cfg.Tool.ExaAPIKey))
 	if httpClient == nil {
 		httpClient = http.DefaultClient
 	}

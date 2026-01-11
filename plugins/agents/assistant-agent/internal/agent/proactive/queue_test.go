@@ -1,4 +1,4 @@
-package store
+package proactive
 
 import (
 	"testing"

@@ -1,4 +1,4 @@
-package ai
+package chat
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/assistant-agent/internal/agent/store"
+	"mew/plugins/assistant-agent/internal/agent/memory"
 	"mew/plugins/assistant-agent/prompt"
 	"mew/plugins/sdk"
 	sdkapi "mew/plugins/sdk/api"
@@ -35,6 +35,115 @@ func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(s), nil
+}
+
+func FormatFactsForContext(f memory.FactsFile) string {
+	if len(f.Facts) == 0 {
+		return "(none)"
+	}
+	var b strings.Builder
+	for _, fact := range f.Facts {
+		id := strings.TrimSpace(fact.FactID)
+		content := strings.TrimSpace(fact.Content)
+		if id == "" || content == "" {
+			continue
+		}
+		b.WriteString(id)
+		b.WriteString(": ")
+		b.WriteString(content)
+		b.WriteString("\n")
+	}
+	s := strings.TrimSpace(b.String())
+	if s == "" {
+		return "(none)"
+	}
+	return s
+}
+
+func FormatSummariesForContext(s memory.SummariesFile) string {
+	if len(s.Summaries) == 0 {
+		return "(none)"
+	}
+	var b strings.Builder
+	for _, item := range s.Summaries {
+		id := strings.TrimSpace(item.SummaryID)
+		sum := strings.TrimSpace(item.Summary)
+		if id == "" || sum == "" {
+			continue
+		}
+		b.WriteString(id)
+		b.WriteString(": ")
+		b.WriteString(sum)
+		if rid := strings.TrimSpace(item.RecordID); rid != "" {
+			b.WriteString(" (RecordID=")
+			b.WriteString(rid)
+			b.WriteString(")")
+		}
+		b.WriteString("\n")
+	}
+	out := strings.TrimSpace(b.String())
+	if out == "" {
+		return "(none)"
+	}
+	return out
+}
+
+func FormatUserActivityFrequency(activeDays, windowDays int) string {
+	if windowDays <= 0 {
+		windowDays = 7
+	}
+	if activeDays < 0 {
+		activeDays = 0
+	}
+	dayWord := "days"
+	if activeDays == 1 {
+		dayWord = "day"
+	}
+	return fmt.Sprintf("Active %d %s in the last %d", activeDays, dayWord, windowDays)
+}
+
+func sanitizeMetaAttrValue(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	s = strings.ReplaceAll(s, "\r", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\t", " ")
+	s = strings.ReplaceAll(s, "\"", "'")
+	s = strings.ReplaceAll(s, "<", "(")
+	s = strings.ReplaceAll(s, ">", ")")
+	s = strings.TrimSpace(s)
+	if len(s) > 80 {
+		s = s[:80]
+		s = strings.TrimSpace(s)
+	}
+	return s
+}
+
+func SpeakerMetaLine(username, userID string, sentAt time.Time) string {
+	u := sanitizeMetaAttrValue(username)
+	id := sanitizeMetaAttrValue(userID)
+	if u == "" {
+		u = "unknown"
+	}
+	if id == "" {
+		id = "unknown"
+	}
+	if !sentAt.IsZero() {
+		// HH:MM precision only, no seconds.
+		return fmt.Sprintf(`<mew_speaker username="%s" user_id="%s" time="%s"/>`, u, id, sentAt.Format("15:04"))
+	}
+	return fmt.Sprintf(`<mew_speaker username="%s" user_id="%s"/>`, u, id)
+}
+
+func WrapUserTextWithSpeakerMeta(username, userID string, sentAt time.Time, text string) string {
+	text = strings.TrimSpace(text)
+	meta := SpeakerMetaLine(username, userID, sentAt)
+	if text == "" {
+		return meta
+	}
+	return meta + "\n" + text
 }
 
 var developerInstructionsOnce sync.Once
@@ -71,7 +180,7 @@ func DeveloperInstructionsText(
 	return out
 }
 
-func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, facts store.FactsFile, summaries store.SummariesFile) string {
+func BuildL1L4UserPrompt(developerInstructions string, meta memory.Metadata, facts memory.FactsFile, summaries memory.SummariesFile) string {
 	var b strings.Builder
 	b.WriteString(strings.TrimSpace(developerInstructions))
 	b.WriteString("\n\n")
@@ -84,11 +193,11 @@ func BuildL1L4UserPrompt(developerInstructions string, meta store.Metadata, fact
 	b.WriteString("\n")
 
 	b.WriteString("### L3 User Memory (Facts)\n")
-	b.WriteString(store.FormatFactsForContext(facts))
+	b.WriteString(FormatFactsForContext(facts))
 	b.WriteString("\n\n")
 
 	b.WriteString("### L4 Recent Summaries\n")
-	b.WriteString(store.FormatSummariesForContext(summaries))
+	b.WriteString(FormatSummariesForContext(summaries))
 	b.WriteString("\n\n")
 
 	return strings.TrimSpace(b.String())

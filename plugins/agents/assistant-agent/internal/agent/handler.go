@@ -1,21 +1,18 @@
-package bot
+package agent
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/assistant-agent/internal/agent/ai"
-	"mew/plugins/assistant-agent/internal/agent/store"
+	"mew/plugins/assistant-agent/internal/agent/chat"
+	"mew/plugins/assistant-agent/internal/agent/memory"
+	"mew/plugins/assistant-agent/internal/agent/proactive"
+	"mew/plugins/assistant-agent/internal/agent/tools"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
 	sdkapi "mew/plugins/sdk/api"
@@ -113,32 +110,6 @@ func (r *Runner) shouldOnDemandRemember(userContent string) bool {
 	return strings.Contains(s, "记住") || strings.Contains(strings.ToLower(s), "remember")
 }
 
-func assistantReplyDelayForLine(line string) time.Duration {
-	n := len([]rune(strings.TrimSpace(line)))
-	if n <= 0 {
-		return 0
-	}
-	d := config.AssistantReplyDelayBase + time.Duration(n)*config.AssistantReplyDelayPerRune
-	if d > config.AssistantReplyDelayMax {
-		return config.AssistantReplyDelayMax
-	}
-	return d
-}
-
-func sleepWithContext(ctx context.Context, d time.Duration) {
-	if d <= 0 {
-		return
-	}
-	t := time.NewTimer(d)
-	defer t.Stop()
-	select {
-	case <-ctx.Done():
-		return
-	case <-t.C:
-		return
-	}
-}
-
 func (r *Runner) processDMMessage(
 	ctx context.Context,
 	logPrefix string,
@@ -173,7 +144,7 @@ func (r *Runner) processDMMessage(
 	if err := r.updateSessionState(ctx, userID, channelID, now, startAt, recordID, prevRecordID, delta, &meta); err != nil {
 		return err
 	}
-	if err := store.SaveMetadata(paths.MetadataPath, meta); err != nil {
+	if err := SaveMetadata(paths.MetadataPath, meta); err != nil {
 		return err
 	}
 
@@ -185,19 +156,29 @@ func (r *Runner) processDMMessage(
 
 	if gotMood {
 		meta.FinalMood = finalMood
-		if err := store.SaveMetadata(paths.MetadataPath, meta); err != nil {
+		if err := SaveMetadata(paths.MetadataPath, meta); err != nil {
 			return err
 		}
 	}
 
-	clean, controls := parseReplyControls(reply)
-	if err := r.sendReply(ctx, emit, channelID, userID, clean, controls, logPrefix); err != nil {
+	clean, controls := chat.ParseReplyControls(reply)
+	if err := chat.SendReply(ctx, emit, channelID, userID, clean, controls, logPrefix,
+		func(ctx context.Context, channelID, content string) error {
+			return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
+		},
+		func(ctx context.Context, channelID, stickerID string) error {
+			return chat.PostStickerHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, stickerID)
+		},
+		func(ctx context.Context, name string) (string, error) {
+			return r.stickers.ResolveStickerIDByName(ctx, r.session.HTTPClient(), r.apiBase, logPrefix, name)
+		},
+	); err != nil {
 		return err
 	}
-	r.maybeEnqueueProactive(now, paths, channelID, recordID, controls.proactive, logPrefix)
+	r.enqueueProactive(now, paths, channelID, recordID, controls.Proactive, logPrefix)
 
 	// If the model explicitly asks for a continuation, prompt it once more.
-	if controls.wantMore {
+	if controls.WantMore {
 		l5More := make([]openaigo.ChatCompletionMessageParamUnion, 0, len(l5)+2)
 		l5More = append(l5More, l5...)
 		if strings.TrimSpace(clean) != "" {
@@ -211,42 +192,78 @@ func (r *Runner) processDMMessage(
 		}
 		if moreGotMood {
 			meta.FinalMood = moreMood
-			if err := store.SaveMetadata(paths.MetadataPath, meta); err != nil {
+			if err := SaveMetadata(paths.MetadataPath, meta); err != nil {
 				return err
 			}
 		}
 
-		moreClean, moreControls := parseReplyControls(more)
-		if err := r.sendReply(ctx, emit, channelID, userID, moreClean, moreControls, logPrefix); err != nil {
+		moreClean, moreControls := chat.ParseReplyControls(more)
+		if err := chat.SendReply(ctx, emit, channelID, userID, moreClean, moreControls, logPrefix,
+			func(ctx context.Context, channelID, content string) error {
+				return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
+			},
+			func(ctx context.Context, channelID, stickerID string) error {
+				return chat.PostStickerHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, stickerID)
+			},
+			func(ctx context.Context, name string) (string, error) {
+				return r.stickers.ResolveStickerIDByName(ctx, r.session.HTTPClient(), r.apiBase, logPrefix, name)
+			},
+		); err != nil {
 			return err
 		}
-		r.maybeEnqueueProactive(now, paths, channelID, recordID, moreControls.proactive, logPrefix)
+		r.enqueueProactive(now, paths, channelID, recordID, moreControls.Proactive, logPrefix)
 	}
 	r.maybeOnDemandRemember(ctx, socketMsg.Content, sessionMsgs, facts, paths, userID, channelID, now, logPrefix)
 	return nil
 }
 
-func (r *Runner) loadUserState(userID, logPrefix string) (paths store.UserStatePaths, facts store.FactsFile, summaries store.SummariesFile, meta store.Metadata, err error) {
-	paths = r.store.Paths(userID)
+func (r *Runner) enqueueProactive(now time.Time, paths UserStatePaths, channelID string, recordID string, d *chat.ProactiveDirective, logPrefix string) {
+	req, ok := proactive.BuildProactiveRequest(now, channelID, recordID, d)
+	if !ok {
+		return
+	}
+
+	q, err := LoadProactiveQueue(paths.ProactivePath)
+	if err != nil {
+		log.Printf("%s load proactive queue failed: path=%s err=%v", logPrefix, paths.ProactivePath, err)
+		return
+	}
+	q = proactive.AppendProactiveRequest(now, q, req, config.AssistantMaxProactiveQueue)
+	if err := SaveProactiveQueue(paths.ProactivePath, q); err != nil {
+		log.Printf("%s save proactive queue failed: path=%s err=%v", logPrefix, paths.ProactivePath, err)
+		return
+	}
+
+	log.Printf("%s proactive queued: channel=%s record=%s at=%s reason=%q",
+		logPrefix,
+		req.ChannelID,
+		req.RecordID,
+		req.RequestAt.Format(time.RFC3339),
+		sdk.PreviewString(req.Reason, config.AssistantLogContentPreviewLen),
+	)
+}
+
+func (r *Runner) loadUserState(userID, logPrefix string) (paths UserStatePaths, facts memory.FactsFile, summaries memory.SummariesFile, meta memory.Metadata, err error) {
+	paths = UserStatePathsFor(r.serviceType, r.botID, userID)
 	log.Printf("%s state paths: user=%s meta=%s facts=%s summaries=%s",
 		logPrefix, userID, paths.MetadataPath, paths.FactsPath, paths.SummariesPath,
 	)
-	facts, err = store.LoadFacts(paths.FactsPath)
+	facts, err = LoadFacts(paths.FactsPath)
 	if err != nil {
-		return store.UserStatePaths{}, store.FactsFile{}, store.SummariesFile{}, store.Metadata{}, err
+		return UserStatePaths{}, memory.FactsFile{}, memory.SummariesFile{}, memory.Metadata{}, err
 	}
-	summaries, err = store.LoadSummaries(paths.SummariesPath)
+	summaries, err = LoadSummaries(paths.SummariesPath)
 	if err != nil {
-		return store.UserStatePaths{}, store.FactsFile{}, store.SummariesFile{}, store.Metadata{}, err
+		return UserStatePaths{}, memory.FactsFile{}, memory.SummariesFile{}, memory.Metadata{}, err
 	}
-	meta, err = store.LoadMetadata(paths.MetadataPath)
+	meta, err = LoadMetadata(paths.MetadataPath)
 	if err != nil {
-		return store.UserStatePaths{}, store.FactsFile{}, store.SummariesFile{}, store.Metadata{}, err
+		return UserStatePaths{}, memory.FactsFile{}, memory.SummariesFile{}, memory.Metadata{}, err
 	}
 	return paths, facts, summaries, meta, nil
 }
 
-func (r *Runner) applyTiming(meta *store.Metadata, channelID string, now time.Time) (delta time.Duration, prevRecordID string, newSession bool) {
+func (r *Runner) applyTiming(meta *memory.Metadata, channelID string, now time.Time) (delta time.Duration, prevRecordID string, newSession bool) {
 	prevRecordID = meta.RecordID
 	if meta.ChannelID == "" {
 		meta.ChannelID = channelID
@@ -266,7 +283,7 @@ func (r *Runner) applyTiming(meta *store.Metadata, channelID string, now time.Ti
 	return delta, prevRecordID, newSession
 }
 
-func (r *Runner) tryFinalizePreviousSession(ctx context.Context, logPrefix, userID string, paths store.UserStatePaths, meta *store.Metadata) {
+func (r *Runner) tryFinalizePreviousSession(ctx context.Context, logPrefix, userID string, paths UserStatePaths, meta *memory.Metadata) {
 	if meta.RecordID == "" || meta.ChannelID == "" || meta.LastSummarizedRecordID == meta.RecordID {
 		return
 	}
@@ -284,7 +301,7 @@ func (r *Runner) updateSessionState(
 	now, startAt time.Time,
 	recordID, prevRecordID string,
 	delta time.Duration,
-	meta *store.Metadata,
+	meta *memory.Metadata,
 ) error {
 	meta.RecordID = recordID
 	meta.StartAt = startAt
@@ -310,23 +327,23 @@ func (r *Runner) updateSessionState(
 
 	baseline := meta.BaselineMood
 	lastFinal := meta.FinalMood
-	if lastFinal == (store.Mood{}) {
+	if lastFinal == (memory.Mood{}) {
 		lastFinal = baseline
 	}
-	meta.InitialMood = store.ComputeInitialMood(baseline, lastFinal, delta)
+	meta.InitialMood = memory.ComputeInitialMood(baseline, lastFinal, delta)
 	return nil
 }
 
 func (r *Runner) buildPrompt(
 	ctx context.Context,
-	meta store.Metadata,
-	facts store.FactsFile,
-	summaries store.SummariesFile,
+	meta memory.Metadata,
+	facts memory.FactsFile,
+	summaries memory.SummariesFile,
 	sessionMsgs []sdkapi.ChannelMessage,
 	logPrefix string,
 ) (l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) {
-	stickerNames := strings.TrimSpace(r.stickerPromptAddon(ctx, logPrefix))
-	l1l4 = ai.BuildL1L4UserPrompt(ai.DeveloperInstructionsText(
+	stickerNames := strings.TrimSpace(r.stickers.StickerPromptAddon(ctx, r.session.HTTPClient(), r.apiBase, logPrefix))
+	l1l4 = chat.BuildL1L4UserPrompt(chat.DeveloperInstructionsText(
 		config.AssistantSilenceToken,
 		config.AssistantWantMoreToken,
 		config.AssistantProactiveTokenPrefix,
@@ -336,7 +353,7 @@ func (r *Runner) buildPrompt(
 		config.DeveloperInstructionsPromptRelPath,
 		config.DeveloperInstructionsEmbeddedName,
 	), meta, facts, summaries)
-	l5, err := ai.BuildL5MessagesWithAttachments(ctx, sessionMsgs, r.botUserID, ai.UserContentPartsOptions{
+	l5, err := chat.BuildL5MessagesWithAttachments(ctx, sessionMsgs, r.botUserID, chat.UserContentPartsOptions{
 		DefaultImagePrompt:    config.DefaultImagePrompt,
 		MaxImageBytes:         config.DefaultMaxImageBytes,
 		MaxTotalImageBytes:    config.DefaultMaxTotalImageBytes,
@@ -349,7 +366,7 @@ func (r *Runner) buildPrompt(
 	})
 	if err != nil {
 		log.Printf("%s build L5 with attachments failed (fallback to text-only): %v", logPrefix, err)
-		l5 = ai.BuildL5Messages(sessionMsgs, r.botUserID, r.timeLoc)
+		l5 = chat.BuildL5Messages(sessionMsgs, r.botUserID, r.timeLoc)
 	}
 	log.Printf("%s prompt prepared: L1L4_len=%d L5_msgs=%d facts=%d summaries=%d",
 		logPrefix, len(l1l4), len(l5), len(facts.Facts), len(summaries.Summaries),
@@ -365,18 +382,18 @@ func (r *Runner) reply(
 	l1l4 string,
 	l5 []openaigo.ChatCompletionMessageParamUnion,
 	logPrefix string,
-) (reply string, finalMood store.Mood, gotMood bool, err error) {
-	return ai.ChatWithTools(ctx, r.llmHTTPClient, r.aiConfig, strings.TrimSpace(r.persona), l1l4, l5, ai.ToolHandlers{
+) (reply string, finalMood memory.Mood, gotMood bool, err error) {
+	return chat.ChatWithTools(ctx, r.llmHTTPClient, r.aiConfig, strings.TrimSpace(r.persona), l1l4, l5, chat.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
-			return r.runHistorySearch(ctx, channelID, keyword)
+			return tools.RunHistorySearch(ctx, r.fetcher, channelID, keyword)
 		},
 		RecordSearch: func(ctx context.Context, recordID string) (any, error) {
-			return r.runRecordSearch(ctx, channelID, recordID)
+			return tools.RunRecordSearch(ctx, r.fetcher, channelID, recordID)
 		},
 		WebSearch: func(ctx context.Context, query string) (any, error) {
-			return r.runWebSearch(ctx, query)
+			return tools.RunWebSearch(ctx, r.llmHTTPClient, r.aiConfig, query)
 		},
-	}, ai.ChatWithToolsOptions{
+	}, chat.ChatWithToolsOptions{
 		MaxToolCalls:          config.AssistantMaxToolCalls,
 		HistorySearchToolName: config.DefaultHistorySearchToolName,
 		RecordSearchToolName:  config.DefaultRecordSearchToolName,
@@ -386,7 +403,9 @@ func (r *Runner) reply(
 		LLMPreviewLen:         config.AssistantLogLLMPreviewLen,
 		ToolResultPreviewLen:  config.AssistantLogToolResultPreviewLen,
 		OnToolCallAssistantText: func(text string) error {
-			return r.sendToolPrelude(ctx, emit, channelID, userID, text, logPrefix)
+			return chat.SendToolPrelude(ctx, emit, channelID, userID, text, logPrefix, func(ctx context.Context, channelID, content string) error {
+				return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
+			})
 		},
 		SilenceToken:           config.AssistantSilenceToken,
 		WantMoreToken:          config.AssistantWantMoreToken,
@@ -398,201 +417,12 @@ func (r *Runner) reply(
 	})
 }
 
-func (r *Runner) sendToolPrelude(
-	ctx context.Context,
-	emit socketio.EmitFunc,
-	channelID string,
-	userID string,
-	text string,
-	logPrefix string,
-) error {
-	text = strings.TrimSpace(text)
-	if text == "" {
-		return nil
-	}
-
-	sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
-		"channelId": channelID,
-		"content":   text,
-	})
-	if sendErr != nil {
-		// Fallback: if the gateway is disconnected, use REST API.
-		if err := r.postMessageHTTP(ctx, channelID, text); err != nil {
-			return fmt.Errorf("send tool prelude failed (gateway=%v http=%v)", sendErr, err)
-		}
-		log.Printf("%s gateway send prelude failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
-	}
-	return nil
-}
-
-func (r *Runner) sendReply(ctx context.Context, emit socketio.EmitFunc, channelID, userID, reply string, controls replyControls, logPrefix string) error {
-	reply = strings.TrimSpace(reply)
-	stickerName := ""
-	if controls.sticker != nil {
-		stickerName = strings.TrimSpace(controls.sticker.Name)
-	}
-
-	if reply == "" && stickerName == "" {
-		log.Printf("%s empty reply: channel=%s user=%s", logPrefix, channelID, userID)
-		return nil
-	}
-	if strings.TrimSpace(reply) == config.AssistantSilenceToken || strings.Contains(reply, config.AssistantSilenceToken) {
-		log.Printf("%s SILENCE: channel=%s user=%s", logPrefix, channelID, userID)
-		return nil
-	}
-
-	if reply != "" {
-		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
-			logPrefix, channelID, userID, sdk.PreviewString(reply, config.AssistantLogContentPreviewLen),
-		)
-
-		lines := make([]string, 0, config.AssistantMaxReplyLines)
-		for _, line := range strings.Split(reply, "\n") {
-			if len(lines) >= config.AssistantMaxReplyLines {
-				break
-			}
-			t := strings.TrimSpace(line)
-			if t == "" {
-				continue
-			}
-			lines = append(lines, t)
-		}
-
-		linesSent := 0
-		for i, t := range lines {
-			sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
-				"channelId": channelID,
-				"content":   t,
-			})
-			if sendErr != nil {
-				// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
-				if err := r.postMessageHTTP(ctx, channelID, t); err != nil {
-					return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
-				}
-				log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
-			}
-			linesSent++
-			if i < len(lines)-1 {
-				sleepWithContext(ctx, assistantReplyDelayForLine(t))
-			}
-		}
-		log.Printf("%s reply sent: channel=%s user=%s lines=%d", logPrefix, channelID, userID, linesSent)
-	}
-
-	if stickerName != "" {
-		stickerID, err := r.resolveStickerIDByName(ctx, logPrefix, stickerName)
-		if err != nil {
-			return err
-		}
-		if strings.TrimSpace(stickerID) == "" {
-			log.Printf("%s sticker not found in group: channel=%s user=%s name=%q", logPrefix, channelID, userID, stickerName)
-			return nil
-		}
-
-		sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
-			"channelId": channelID,
-			"type":      "message/sticker",
-			"payload": map[string]any{
-				"stickerId":    stickerID,
-				"stickerScope": "user",
-			},
-		})
-		if sendErr != nil {
-			if err := r.postStickerHTTP(ctx, channelID, stickerID); err != nil {
-				return fmt.Errorf("send sticker failed (gateway=%v http=%v)", sendErr, err)
-			}
-			log.Printf("%s gateway sticker send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
-		}
-		log.Printf("%s sticker sent: channel=%s user=%s name=%q", logPrefix, channelID, userID, stickerName)
-	}
-
-	return nil
-}
-
-func (r *Runner) postMessageHTTP(ctx context.Context, channelID, content string) error {
-	httpClient := r.session.HTTPClient()
-	if httpClient == nil {
-		return fmt.Errorf("missing mew http client")
-	}
-	if strings.TrimSpace(r.apiBase) == "" {
-		return fmt.Errorf("missing api base")
-	}
-	channelID = strings.TrimSpace(channelID)
-	if channelID == "" {
-		return fmt.Errorf("missing channel id")
-	}
-
-	u := strings.TrimRight(r.apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
-	body, _ := json.Marshal(map[string]any{"content": content})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
-		return fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(b)))
-	}
-	return nil
-}
-
-func (r *Runner) postStickerHTTP(ctx context.Context, channelID, stickerID string) error {
-	httpClient := r.session.HTTPClient()
-	if httpClient == nil {
-		return fmt.Errorf("missing mew http client")
-	}
-	if strings.TrimSpace(r.apiBase) == "" {
-		return fmt.Errorf("missing api base")
-	}
-	channelID = strings.TrimSpace(channelID)
-	if channelID == "" {
-		return fmt.Errorf("missing channel id")
-	}
-	stickerID = strings.TrimSpace(stickerID)
-	if stickerID == "" {
-		return fmt.Errorf("missing sticker id")
-	}
-
-	u := strings.TrimRight(r.apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
-	body, _ := json.Marshal(map[string]any{
-		"type": "message/sticker",
-		"payload": map[string]any{
-			"stickerId":    stickerID,
-			"stickerScope": "user",
-		},
-	})
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
-		return fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(b)))
-	}
-	return nil
-}
-
 func (r *Runner) maybeOnDemandRemember(
 	ctx context.Context,
 	userContent string,
 	sessionMsgs []sdkapi.ChannelMessage,
-	facts store.FactsFile,
-	paths store.UserStatePaths,
+	facts memory.FactsFile,
+	paths UserStatePaths,
 	userID, channelID string,
 	now time.Time,
 	logPrefix string,
@@ -602,8 +432,8 @@ func (r *Runner) maybeOnDemandRemember(
 	}
 
 	log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
-	sessionText := ai.FormatSessionRecordForContext(sessionMsgs)
-	res, err := ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, CognitiveRetryOptions{
+	sessionText := chat.FormatSessionRecordForContext(sessionMsgs)
+	res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, memory.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -617,20 +447,20 @@ func (r *Runner) maybeOnDemandRemember(
 		return
 	}
 
-	facts.Facts = store.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
-	facts = store.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
-	_ = store.SaveFacts(paths.FactsPath, facts)
+	facts.Facts = memory.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
+	facts = memory.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
+	_ = SaveFacts(paths.FactsPath, facts)
 	log.Printf("%s facts updated (on-demand): user=%s count=%d used=%d new=%d", logPrefix, userID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 }
 
-func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, paths store.UserStatePaths, meta *store.Metadata) error {
+func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, paths UserStatePaths, meta *memory.Metadata) error {
 	now := time.Now()
 
-	facts, err := store.LoadFacts(paths.FactsPath)
+	facts, err := LoadFacts(paths.FactsPath)
 	if err != nil {
 		return err
 	}
-	summaries, err := store.LoadSummaries(paths.SummariesPath)
+	summaries, err := LoadSummaries(paths.SummariesPath)
 	if err != nil {
 		return err
 	}
@@ -639,19 +469,19 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 	if err != nil {
 		return err
 	}
-	recordText := ai.FormatSessionRecordForContext(msgs)
+	recordText := chat.FormatSessionRecordForContext(msgs)
 
-	if summaryText, err := SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, CognitiveRetryOptions{
+	if summaryText, err := memory.SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, memory.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
 		LogPrefix:      logPrefix,
 		ChannelID:      meta.ChannelID,
 	}); err == nil && strings.TrimSpace(summaryText) != "" {
-		summaries = store.AppendSummary(now, summaries, meta.RecordID, summaryText, config.AssistantMaxSummaries)
-		_ = store.SaveSummaries(paths.SummariesPath, summaries)
+		summaries = memory.AppendSummary(now, summaries, meta.RecordID, summaryText, config.AssistantMaxSummaries)
+		_ = SaveSummaries(paths.SummariesPath, summaries)
 		meta.LastSummarizedRecordID = meta.RecordID
-		_ = store.SaveMetadata(paths.MetadataPath, *meta)
+		_ = SaveMetadata(paths.MetadataPath, *meta)
 		log.Printf("%s summary saved: user=%s record=%s summaries=%d preview=%q",
 			logPrefix, userID, meta.RecordID, len(summaries.Summaries), sdk.PreviewString(summaryText, config.AssistantLogContentPreviewLen),
 		)
@@ -659,16 +489,16 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 		log.Printf("%s summarize failed: user=%s record=%s err=%v", logPrefix, userID, meta.RecordID, err)
 	}
 
-	if res, err := ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts, CognitiveRetryOptions{
+	if res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts, memory.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
 		LogPrefix:      logPrefix,
 		ChannelID:      meta.ChannelID,
 	}); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
-		facts.Facts = store.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
-		facts = store.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
-		_ = store.SaveFacts(paths.FactsPath, facts)
+		facts.Facts = memory.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
+		facts = memory.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
+		_ = SaveFacts(paths.FactsPath, facts)
 		log.Printf("%s facts updated (end-of-session): user=%s count=%d used=%d new=%d", logPrefix, userID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 	} else if err != nil {
 		log.Printf("%s fact engine end-of-session failed: user=%s err=%v", logPrefix, userID, err)

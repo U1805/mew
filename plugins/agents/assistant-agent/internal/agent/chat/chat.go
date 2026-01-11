@@ -1,4 +1,4 @@
-package ai
+package chat
 
 import (
 	"bytes"
@@ -13,8 +13,8 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
+	"mew/plugins/assistant-agent/internal/agent/memory"
 	"mew/plugins/assistant-agent/internal/config"
-	"mew/plugins/assistant-agent/internal/agent/store"
 	"mew/plugins/sdk"
 	"mew/plugins/sdk/x/llm"
 )
@@ -58,7 +58,7 @@ func ChatWithTools(
 	l5 []openaigo.ChatCompletionMessageParamUnion,
 	handlers ToolHandlers,
 	opts ChatWithToolsOptions,
-) (reply string, finalMood store.Mood, gotMood bool, err error) {
+) (reply string, finalMood memory.Mood, gotMood bool, err error) {
 	if opts.MaxToolCalls <= 0 {
 		opts.MaxToolCalls = 3
 	}
@@ -102,7 +102,7 @@ func ChatWithTools(
 		logLLMMessages(opts.LogPrefix, opts.ChannelID, messages)
 		openaiCfg, err := cfg.OpenAIChatConfig()
 		if err != nil {
-			return "", store.Mood{}, false, err
+			return "", memory.Mood{}, false, err
 		}
 		resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, httpClient, openaiCfg, messages, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
 			MaxRetries:     opts.MaxLLMRetries,
@@ -112,10 +112,10 @@ func ChatWithTools(
 			ChannelID:      opts.ChannelID,
 		})
 		if err != nil {
-			return "", store.Mood{}, false, err
+			return "", memory.Mood{}, false, err
 		}
 		if resp == nil || len(resp.Choices) == 0 {
-			return "", store.Mood{}, false, fmt.Errorf("llm returned empty choices")
+			return "", memory.Mood{}, false, fmt.Errorf("llm returned empty choices")
 		}
 		msg := resp.Choices[0].Message
 		out := stripLeadingMalformedToolDirectives(msg.Content, "<TOOL>")
@@ -124,7 +124,7 @@ func ChatWithTools(
 		}
 
 		// Strip mood line (can appear before/after tool directives).
-		outNoMood, _, _ := store.ExtractAndStripFinalMood(out)
+		outNoMood, _, _ := memory.ExtractAndStripFinalMood(out)
 		outNoMood = stripInvalidToolCloseLines(outNoMood)
 
 		cleanText, toolCalls := extractTrailingToolCalls(outNoMood, "<TOOL>")
@@ -141,7 +141,7 @@ func ChatWithTools(
 			})
 			if opts.OnToolCallAssistantText != nil && strings.TrimSpace(cleanText) != "" {
 				if err := opts.OnToolCallAssistantText(strings.TrimSpace(cleanText)); err != nil {
-					return "", store.Mood{}, false, err
+					return "", memory.Mood{}, false, err
 				}
 			}
 			if strings.TrimSpace(cleanText) != "" {
@@ -213,7 +213,7 @@ func ChatWithTools(
 			continue
 		}
 
-		clean, mood, ok := store.ExtractAndStripFinalMood(out)
+		clean, mood, ok := memory.ExtractAndStripFinalMood(out)
 		if ok && strings.TrimSpace(opts.LogPrefix) != "" {
 			log.Printf("%s final_mood parsed: channel=%s valence=%.4f arousal=%.4f", opts.LogPrefix, opts.ChannelID, mood.Valence, mood.Arousal)
 		}
@@ -222,7 +222,7 @@ func ChatWithTools(
 		return clean, mood, ok, nil
 	}
 
-	return "", store.Mood{}, false, fmt.Errorf("tool loop exceeded")
+	return "", memory.Mood{}, false, fmt.Errorf("tool loop exceeded")
 }
 
 type textToolCall struct {

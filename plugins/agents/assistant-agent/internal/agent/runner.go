@@ -1,4 +1,4 @@
-package bot
+package agent
 
 import (
 	"context"
@@ -12,8 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"mew/plugins/assistant-agent/internal/agent/ai"
-	"mew/plugins/assistant-agent/internal/agent/store"
+	"mew/plugins/assistant-agent/internal/agent/chat"
+	"mew/plugins/assistant-agent/internal/agent/memory"
+	"mew/plugins/assistant-agent/internal/agent/proactive"
+	"mew/plugins/assistant-agent/internal/agent/tools"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
 	"mew/plugins/sdk/api/gateway/socketio"
@@ -40,7 +42,6 @@ type Runner struct {
 	persona  string
 
 	dmChannels *sdk.DMChannelCache
-	store      *store.Store
 	fetcher    *history.Fetcher
 
 	userMu   sync.Mutex
@@ -49,8 +50,7 @@ type Runner struct {
 	knownUsersMu sync.RWMutex
 	knownUsers   map[string]struct{}
 
-	stickersMu    sync.RWMutex
-	stickersCache stickerCache
+	stickers *tools.StickerService
 }
 
 func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*Runner, error) {
@@ -74,7 +74,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		return nil, err
 	}
 
-	persona, err := ai.ReadPromptWithOverrides(config.PersonaPromptRelPath, config.PersonaPromptEmbeddedName)
+	persona, err := chat.ReadPromptWithOverrides(config.PersonaPromptRelPath, config.PersonaPromptEmbeddedName)
 	if err != nil {
 		return nil, fmt.Errorf("read persona failed: %w", err)
 	}
@@ -108,7 +108,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		timeLoc:       timeLoc,
 		persona:       persona,
 		dmChannels:    sdk.NewDMChannelCache(),
-		store:         store.NewStore(serviceType, botID),
+		stickers:      tools.NewStickerService(),
 		fetcher: &history.Fetcher{
 			HTTPClient:         mewHTTPClient,
 			APIBase:            strings.TrimRight(cfg.APIBase, "/"),
@@ -229,8 +229,8 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 		lock.Lock()
 		func() {
 			defer lock.Unlock()
-			paths := r.store.Paths(userID)
-			meta, err := store.LoadMetadata(paths.MetadataPath)
+			paths := UserStatePathsFor(r.serviceType, r.botID, userID)
+			meta, err := LoadMetadata(paths.MetadataPath)
 			if err != nil {
 				log.Printf("%s load metadata failed (periodic): user=%s err=%v", logPrefix, userID, err)
 				return
@@ -248,7 +248,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 				return
 			}
 
-			facts, err := store.LoadFacts(paths.FactsPath)
+			facts, err := LoadFacts(paths.FactsPath)
 			if err != nil {
 				log.Printf("%s load facts failed (periodic): user=%s err=%v", logPrefix, userID, err)
 				return
@@ -263,8 +263,8 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 				return
 			}
 
-			sessionText := ai.FormatSessionRecordForContext(sessionMsgs)
-			res, err := ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, CognitiveRetryOptions{
+			sessionText := chat.FormatSessionRecordForContext(sessionMsgs)
+			res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, memory.CognitiveRetryOptions{
 				MaxRetries:     config.AssistantMaxLLMRetries,
 				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -276,15 +276,15 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 				return
 			}
 			if len(res.Facts) > 0 || len(res.UsedFactIDs) > 0 {
-				facts.Facts = store.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
-				facts = store.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
-				_ = store.SaveFacts(paths.FactsPath, facts)
+				facts.Facts = memory.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
+				facts = memory.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
+				_ = SaveFacts(paths.FactsPath, facts)
 				log.Printf("%s facts updated (periodic): user=%s record=%s count=%d used=%d new=%d", logPrefix, userID, meta.RecordID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 			}
 
 			meta.LastFactRecordID = meta.RecordID
 			meta.LastFactProcessedAt = meta.LastMessageAt
-			_ = store.SaveMetadata(paths.MetadataPath, meta)
+			_ = SaveMetadata(paths.MetadataPath, meta)
 		}()
 	}
 }
@@ -303,8 +303,8 @@ func (r *Runner) finalizeStaleSessions(ctx context.Context, logPrefix string) {
 		lock.Lock()
 		func() {
 			defer lock.Unlock()
-			paths := r.store.Paths(userID)
-			meta, err := store.LoadMetadata(paths.MetadataPath)
+			paths := UserStatePathsFor(r.serviceType, r.botID, userID)
+			meta, err := LoadMetadata(paths.MetadataPath)
 			if err != nil {
 				log.Printf("%s load metadata failed: user=%s err=%v", logPrefix, userID, err)
 				return
@@ -324,6 +324,66 @@ func (r *Runner) finalizeStaleSessions(ctx context.Context, logPrefix string) {
 			if err := r.finalizeRecord(ctx, logPrefix, userID, paths, &meta); err != nil {
 				log.Printf("%s finalize record failed: user=%s err=%v", logPrefix, userID, err)
 				return
+			}
+		}()
+	}
+}
+
+func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
+	r.knownUsersMu.RLock()
+	users := make([]string, 0, len(r.knownUsers))
+	for id := range r.knownUsers {
+		users = append(users, id)
+	}
+	r.knownUsersMu.RUnlock()
+
+	for _, userID := range users {
+		lock := r.userMutex(userID)
+		lock.Lock()
+		func() {
+			defer lock.Unlock()
+			paths := UserStatePathsFor(r.serviceType, r.botID, userID)
+
+			q, err := LoadProactiveQueue(paths.ProactivePath)
+			if err != nil {
+				log.Printf("%s load proactive queue failed: user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+			if len(q.Requests) == 0 {
+				return
+			}
+
+			hasDue := false
+			now := time.Now()
+			for _, req := range q.Requests {
+				if !req.RequestAt.After(now) {
+					hasDue = true
+					break
+				}
+			}
+			if !hasDue {
+				return
+			}
+
+			meta, err := LoadMetadata(paths.MetadataPath)
+			if err != nil {
+				log.Printf("%s load metadata failed (proactive): user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+
+			var summaries memory.SummariesFile
+			if s, err := LoadSummaries(paths.SummariesPath); err == nil {
+				summaries = s
+			}
+
+			q = proactive.RunProactiveQueueForUser(ctx, userID, q, meta, summaries, r.fetcher, r.llmHTTPClient, r.aiConfig, r.persona, logPrefix,
+				func(ctx context.Context, channelID, content string) error {
+					return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
+				},
+			)
+
+			if err := SaveProactiveQueue(paths.ProactivePath, q); err != nil {
+				log.Printf("%s save proactive queue failed: user=%s err=%v", logPrefix, userID, err)
 			}
 		}()
 	}

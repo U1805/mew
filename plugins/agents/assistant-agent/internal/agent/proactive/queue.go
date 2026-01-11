@@ -1,12 +1,9 @@
-package store
+package proactive
 
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"os"
 	"time"
-
-	"mew/plugins/sdk"
 )
 
 type ProactiveRequest struct {
@@ -30,27 +27,6 @@ func newProactiveID() string {
 		return ""
 	}
 	return hex.EncodeToString(b[:])
-}
-
-func LoadProactiveQueue(path string) (ProactiveQueueFile, error) {
-	v, err := sdk.LoadJSONFile[ProactiveQueueFile](path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return ProactiveQueueFile{Requests: []ProactiveRequest{}}, nil
-		}
-		return ProactiveQueueFile{}, err
-	}
-	if v.Requests == nil {
-		v.Requests = []ProactiveRequest{}
-	}
-	return v, nil
-}
-
-func SaveProactiveQueue(path string, v ProactiveQueueFile) error {
-	if v.Requests == nil {
-		v.Requests = []ProactiveRequest{}
-	}
-	return sdk.SaveJSONFileIndented(path, v)
 }
 
 func AppendProactiveRequest(now time.Time, q ProactiveQueueFile, req ProactiveRequest, max int) ProactiveQueueFile {

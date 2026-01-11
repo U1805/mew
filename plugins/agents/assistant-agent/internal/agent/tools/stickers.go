@@ -1,11 +1,13 @@
-package bot
+package tools
 
 import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"mew/plugins/assistant-agent/internal/config"
@@ -17,34 +19,47 @@ type stickerCache struct {
 	Stickers  []apistickers.Sticker
 }
 
-func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) ([]apistickers.Sticker, error) {
+type StickerService struct {
+	mu    sync.RWMutex
+	cache stickerCache
+}
+
+func NewStickerService() *StickerService {
+	return &StickerService{}
+}
+
+func (s *StickerService) listConfiguredStickers(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix string) ([]apistickers.Sticker, error) {
 	now := time.Now()
-	r.stickersMu.RLock()
-	if !r.stickersCache.FetchedAt.IsZero() && now.Sub(r.stickersCache.FetchedAt) < config.StickerCacheTTL {
-		out := append([]apistickers.Sticker(nil), r.stickersCache.Stickers...)
-		r.stickersMu.RUnlock()
+	s.mu.RLock()
+	if !s.cache.FetchedAt.IsZero() && now.Sub(s.cache.FetchedAt) < config.StickerCacheTTL {
+		out := append([]apistickers.Sticker(nil), s.cache.Stickers...)
+		s.mu.RUnlock()
 		return out, nil
 	}
-	r.stickersMu.RUnlock()
+	s.mu.RUnlock()
 
-	stickers, err := apistickers.ListMyStickers(ctx, r.session.HTTPClient(), r.apiBase, "")
+	if httpClient == nil {
+		return nil, fmt.Errorf("missing http client")
+	}
+
+	stickers, err := apistickers.ListMyStickers(ctx, httpClient, apiBase, "")
 	if err != nil {
 		log.Printf("%s sticker list fetch failed: err=%v", logPrefix, err)
 		return nil, err
 	}
 
-	r.stickersMu.Lock()
-	r.stickersCache = stickerCache{
+	s.mu.Lock()
+	s.cache = stickerCache{
 		FetchedAt: now,
 		Stickers:  append([]apistickers.Sticker(nil), stickers...),
 	}
-	r.stickersMu.Unlock()
+	s.mu.Unlock()
 
 	return stickers, nil
 }
 
-func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) string {
-	stickers, err := r.listConfiguredStickers(ctx, logPrefix)
+func (s *StickerService) StickerPromptAddon(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix string) string {
+	stickers, err := s.listConfiguredStickers(ctx, httpClient, apiBase, logPrefix)
 	if err != nil {
 		return ""
 	}
@@ -93,12 +108,12 @@ func (r *Runner) stickerPromptAddon(ctx context.Context, logPrefix string) strin
 	return strings.TrimSpace(b.String())
 }
 
-func (r *Runner) resolveStickerIDByName(ctx context.Context, logPrefix, name string) (string, error) {
+func (s *StickerService) ResolveStickerIDByName(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix, name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", nil
 	}
-	stickers, err := r.listConfiguredStickers(ctx, logPrefix)
+	stickers, err := s.listConfiguredStickers(ctx, httpClient, apiBase, logPrefix)
 	if err != nil {
 		return "", err
 	}
