@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"mew/plugins/sdk"
+	"mew/plugins/sdk/util/proxy"
 )
 
 type Client struct {
@@ -43,7 +44,16 @@ func (c *Client) FetchTimeline(ctx context.Context, handle string) (Timeline, er
 
 	client := c.httpClient
 	if client == nil {
-		client = &http.Client{Timeout: 25 * time.Second, Transport: &http.Transport{Proxy: http.ProxyFromEnvironment}}
+		tmp, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+			Timeout:   25 * time.Second,
+			CookieJar: true,
+			Transport: proxy.NewTransport(nil),
+		})
+		if err != nil {
+			client = &http.Client{Timeout: 25 * time.Second, Transport: http.DefaultTransport}
+		} else {
+			client = tmp
+		}
 	}
 	if client.Jar == nil {
 		jar, _ := cookiejar.New(nil)

@@ -125,6 +125,7 @@ services:
       MEW_URL: http://server:3000
       MEW_CONFIG_SYNC_INTERVAL_SECONDS: ${MEW_CONFIG_SYNC_INTERVAL_SECONDS:-60}
       MEW_PLUGINS: ${MEW_PLUGINS:-test-fetcher,test-agent}
+      proxy_list_urls: ${proxy_list_urls:-https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt}
     volumes:
       - plugins_cache:/root/.cache/mew
 

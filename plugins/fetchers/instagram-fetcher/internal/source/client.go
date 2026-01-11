@@ -14,6 +14,7 @@ import (
 	"crypto/rand"
 
 	"mew/plugins/sdk"
+	"mew/plugins/sdk/util/proxy"
 )
 
 type Client struct {
@@ -21,11 +22,14 @@ type Client struct {
 }
 
 func NewClient(useProxy bool) (*Client, error) {
-	httpClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:     35 * time.Second,
-		CookieJar:   true,
-		UseMEWProxy: useProxy,
-	})
+	opts := sdk.HTTPClientOptions{
+		Timeout:   35 * time.Second,
+		CookieJar: true,
+	}
+	if useProxy {
+		opts.Transport = proxy.NewTransport(nil)
+	}
+	httpClient, err := sdk.NewHTTPClient(opts)
 	if err != nil {
 		return nil, err
 	}
