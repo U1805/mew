@@ -1,7 +1,7 @@
 package app
 
 import (
-	"mew/plugins/assistant-agent/internal/bot"
+	"mew/plugins/assistant-agent/internal/agent/bot"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
 )

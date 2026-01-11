@@ -138,7 +138,7 @@ func (p *Pool) UpdateNow(ctx context.Context) {
 	}
 	defer atomic.StoreInt32(&p.updating, 0)
 
-	p.log.Printf("refreshing proxy pool from %d source(s)...", len(p.cfg.ProxyListURLs))
+	// p.log.Printf("refreshing proxy pool from %d source(s)...", len(p.cfg.ProxyListURLs))
 
 	raw, err := fetchProxyLists(ctx, p.cfg.ProxyListURLs)
 	if err != nil {
@@ -157,12 +157,12 @@ func (p *Pool) UpdateNow(ctx context.Context) {
 	}
 
 	p.mu.Lock()
-	old := len(p.proxies)
+	// old := len(p.proxies)
 	p.proxies = healthy
 	atomic.StoreUint64(&p.idx, 0)
 	p.mu.Unlock()
 
-	p.log.Printf("proxy pool updated: %d -> %d", old, len(healthy))
+	// p.log.Printf("proxy pool updated: %d -> %d", old, len(healthy))
 }
 
 func (p *Pool) Len() int {
