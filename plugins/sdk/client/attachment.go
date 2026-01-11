@@ -26,13 +26,15 @@ func DownloadAttachmentBytes(ctx context.Context, mewHTTPClient, externalHTTPCli
 
 	key := strings.TrimSpace(att.Key)
 	channelID := strings.TrimSpace(att.ChannelID)
-	if key != "" && channelID != "" && strings.TrimSpace(userToken) != "" && mewHTTPClient != nil {
+	if key != "" && channelID != "" && mewHTTPClient != nil {
 		u := fmt.Sprintf("%s/channels/%s/uploads/%s", strings.TrimRight(strings.TrimSpace(apiBase), "/"), url.PathEscape(channelID), url.PathEscape(key))
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(userToken))
+		if strings.TrimSpace(userToken) != "" {
+			req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(userToken))
+		}
 		resp, err := mewHTTPClient.Do(req)
 		if err == nil {
 			defer resp.Body.Close()

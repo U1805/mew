@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -14,7 +13,9 @@ func FetchDMChannels(ctx context.Context, httpClient *http.Client, apiBase, user
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+userToken)
+	if strings.TrimSpace(userToken) != "" {
+		req.Header.Set("Authorization", "Bearer "+userToken)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -24,7 +25,7 @@ func FetchDMChannels(ctx context.Context, httpClient *http.Client, apiBase, user
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Body: strings.TrimSpace(string(body))}
 	}
 
 	var channels []struct {

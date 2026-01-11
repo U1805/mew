@@ -17,6 +17,7 @@ describe('Auth Routes', () => {
       expect(res.statusCode).toBe(201);
       expect(res.body.user.email).toBe(userData.email);
       expect(res.body.token).toBeDefined();
+      expect(res.headers['set-cookie']).toBeDefined();
     });
 
     it('should return 409 if email is already taken', async () => {
@@ -48,11 +49,32 @@ describe('Auth Routes', () => {
       const res = await request(app).post('/api/auth/login').send({
         email: userData.email,
         password: userData.password,
+        rememberMe: true,
       });
 
       expect(res.statusCode).toBe(200);
       expect(res.body.token).toBeDefined();
       expect(res.body.user.email).toBe(userData.email);
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('should issue a session refresh cookie when rememberMe=false', async () => {
+      const userData = {
+        email: 'login-session-1@example.com',
+        username: 'loginsession1',
+        password: 'password123',
+      };
+      await request(app).post('/api/auth/register').send(userData);
+      const res = await request(app).post('/api/auth/login').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: false,
+      });
+
+      expect(res.statusCode).toBe(200);
+      const cookies = res.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+      expect((cookies || []).join(';')).not.toContain('Max-Age=');
     });
 
     it('should return 401 for incorrect password', async () => {
@@ -95,11 +117,106 @@ describe('Auth Routes', () => {
       expect(res.statusCode).toBe(200);
       expect(res.body.token).toBeDefined();
       expect(res.body.user?._id).toBe(botUser._id.toString());
+      expect(res.headers['set-cookie']).toBeDefined();
     });
 
     it('should return 401 for invalid bot accessToken', async () => {
       const res = await request(app).post('/api/auth/bot').send({ accessToken: 'nope' });
       expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe('bot refresh flow', () => {
+    it('should allow /api/auth/refresh after /api/auth/bot', async () => {
+      const botUser = await User.create({
+        email: 'bot-refresh-1@internal.mew',
+        username: 'bot-refresh-1',
+        password: 'x'.repeat(20),
+        isBot: true,
+      });
+
+      const accessToken = 'r'.repeat(32);
+      await Bot.create({
+        ownerId: new mongoose.Types.ObjectId(),
+        name: 'bot-refresh',
+        accessToken,
+        serviceType: 'rss-fetcher',
+        dmEnabled: true,
+        config: '{}',
+        botUserId: botUser._id,
+      });
+
+      const loginRes = await request(app).post('/api/auth/bot').send({ accessToken });
+      expect(loginRes.statusCode).toBe(200);
+      const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+
+      const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      expect(refreshRes.statusCode).toBe(200);
+      expect(refreshRes.body.token).toBeDefined();
+      expect(refreshRes.body.user?._id).toBe(botUser._id.toString());
+    });
+  });
+
+  describe('POST /api/auth/refresh', () => {
+    it('should rotate refresh token and return a new access token', async () => {
+      const userData = {
+        email: 'refresh-1@example.com',
+        username: 'refreshuser1',
+        password: 'password123',
+      };
+
+      await request(app).post('/api/auth/register').send(userData);
+      const loginRes = await request(app).post('/api/auth/login').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: true,
+      });
+
+      expect(loginRes.statusCode).toBe(200);
+      const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+
+      const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      expect(refreshRes.statusCode).toBe(200);
+      expect(refreshRes.body.token).toBeDefined();
+      expect(refreshRes.headers['set-cookie']).toBeDefined();
+
+      // Old refresh token should no longer be valid after rotation.
+      const refreshAgainOld = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      expect(refreshAgainOld.statusCode).toBe(401);
+    });
+
+    it('should return 401 when refresh cookie is missing', async () => {
+      const res = await request(app).post('/api/auth/refresh');
+      expect(res.statusCode).toBe(401);
+    });
+  });
+
+  describe('POST /api/auth/logout', () => {
+    it('should revoke refresh token and clear cookie', async () => {
+      const userData = {
+        email: 'logout-1@example.com',
+        username: 'logoutuser1',
+        password: 'password123',
+      };
+
+      await request(app).post('/api/auth/register').send(userData);
+      const loginRes = await request(app).post('/api/auth/login').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: true,
+      });
+
+      const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+
+      const logoutRes = await request(app).post('/api/auth/logout').set('Cookie', cookies || []);
+      expect(logoutRes.statusCode).toBe(204);
+      expect(logoutRes.headers['set-cookie']).toBeDefined();
+
+      const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      expect(refreshRes.statusCode).toBe(401);
     });
   });
 });

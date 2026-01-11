@@ -25,8 +25,8 @@ type Runner struct {
 	botID       string
 	botName     string
 	accessToken string
-	userToken   string
 	botUserID   string
+	session     *sdk.BotSession
 
 	apiBase string
 	mewURL  string
@@ -97,8 +97,8 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		botID:         botID,
 		botName:       botName,
 		accessToken:   accessToken,
-		userToken:     "",
 		botUserID:     "",
+		session:       nil,
 		apiBase:       strings.TrimRight(cfg.APIBase, "/"),
 		mewURL:        mewURL,
 		wsURL:         wsURL,
@@ -127,13 +127,16 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 func (r *Runner) Run(ctx context.Context) error {
 	logPrefix := fmt.Sprintf("%s bot=%s name=%q", assistantLogPrefix, r.botID, r.botName)
 
-	me, token, err := sdk.LoginBot(ctx, r.mewHTTPClient, r.apiBase, r.accessToken)
+	r.session = sdk.NewBotSession(r.apiBase, r.accessToken, r.mewHTTPClient)
+	me, err := r.session.User(ctx)
 	if err != nil {
 		return fmt.Errorf("%s bot auth failed: %w", logPrefix, err)
 	}
 	r.botUserID = me.ID
-	r.userToken = token
-	r.fetcher.UserToken = token
+	if authed := r.session.HTTPClient(); authed != nil {
+		r.fetcher.HTTPClient = authed
+	}
+	r.fetcher.UserToken = ""
 
 	r.loadKnownUsersFromDisk(logPrefix)
 
@@ -178,7 +181,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		})
 	})
 	g.Go(func(ctx context.Context) {
-		err := socketio.RunGatewayWithReconnect(ctx, r.wsURL, r.userToken, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
+		err := socketio.RunGatewayWithReconnectSession(ctx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
 			if eventName != assistantEventMessageCreate {
 				return nil
 			}
@@ -327,7 +330,7 @@ func (r *Runner) finalizeStaleSessions(ctx context.Context, logPrefix string) {
 }
 
 func (r *Runner) refreshDMChannels(ctx context.Context) error {
-	return r.dmChannels.Refresh(ctx, r.mewHTTPClient, r.apiBase, r.userToken)
+	return r.dmChannels.RefreshWithBotSession(ctx, r.session)
 }
 
 func (r *Runner) userMutex(userID string) *sync.Mutex {

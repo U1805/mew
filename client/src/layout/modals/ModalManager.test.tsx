@@ -75,9 +75,9 @@ describe('ModalManager', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders matching modal for activeModal', () => {
+  it('renders matching modal for activeModal', async () => {
     useModalStore.setState({ activeModal: 'createInvite', modalData: null });
     render(<ModalManager />);
-    expect(screen.getByTestId('createInvite')).toBeInTheDocument();
+    expect(await screen.findByTestId('createInvite')).toBeInTheDocument();
   });
 });

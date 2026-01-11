@@ -22,7 +22,7 @@ type JpdictRunner struct {
 	botID       string
 	botName     string
 	accessToken string // bot access token from bootstrap (not a JWT)
-	userToken   string // JWT issued by /api/auth/bot
+	session     *sdk.BotSession
 
 	apiBase string
 	mewURL  string
@@ -80,7 +80,7 @@ func NewJpdictRunner(serviceType, botID, botName, accessToken, rawConfig string,
 		botID:         botID,
 		botName:       botName,
 		accessToken:   accessToken,
-		userToken:     "",
+		session:       nil,
 		apiBase:       strings.TrimRight(cfg.APIBase, "/"),
 		mewURL:        mewURL,
 		wsURL:         wsURL,
@@ -97,18 +97,18 @@ func NewJpdictRunner(serviceType, botID, botName, accessToken, rawConfig string,
 func (r *JpdictRunner) Run(ctx context.Context) error {
 	logPrefix := fmt.Sprintf("[jpdict-agent] bot=%s name=%q", r.botID, r.botName)
 
-	me, token, err := sdk.LoginBot(ctx, r.mewHTTPClient, r.apiBase, r.accessToken)
+	r.session = sdk.NewBotSession(r.apiBase, r.accessToken, r.mewHTTPClient)
+	me, err := r.session.User(ctx)
 	if err != nil {
 		return fmt.Errorf("%s bot auth failed: %w", logPrefix, err)
 	}
 	r.botUserID = me.ID
-	r.userToken = token
 
 	if err := r.refreshDMChannels(ctx); err != nil {
 		log.Printf("%s refresh DM channels failed (will retry later): %v", logPrefix, err)
 	}
 
-	return socketio.RunGatewayWithReconnect(ctx, r.wsURL, r.userToken, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
+	return socketio.RunGatewayWithReconnectSession(ctx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
 		if eventName != "MESSAGE_CREATE" {
 			return nil
 		}
@@ -194,5 +194,5 @@ func (r *JpdictRunner) isDMChannel(channelID string) bool {
 }
 
 func (r *JpdictRunner) refreshDMChannels(ctx context.Context) error {
-	return r.dmChannels.Refresh(ctx, r.mewHTTPClient, r.apiBase, r.userToken)
+	return r.dmChannels.RefreshWithBotSession(ctx, r.session)
 }

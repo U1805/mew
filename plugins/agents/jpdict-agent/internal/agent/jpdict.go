@@ -86,7 +86,8 @@ func (r *JpdictRunner) queryLLM(ctx context.Context, text string, attachments []
 		DefaultTextPrompt:  jpdictDefaultTextPrompt,
 		DefaultImagePrompt: jpdictDefaultImagePrompt,
 		Download: func(ctx context.Context, att client.AttachmentRef, limit int64) ([]byte, error) {
-			return client.DownloadAttachmentBytes(ctx, r.mewHTTPClient, r.llmHTTPClient, r.apiBase, r.userToken, att, limit)
+			// Use SDK-managed auth (refresh/login) via the MEW HTTP client's cookie jar + auth transport.
+			return client.DownloadAttachmentBytes(ctx, r.session.HTTPClient(), r.llmHTTPClient, r.apiBase, "", att, limit)
 		},
 	})
 	if err != nil {

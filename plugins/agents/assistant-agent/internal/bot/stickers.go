@@ -28,7 +28,7 @@ func (r *Runner) listConfiguredStickers(ctx context.Context, logPrefix string) (
 	}
 	r.stickersMu.RUnlock()
 
-	stickers, err := client.ListMyStickers(ctx, r.mewHTTPClient, r.apiBase, r.userToken)
+	stickers, err := client.ListMyStickers(ctx, r.session.HTTPClient(), r.apiBase, "")
 	if err != nil {
 		log.Printf("%s sticker list fetch failed: err=%v", logPrefix, err)
 		return nil, err

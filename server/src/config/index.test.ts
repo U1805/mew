@@ -10,9 +10,16 @@ describe('config/createConfig', () => {
     expect(createConfig({ PORT: 'nope' }).port).toBe(3000);
     expect(createConfig({ PORT: '4000' }).port).toBe(4000);
 
-    expect(createConfig({}).jwtExpiresIn).toBe(86400);
+    expect(createConfig({}).jwtExpiresIn).toBe(1800);
     expect(createConfig({ JWT_EXPIRES_IN: '60' }).jwtExpiresIn).toBe(60);
     expect(createConfig({ JWT_EXPIRES_IN: '2h' }).jwtExpiresIn).toBe('2h');
+  });
+
+  it('parses REFRESH_TOKEN_EXPIRES_IN into seconds', () => {
+    expect(createConfig({}).refreshTokenExpiresSeconds).toBe(60 * 60 * 24 * 30);
+    expect(createConfig({ REFRESH_TOKEN_EXPIRES_IN: '60' }).refreshTokenExpiresSeconds).toBe(60);
+    expect(createConfig({ REFRESH_TOKEN_EXPIRES_IN: '2h' }).refreshTokenExpiresSeconds).toBe(2 * 60 * 60);
+    expect(createConfig({ REFRESH_TOKEN_EXPIRES_IN: '7d' }).refreshTokenExpiresSeconds).toBe(7 * 60 * 60 * 24);
   });
 
   it('parses booleans and infra allowed IPs from CSV', () => {

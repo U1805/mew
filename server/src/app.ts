@@ -66,6 +66,7 @@ const corsOrigin: cors.CorsOptions['origin'] = (origin, cb) => {
 app.use(
   cors({
     origin: corsOrigin,
+    credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Mew-Admin-Secret'],
     exposedHeaders: ['Content-Length'],

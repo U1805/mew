@@ -2,12 +2,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 let token: string | null = null;
 const requestUse = vi.fn();
+const responseUse = vi.fn();
 
 vi.mock('axios', () => {
-  const instance = { interceptors: { request: { use: requestUse } } };
+  const instance = { interceptors: { request: { use: requestUse }, response: { use: responseUse } } };
   return {
     default: {
       create: vi.fn(() => instance),
+      post: vi.fn(),
     },
   };
 });
@@ -22,6 +24,7 @@ describe('shared/services/http', () => {
   beforeEach(() => {
     token = null;
     requestUse.mockClear();
+    responseUse.mockClear();
     vi.resetModules();
   });
 

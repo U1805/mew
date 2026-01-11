@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"strings"
 	"time"
@@ -30,8 +31,14 @@ func NewUserHTTPClient() (*http.Client, error) {
 		transport.Proxy = proxyFunc
 	}
 
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, fmt.Errorf("create cookie jar: %w", err)
+	}
+
 	return &http.Client{
 		Transport: transport,
+		Jar:       jar,
 		Timeout:   15 * time.Second,
 	}, nil
 }

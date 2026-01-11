@@ -77,7 +77,9 @@ func FetchChannelMessages(ctx context.Context, httpClient *http.Client, apiBase,
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+userToken)
+	if strings.TrimSpace(userToken) != "" {
+		req.Header.Set("Authorization", "Bearer "+userToken)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -87,7 +89,7 @@ func FetchChannelMessages(ctx context.Context, httpClient *http.Client, apiBase,
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Body: strings.TrimSpace(string(body))}
 	}
 
 	var msgs []ChannelMessage
@@ -127,7 +129,9 @@ func SearchChannelMessages(ctx context.Context, httpClient *http.Client, apiBase
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("Authorization", "Bearer "+userToken)
+	if strings.TrimSpace(userToken) != "" {
+		req.Header.Set("Authorization", "Bearer "+userToken)
+	}
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -137,7 +141,7 @@ func SearchChannelMessages(ctx context.Context, httpClient *http.Client, apiBase
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, &HTTPStatusError{StatusCode: resp.StatusCode, Body: strings.TrimSpace(string(body))}
 	}
 
 	var parsed struct {
