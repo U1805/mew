@@ -13,6 +13,7 @@ import (
 	"mew/plugins/assistant-agent/internal/agent/memory"
 	"mew/plugins/assistant-agent/internal/agent/proactive"
 	"mew/plugins/assistant-agent/internal/agent/tools"
+	"mew/plugins/assistant-agent/internal/agent/utils"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
 	sdkapi "mew/plugins/sdk/api"
@@ -433,7 +434,7 @@ func (r *Runner) maybeOnDemandRemember(
 
 	log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
 	sessionText := chat.FormatSessionRecordForContext(sessionMsgs)
-	res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, memory.CognitiveRetryOptions{
+	res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -471,7 +472,7 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 	}
 	recordText := chat.FormatSessionRecordForContext(msgs)
 
-	if summaryText, err := memory.SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, memory.CognitiveRetryOptions{
+	if summaryText, err := memory.SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -489,7 +490,7 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 		log.Printf("%s summarize failed: user=%s record=%s err=%v", logPrefix, userID, meta.RecordID, err)
 	}
 
-	if res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts, memory.CognitiveRetryOptions{
+	if res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,

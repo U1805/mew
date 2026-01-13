@@ -3,7 +3,7 @@ package config
 import "time"
 
 const (
-	DefaultTimezone = "+08:00"
+	DefaultTimezone                = "+08:00"
 	AssistantEventMessageCreate    = "MESSAGE_CREATE"
 	AssistantUpstreamMessageCreate = "message/create"
 
@@ -34,6 +34,24 @@ const (
 	AssistantMaxFacts           = 30
 	AssistantMaxSummaries       = 30
 	AssistantMaxProactiveQueue  = 16
+
+	// AssistantFactDefaultImportance is the conservative fallback importance score (1-10)
+	// used when migrating legacy fact formats or when the model doesn't provide importance.
+	AssistantFactDefaultImportance = 3
+
+	// AssistantFactRetentionAlpha is the decay coefficient used by fact retention scoring:
+	// Score = S / (1+t)^alpha.
+	AssistantFactRetentionAlpha = 0.5
+
+	// AssistantFactRetentionRecencyScale is the scaling factor C in:
+	// t = ((L-1-Index)/L) * C.
+	AssistantFactRetentionRecencyScale = 10.0
+
+	// AssistantFactMinForConsolidation skips consolidation when facts are too few.
+	AssistantFactMinForConsolidation = 8
+
+	// AssistantFactMaxConsolidationOps caps consolidation operations per run.
+	AssistantFactMaxConsolidationOps = 8
 
 	AssistantIncomingQueueSize = 256
 	AssistantWorkerCount       = 4
@@ -75,7 +93,7 @@ const (
 	DefaultMaxImageBytes      int64 = 5 * 1024 * 1024
 	DefaultMaxTotalImageBytes int64 = 12 * 1024 * 1024
 
-	StickerCacheTTL  = 60 * time.Second
+	StickerCacheTTL   = 60 * time.Second
 	ExaSearchEndpoint = "https://api.exa.ai/search"
 
 	DefaultBaselineValence = 0.2

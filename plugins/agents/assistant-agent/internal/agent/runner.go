@@ -16,6 +16,7 @@ import (
 	"mew/plugins/assistant-agent/internal/agent/memory"
 	"mew/plugins/assistant-agent/internal/agent/proactive"
 	"mew/plugins/assistant-agent/internal/agent/tools"
+	"mew/plugins/assistant-agent/internal/agent/utils"
 	"mew/plugins/assistant-agent/internal/config"
 	"mew/plugins/sdk"
 	"mew/plugins/sdk/api/gateway/socketio"
@@ -230,6 +231,27 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 		func() {
 			defer lock.Unlock()
 			paths := UserStatePathsFor(r.serviceType, r.botID, userID)
+			facts, err := LoadFacts(paths.FactsPath)
+			if err != nil {
+				log.Printf("%s load facts failed (periodic): user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+
+			// 记忆整理属于“梦境固化”式的后台工作，不应依赖会话状态。
+			// 它对每个用户最多每天执行一次，并持久化在 facts.json 中（LastConsolidatedAt）。
+			if updated, ran, err := memory.MaybeConsolidateFactsWithRetry(ctx, r.llmHTTPClient, r.aiConfig, now, facts, config.AssistantMaxFacts, utils.CognitiveRetryOptions{
+				MaxRetries:     config.AssistantMaxLLMRetries,
+				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
+				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
+				LogPrefix:      logPrefix,
+				ChannelID:      "",
+			}); err != nil {
+				log.Printf("%s facts consolidation failed (periodic): user=%s err=%v", logPrefix, userID, err)
+			} else if ran {
+				facts = updated
+				_ = SaveFacts(paths.FactsPath, facts)
+			}
+
 			meta, err := LoadMetadata(paths.MetadataPath)
 			if err != nil {
 				log.Printf("%s load metadata failed (periodic): user=%s err=%v", logPrefix, userID, err)
@@ -248,12 +270,6 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 				return
 			}
 
-			facts, err := LoadFacts(paths.FactsPath)
-			if err != nil {
-				log.Printf("%s load facts failed (periodic): user=%s err=%v", logPrefix, userID, err)
-				return
-			}
-
 			sessionMsgs, recordID, _, err := r.fetcher.FetchSessionMessages(ctx, meta.ChannelID)
 			if err != nil {
 				log.Printf("%s load session record failed (periodic): user=%s channel=%s err=%v", logPrefix, userID, meta.ChannelID, err)
@@ -264,7 +280,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 			}
 
 			sessionText := chat.FormatSessionRecordForContext(sessionMsgs)
-			res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, memory.CognitiveRetryOptions{
+			res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, utils.CognitiveRetryOptions{
 				MaxRetries:     config.AssistantMaxLLMRetries,
 				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
