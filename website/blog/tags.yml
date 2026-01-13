@@ -7,3 +7,8 @@ assistant-agent:
   label: assistant-agent
   permalink: /assistant-agent
   description: agent 插件与实现细节
+
+memory-system:
+  label: 记忆系统
+  permalink: /memory-system
+  description: 记忆抽取、遗忘策略、整理固化等实现与设计
