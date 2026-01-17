@@ -77,6 +77,10 @@ const (
 	AssistantReplyDelayPerRune = 60 * time.Millisecond
 	AssistantReplyDelayMax     = 3500 * time.Millisecond
 
+	// AssistantTypingWPMDefault is the default typing speed simulation.
+	// WPM counts "words" as Unicode characters (runes) for this project.
+	AssistantTypingWPMDefault = 30
+
 	AssistantLLMRetryInitialBackoff = 250 * time.Millisecond
 	AssistantLLMRetryMaxBackoff     = 5 * time.Second
 

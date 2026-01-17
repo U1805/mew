@@ -163,7 +163,7 @@ func (r *Runner) processDMMessage(
 	}
 
 	clean, controls := chat.ParseReplyControls(reply)
-	if err := chat.SendReply(ctx, emit, channelID, userID, clean, controls, logPrefix,
+	if err := chat.SendReply(ctx, emit, channelID, userID, clean, config.AssistantTypingWPMDefault, controls, logPrefix,
 		func(ctx context.Context, channelID, content string) error {
 			return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
 		},
@@ -199,7 +199,7 @@ func (r *Runner) processDMMessage(
 		}
 
 		moreClean, moreControls := chat.ParseReplyControls(more)
-		if err := chat.SendReply(ctx, emit, channelID, userID, moreClean, moreControls, logPrefix,
+		if err := chat.SendReply(ctx, emit, channelID, userID, moreClean, config.AssistantTypingWPMDefault, moreControls, logPrefix,
 			func(ctx context.Context, channelID, content string) error {
 				return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
 			},

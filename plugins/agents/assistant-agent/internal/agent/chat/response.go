@@ -115,6 +115,20 @@ func AssistantReplyDelayForLine(line string) time.Duration {
 	return d
 }
 
+func AssistantTypingDelayForLine(line string, wpm int) time.Duration {
+	n := len([]rune(strings.TrimSpace(line)))
+	if n <= 0 {
+		return 0
+	}
+	if wpm <= 0 {
+		wpm = config.AssistantTypingWPMDefault
+	}
+	if wpm <= 0 {
+		return 0
+	}
+	return time.Duration(n) * time.Minute / time.Duration(wpm)
+}
+
 func SleepWithContext(ctx context.Context, d time.Duration) {
 	if d <= 0 {
 		return
@@ -166,6 +180,7 @@ func SendReply(
 	channelID string,
 	userID string,
 	reply string,
+	typingWPM int,
 	controls ReplyControls,
 	logPrefix string,
 	postMessageHTTP func(ctx context.Context, channelID, content string) error,
@@ -206,6 +221,7 @@ func SendReply(
 
 		linesSent := 0
 		for i, t := range lines {
+			SleepWithContext(ctx, AssistantTypingDelayForLine(t, typingWPM))
 			sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
 				"channelId": channelID,
 				"content":   t,

@@ -157,12 +157,12 @@ func (p *Pool) UpdateNow(ctx context.Context) {
 	}
 
 	p.mu.Lock()
-	// old := len(p.proxies)
+	old := len(p.proxies)
 	p.proxies = healthy
 	atomic.StoreUint64(&p.idx, 0)
 	p.mu.Unlock()
 
-	// p.log.Printf("proxy pool updated: %d -> %d", old, len(healthy))
+	p.log.Printf("proxy pool updated: %d -> %d", old, len(healthy))
 }
 
 func (p *Pool) Len() int {

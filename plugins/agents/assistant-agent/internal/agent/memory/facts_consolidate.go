@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -158,6 +159,12 @@ Return ONLY a JSON array like:
 		}
 
 		raw := extractJSONFromText(resp.Choices[0].Message.Content)
+		logPrefix := opts.LogPrefix
+		if strings.TrimSpace(logPrefix) == "" {
+			logPrefix = config.AssistantLogPrefix
+		}
+		log.Printf("%s facts consolidation model_json=%s", logPrefix, raw)
+
 		var parsed []FactConsolidationOp
 		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
 			return fmt.Errorf("consolidation invalid json: %w", err)

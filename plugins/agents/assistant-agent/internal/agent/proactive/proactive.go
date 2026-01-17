@@ -129,7 +129,7 @@ func RunProactiveQueueForUser(
 			continue
 		}
 
-		if err := sendReplyHTTP(ctx, req.ChannelID, outClean, func(line string) error {
+		if err := sendReplyHTTP(ctx, req.ChannelID, outClean, config.AssistantTypingWPMDefault, func(line string) error {
 			if postMessage == nil {
 				return fmt.Errorf("postMessage not configured")
 			}
@@ -317,7 +317,7 @@ func formatSummariesBetween(s memory.SummariesFile, start time.Time, end time.Ti
 	return strings.TrimSpace(b.String())
 }
 
-func sendReplyHTTP(ctx context.Context, channelID string, reply string, postLine func(line string) error) error {
+func sendReplyHTTP(ctx context.Context, channelID string, reply string, typingWPM int, postLine func(line string) error) error {
 	reply = strings.TrimSpace(reply)
 	if reply == "" {
 		return nil
@@ -339,6 +339,7 @@ func sendReplyHTTP(ctx context.Context, channelID string, reply string, postLine
 	}
 
 	for i, t := range lines {
+		chat.SleepWithContext(ctx, chat.AssistantTypingDelayForLine(t, typingWPM))
 		if err := postLine(t); err != nil {
 			return err
 		}
