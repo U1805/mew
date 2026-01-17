@@ -1,18 +1,17 @@
 package memory
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math"
-	"net/http"
 	"strings"
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -268,11 +267,9 @@ func UpsertFacts(now time.Time, facts FactsFile, newFacts []FactCandidate, maxFa
 // 兼容旧输出：
 //   - 纯 JSON string 数组：["..."]
 //   - 或对象：{"facts":["..."],"used_fact_ids":[...]}
-func ExtractFactsAndUsage(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, sessionText string, existing FactsFile) (FactEngineResult, error) {
-	return ExtractFactsAndUsageWithRetry(ctx, httpClient, cfg, sessionText, existing, utils.CognitiveRetryOptions{})
-}
+func ExtractFactsAndUsage(c agentctx.LLMCallContext, sessionText string, existing FactsFile, opts utils.CognitiveRetryOptions) (FactEngineResult, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
 
-func ExtractFactsAndUsageWithRetry(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, sessionText string, existing FactsFile, opts utils.CognitiveRetryOptions) (FactEngineResult, error) {
 	system := `You are a fact extraction engine.
 Extract stable, user-specific facts from the conversation.
 Write each fact in the user's language (use the predominant language of the conversation).
@@ -289,14 +286,14 @@ Conservative principle: if unsure between 6 and 7, choose 6.
 If the user explicitly says "记住/remember", set importance=10 for that instruction-derived fact.`
 	user := "Conversation:\n" + sessionText + "\n\nExisting facts (ID: content):\n" + formatFactsForCognitive(existing) + "\n\nReturn ONLY a JSON object like:\n{\"facts\": [{\"content\":\"...\",\"importance\":7}], \"used_fact_ids\": [\"F1a2b\", \"F0f3c\"]}\n"
 
-	openaiCfg, err := cfg.OpenAIChatConfig()
+	openaiCfg, err := c.Config.OpenAIChatConfig()
 	if err != nil {
 		return FactEngineResult{}, err
 	}
 
 	var out FactEngineResult
 	err = utils.RetryCognitive(ctx, opts, func() error {
-		resp, err := llm.CallOpenAIChatCompletion(ctx, httpClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
+		resp, err := llm.CallOpenAIChatCompletion(ctx, c.HTTPClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
 			openaigo.SystemMessage(system),
 			openaigo.UserMessage(user),
 		}, nil)

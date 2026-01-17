@@ -6,15 +6,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/x/llm"
 )
@@ -50,15 +49,15 @@ type ChatWithToolsOptions struct {
 }
 
 func ChatWithTools(
-	ctx context.Context,
-	httpClient *http.Client,
-	cfg config.AssistantConfig,
+	c agentctx.LLMCallContext,
 	personaSystem string,
 	firstUserPrompt string,
 	l5 []openaigo.ChatCompletionMessageParamUnion,
 	handlers ToolHandlers,
 	opts ChatWithToolsOptions,
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
 	if opts.MaxToolCalls <= 0 {
 		opts.MaxToolCalls = 3
 	}
@@ -100,11 +99,11 @@ func ChatWithTools(
 			log.Printf("%s llm call: channel=%s attempt=%d messages=%d", opts.LogPrefix, opts.ChannelID, i+1, len(messages))
 		}
 		logLLMMessages(opts.LogPrefix, opts.ChannelID, messages)
-		openaiCfg, err := cfg.OpenAIChatConfig()
+		openaiCfg, err := c.Config.OpenAIChatConfig()
 		if err != nil {
 			return "", memory.Mood{}, false, err
 		}
-		resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, httpClient, openaiCfg, messages, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
+		resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, c.HTTPClient, openaiCfg, messages, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
 			MaxRetries:     opts.MaxLLMRetries,
 			InitialBackoff: opts.LLMRetryInitialBackoff,
 			MaxBackoff:     opts.LLMRetryMaxBackoff,

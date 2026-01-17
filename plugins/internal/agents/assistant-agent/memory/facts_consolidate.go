@@ -1,18 +1,17 @@
 package memory
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -48,7 +47,7 @@ type FactConsolidationSource struct {
 	Content string `json:"content"`
 }
 
-// MaybeConsolidateFactsWithRetry 按“每天一次”的节奏尝试执行事实记忆整理。
+// MaybeConsolidateFacts 按“每天一次”的节奏尝试执行事实记忆整理。
 //
 // 记忆整理目标：
 //   - 去重：合并语义重复的事实（累加频次释放空间）
@@ -64,10 +63,8 @@ type FactConsolidationSource struct {
 //   - 更新后的 FactsFile
 //   - ran：本次是否“到期并尝试执行”（即使因事实过少而跳过，也算 ran=true）
 //   - err：LLM 调用或解析失败时返回错误
-func MaybeConsolidateFactsWithRetry(
-	ctx context.Context,
-	httpClient *http.Client,
-	cfg config.AssistantConfig,
+func MaybeConsolidateFacts(
+	c agentctx.LLMCallContext,
 	now time.Time,
 	facts FactsFile,
 	maxFacts int,
@@ -81,7 +78,7 @@ func MaybeConsolidateFactsWithRetry(
 		return facts, true, nil
 	}
 
-	updated, err := consolidateFactsWithRetry(ctx, httpClient, cfg, now, facts, maxFacts, opts)
+	updated, err := consolidateFacts(c, now, facts, maxFacts, opts)
 	if err != nil {
 		return facts, true, err
 	}
@@ -101,17 +98,17 @@ func shouldConsolidateFacts(now time.Time, last time.Time) bool {
 	return y1 != y2 || m1 != m2 || d1 != d2
 }
 
-// consolidateFactsWithRetry 执行一次记忆整理，并在成功后写入 LastConsolidatedAt。
-func consolidateFactsWithRetry(
-	ctx context.Context,
-	httpClient *http.Client,
-	cfg config.AssistantConfig,
+// consolidateFacts 执行一次记忆整理，并在成功后写入 LastConsolidatedAt。
+func consolidateFacts(
+	c agentctx.LLMCallContext,
 	now time.Time,
 	facts FactsFile,
 	maxFacts int,
 	opts utils.CognitiveRetryOptions,
 ) (FactsFile, error) {
-	openaiCfg, err := cfg.OpenAIChatConfig()
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
+	openaiCfg, err := c.Config.OpenAIChatConfig()
 	if err != nil {
 		return FactsFile{}, err
 	}
@@ -147,7 +144,7 @@ Return ONLY a JSON array like:
 
 	var ops []FactConsolidationOp
 	err = utils.RetryCognitive(ctx, opts, func() error {
-		resp, err := llm.CallOpenAIChatCompletion(ctx, httpClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
+		resp, err := llm.CallOpenAIChatCompletion(ctx, c.HTTPClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
 			openaigo.SystemMessage(system),
 			openaigo.UserMessage(user),
 		}, nil)

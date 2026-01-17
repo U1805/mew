@@ -1,7 +1,6 @@
-package app
+package agent
 
 import (
-	"mew/plugins/internal/agents/assistant-agent/agent"
 	"mew/plugins/internal/agents/assistant-agent/config"
 	"mew/plugins/pkg"
 )
@@ -31,7 +30,14 @@ func Run() error {
 		Description:    "赛博安和昴",
 		ConfigTemplate: cfgTemplate,
 		NewRunner: func(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (sdk.Runner, error) {
-			return agent.NewAssistantRunner(cfg.ServiceType, botID, botName, accessToken, rawConfig, cfg)
+			return NewAssistantRunner(RunnerOptions{
+				ServiceType: cfg.ServiceType,
+				BotID:       botID,
+				BotName:     botName,
+				AccessToken: accessToken,
+				RawConfig:   rawConfig,
+				Runtime:     cfg,
+			})
 		},
 	})
 }

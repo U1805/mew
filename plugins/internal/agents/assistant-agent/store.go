@@ -4,8 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
-	"mew/plugins/internal/agents/assistant-agent/agent/proactive"
+	"mew/plugins/internal/agents/assistant-agent/memory"
+	"mew/plugins/internal/agents/assistant-agent/proactive"
 	"mew/plugins/pkg"
 )
 

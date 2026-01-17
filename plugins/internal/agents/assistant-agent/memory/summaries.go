@@ -1,16 +1,14 @@
 package memory
 
 import (
-	"context"
 	"fmt"
-	"net/http"
 	"strings"
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/utils"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -51,24 +49,22 @@ func AppendSummary(now time.Time, summaries SummariesFile, recordID, summaryText
 	return summaries
 }
 
-func SummarizeRecord(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, recordText string) (string, error) {
-	return SummarizeRecordWithRetry(ctx, httpClient, cfg, recordText, utils.CognitiveRetryOptions{})
-}
+func SummarizeRecord(c agentctx.LLMCallContext, recordText string, opts utils.CognitiveRetryOptions) (string, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
 
-func SummarizeRecordWithRetry(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, recordText string, opts utils.CognitiveRetryOptions) (string, error) {
 	system := `You are a conversation summarizer.
 Summarize the session record into 1-3 sentences, focusing on user intent, key events, and emotional tone.
 Return plain text only.`
 	user := "Session Record:\n" + recordText
 
-	openaiCfg, err := cfg.OpenAIChatConfig()
+	openaiCfg, err := c.Config.OpenAIChatConfig()
 	if err != nil {
 		return "", err
 	}
 
 	var out string
 	err = utils.RetryCognitive(ctx, opts, func() error {
-		resp, err := llm.CallOpenAIChatCompletion(ctx, httpClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
+		resp, err := llm.CallOpenAIChatCompletion(ctx, c.HTTPClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
 			openaigo.SystemMessage(system),
 			openaigo.UserMessage(user),
 		}, nil)

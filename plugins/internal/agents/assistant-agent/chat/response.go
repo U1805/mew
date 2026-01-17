@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/config"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
@@ -31,6 +32,18 @@ type ReplyControls struct {
 	WantMore  bool
 	Proactive *ProactiveDirective
 	Sticker   *StickerDirective
+}
+
+type TransportContext struct {
+	Emit      socketio.EmitFunc
+	ChannelID string
+	UserID    string
+	LogPrefix string
+	TypingWPM int
+
+	PostMessageHTTP        func(ctx context.Context, channelID, content string) error
+	PostStickerHTTP        func(ctx context.Context, channelID, stickerID string) error
+	ResolveStickerIDByName func(ctx context.Context, name string) (string, error)
 }
 
 func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
@@ -145,47 +158,41 @@ func SleepWithContext(ctx context.Context, d time.Duration) {
 
 func SendToolPrelude(
 	ctx context.Context,
-	emit socketio.EmitFunc,
-	channelID string,
-	userID string,
+	c TransportContext,
 	text string,
-	logPrefix string,
-	postMessageHTTP func(ctx context.Context, channelID, content string) error,
 ) error {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return nil
 	}
 
-	sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
-		"channelId": channelID,
-		"content":   text,
-	})
+	var sendErr error
+	if c.Emit == nil {
+		sendErr = fmt.Errorf("emit not configured")
+	} else {
+		sendErr = c.Emit(config.AssistantUpstreamMessageCreate, map[string]any{
+			"channelId": c.ChannelID,
+			"content":   text,
+		})
+	}
 	if sendErr != nil {
 		// Fallback: if the gateway is disconnected, use REST API.
-		if postMessageHTTP == nil {
+		if c.PostMessageHTTP == nil {
 			return fmt.Errorf("send tool prelude failed (gateway=%v http=%v)", sendErr, fmt.Errorf("postMessageHTTP not configured"))
 		}
-		if err := postMessageHTTP(ctx, channelID, text); err != nil {
+		if err := c.PostMessageHTTP(ctx, c.ChannelID, text); err != nil {
 			return fmt.Errorf("send tool prelude failed (gateway=%v http=%v)", sendErr, err)
 		}
-		log.Printf("%s gateway send prelude failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
+		log.Printf("%s gateway send prelude failed, fallback to http ok: channel=%s user=%s err=%v", c.LogPrefix, c.ChannelID, c.UserID, sendErr)
 	}
 	return nil
 }
 
 func SendReply(
 	ctx context.Context,
-	emit socketio.EmitFunc,
-	channelID string,
-	userID string,
+	c TransportContext,
 	reply string,
-	typingWPM int,
 	controls ReplyControls,
-	logPrefix string,
-	postMessageHTTP func(ctx context.Context, channelID, content string) error,
-	postStickerHTTP func(ctx context.Context, channelID, stickerID string) error,
-	resolveStickerIDByName func(ctx context.Context, name string) (string, error),
 ) error {
 	reply = strings.TrimSpace(reply)
 	stickerName := ""
@@ -194,17 +201,22 @@ func SendReply(
 	}
 
 	if reply == "" && stickerName == "" {
-		log.Printf("%s empty reply: channel=%s user=%s", logPrefix, channelID, userID)
+		log.Printf("%s empty reply: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 		return nil
 	}
 	if strings.TrimSpace(reply) == config.AssistantSilenceToken || strings.Contains(reply, config.AssistantSilenceToken) {
-		log.Printf("%s SILENCE: channel=%s user=%s", logPrefix, channelID, userID)
+		log.Printf("%s SILENCE: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 		return nil
+	}
+
+	typingWPM := c.TypingWPM
+	if typingWPM <= 0 {
+		typingWPM = config.AssistantTypingWPMDefault
 	}
 
 	if reply != "" {
 		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
-			logPrefix, channelID, userID, sdk.PreviewString(reply, config.AssistantLogContentPreviewLen),
+			c.LogPrefix, c.ChannelID, c.UserID, sdk.PreviewString(reply, config.AssistantLogContentPreviewLen),
 		)
 
 		lines := make([]string, 0, config.AssistantMaxReplyLines)
@@ -222,69 +234,81 @@ func SendReply(
 		linesSent := 0
 		for i, t := range lines {
 			SleepWithContext(ctx, AssistantTypingDelayForLine(t, typingWPM))
-			sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
-				"channelId": channelID,
-				"content":   t,
-			})
+			var sendErr error
+			if c.Emit == nil {
+				sendErr = fmt.Errorf("emit not configured")
+			} else {
+				sendErr = c.Emit(config.AssistantUpstreamMessageCreate, map[string]any{
+					"channelId": c.ChannelID,
+					"content":   t,
+				})
+			}
 			if sendErr != nil {
 				// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
-				if postMessageHTTP == nil {
+				if c.PostMessageHTTP == nil {
 					return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, fmt.Errorf("postMessageHTTP not configured"))
 				}
-				if err := postMessageHTTP(ctx, channelID, t); err != nil {
+				if err := c.PostMessageHTTP(ctx, c.ChannelID, t); err != nil {
 					return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
 				}
-				log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
+				log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", c.LogPrefix, c.ChannelID, c.UserID, sendErr)
 			}
 			linesSent++
 			if i < len(lines)-1 {
 				SleepWithContext(ctx, AssistantReplyDelayForLine(t))
 			}
 		}
-		log.Printf("%s reply sent: channel=%s user=%s lines=%d", logPrefix, channelID, userID, linesSent)
+		log.Printf("%s reply sent: channel=%s user=%s lines=%d", c.LogPrefix, c.ChannelID, c.UserID, linesSent)
 	}
 
 	if stickerName != "" {
-		if resolveStickerIDByName == nil {
+		if c.ResolveStickerIDByName == nil {
 			return fmt.Errorf("resolveStickerIDByName not configured")
 		}
-		stickerID, err := resolveStickerIDByName(ctx, stickerName)
+		stickerID, err := c.ResolveStickerIDByName(ctx, stickerName)
 		if err != nil {
 			return err
 		}
 		if strings.TrimSpace(stickerID) == "" {
-			log.Printf("%s sticker not found in group: channel=%s user=%s name=%q", logPrefix, channelID, userID, stickerName)
+			log.Printf("%s sticker not found in group: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, stickerName)
 			return nil
 		}
 
-		sendErr := emit(config.AssistantUpstreamMessageCreate, map[string]any{
-			"channelId": channelID,
-			"type":      "message/sticker",
-			"payload": map[string]any{
-				"stickerId":    stickerID,
-				"stickerScope": "user",
-			},
-		})
+		var sendErr error
+		if c.Emit == nil {
+			sendErr = fmt.Errorf("emit not configured")
+		} else {
+			sendErr = c.Emit(config.AssistantUpstreamMessageCreate, map[string]any{
+				"channelId": c.ChannelID,
+				"type":      "message/sticker",
+				"payload": map[string]any{
+					"stickerId":    stickerID,
+					"stickerScope": "user",
+				},
+			})
+		}
 		if sendErr != nil {
-			if postStickerHTTP == nil {
+			if c.PostStickerHTTP == nil {
 				return fmt.Errorf("send sticker failed (gateway=%v http=%v)", sendErr, fmt.Errorf("postStickerHTTP not configured"))
 			}
-			if err := postStickerHTTP(ctx, channelID, stickerID); err != nil {
+			if err := c.PostStickerHTTP(ctx, c.ChannelID, stickerID); err != nil {
 				return fmt.Errorf("send sticker failed (gateway=%v http=%v)", sendErr, err)
 			}
-			log.Printf("%s gateway sticker send failed, fallback to http ok: channel=%s user=%s err=%v", logPrefix, channelID, userID, sendErr)
+			log.Printf("%s gateway sticker send failed, fallback to http ok: channel=%s user=%s err=%v", c.LogPrefix, c.ChannelID, c.UserID, sendErr)
 		}
-		log.Printf("%s sticker sent: channel=%s user=%s name=%q", logPrefix, channelID, userID, stickerName)
+		log.Printf("%s sticker sent: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, stickerName)
 	}
 
 	return nil
 }
 
-func PostMessageHTTP(ctx context.Context, httpClient *http.Client, apiBase string, channelID, content string) error {
-	if httpClient == nil {
+func PostMessageHTTP(c agentctx.MewCallContext, channelID, content string) error {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
+	if c.HTTPClient == nil {
 		return fmt.Errorf("missing mew http client")
 	}
-	if strings.TrimSpace(apiBase) == "" {
+	if strings.TrimSpace(c.APIBase) == "" {
 		return fmt.Errorf("missing api base")
 	}
 	channelID = strings.TrimSpace(channelID)
@@ -292,7 +316,7 @@ func PostMessageHTTP(ctx context.Context, httpClient *http.Client, apiBase strin
 		return fmt.Errorf("missing channel id")
 	}
 
-	u := strings.TrimRight(apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
+	u := strings.TrimRight(c.APIBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
 	body, _ := json.Marshal(map[string]any{"content": content})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
@@ -300,7 +324,7 @@ func PostMessageHTTP(ctx context.Context, httpClient *http.Client, apiBase strin
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -313,11 +337,13 @@ func PostMessageHTTP(ctx context.Context, httpClient *http.Client, apiBase strin
 	return nil
 }
 
-func PostStickerHTTP(ctx context.Context, httpClient *http.Client, apiBase string, channelID, stickerID string) error {
-	if httpClient == nil {
+func PostStickerHTTP(c agentctx.MewCallContext, channelID, stickerID string) error {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
+	if c.HTTPClient == nil {
 		return fmt.Errorf("missing mew http client")
 	}
-	if strings.TrimSpace(apiBase) == "" {
+	if strings.TrimSpace(c.APIBase) == "" {
 		return fmt.Errorf("missing api base")
 	}
 	channelID = strings.TrimSpace(channelID)
@@ -329,7 +355,7 @@ func PostStickerHTTP(ctx context.Context, httpClient *http.Client, apiBase strin
 		return fmt.Errorf("missing sticker id")
 	}
 
-	u := strings.TrimRight(apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
+	u := strings.TrimRight(c.APIBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
 	body, _ := json.Marshal(map[string]any{
 		"type": "message/sticker",
 		"payload": map[string]any{
@@ -343,7 +369,7 @@ func PostStickerHTTP(ctx context.Context, httpClient *http.Client, apiBase strin
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return err
 	}

@@ -10,7 +10,7 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
+	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/internal/agents/assistant-agent/prompt"
 	"mew/plugins/pkg"
 	sdkapi "mew/plugins/pkg/api"
@@ -128,7 +128,9 @@ func timeInLocation(t time.Time, loc *time.Location) time.Time {
 	return t
 }
 
-func SpeakerMetaLine(username, userID string, sentAt time.Time) string {
+func SpeakerMetaLine(loc *time.Location, username, userID string, sentAt time.Time) string {
+	sentAt = timeInLocation(sentAt, loc)
+
 	u := sanitizeMetaAttrValue(username)
 	id := sanitizeMetaAttrValue(userID)
 	if u == "" {
@@ -144,26 +146,18 @@ func SpeakerMetaLine(username, userID string, sentAt time.Time) string {
 	return fmt.Sprintf(`<mew_speaker username="%s" user_id="%s"/>`, u, id)
 }
 
-func SpeakerMetaLineInLocation(loc *time.Location, username, userID string, sentAt time.Time) string {
-	return SpeakerMetaLine(username, userID, timeInLocation(sentAt, loc))
-}
-
-func WrapUserTextWithSpeakerMeta(username, userID string, sentAt time.Time, text string) string {
+func WrapUserTextWithSpeakerMeta(loc *time.Location, username, userID string, sentAt time.Time, text string) string {
 	text = strings.TrimSpace(text)
-	meta := SpeakerMetaLine(username, userID, sentAt)
+	meta := SpeakerMetaLine(loc, username, userID, sentAt)
 	if text == "" {
 		return meta
 	}
 	return meta + "\n" + text
 }
 
-func WrapUserTextWithSpeakerMetaInLocation(loc *time.Location, username, userID string, sentAt time.Time, text string) string {
-	return WrapUserTextWithSpeakerMeta(username, userID, timeInLocation(sentAt, loc), text)
-}
-
 func SpeakerMetaFuncInLocation(loc *time.Location) llm.SpeakerMetaFunc {
 	return func(username, userID string, sentAt time.Time) string {
-		return SpeakerMetaLineInLocation(loc, username, userID, sentAt)
+		return SpeakerMetaLine(loc, username, userID, sentAt)
 	}
 }
 
@@ -271,7 +265,7 @@ func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc 
 
 		flushAssistant()
 
-		out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMetaInLocation(loc, m.AuthorUsername(), m.AuthorID(), m.CreatedAt, content)))
+		out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMeta(loc, m.AuthorUsername(), m.AuthorID(), m.CreatedAt, content)))
 	}
 	flushAssistant()
 	return out

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/config"
 	apistickers "mew/plugins/pkg/api/stickers"
 )
@@ -58,8 +59,9 @@ func (s *StickerService) listConfiguredStickers(ctx context.Context, httpClient 
 	return stickers, nil
 }
 
-func (s *StickerService) StickerPromptAddon(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix string) string {
-	stickers, err := s.listConfiguredStickers(ctx, httpClient, apiBase, logPrefix)
+func (s *StickerService) StickerPromptAddon(c agentctx.MewCallContext, logPrefix string) string {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+	stickers, err := s.listConfiguredStickers(ctx, c.HTTPClient, c.APIBase, logPrefix)
 	if err != nil {
 		return ""
 	}
@@ -108,12 +110,14 @@ func (s *StickerService) StickerPromptAddon(ctx context.Context, httpClient *htt
 	return strings.TrimSpace(b.String())
 }
 
-func (s *StickerService) ResolveStickerIDByName(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix, name string) (string, error) {
+func (s *StickerService) ResolveStickerIDByName(c agentctx.MewCallContext, logPrefix, name string) (string, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return "", nil
 	}
-	stickers, err := s.listConfiguredStickers(ctx, httpClient, apiBase, logPrefix)
+	stickers, err := s.listConfiguredStickers(ctx, c.HTTPClient, c.APIBase, logPrefix)
 	if err != nil {
 		return "", err
 	}

@@ -12,12 +12,13 @@ import (
 	"sync"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/chat"
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
-	"mew/plugins/internal/agents/assistant-agent/agent/proactive"
-	"mew/plugins/internal/agents/assistant-agent/agent/tools"
-	"mew/plugins/internal/agents/assistant-agent/agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/chat"
 	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/memory"
+	"mew/plugins/internal/agents/assistant-agent/proactive"
+	"mew/plugins/internal/agents/assistant-agent/tools"
+	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 	"mew/plugins/pkg/api/history"
@@ -54,8 +55,17 @@ type Runner struct {
 	stickers *tools.StickerService
 }
 
-func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*Runner, error) {
-	mewURL := sdk.MewURLFromEnvOrAPIBase(cfg.APIBase, config.AssistantDefaultMewURL)
+type RunnerOptions struct {
+	ServiceType string
+	BotID       string
+	BotName     string
+	AccessToken string
+	RawConfig   string
+	Runtime     sdk.RuntimeConfig
+}
+
+func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
+	mewURL := sdk.MewURLFromEnvOrAPIBase(opts.Runtime.APIBase, config.AssistantDefaultMewURL)
 	wsURL, err := socketio.WebsocketURL(mewURL)
 	if err != nil {
 		return nil, err
@@ -66,7 +76,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		return nil, err
 	}
 
-	llmCfg, err := config.ParseAssistantConfig(rawConfig)
+	llmCfg, err := config.ParseAssistantConfig(opts.RawConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -94,13 +104,13 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 	})
 
 	r := &Runner{
-		serviceType:   serviceType,
-		botID:         botID,
-		botName:       botName,
-		accessToken:   accessToken,
+		serviceType:   opts.ServiceType,
+		botID:         opts.BotID,
+		botName:       opts.BotName,
+		accessToken:   opts.AccessToken,
 		botUserID:     "",
 		session:       nil,
-		apiBase:       strings.TrimRight(cfg.APIBase, "/"),
+		apiBase:       strings.TrimRight(opts.Runtime.APIBase, "/"),
 		mewURL:        mewURL,
 		wsURL:         wsURL,
 		mewHTTPClient: mewHTTPClient,
@@ -112,7 +122,7 @@ func NewAssistantRunner(serviceType, botID, botName, accessToken, rawConfig stri
 		stickers:      tools.NewStickerService(),
 		fetcher: &history.Fetcher{
 			HTTPClient:         mewHTTPClient,
-			APIBase:            strings.TrimRight(cfg.APIBase, "/"),
+			APIBase:            strings.TrimRight(opts.Runtime.APIBase, "/"),
 			UserToken:          "",
 			PageSize:           config.AssistantFetchPageSize,
 			MaxPages:           config.AssistantMaxFetchPages,
@@ -239,7 +249,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 
 			// 记忆整理属于“梦境固化”式的后台工作，不应依赖会话状态。
 			// 它对每个用户最多每天执行一次，并持久化在 facts.json 中（LastConsolidatedAt）。
-			if updated, ran, err := memory.MaybeConsolidateFactsWithRetry(ctx, r.llmHTTPClient, r.aiConfig, now, facts, config.AssistantMaxFacts, utils.CognitiveRetryOptions{
+			if updated, ran, err := memory.MaybeConsolidateFacts(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, now, facts, config.AssistantMaxFacts, utils.CognitiveRetryOptions{
 				MaxRetries:     config.AssistantMaxLLMRetries,
 				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -280,7 +290,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 			}
 
 			sessionText := chat.FormatSessionRecordForContext(sessionMsgs, r.timeLoc)
-			res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, utils.CognitiveRetryOptions{
+			res, err := memory.ExtractFactsAndUsage(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, sessionText, facts, utils.CognitiveRetryOptions{
 				MaxRetries:     config.AssistantMaxLLMRetries,
 				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -392,11 +402,16 @@ func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
 				summaries = s
 			}
 
-			q = proactive.RunProactiveQueueForUser(ctx, userID, q, meta, summaries, r.timeLoc, r.fetcher, r.llmHTTPClient, r.aiConfig, r.persona, logPrefix,
-				func(ctx context.Context, channelID, content string) error {
-					return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
-				},
-			)
+			q = proactive.RunProactiveQueueForUser(agentctx.AssistantRequestContext{
+				Ctx:       ctx,
+				UserID:    userID,
+				LogPrefix: logPrefix,
+				TimeLoc:   r.timeLoc,
+				Persona:   r.persona,
+				LLM:       agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig},
+				Mew:       agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase},
+				History:   agentctx.HistoryCallContext{Ctx: ctx, Fetcher: r.fetcher, TimeLoc: r.timeLoc},
+			}, q, meta, summaries)
 
 			if err := SaveProactiveQueue(paths.ProactivePath, q); err != nil {
 				log.Printf("%s save proactive queue failed: user=%s err=%v", logPrefix, userID, err)

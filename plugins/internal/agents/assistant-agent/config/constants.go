@@ -84,9 +84,9 @@ const (
 	AssistantLLMRetryInitialBackoff = 250 * time.Millisecond
 	AssistantLLMRetryMaxBackoff     = 5 * time.Second
 
-	PersonaPromptRelPath               = "prompt/system_prompt.txt"
+	PersonaPromptRelPath               = "agent/prompt/system_prompt.txt"
 	PersonaPromptEmbeddedName          = "system_prompt.txt"
-	DeveloperInstructionsPromptRelPath = "prompt/instruct_prompt.txt"
+	DeveloperInstructionsPromptRelPath = "agent/prompt/instruct_prompt.txt"
 	DeveloperInstructionsEmbeddedName  = "instruct_prompt.txt"
 
 	DefaultHistorySearchToolName = "HistorySearch"

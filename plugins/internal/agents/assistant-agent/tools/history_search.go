@@ -1,39 +1,40 @@
 package tools
 
 import (
-	"context"
 	"fmt"
 	"strings"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/chat"
-	"mew/plugins/pkg/api/history"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/chat"
 )
 
-func RunHistorySearch(ctx context.Context, fetcher *history.Fetcher, channelID, keyword string, loc *time.Location) (any, error) {
+func RunHistorySearch(c agentctx.HistoryCallContext, channelID, keyword string) (any, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
 	keyword = strings.TrimSpace(keyword)
 	if keyword == "" {
 		return map[string]any{"messages": []any{}}, nil
 	}
-	if fetcher == nil {
+	if c.Fetcher == nil {
 		return nil, fmt.Errorf("history fetcher not configured")
 	}
-	msgs, err := fetcher.SearchHistory(ctx, channelID, keyword, 10)
+	msgs, err := c.Fetcher.SearchHistory(ctx, channelID, keyword, 10)
 	if err != nil {
 		return nil, err
 	}
 
 	out := make([]map[string]any, 0, len(msgs))
 	for _, m := range msgs {
-		rid, err := fetcher.RecordIDForMessage(ctx, channelID, m.ID)
+		rid, err := c.Fetcher.RecordIDForMessage(ctx, channelID, m.ID)
 		recordID := ""
 		if err == nil {
 			recordID = rid
 		}
 
 		createdAt := m.CreatedAt
-		if loc != nil && !createdAt.IsZero() {
-			createdAt = createdAt.In(loc)
+		if c.TimeLoc != nil && !createdAt.IsZero() {
+			createdAt = createdAt.In(c.TimeLoc)
 		}
 		out = append(out, map[string]any{
 			"id":        m.ID,
@@ -47,16 +48,18 @@ func RunHistorySearch(ctx context.Context, fetcher *history.Fetcher, channelID, 
 	return map[string]any{"keyword": keyword, "messages": out}, nil
 }
 
-func RunRecordSearch(ctx context.Context, fetcher *history.Fetcher, channelID, recordID string, loc *time.Location) (any, error) {
-	if fetcher == nil {
+func RunRecordSearch(c agentctx.HistoryCallContext, channelID, recordID string) (any, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
+	if c.Fetcher == nil {
 		return nil, fmt.Errorf("history fetcher not configured")
 	}
-	msgs, err := fetcher.RecordSearch(ctx, channelID, recordID)
+	msgs, err := c.Fetcher.RecordSearch(ctx, channelID, recordID)
 	if err != nil {
 		return nil, err
 	}
 	return map[string]any{
 		"recordId": recordID,
-		"text":     chat.FormatSessionRecordForContext(msgs, loc),
+		"text":     chat.FormatSessionRecordForContext(msgs, c.TimeLoc),
 	}, nil
 }

@@ -4,18 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/chat"
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/chat"
 	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/pkg"
-	"mew/plugins/pkg/api/history"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -48,19 +47,17 @@ func BuildProactiveRequest(now time.Time, channelID string, recordID string, d *
 }
 
 func RunProactiveQueueForUser(
-	ctx context.Context,
-	userID string,
+	c agentctx.AssistantRequestContext,
 	q ProactiveQueueFile,
 	meta memory.Metadata,
 	summaries memory.SummariesFile,
-	timeLoc *time.Location,
-	fetcher *history.Fetcher,
-	llmHTTPClient *http.Client,
-	aiConfig config.AssistantConfig,
-	persona string,
-	logPrefix string,
-	postMessage func(ctx context.Context, channelID, content string) error,
 ) ProactiveQueueFile {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+	userID := strings.TrimSpace(c.UserID)
+	logPrefix := strings.TrimSpace(c.LogPrefix)
+	timeLoc := c.TimeLoc
+	fetcher := c.History.Fetcher
+
 	if fetcher == nil {
 		return q
 	}
@@ -117,7 +114,7 @@ func RunProactiveQueueForUser(
 		recordText := chat.FormatSessionRecordForContext(msgs, timeLoc)
 
 		intermediate := formatSummariesBetween(summaries, req.AddedAt, currentSessionStartAt, now, 12, timeLoc)
-		out, err := proactiveDecideAndCompose(ctx, llmHTTPClient, aiConfig, persona, req, recordText, currentChannelID, currentRecordID, currentRecordText, intermediate, logPrefix, timeLoc)
+		out, err := proactiveDecideAndCompose(c.LLM, c.Persona, req, recordText, currentChannelID, currentRecordID, currentRecordText, intermediate, logPrefix, timeLoc)
 		if err != nil {
 			log.Printf("%s proactive llm failed: user=%s channel=%s record=%s err=%v", logPrefix, userID, req.ChannelID, req.RecordID, err)
 			kept = append(kept, req)
@@ -131,10 +128,11 @@ func RunProactiveQueueForUser(
 		}
 
 		if err := sendReplyHTTP(ctx, req.ChannelID, outClean, config.AssistantTypingWPMDefault, func(line string) error {
-			if postMessage == nil {
-				return fmt.Errorf("postMessage not configured")
-			}
-			return postMessage(ctx, req.ChannelID, line)
+			return chat.PostMessageHTTP(agentctx.MewCallContext{
+				Ctx:        ctx,
+				HTTPClient: c.Mew.HTTPClient,
+				APIBase:    c.Mew.APIBase,
+			}, req.ChannelID, line)
 		}); err != nil {
 			log.Printf("%s proactive send failed: user=%s channel=%s record=%s err=%v", logPrefix, userID, req.ChannelID, req.RecordID, err)
 			kept = append(kept, req)
@@ -154,9 +152,7 @@ func RunProactiveQueueForUser(
 }
 
 func proactiveDecideAndCompose(
-	ctx context.Context,
-	llmHTTPClient *http.Client,
-	aiConfig config.AssistantConfig,
+	c agentctx.LLMCallContext,
 	persona string,
 	req ProactiveRequest,
 	recordText string,
@@ -167,6 +163,8 @@ func proactiveDecideAndCompose(
 	logPrefix string,
 	timeLoc *time.Location,
 ) (string, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
 	system := strings.TrimSpace(persona)
 	if system == "" {
 		system = "You are a helpful assistant."
@@ -246,11 +244,11 @@ Recent current session record:
 		openaigo.UserMessage(userPrompt),
 	}
 
-	openaiCfg, err := aiConfig.OpenAIChatConfig()
+	openaiCfg, err := c.Config.OpenAIChatConfig()
 	if err != nil {
 		return "", err
 	}
-	resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, llmHTTPClient, openaiCfg, messages, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
+	resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, c.HTTPClient, openaiCfg, messages, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,

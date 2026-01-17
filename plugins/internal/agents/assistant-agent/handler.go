@@ -9,12 +9,13 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/chat"
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
-	"mew/plugins/internal/agents/assistant-agent/agent/proactive"
-	"mew/plugins/internal/agents/assistant-agent/agent/tools"
-	"mew/plugins/internal/agents/assistant-agent/agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/chat"
 	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/memory"
+	"mew/plugins/internal/agents/assistant-agent/proactive"
+	"mew/plugins/internal/agents/assistant-agent/tools"
+	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg"
 	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/api/attachment"
@@ -163,17 +164,24 @@ func (r *Runner) processDMMessage(
 	}
 
 	clean, controls := chat.ParseReplyControls(reply)
-	if err := chat.SendReply(ctx, emit, channelID, userID, clean, config.AssistantTypingWPMDefault, controls, logPrefix,
-		func(ctx context.Context, channelID, content string) error {
-			return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
+	transport := chat.TransportContext{
+		Emit:      emit,
+		ChannelID: channelID,
+		UserID:    userID,
+		LogPrefix: logPrefix,
+		TypingWPM: config.AssistantTypingWPMDefault,
+		PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
+			return chat.PostMessageHTTP(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, channelID, content)
 		},
-		func(ctx context.Context, channelID, stickerID string) error {
-			return chat.PostStickerHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, stickerID)
+		PostStickerHTTP: func(ctx context.Context, channelID, stickerID string) error {
+			return chat.PostStickerHTTP(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, channelID, stickerID)
 		},
-		func(ctx context.Context, name string) (string, error) {
-			return r.stickers.ResolveStickerIDByName(ctx, r.session.HTTPClient(), r.apiBase, logPrefix, name)
+		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
+			return r.stickers.ResolveStickerIDByName(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, logPrefix, name)
 		},
-	); err != nil {
+	}
+
+	if err := chat.SendReply(ctx, transport, clean, controls); err != nil {
 		return err
 	}
 	r.enqueueProactive(now, paths, channelID, recordID, controls.Proactive, logPrefix)
@@ -199,17 +207,7 @@ func (r *Runner) processDMMessage(
 		}
 
 		moreClean, moreControls := chat.ParseReplyControls(more)
-		if err := chat.SendReply(ctx, emit, channelID, userID, moreClean, config.AssistantTypingWPMDefault, moreControls, logPrefix,
-			func(ctx context.Context, channelID, content string) error {
-				return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
-			},
-			func(ctx context.Context, channelID, stickerID string) error {
-				return chat.PostStickerHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, stickerID)
-			},
-			func(ctx context.Context, name string) (string, error) {
-				return r.stickers.ResolveStickerIDByName(ctx, r.session.HTTPClient(), r.apiBase, logPrefix, name)
-			},
-		); err != nil {
+		if err := chat.SendReply(ctx, transport, moreClean, moreControls); err != nil {
 			return err
 		}
 		r.enqueueProactive(now, paths, channelID, recordID, moreControls.Proactive, logPrefix)
@@ -343,7 +341,11 @@ func (r *Runner) buildPrompt(
 	sessionMsgs []sdkapi.ChannelMessage,
 	logPrefix string,
 ) (l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) {
-	stickerNames := strings.TrimSpace(r.stickers.StickerPromptAddon(ctx, r.session.HTTPClient(), r.apiBase, logPrefix))
+	stickerNames := strings.TrimSpace(r.stickers.StickerPromptAddon(agentctx.MewCallContext{
+		Ctx:        ctx,
+		HTTPClient: r.session.HTTPClient(),
+		APIBase:    r.apiBase,
+	}, logPrefix))
 	l1l4 = chat.BuildL1L4UserPrompt(chat.DeveloperInstructionsText(
 		config.AssistantSilenceToken,
 		config.AssistantWantMoreToken,
@@ -384,15 +386,15 @@ func (r *Runner) reply(
 	l5 []openaigo.ChatCompletionMessageParamUnion,
 	logPrefix string,
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
-	return chat.ChatWithTools(ctx, r.llmHTTPClient, r.aiConfig, strings.TrimSpace(r.persona), l1l4, l5, chat.ToolHandlers{
+	return chat.ChatWithTools(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, strings.TrimSpace(r.persona), l1l4, l5, chat.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
-			return tools.RunHistorySearch(ctx, r.fetcher, channelID, keyword, r.timeLoc)
+			return tools.RunHistorySearch(agentctx.HistoryCallContext{Ctx: ctx, Fetcher: r.fetcher, TimeLoc: r.timeLoc}, channelID, keyword)
 		},
 		RecordSearch: func(ctx context.Context, recordID string) (any, error) {
-			return tools.RunRecordSearch(ctx, r.fetcher, channelID, recordID, r.timeLoc)
+			return tools.RunRecordSearch(agentctx.HistoryCallContext{Ctx: ctx, Fetcher: r.fetcher, TimeLoc: r.timeLoc}, channelID, recordID)
 		},
 		WebSearch: func(ctx context.Context, query string) (any, error) {
-			return tools.RunWebSearch(ctx, r.llmHTTPClient, r.aiConfig, query)
+			return tools.RunWebSearch(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, query)
 		},
 	}, chat.ChatWithToolsOptions{
 		MaxToolCalls:          config.AssistantMaxToolCalls,
@@ -404,9 +406,15 @@ func (r *Runner) reply(
 		LLMPreviewLen:         config.AssistantLogLLMPreviewLen,
 		ToolResultPreviewLen:  config.AssistantLogToolResultPreviewLen,
 		OnToolCallAssistantText: func(text string) error {
-			return chat.SendToolPrelude(ctx, emit, channelID, userID, text, logPrefix, func(ctx context.Context, channelID, content string) error {
-				return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
-			})
+			return chat.SendToolPrelude(ctx, chat.TransportContext{
+				Emit:      emit,
+				ChannelID: channelID,
+				UserID:    userID,
+				LogPrefix: logPrefix,
+				PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
+					return chat.PostMessageHTTP(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, channelID, content)
+				},
+			}, text)
 		},
 		SilenceToken:           config.AssistantSilenceToken,
 		WantMoreToken:          config.AssistantWantMoreToken,
@@ -434,7 +442,7 @@ func (r *Runner) maybeOnDemandRemember(
 
 	log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
 	sessionText := chat.FormatSessionRecordForContext(sessionMsgs, r.timeLoc)
-	res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, utils.CognitiveRetryOptions{
+	res, err := memory.ExtractFactsAndUsage(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, sessionText, facts, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -472,7 +480,7 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 	}
 	recordText := chat.FormatSessionRecordForContext(msgs, r.timeLoc)
 
-	if summaryText, err := memory.SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, utils.CognitiveRetryOptions{
+	if summaryText, err := memory.SummarizeRecord(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, recordText, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
@@ -490,7 +498,7 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 		log.Printf("%s summarize failed: user=%s record=%s err=%v", logPrefix, userID, meta.RecordID, err)
 	}
 
-	if res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, facts, utils.CognitiveRetryOptions{
+	if res, err := memory.ExtractFactsAndUsage(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, recordText, facts, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
 		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,

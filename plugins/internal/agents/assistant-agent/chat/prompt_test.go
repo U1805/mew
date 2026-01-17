@@ -5,24 +5,24 @@ import (
 	"testing"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agent/memory"
+	"mew/plugins/internal/agents/assistant-agent/memory"
 )
 
-func TestSpeakerMetaLineInLocation_ConvertsTimezone(t *testing.T) {
+func TestSpeakerMetaLine_ConvertsTimezone(t *testing.T) {
 	loc := time.FixedZone("UTC+08:00", 8*60*60)
 	sentAtUTC := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 
-	meta := SpeakerMetaLineInLocation(loc, "alice", "u1", sentAtUTC)
+	meta := SpeakerMetaLine(loc, "alice", "u1", sentAtUTC)
 	if !strings.Contains(meta, `time="08:00"`) {
 		t.Fatalf("expected local time in meta, got: %q", meta)
 	}
 }
 
-func TestWrapUserTextWithSpeakerMetaInLocation_ConvertsTimezone(t *testing.T) {
+func TestWrapUserTextWithSpeakerMeta_ConvertsTimezone(t *testing.T) {
 	loc := time.FixedZone("UTC-07:00", -7*60*60)
 	sentAtUTC := time.Date(2025, 1, 1, 12, 34, 0, 0, time.UTC)
 
-	out := WrapUserTextWithSpeakerMetaInLocation(loc, "bob", "u2", sentAtUTC, "hello")
+	out := WrapUserTextWithSpeakerMeta(loc, "bob", "u2", sentAtUTC, "hello")
 	if !strings.Contains(out, `time="05:34"`) {
 		t.Fatalf("expected local time in wrapped message, got: %q", out)
 	}

@@ -2,13 +2,13 @@ package tools
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/config"
 )
 
@@ -23,12 +23,14 @@ type exaSearchResponse struct {
 	} `json:"results"`
 }
 
-func RunWebSearch(ctx context.Context, httpClient *http.Client, cfg config.AssistantConfig, query string) (any, error) {
+func RunWebSearch(c agentctx.LLMCallContext, query string) (any, error) {
+	ctx := agentctx.ContextOrBackground(c.Ctx)
+
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return map[string]any{"results": []any{}}, nil
 	}
-	if strings.TrimSpace(cfg.Tool.ExaAPIKey) == "" {
+	if strings.TrimSpace(c.Config.Tool.ExaAPIKey) == "" {
 		return nil, fmt.Errorf("assistant-agent config incomplete: tool.exa_api_key is required for WebSearch")
 	}
 
@@ -50,12 +52,12 @@ func RunWebSearch(ctx context.Context, httpClient *http.Client, cfg config.Assis
 		return nil, err
 	}
 	req.Header.Set("content-type", "application/json")
-	req.Header.Set("x-api-key", strings.TrimSpace(cfg.Tool.ExaAPIKey))
-	if httpClient == nil {
-		httpClient = http.DefaultClient
+	req.Header.Set("x-api-key", strings.TrimSpace(c.Config.Tool.ExaAPIKey))
+	if c.HTTPClient == nil {
+		c.HTTPClient = http.DefaultClient
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := c.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
