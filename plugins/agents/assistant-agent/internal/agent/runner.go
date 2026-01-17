@@ -279,7 +279,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 				return
 			}
 
-			sessionText := chat.FormatSessionRecordForContext(sessionMsgs)
+			sessionText := chat.FormatSessionRecordForContext(sessionMsgs, r.timeLoc)
 			res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, utils.CognitiveRetryOptions{
 				MaxRetries:     config.AssistantMaxLLMRetries,
 				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
@@ -392,7 +392,7 @@ func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
 				summaries = s
 			}
 
-			q = proactive.RunProactiveQueueForUser(ctx, userID, q, meta, summaries, r.fetcher, r.llmHTTPClient, r.aiConfig, r.persona, logPrefix,
+			q = proactive.RunProactiveQueueForUser(ctx, userID, q, meta, summaries, r.timeLoc, r.fetcher, r.llmHTTPClient, r.aiConfig, r.persona, logPrefix,
 				func(ctx context.Context, channelID, content string) error {
 					return chat.PostMessageHTTP(ctx, r.session.HTTPClient(), r.apiBase, channelID, content)
 				},

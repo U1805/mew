@@ -121,6 +121,13 @@ func sanitizeMetaAttrValue(s string) string {
 	return s
 }
 
+func timeInLocation(t time.Time, loc *time.Location) time.Time {
+	if loc != nil && !t.IsZero() {
+		return t.In(loc)
+	}
+	return t
+}
+
 func SpeakerMetaLine(username, userID string, sentAt time.Time) string {
 	u := sanitizeMetaAttrValue(username)
 	id := sanitizeMetaAttrValue(userID)
@@ -137,6 +144,10 @@ func SpeakerMetaLine(username, userID string, sentAt time.Time) string {
 	return fmt.Sprintf(`<mew_speaker username="%s" user_id="%s"/>`, u, id)
 }
 
+func SpeakerMetaLineInLocation(loc *time.Location, username, userID string, sentAt time.Time) string {
+	return SpeakerMetaLine(username, userID, timeInLocation(sentAt, loc))
+}
+
 func WrapUserTextWithSpeakerMeta(username, userID string, sentAt time.Time, text string) string {
 	text = strings.TrimSpace(text)
 	meta := SpeakerMetaLine(username, userID, sentAt)
@@ -144,6 +155,16 @@ func WrapUserTextWithSpeakerMeta(username, userID string, sentAt time.Time, text
 		return meta
 	}
 	return meta + "\n" + text
+}
+
+func WrapUserTextWithSpeakerMetaInLocation(loc *time.Location, username, userID string, sentAt time.Time, text string) string {
+	return WrapUserTextWithSpeakerMeta(username, userID, timeInLocation(sentAt, loc), text)
+}
+
+func SpeakerMetaFuncInLocation(loc *time.Location) llm.SpeakerMetaFunc {
+	return func(username, userID string, sentAt time.Time) string {
+		return SpeakerMetaLineInLocation(loc, username, userID, sentAt)
+	}
 }
 
 var developerInstructionsOnce sync.Once
@@ -180,13 +201,25 @@ func DeveloperInstructionsText(
 	return out
 }
 
-func BuildL1L4UserPrompt(developerInstructions string, meta memory.Metadata, facts memory.FactsFile, summaries memory.SummariesFile) string {
+func formatSessionStartDatetime(meta memory.Metadata, loc *time.Location) string {
+	if !meta.StartAt.IsZero() {
+		t := meta.StartAt
+		if loc != nil {
+			t = t.In(loc)
+		}
+		// Include weekday for better temporal grounding.
+		return t.Format("2006-01-02 Mon 15:04")
+	}
+	return strings.TrimSpace(meta.SessionStartDatetime)
+}
+
+func BuildL1L4UserPrompt(developerInstructions string, meta memory.Metadata, facts memory.FactsFile, summaries memory.SummariesFile, loc *time.Location) string {
 	var b strings.Builder
 	b.WriteString(strings.TrimSpace(developerInstructions))
 	b.WriteString("\n\n")
 
 	b.WriteString("### L2 Session Metadata\n")
-	b.WriteString(fmt.Sprintf("session_start_datetime: %s\n", strings.TrimSpace(meta.SessionStartDatetime)))
+	b.WriteString(fmt.Sprintf("session_start_datetime: %s\n", formatSessionStartDatetime(meta, loc)))
 	b.WriteString(fmt.Sprintf("time_since_last_message: %s\n", strings.TrimSpace(meta.TimeSinceLastMessage)))
 	b.WriteString(fmt.Sprintf("user_activity_frequency: %s\n", strings.TrimSpace(meta.UserActivityFrequency)))
 	b.WriteString(fmt.Sprintf("initial_mood: {\"valence\": %.4f, \"arousal\": %.4f}\n", meta.InitialMood.Valence, meta.InitialMood.Arousal))
@@ -238,17 +271,13 @@ func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc 
 
 		flushAssistant()
 
-		sentAt := m.CreatedAt
-		if loc != nil && !sentAt.IsZero() {
-			sentAt = sentAt.In(loc)
-		}
-		out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMeta(m.AuthorUsername(), m.AuthorID(), sentAt, content)))
+		out = append(out, openaigo.UserMessage(WrapUserTextWithSpeakerMetaInLocation(loc, m.AuthorUsername(), m.AuthorID(), m.CreatedAt, content)))
 	}
 	flushAssistant()
 	return out
 }
 
-func FormatSessionRecordForContext(msgs []sdkapi.ChannelMessage) string {
+func FormatSessionRecordForContext(msgs []sdkapi.ChannelMessage, loc *time.Location) string {
 	if len(msgs) == 0 {
 		return "(empty)"
 	}
@@ -256,7 +285,11 @@ func FormatSessionRecordForContext(msgs []sdkapi.ChannelMessage) string {
 	for _, m := range msgs {
 		ts := ""
 		if !m.CreatedAt.IsZero() {
-			ts = m.CreatedAt.Format(time.RFC3339)
+			t := m.CreatedAt
+			if loc != nil {
+				t = t.In(loc)
+			}
+			ts = t.Format(time.RFC3339)
 		}
 		author := m.AuthorUsername()
 		if author == "" {
@@ -306,17 +339,13 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []sdkapi.Ch
 			attachments = append(attachments, m.Attachments...)
 			attachments = append(attachments, llm.StickerAttachmentsFromPayload(m.ChannelID, m.Payload)...)
 
-			sentAt := m.CreatedAt
-			if opts.Location != nil && !sentAt.IsZero() {
-				sentAt = sentAt.In(opts.Location)
-			}
-			userMsg, err := llm.BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), sentAt, strings.TrimSpace(m.ContextText()), attachments, llm.BuildUserContentOptions{
+			userMsg, err := llm.BuildUserMessageParam(ctx, m.AuthorUsername(), m.AuthorID(), m.CreatedAt, strings.TrimSpace(m.ContextText()), attachments, llm.BuildUserContentOptions{
 				DefaultImagePrompt:    opts.DefaultImagePrompt,
 				MaxImageBytes:         opts.MaxImageBytes,
 				MaxTotalImageBytes:    opts.MaxTotalImageBytes,
 				KeepEmptyWhenNoImages: opts.KeepEmptyWhenNoImages,
 				Download:              opts.Download,
-				SpeakerMeta:           SpeakerMetaLine,
+				SpeakerMeta:           SpeakerMetaFuncInLocation(opts.Location),
 			})
 			if err != nil {
 				return nil, err

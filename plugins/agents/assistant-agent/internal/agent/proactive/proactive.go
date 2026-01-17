@@ -53,6 +53,7 @@ func RunProactiveQueueForUser(
 	q ProactiveQueueFile,
 	meta memory.Metadata,
 	summaries memory.SummariesFile,
+	timeLoc *time.Location,
 	fetcher *history.Fetcher,
 	llmHTTPClient *http.Client,
 	aiConfig config.AssistantConfig,
@@ -86,7 +87,7 @@ func RunProactiveQueueForUser(
 			currentChannelID = meta.ChannelID
 			currentRecordID = rid
 			currentSessionStartAt = startAt
-			currentRecordText = chat.FormatSessionRecordForContext(msgs)
+			currentRecordText = chat.FormatSessionRecordForContext(msgs, timeLoc)
 		}
 	}
 
@@ -113,10 +114,10 @@ func RunProactiveQueueForUser(
 			kept = append(kept, req)
 			continue
 		}
-		recordText := chat.FormatSessionRecordForContext(msgs)
+		recordText := chat.FormatSessionRecordForContext(msgs, timeLoc)
 
-		intermediate := formatSummariesBetween(summaries, req.AddedAt, currentSessionStartAt, now, 12)
-		out, err := proactiveDecideAndCompose(ctx, llmHTTPClient, aiConfig, persona, req, recordText, currentChannelID, currentRecordID, currentRecordText, intermediate, logPrefix)
+		intermediate := formatSummariesBetween(summaries, req.AddedAt, currentSessionStartAt, now, 12, timeLoc)
+		out, err := proactiveDecideAndCompose(ctx, llmHTTPClient, aiConfig, persona, req, recordText, currentChannelID, currentRecordID, currentRecordText, intermediate, logPrefix, timeLoc)
 		if err != nil {
 			log.Printf("%s proactive llm failed: user=%s channel=%s record=%s err=%v", logPrefix, userID, req.ChannelID, req.RecordID, err)
 			kept = append(kept, req)
@@ -164,6 +165,7 @@ func proactiveDecideAndCompose(
 	currentRecordText string,
 	intermediateSummaries string,
 	logPrefix string,
+	timeLoc *time.Location,
 ) (string, error) {
 	system := strings.TrimSpace(persona)
 	if system == "" {
@@ -171,6 +173,18 @@ func proactiveDecideAndCompose(
 	}
 
 	now := time.Now()
+	nowLocal := now
+	if timeLoc != nil && !nowLocal.IsZero() {
+		nowLocal = nowLocal.In(timeLoc)
+	}
+	addedAtLocal := req.AddedAt
+	if timeLoc != nil && !addedAtLocal.IsZero() {
+		addedAtLocal = addedAtLocal.In(timeLoc)
+	}
+	requestAtLocal := req.RequestAt
+	if timeLoc != nil && !requestAtLocal.IsZero() {
+		requestAtLocal = requestAtLocal.In(timeLoc)
+	}
 	var currentIDs string
 	{
 		var b strings.Builder
@@ -216,9 +230,9 @@ Recent current session record:
 		config.AssistantSilenceToken,
 		config.AssistantWantMoreToken,
 		config.AssistantProactiveTokenPrefix,
-		now.Format(time.RFC3339),
-		req.AddedAt.Format(time.RFC3339),
-		req.RequestAt.Format(time.RFC3339),
+		nowLocal.Format(time.RFC3339),
+		addedAtLocal.Format(time.RFC3339),
+		requestAtLocal.Format(time.RFC3339),
 		strings.TrimSpace(req.Reason),
 		strings.TrimSpace(req.RecordID),
 		currentIDs,
@@ -259,7 +273,7 @@ Recent current session record:
 	return out, nil
 }
 
-func formatSummariesBetween(s memory.SummariesFile, start time.Time, end time.Time, fallbackEnd time.Time, max int) string {
+func formatSummariesBetween(s memory.SummariesFile, start time.Time, end time.Time, fallbackEnd time.Time, max int, timeLoc *time.Location) string {
 	if len(s.Summaries) == 0 {
 		return ""
 	}
@@ -307,9 +321,14 @@ func formatSummariesBetween(s memory.SummariesFile, start time.Time, end time.Ti
 		if rid == "" {
 			rid = "unknown"
 		}
+
+		createdAtLocal := it.CreatedAt
+		if timeLoc != nil && !createdAtLocal.IsZero() {
+			createdAtLocal = createdAtLocal.In(timeLoc)
+		}
 		b.WriteString(fmt.Sprintf("%s [%s] (RecordID=%s): %s\n",
 			id,
-			it.CreatedAt.Format(time.RFC3339),
+			createdAtLocal.Format(time.RFC3339),
 			rid,
 			strings.TrimSpace(it.Summary),
 		))

@@ -353,7 +353,7 @@ func (r *Runner) buildPrompt(
 		stickerNames,
 		config.DeveloperInstructionsPromptRelPath,
 		config.DeveloperInstructionsEmbeddedName,
-	), meta, facts, summaries)
+	), meta, facts, summaries, r.timeLoc)
 	l5, err := chat.BuildL5MessagesWithAttachments(ctx, sessionMsgs, r.botUserID, chat.UserContentPartsOptions{
 		DefaultImagePrompt:    config.DefaultImagePrompt,
 		MaxImageBytes:         config.DefaultMaxImageBytes,
@@ -386,10 +386,10 @@ func (r *Runner) reply(
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
 	return chat.ChatWithTools(ctx, r.llmHTTPClient, r.aiConfig, strings.TrimSpace(r.persona), l1l4, l5, chat.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
-			return tools.RunHistorySearch(ctx, r.fetcher, channelID, keyword)
+			return tools.RunHistorySearch(ctx, r.fetcher, channelID, keyword, r.timeLoc)
 		},
 		RecordSearch: func(ctx context.Context, recordID string) (any, error) {
-			return tools.RunRecordSearch(ctx, r.fetcher, channelID, recordID)
+			return tools.RunRecordSearch(ctx, r.fetcher, channelID, recordID, r.timeLoc)
 		},
 		WebSearch: func(ctx context.Context, query string) (any, error) {
 			return tools.RunWebSearch(ctx, r.llmHTTPClient, r.aiConfig, query)
@@ -433,7 +433,7 @@ func (r *Runner) maybeOnDemandRemember(
 	}
 
 	log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
-	sessionText := chat.FormatSessionRecordForContext(sessionMsgs)
+	sessionText := chat.FormatSessionRecordForContext(sessionMsgs, r.timeLoc)
 	res, err := memory.ExtractFactsAndUsageWithRetry(ctx, r.llmHTTPClient, r.aiConfig, sessionText, facts, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,
 		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
@@ -470,7 +470,7 @@ func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, p
 	if err != nil {
 		return err
 	}
-	recordText := chat.FormatSessionRecordForContext(msgs)
+	recordText := chat.FormatSessionRecordForContext(msgs, r.timeLoc)
 
 	if summaryText, err := memory.SummarizeRecordWithRetry(ctx, r.llmHTTPClient, r.aiConfig, recordText, utils.CognitiveRetryOptions{
 		MaxRetries:     config.AssistantMaxLLMRetries,

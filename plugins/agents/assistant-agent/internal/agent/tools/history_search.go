@@ -10,7 +10,7 @@ import (
 	"mew/plugins/sdk/api/history"
 )
 
-func RunHistorySearch(ctx context.Context, fetcher *history.Fetcher, channelID, keyword string) (any, error) {
+func RunHistorySearch(ctx context.Context, fetcher *history.Fetcher, channelID, keyword string, loc *time.Location) (any, error) {
 	keyword = strings.TrimSpace(keyword)
 	if keyword == "" {
 		return map[string]any{"messages": []any{}}, nil
@@ -30,9 +30,14 @@ func RunHistorySearch(ctx context.Context, fetcher *history.Fetcher, channelID, 
 		if err == nil {
 			recordID = rid
 		}
+
+		createdAt := m.CreatedAt
+		if loc != nil && !createdAt.IsZero() {
+			createdAt = createdAt.In(loc)
+		}
 		out = append(out, map[string]any{
 			"id":        m.ID,
-			"createdAt": m.CreatedAt.Format(time.RFC3339),
+			"createdAt": createdAt.Format(time.RFC3339),
 			"authorId":  m.AuthorID(),
 			"author":    m.AuthorUsername(),
 			"content":   m.ContextText(),
@@ -42,7 +47,7 @@ func RunHistorySearch(ctx context.Context, fetcher *history.Fetcher, channelID, 
 	return map[string]any{"keyword": keyword, "messages": out}, nil
 }
 
-func RunRecordSearch(ctx context.Context, fetcher *history.Fetcher, channelID, recordID string) (any, error) {
+func RunRecordSearch(ctx context.Context, fetcher *history.Fetcher, channelID, recordID string, loc *time.Location) (any, error) {
 	if fetcher == nil {
 		return nil, fmt.Errorf("history fetcher not configured")
 	}
@@ -52,6 +57,6 @@ func RunRecordSearch(ctx context.Context, fetcher *history.Fetcher, channelID, r
 	}
 	return map[string]any{
 		"recordId": recordID,
-		"text":     chat.FormatSessionRecordForContext(msgs),
+		"text":     chat.FormatSessionRecordForContext(msgs, loc),
 	}, nil
 }
