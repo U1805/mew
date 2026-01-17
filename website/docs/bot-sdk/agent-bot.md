@@ -9,7 +9,7 @@ sidebar_label: 'Agent Bot'
 本篇文档将引导你构建一个最小可用的会话型 Bot。它的核心任务是：**监听消息事件，在频道内被 `@` 或在私聊中收到特定指令时，自动进行回复。**
 
 :::info 参考实现
-本文所有内容均可参考官方示例 `plugins/agents/test-agent`，该示例完整实现了一个 `echo` 指令机器人。
+本文所有内容均可参考官方示例 `plugins/internal/agents/test-agent`，该示例完整实现了一个 `echo` 指令机器人。
 :::
 
 ## 工作原理
@@ -37,8 +37,7 @@ sidebar_label: 'Agent Bot'
 首先，在你的本地环境中启动 `test-agent` 服务：
 
 ```bash
-cd plugins/agents/test-agent
-go run ./cmd/test-agent
+go run ./plugins/cmd/agents/test-agent
 ```
 
 ### 2. 在前端注册并使用 Bot

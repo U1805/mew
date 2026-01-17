@@ -108,7 +108,7 @@ interface Bot {
 
 ## 实践：开发消息推送 Bot (Fetcher)
 
-> **参考实现**：`plugins/fetchers/test-fetcher`
+> **参考实现**：`plugins/internal/fetchers/test-fetcher`
 
 Fetcher Bot 是一个后台守护进程，根据 `config` 中的任务列表执行数据拉取和推送。
 
@@ -147,7 +147,7 @@ Fetcher Bot 是一个后台守护进程，根据 `config` 中的任务列表执�
 
 ## 实践：开发会话机器人 (Agent)
 
-> **参考实现**：`plugins/agents/test-agent`
+> **参考实现**：`plugins/internal/agents/test-agent`
 
 Agent Bot 是一个长连接客户端，通过 WebSocket 实时监听和响应用户消息。
 
@@ -169,7 +169,7 @@ Agent Bot 是一个长连接客户端，通过 WebSocket 实时监听和响应�
 当前版本的配置同步是通过 **定时轮询** 实现的，具体流程如下：
 
 *   Bot Service 启动后，会定期调用内部接口 `POST /api/bots/bootstrap`（需携带管理员密钥 `X-Mew-Admin-Secret`），拉取所有与其 `serviceType` 匹配的 Bot 实例及其配置。
-*   `plugins/sdk` 中的 `BotManager` 模块会负责管理所有 Bot 实例的生命周期。
+*   `plugins/pkg` 中的 `BotManager` 模块会负责管理所有 Bot 实例的生命周期。
 *   当检测到某个 Bot 的 `config` 发生变化、或者有新增/删除的 Bot 时，`BotManager` 会自动触发对应 Runner 的热重载。
 
 :::info

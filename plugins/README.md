@@ -8,17 +8,17 @@
 
 ## 目录结构
 
-- `plugins/sdk`：Bot SDK（通用代码：dotenv、环境变量解析、bootstrap client、通用 manager）
-- `plugins/fetchers/*`：Fetcher 类 Bot（Go）
-  - `plugins/fetchers/test-fetcher`：示例 Fetcher（serviceType=`test-fetcher`）
-  - `plugins/fetchers/rss-fetcher`：RSS 抓取（serviceType=`rss-fetcher`）
-- `plugins/agents/*`：Agent 类 Bot（Go）
-  - `plugins/agents/test-agent`：示例 Agent（serviceType=`test-agent`）
-  - `plugins/agents/jpdict-agent`：词典/翻译 Agent（serviceType=`jpdict-agent`）
+- `plugins/pkg`：Bot SDK（通用代码：dotenv、环境变量解析、bootstrap client、通用 manager）
+- `plugins/internal/fetchers/*`：Fetcher 类 Bot（Go）
+  - `plugins/internal/fetchers/test-fetcher`：示例 Fetcher（serviceType=`test-fetcher`）
+  - `plugins/internal/fetchers/rss-fetcher`：RSS 抓取（serviceType=`rss-fetcher`）
+- `plugins/internal/agents/*`：Agent 类 Bot（Go）
+  - `plugins/internal/agents/test-agent`：示例 Agent（serviceType=`test-agent`）
+  - `plugins/internal/agents/jpdict-agent`：词典/翻译 Agent（serviceType=`jpdict-agent`）
 
 ## 通用环境变量
 
-所有基于 `plugins/sdk` 的 Bot 通常都支持：
+所有基于 `plugins/pkg` 的 Bot 通常都支持：
 
 - `MEW_ADMIN_SECRET`：必填，对应后端 `MEW_ADMIN_SECRET`
 - `MEW_URL`：后端基址（默认 `http://localhost:3000`）
@@ -27,11 +27,11 @@
 - `MEW_CONFIG_SYNC_INTERVAL_SECONDS`：轮询同步间隔，默认 `60`
 - `MEW_DOTENV`：可选，设置为 `0/false/off/no` 可禁用 `.env` 加载（默认启用）
 
-`serviceType` 不通过环境变量设置，而是自动使用插件目录名（例如 `plugins/fetchers/test-fetcher` 的 `serviceType` 为 `test-fetcher`）。
+`serviceType` 不通过环境变量设置，而是自动使用插件目录名（例如 `plugins/internal/fetchers/test-fetcher` 的 `serviceType` 为 `test-fetcher`）。
 
 ## Fetcher 代理池
 
-Fetcher 类插件（`plugins/fetchers/*`）的外网请求默认会使用内置 SOCKS5 代理池进行轮询，以降低触发4xx的概率。
+Fetcher 类插件（`plugins/internal/fetchers/*`）的外网请求默认会使用内置 SOCKS5 代理池进行轮询，以降低触发4xx的概率。
 
 - `proxy_list_urls`：代理列表来源（支持逗号/空格/换行分隔多个 URL）；默认：
   - `https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt`
@@ -40,12 +40,12 @@ Fetcher 类插件（`plugins/fetchers/*`）的外网请求默认会使用内置 
 
 ## `.env.local` / `.env` 加载规则
 
-`plugins/sdk` 会在启动时尝试从以下位置加载环境变量（仅在变量尚未设置时才会写入）：
+`plugins/pkg` 会在启动时尝试从以下位置加载环境变量（仅在变量尚未设置时才会写入）：
 
 - 仓库提供了模板：`plugins/.env.example`（不会被自动加载）；请复制为 `.env.local` 或 `.env` 后再运行 Bot
 - 当前工作目录：`.env.local`（优先）→ `.env`
 - 插件源码目录：`.env.local`（优先）→ `.env`
-- 插件分组目录（如 `plugins/fetchers/`）：`.env.local`（优先）→ `.env`
+- 插件分组目录（如 `plugins/internal/fetchers/`）：`.env.local`（优先）→ `.env`
 - `plugins/` 目录：`.env.local`（优先）→ `.env`（建议把通用变量放这里）
 
 ## 本地运行
@@ -53,7 +53,7 @@ Fetcher 类插件（`plugins/fetchers/*`）的外网请求默认会使用内置 
 示例：
 
 ```bash
-go run ./plugins/fetchers/test-fetcher/cmd/test-fetcher
-go run ./plugins/fetchers/rss-fetcher/cmd/rss-fetcher
-go run ./plugins/agents/test-agent
+go run ./plugins/cmd/fetchers/test-fetcher
+go run ./plugins/cmd/fetchers/rss-fetcher
+go run ./plugins/cmd/agents/test-agent
 ```

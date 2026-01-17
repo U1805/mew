@@ -16,7 +16,7 @@ Mew 中的 Bot 主要分为两种类型，它们的设计目标和工作模式�
 | **通信模式** | **单向**: 外部源 -> Bot -> Webhook | **双向**: Bot \<-> WebSocket \<-> User |
 | **触发机制** | 定时器 (Cron / Ticker) | 事件 (Event) |
 | **典型场景** | RSS/Atom 订阅、定时抓取新闻并投递 | 指令机器人、词典/翻译、对话式助手 |
-| **参考实现** | **Go** (`plugins/fetchers/*`) | **Go** (`plugins/agents/*`) |
+| **参考实现** | **Go** (`plugins/internal/fetchers/*`) | **Go** (`plugins/internal/agents/*`) |
 
 ---
 
@@ -36,7 +36,7 @@ Mew 中的 Bot 主要分为两种类型，它们的设计目标和工作模式�
 
 这是您在服务器上 **独立运行的 Go 程序**，例如一个 `rss-fetcher` 服务。一个 Bot Service 通常会处理某一特定类型的所有 Bot 实例，其主要职责包括：
 -   **引导启动**：在启动时，通过 `POST /api/bots/bootstrap` 接口拉取该 `serviceType` 下所有 Bot 实例的配置及 `accessToken`。
--   **任务管理**：为每个 Bot 实例启动一个独立的运行器 (Runner)，并根据配置变化进行热重载。`plugins/sdk` 中的 `BotManager` 提供了此功能的封装。
+-   **任务管理**：为每个 Bot 实例启动一个独立的运行器 (Runner)，并根据配置变化进行热重载。`plugins/pkg` 中的 `BotManager` 提供了此功能的封装。
 
 :::info 安全提示
 `bootstrap` 接口是受保护的，需要通过环境变量 `MEW_ADMIN_SECRET` 和 `MEW_INFRA_ALLOWED_IPS` 进行访问控制，确保只有您的 Bot Service 能够调用。
