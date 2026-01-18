@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
+import { Types } from 'mongoose';
 import ServiceTypeModel from '../infra/serviceType.model';
 import BotModel from '../bot/bot.model';
+import MessageModel from '../message/message.model';
 
 // Mock the socketManager to prevent errors in tests that indirectly trigger socket events
 vi.mock('../../gateway/events', () => ({
@@ -407,6 +409,52 @@ describe('User Routes', () => {
 
       const channel = res.body.find((c: any) => c._id === dmChannelId);
       expect(channel.lastMessage).toBe(null);
+    });
+
+    it('should allow the bot owner to retract a bot-authored message in a DM channel', async () => {
+      await ServiceTypeModel.updateOne(
+        { name: 'rss-fetcher' },
+        { $setOnInsert: { name: 'rss-fetcher' } },
+        { upsert: true }
+      );
+
+      const botCreateRes = await request(app)
+        .post('/api/users/@me/bots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'DmDelBot', serviceType: 'rss-fetcher' });
+      expect(botCreateRes.statusCode).toBe(201);
+
+      const botUpdateRes = await request(app)
+        .patch(`/api/users/@me/bots/${botCreateRes.body._id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ dmEnabled: true });
+      expect(botUpdateRes.statusCode).toBe(200);
+
+      const bot = await BotModel.findById(botCreateRes.body._id).lean();
+      expect(bot).toBeTruthy();
+      const botUserId = (bot as any).botUserId?.toString?.();
+      expect(typeof botUserId).toBe('string');
+
+      const dmRes = await request(app)
+        .post('/api/users/@me/channels')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ recipientId: botUserId });
+      expect(dmRes.statusCode).toBe(201);
+      const botDmChannelId = dmRes.body._id;
+
+      const botMessage = await MessageModel.create({
+        channelId: new Types.ObjectId(botDmChannelId),
+        authorId: new Types.ObjectId(botUserId),
+        content: 'hello from bot',
+      });
+
+      const delRes = await request(app)
+        .delete(`/api/channels/${botDmChannelId}/messages/${botMessage._id}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(delRes.statusCode).toBe(200);
+      expect(delRes.body.retractedAt).toBeDefined();
+      expect(delRes.body.content).toBe('此消息已撤回');
     });
   });
 

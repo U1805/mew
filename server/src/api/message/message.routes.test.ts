@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
+import { Types } from 'mongoose';
 import app from '../../app';
 import { ChannelType } from '../channel/channel.model';
 import { createMessage, getMessageById } from './message.service';
 import Server from '../server/server.model';
 import Role from '../role/role.model';
+import ServiceTypeModel from '../infra/serviceType.model';
+import BotModel from '../bot/bot.model';
+import MessageModel from './message.model';
 
 describe('Message Routes', () => {
   const userData = {
@@ -351,6 +355,39 @@ describe('Message Routes', () => {
         .set('Authorization', `Bearer ${anotherToken}`);
 
       expect(res.statusCode).toBe(403);
+    });
+
+    it('should allow the bot owner to retract a message sent by their bot', async () => {
+      await ServiceTypeModel.updateOne(
+        { name: 'rss-fetcher' },
+        { $setOnInsert: { name: 'rss-fetcher' } },
+        { upsert: true }
+      );
+
+      const botCreateRes = await request(app)
+        .post('/api/users/@me/bots')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'OwnedDelBot', serviceType: 'rss-fetcher' });
+      expect(botCreateRes.statusCode).toBe(201);
+
+      const bot = await BotModel.findById(botCreateRes.body._id).lean();
+      expect(bot).toBeTruthy();
+      const botUserId = (bot as any).botUserId?.toString?.();
+      expect(typeof botUserId).toBe('string');
+
+      const botMessage = await MessageModel.create({
+        channelId: new Types.ObjectId(channelId),
+        authorId: new Types.ObjectId(botUserId),
+        content: 'bot says hi',
+      });
+
+      const res = await request(app)
+        .delete(`/api/servers/${serverId}/channels/${channelId}/messages/${botMessage._id}`)
+        .set('Authorization', `Bearer ${token}`);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.retractedAt).toBeDefined();
+      expect(res.body.content).toBe('此消息已撤回');
     });
   });
 

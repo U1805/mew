@@ -199,6 +199,7 @@ export interface Webhook {
 export interface Bot {
   _id: string;
   ownerId: string;
+  botUserId?: string;
   name: string;
   avatarUrl?: string;
   accessToken?: string;

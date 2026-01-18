@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useRef, useEffect, useLayoutEffect, useState } from 'react';
+import { Fragment, useCallback, useRef, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import MessageItem from './MessageItem';
 import TimestampDivider from './TimestampDivider';
@@ -8,6 +8,7 @@ import { Message, Channel, ChannelType, User } from '../../../shared/types';
 import { useAuthStore, useUIStore, useUnreadStore } from '../../../shared/stores';
 import { channelApi } from '../../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBots } from '../../users/hooks/useBots';
 
 interface MessageListProps {
   messages: Message[];
@@ -37,9 +38,18 @@ const MessageList: React.FC<MessageListProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
+  const { data: myBots } = useBots({ enabled: !!user });
   const queryClient = useQueryClient();
   const { currentServerId, targetMessageId, setTargetMessageId } = useUIStore();
   const removeUnreadChannel = useUnreadStore(s => s.removeUnreadChannel);
+
+  const ownedBotUserIds = useMemo(() => {
+    const set = new Set<string>();
+    (Array.isArray(myBots) ? myBots : []).forEach((b) => {
+      if (b?.botUserId) set.add(b.botUserId);
+    });
+    return set;
+  }, [myBots]);
 
   // 本地 ACK 熔断：避免 setQueryData + effect 互相触发导致死循环。
   const lastAckedMessageIdRef = useRef<string | null>(null);
@@ -301,7 +311,7 @@ const MessageList: React.FC<MessageListProps> = ({
                 return (
                   <Fragment key={msg._id}>
                     {showDivider && <TimestampDivider timestamp={formatDividerTimestamp(currentTimestamp)} />}
-                    <MessageItem message={msg} isSequential={!!isSequential} />
+                    <MessageItem message={msg} isSequential={!!isSequential} ownedBotUserIds={ownedBotUserIds} />
                   </Fragment>
                 );
               })}

@@ -19,6 +19,7 @@ import { usePermissions } from '../../../shared/hooks/usePermissions';
 interface MessageItemProps {
   message: Message;
   isSequential?: boolean;
+  ownedBotUserIds?: Set<string>;
 }
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -71,7 +72,7 @@ const getSelectionTextWithin = (container: HTMLElement | null) => {
 
 const looksLikeIdPlaceholder = (text: string) => /^@?[0-9a-fA-F]{24}$/.test(text.trim());
 
-const MessageItem = ({ message, isSequential }: MessageItemProps) => {
+const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProps) => {
   const { user } = useAuthStore();
   const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId, targetMessageId } = useUIStore();
   const { openModal } = useModalStore();
@@ -101,6 +102,7 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
   const isJpdictCard = message.type === 'app/x-jpdict-card';
   const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isForwardCard || isJpdictCard;
   const isAuthor = user?._id?.toString() === author._id?.toString();
+  const canDeleteAsBotOwner = !!user && !!author?.isBot && !!ownedBotUserIds?.has(author._id?.toString());
   const isRetracted = !!message.retractedAt;
   const referencedMessage = message.referencedMessageId
     ? (queryClient.getQueryData<Message[]>(['messages', message.channelId]) || []).find(
@@ -447,7 +449,7 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
                 </button>
               )}
 
-              {(isAuthor || canManageMessages) && (
+              {(isAuthor || canManageMessages || canDeleteAsBotOwner) && (
                 <button
                   type="button"
                   onClick={handleDelete}
@@ -566,7 +568,7 @@ const MessageItem = ({ message, isSequential }: MessageItemProps) => {
         canReply={canSendMessages}
         canForward={canSendMessages}
         canCopy={true}
-        canDelete={isAuthor || canManageMessages}
+        canDelete={isAuthor || canManageMessages || canDeleteAsBotOwner}
         canSendToJpdict={canSendToJpdict}
         isRetracted={isRetracted}
         onAddReaction={handleReactionClick}

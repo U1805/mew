@@ -13,6 +13,7 @@ import { getS3PublicUrl } from '../../utils/s3';
 import config from '../../config';
 import Sticker from '../sticker/sticker.model';
 import UserSticker from '../userSticker/userSticker.model';
+import BotModel from '../bot/bot.model';
 
 // Convert stored attachment keys into client-consumable URLs.
 function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
@@ -106,11 +107,20 @@ function buildMessageContext(messageObject: any): string {
   return parts.join('\n').trim();
 }
 
-async function checkMessagePermissions(messageId: string, userId: string) {
+type MessagePermissionAction = 'update' | 'delete';
+
+async function checkMessagePermissions(messageId: string, userId: string, action: MessagePermissionAction) {
   const message = await getMessageById(messageId);
 
   if (message.authorId.toString() === userId) {
     return;
+  }
+
+  // Allow a bot owner to delete messages authored by their bot user.
+  // (Intentionally scoped to deletion only; editing remains author-only or MANAGE_MESSAGES.)
+  if (action === 'delete') {
+    const isOwner = await BotModel.exists({ botUserId: message.authorId, ownerId: userId });
+    if (isOwner) return;
   }
 
   const channel = await Channel.findById(message.channelId)
@@ -507,7 +517,7 @@ export const getMessageById = async (messageId: string) => {
     userId: string,
     content: string
   ) => {
-    await checkMessagePermissions(messageId, userId);
+    await checkMessagePermissions(messageId, userId, 'update');
     const message = await getMessageById(messageId);
 
     const channel = await Channel.findById(message.channelId).lean();
@@ -535,7 +545,7 @@ export const getMessageById = async (messageId: string) => {
   };
 
   export const deleteMessage = async (messageId: string, userId: string) => {
-    await checkMessagePermissions(messageId, userId);
+    await checkMessagePermissions(messageId, userId, 'delete');
     const message = await getMessageById(messageId);
 
     const channel = await Channel.findById(message.channelId).select('type serverId').lean();
