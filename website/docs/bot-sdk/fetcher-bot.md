@@ -10,12 +10,12 @@ sidebar_label: 'Fetcher Bot'
 我们的目标是编写一个 Go 服务，它能自动从 Mew 平台拉取属于自己 `serviceType` 的 Bot 配置。服务会解析配置中的任务列表，并按照设定的时间间隔，周期性地向指定的 Webhook 地址推送消息。
 
 :::info 参考实现
-我们强烈建议您先跑通示例项目 `plugins/fetchers/test-fetcher`，这会帮助您更快地理解核心流程，然后再基于它进行改造。
+我们强烈建议您先跑通示例项目 `plugins/internal/fetchers/test-fetcher`，这会帮助您更快地理解核心流程，然后再基于它进行改造（运行入口见 `plugins/cmd/fetchers/test-fetcher`）。
 :::
 
 ### 第一步：创建服务入口
 
-为了简化开发，我们推荐直接复用项目内置的 Go SDK (`plugins/sdk`)。这个 SDK 已经为你处理好了大部分的底层工作，包括：
+为了简化开发，我们推荐直接复用项目内置的 Go SDK (`plugins/pkg`)。这个 SDK 已经为你处理好了大部分的底层工作，包括：
 
 *   **配置加载**：自动读取 `.env` 和 `.env.local` 文件，以及运行时的环境变量（如 `MEW_ADMIN_SECRET`, `MEW_URL` 等）。
 *   **配置同步**：通过 `POST /api/bots/bootstrap` 接口**轮询**拉取 Bot 配置，并支持热更新。
@@ -30,7 +30,7 @@ package main
 import (
 	"log"
 
-	"mew/plugins/sdk"
+	"mew/plugins/pkg"
 )
 
 func main()
@@ -48,7 +48,7 @@ func main()
 ```
 
 :::info 关于 `serviceType`
-SDK 会自动从**入口 `main.go` 所在目录的名称**推导出 `serviceType`。例如，如果你的代码位于 `plugins/fetchers/rss-fetcher`，那么 `serviceType` 就会被设为 `rss-fetcher`。当然，你也可以在 `sdk.ServiceOptions` 中显式传递 `ServiceType` 参数来覆盖这个默认行为。
+SDK 会自动从入口推导 `serviceType`。在本项目的集中入口布局下（`plugins/cmd/(fetchers|agents)/<serviceType>/main.go`），`serviceType` 会从入口目录名推导（例如 `plugins/cmd/fetchers/rss-fetcher/main.go` → `rss-fetcher`）。当然，你也可以在 `sdk.ServiceOptions` 中显式传递 `ServiceType` 参数来覆盖这个默认行为。
 :::
 
 ### 第二步：解析任务配置 (`bot.config`)
@@ -61,7 +61,7 @@ package main
 import (
 	"fmt"
 
-	"mew/plugins/sdk"
+	"mew/plugins/pkg"
 )
 
 // TaskConfig 定义了单个任务的结构

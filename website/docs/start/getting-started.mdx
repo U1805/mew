@@ -203,7 +203,7 @@ MEW_URL=http://localhost:3000
 cd fetchers/test-fetcher
 
 # 运行服务
-go run ./cmd/test-fetcher
+go run ./plugins/cmd/fetchers/test-fetcher
 ```
 :::info
 Bot 的 `serviceType` 会根据其入口文件 (`main.go`) 所在的目录名自动推导，此处为 `test-fetcher`。

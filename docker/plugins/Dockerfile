@@ -16,43 +16,19 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     set -eux; \
     mkdir -p /out; \
-    for d in /src/plugins/fetchers/* /src/plugins/agents/*; do \
-      if [ ! -d "$d" ]; then \
-        continue; \
-      fi; \
-      name="$(basename "$d")"; \
-      if [ ! -f "$d/go.mod" ]; then \
-        continue; \
-      fi; \
-      ( \
-        cd "$d"; \
-        CGO_ENABLED=0 go env -w GO111MODULE=on; \
-        CGO_ENABLED=0 go env -w GOPROXY="$GOPROXY"; \
-        CGO_ENABLED=0 go mod download; \
-        pkg="."; \
-        if [ -d "./cmd" ]; then \
-          if [ -d "./cmd/${name}" ]; then \
-            pkg="./cmd/${name}"; \
-          else \
-            # If there's exactly one cmd/* directory, use it as the main package. \
-            cmd_pkg=""; \
-            for c in ./cmd/*; do \
-              if [ -d "$c" ]; then \
-                if [ -n "$cmd_pkg" ]; then \
-                  cmd_pkg=""; \
-                  break; \
-                fi; \
-                cmd_pkg="$c"; \
-              fi; \
-            done; \
-            if [ -n "$cmd_pkg" ]; then \
-              pkg="$cmd_pkg"; \
-            fi; \
-          fi; \
+    ( \
+      cd /src/plugins; \
+      CGO_ENABLED=0 go env -w GO111MODULE=on; \
+      CGO_ENABLED=0 go env -w GOPROXY="$GOPROXY"; \
+      CGO_ENABLED=0 go mod download; \
+      for d in ./cmd/fetchers/* ./cmd/agents/*; do \
+        if [ ! -d "$d" ]; then \
+          continue; \
         fi; \
-        GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" CGO_ENABLED=0 go build -o "/out/mew-${name}-bot" "$pkg"; \
-      ); \
-    done
+        name="$(basename "$d")"; \
+        GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" CGO_ENABLED=0 go build -o "/out/mew-${name}-bot" "$d"; \
+      done; \
+    )
 
 FROM --platform=$TARGETPLATFORM ${RUNTIME_IMAGE}
 

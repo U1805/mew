@@ -144,5 +144,5 @@ WebSocket 网关是实现实时体验的核心，入口位于 `server/src/server
 3. Bot Service 通过内部接口 (`POST /api/bots/bootstrap`) 定期拉取所有归属于它的 Bot 的配置信息，实现自动同步。
 
 :::caution 当前实现细节
-目前 `plugins/sdk` 采用**轮询**方式同步配置。配置变更（如用户在 UI 上修改了 Bot 设置）由 Bot Service 侧的轮询拉取来感知，而非通过 WebSocket 实时推送。
+目前 `plugins/pkg` 采用**轮询**方式同步配置。配置变更（如用户在 UI 上修改了 Bot 设置）由 Bot Service 侧的轮询拉取来感知，而非通过 WebSocket 实时推送。
 :::
