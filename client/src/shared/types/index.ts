@@ -105,6 +105,7 @@ export interface Attachment {
   contentType: string;
   url: string;
   size: number;
+  key?: string;
 }
 
 export interface Reaction {
@@ -156,6 +157,13 @@ export interface MessagePayload {
   };
   embeds?: Embed[];
   sticker?: Sticker;
+  voice?: {
+    key: string;
+    url?: string;
+    contentType: string;
+    size: number;
+    durationMs?: number;
+  };
   [key: string]: any;
 }
 

@@ -4,6 +4,7 @@ import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { AttachmentList } from '../../chat-attachments/components/AttachmentList';
 import ForwardCard from './ForwardCard';
 import { BilibiliCard, InstagramCard, JpdictCard, PornhubCard, RssCard, TwitterCard, UrlEmbed } from '../../chat-embeds';
+import { VoiceMessagePlayer } from '../../chat-voice/components/VoiceMessagePlayer';
 
 interface MessageContentProps {
     message: Message;
@@ -19,6 +20,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
     const isInstagramCard = message.type === 'app/x-instagram-card';
     const isForwardCard = message.type === 'app/x-forward-card';
     const isJpdictCard = message.type === 'app/x-jpdict-card';
+    const isVoiceMessage = message.type === 'message/voice';
 
     if (isForwardCard && message.payload) {
         return <ForwardCard payload={message.payload} serverId={serverId} channelId={channelId} />;
@@ -46,6 +48,19 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
 
     if (isInstagramCard && message.payload) {
         return <InstagramCard payload={message.payload} />;
+    }
+
+    if (isVoiceMessage) {
+        const voice = message.payload?.voice as any;
+        const src = typeof voice?.url === 'string' ? voice.url : '';
+        const contentType = typeof voice?.contentType === 'string' ? voice.contentType : undefined;
+        const durationMs = typeof voice?.durationMs === 'number' ? voice.durationMs : undefined;
+
+        return src ? (
+          <VoiceMessagePlayer src={src} contentType={contentType} durationMs={durationMs} />
+        ) : (
+          <div className="text-mew-textMuted italic text-sm">(voice message)</div>
+        );
     }
 
     return (

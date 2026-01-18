@@ -63,6 +63,17 @@ function buildMessageContext(messageObject: any): string {
     const stickerName = typeof sticker?.name === 'string' ? sticker.name.trim() : '';
     if (stickerName) parts.push(`sticker: ${stickerName}`);
 
+    const voice = payload?.voice && typeof payload.voice === 'object' ? payload.voice : undefined;
+    const durationMs = typeof (voice as any)?.durationMs === 'number' ? (voice as any).durationMs : undefined;
+    if (durationMs && durationMs > 0) {
+      const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+      const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+      const ss = String(totalSeconds % 60).padStart(2, '0');
+      parts.push(`voice: ${mm}:${ss}`);
+    } else if (voice) {
+      parts.push('voice');
+    }
+
     const title = typeof payload.title === 'string' ? payload.title.trim() : '';
     const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
     const url = typeof payload.url === 'string' ? payload.url.trim() : '';
@@ -191,6 +202,14 @@ function processMessageForClient(message: any): object {
     const key = (messageObject.payload.sticker as any).key;
     if (typeof key === 'string' && key) {
       (messageObject.payload.sticker as any).url = getS3PublicUrl(key);
+    }
+  }
+
+  // Hydrate voice URLs (if any).
+  if (messageObject?.payload?.voice && typeof messageObject.payload.voice === 'object') {
+    const key = (messageObject.payload.voice as any).key;
+    if (typeof key === 'string' && key) {
+      (messageObject.payload.voice as any).url = getS3PublicUrl(key);
     }
   }
   }
@@ -364,6 +383,37 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
         },
       };
     }
+  }
+
+  if (data.type === 'message/voice') {
+    const payload = data.payload && typeof data.payload === 'object' ? (data.payload as any) : {};
+    const voice = payload?.voice && typeof payload.voice === 'object' ? payload.voice : undefined;
+    const key = typeof (voice as any)?.key === 'string' ? (voice as any).key.trim() : '';
+    const contentType = typeof (voice as any)?.contentType === 'string' ? (voice as any).contentType.trim() : '';
+    const size = typeof (voice as any)?.size === 'number' ? (voice as any).size : Number.NaN;
+    const durationMsRaw = (voice as any)?.durationMs;
+    const durationMs =
+      durationMsRaw == null ? undefined : (typeof durationMsRaw === 'number' ? durationMsRaw : Number.NaN);
+
+    if (!key) throw new BadRequestError('voice.key is required for voice messages');
+    if (!contentType) throw new BadRequestError('voice.contentType is required for voice messages');
+    if (!Number.isFinite(size) || size <= 0) throw new BadRequestError('voice.size is required for voice messages');
+    if (durationMs !== undefined && (!Number.isFinite(durationMs) || durationMs <= 0)) {
+      throw new BadRequestError('voice.durationMs must be a positive number');
+    }
+
+    // Voice messages are allowed to have no content/attachments.
+    data.content = '';
+    data.attachments = [];
+    data.payload = {
+      ...(payload || {}),
+      voice: {
+        key,
+        contentType,
+        size,
+        ...(durationMs !== undefined ? { durationMs } : {}),
+      },
+    };
   }
 
   if (data.referencedMessageId) {

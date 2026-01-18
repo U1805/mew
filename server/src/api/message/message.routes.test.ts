@@ -212,6 +212,31 @@ describe('Message Routes', () => {
       expect(res.body.content).toBe(messageData.content);
       expect(res.body.authorId.username).toBe(userData.username);
     });
+
+    it('should create a voice message and hydrate payload.voice.url', async () => {
+      const voiceKey = 'voice-test.webm';
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          type: 'message/voice',
+          payload: {
+            voice: {
+              key: voiceKey,
+              contentType: 'audio/webm',
+              size: 1234,
+              durationMs: 3200,
+            },
+          },
+        });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.type).toBe('message/voice');
+      expect(res.body.content).toBe('');
+      expect(res.body.attachments).toEqual([]);
+      expect(res.body.payload?.voice?.key).toBe(voiceKey);
+      expect(res.body.payload?.voice?.url).toContain(voiceKey);
+    });
   });
 
   describe('PATCH /api/servers/:serverId/channels/:channelId/messages/:messageId', () => {

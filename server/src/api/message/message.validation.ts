@@ -36,6 +36,18 @@ export const createMessageSchema = z.object({
           return !!(forwarded && typeof forwarded === 'object');
         }
 
+        if (data.type === 'message/voice') {
+          const voice = (data.payload as any)?.voice;
+          const key = typeof voice?.key === 'string' ? voice.key.trim() : '';
+          const contentType = typeof voice?.contentType === 'string' ? voice.contentType.trim() : '';
+          const size = typeof voice?.size === 'number' ? voice.size : Number.NaN;
+          const durationMs =
+            voice?.durationMs == null ? null : (typeof voice.durationMs === 'number' ? voice.durationMs : Number.NaN);
+
+          const okDuration = durationMs == null || (Number.isFinite(durationMs) && durationMs > 0);
+          return !!(key && contentType && Number.isFinite(size) && size > 0 && okDuration);
+        }
+
         // Allow non-default typed messages (e.g. webhook cards) to be created without content/attachments.
         if (data.type && data.type !== 'message/default') {
           return !!data.payload;
