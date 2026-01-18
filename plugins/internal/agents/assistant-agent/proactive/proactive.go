@@ -10,9 +10,8 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/chat"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/x/llm"
@@ -47,12 +46,12 @@ func BuildProactiveRequest(now time.Time, channelID string, recordID string, d *
 }
 
 func RunProactiveQueueForUser(
-	c agentctx.AssistantRequestContext,
+	c infra.AssistantRequestContext,
 	q ProactiveQueueFile,
 	meta memory.Metadata,
 	summaries memory.SummariesFile,
 ) ProactiveQueueFile {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+	ctx := infra.ContextOrBackground(c.Ctx)
 	userID := strings.TrimSpace(c.UserID)
 	logPrefix := strings.TrimSpace(c.LogPrefix)
 	timeLoc := c.TimeLoc
@@ -123,16 +122,12 @@ func RunProactiveQueueForUser(
 
 		outClean, _ := chat.ParseReplyControls(out)
 		outClean = strings.TrimSpace(outClean)
-		if outClean == "" || strings.TrimSpace(outClean) == config.AssistantSilenceToken || strings.Contains(outClean, config.AssistantSilenceToken) {
+		if outClean == "" || strings.TrimSpace(outClean) == infra.AssistantSilenceToken || strings.Contains(outClean, infra.AssistantSilenceToken) {
 			continue
 		}
 
-		if err := sendReplyHTTP(ctx, req.ChannelID, outClean, config.AssistantTypingWPMDefault, func(line string) error {
-			return chat.PostMessageHTTP(agentctx.MewCallContext{
-				Ctx:        ctx,
-				HTTPClient: c.Mew.HTTPClient,
-				APIBase:    c.Mew.APIBase,
-			}, req.ChannelID, line)
+		if err := sendReplyHTTP(ctx, req.ChannelID, outClean, infra.AssistantTypingWPMDefault, func(line string) error {
+			return chat.PostMessageHTTP(c.Mew.WithCtx(ctx), req.ChannelID, line)
 		}); err != nil {
 			log.Printf("%s proactive send failed: user=%s channel=%s record=%s err=%v", logPrefix, userID, req.ChannelID, req.RecordID, err)
 			kept = append(kept, req)
@@ -142,8 +137,8 @@ func RunProactiveQueueForUser(
 			logPrefix,
 			req.ChannelID,
 			req.RecordID,
-			sdk.PreviewString(req.Reason, config.AssistantLogContentPreviewLen),
-			sdk.PreviewString(outClean, config.AssistantLogContentPreviewLen),
+			sdk.PreviewString(req.Reason, infra.AssistantLogContentPreviewLen),
+			sdk.PreviewString(outClean, infra.AssistantLogContentPreviewLen),
 		)
 	}
 
@@ -152,7 +147,7 @@ func RunProactiveQueueForUser(
 }
 
 func proactiveDecideAndCompose(
-	c agentctx.LLMCallContext,
+	c infra.LLMCallContext,
 	persona string,
 	req ProactiveRequest,
 	recordText string,
@@ -163,7 +158,7 @@ func proactiveDecideAndCompose(
 	logPrefix string,
 	timeLoc *time.Location,
 ) (string, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	system := strings.TrimSpace(persona)
 	if system == "" {
@@ -225,9 +220,9 @@ Session summaries between the scheduled request and now:
 Recent current session record:
 %s
 `,
-		config.AssistantSilenceToken,
-		config.AssistantWantMoreToken,
-		config.AssistantProactiveTokenPrefix,
+		infra.AssistantSilenceToken,
+		infra.AssistantWantMoreToken,
+		infra.AssistantProactiveTokenPrefix,
 		nowLocal.Format(time.RFC3339),
 		addedAtLocal.Format(time.RFC3339),
 		requestAtLocal.Format(time.RFC3339),
@@ -249,10 +244,10 @@ Recent current session record:
 		return "", err
 	}
 	resp, err := llm.CallOpenAIChatCompletionWithRetry(ctx, c.HTTPClient, openaiCfg, messages, nil, llm.CallOpenAIChatCompletionWithRetryOptions{
-		MaxRetries:     config.AssistantMaxLLMRetries,
-		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
-		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
-		LogPrefix:      config.AssistantLogPrefix,
+		MaxRetries:     infra.AssistantMaxLLMRetries,
+		InitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+		MaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
+		LogPrefix:      infra.AssistantLogPrefix,
 		ChannelID:      req.ChannelID,
 	})
 	if err != nil {
@@ -266,7 +261,7 @@ Recent current session record:
 		logPrefix,
 		req.ChannelID,
 		req.RecordID,
-		sdk.PreviewString(out, config.AssistantLogLLMPreviewLen),
+		sdk.PreviewString(out, infra.AssistantLogLLMPreviewLen),
 	)
 	return out, nil
 }
@@ -343,9 +338,9 @@ func sendReplyHTTP(ctx context.Context, channelID string, reply string, typingWP
 		return nil
 	}
 
-	lines := make([]string, 0, config.AssistantMaxReplyLines)
+	lines := make([]string, 0, infra.AssistantMaxReplyLines)
 	for _, line := range strings.Split(reply, "\n") {
-		if len(lines) >= config.AssistantMaxReplyLines {
+		if len(lines) >= infra.AssistantMaxReplyLines {
 			break
 		}
 		t := strings.TrimSpace(line)

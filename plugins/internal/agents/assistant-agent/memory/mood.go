@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 )
 
 type Mood struct {
@@ -16,7 +16,7 @@ type Mood struct {
 }
 
 func DefaultBaselineMood() Mood {
-	return Mood{Valence: config.DefaultBaselineValence, Arousal: config.DefaultBaselineArousal}
+	return Mood{Valence: infra.DefaultBaselineValence, Arousal: infra.DefaultBaselineArousal}
 }
 
 func ComputeInitialMood(baseline, lastFinal Mood, delta time.Duration) Mood {
@@ -24,7 +24,7 @@ func ComputeInitialMood(baseline, lastFinal Mood, delta time.Duration) Mood {
 	if dHours < 0 {
 		dHours = 0
 	}
-	decay := math.Exp(-config.MoodDecayKPerHour * dHours)
+	decay := math.Exp(-infra.MoodDecayKPerHour * dHours)
 
 	return Mood{
 		Valence: baseline.Valence + (lastFinal.Valence-baseline.Valence)*decay,

@@ -9,13 +9,11 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/chat"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/internal/agents/assistant-agent/proactive"
 	"mew/plugins/internal/agents/assistant-agent/tools"
-	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg"
 	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/api/attachment"
@@ -82,7 +80,7 @@ func (r *Runner) handleMessageCreate(
 		channelID,
 		msg.ID,
 		userID,
-		sdk.PreviewString(msg.Content, config.AssistantLogContentPreviewLen),
+		sdk.PreviewString(msg.Content, infra.AssistantLogContentPreviewLen),
 	)
 
 	r.knownUsersMu.Lock()
@@ -120,45 +118,46 @@ func (r *Runner) processDMMessage(
 ) error {
 	userID := socketMsg.AuthorID()
 	channelID := socketMsg.ChannelID
+	reqCtx := r.newRequestContext(ctx, userID, channelID, logPrefix)
 	now := socketMsg.CreatedAt
 	if now.IsZero() {
 		now = time.Now()
 	}
 
-	paths, facts, summaries, meta, err := r.loadUserState(userID, logPrefix)
+	state, err := r.loadUserState(reqCtx)
 	if err != nil {
 		return err
 	}
 
-	delta, prevRecordID, newSession := r.applyTiming(&meta, channelID, now)
+	delta, prevRecordID, newSession := r.applyTiming(&state.Metadata, reqCtx.ChannelID, now)
 	if newSession {
-		r.tryFinalizePreviousSession(ctx, logPrefix, userID, paths, &meta)
+		r.tryFinalizePreviousSession(reqCtx, &state)
 	}
 
-	sessionMsgs, recordID, startAt, err := r.fetcher.FetchSessionMessages(ctx, channelID)
+	sessionMsgs, recordID, startAt, err := r.fetcher.FetchSessionMessages(reqCtx.Ctx, reqCtx.ChannelID)
 	if err != nil {
 		return err
 	}
 	log.Printf("%s session record loaded: channel=%s record=%s start=%s msgs=%d persona=%q",
-		logPrefix, channelID, recordID, startAt.Format(time.RFC3339), len(sessionMsgs), sdk.PreviewString(r.persona, config.AssistantLogPersonaPreviewLen),
+		reqCtx.LogPrefix, reqCtx.ChannelID, recordID, startAt.Format(time.RFC3339), len(sessionMsgs), sdk.PreviewString(r.persona, infra.AssistantLogPersonaPreviewLen),
 	)
 
-	if err := r.updateSessionState(ctx, userID, channelID, now, startAt, recordID, prevRecordID, delta, &meta); err != nil {
+	if err := r.updateSessionState(reqCtx, now, startAt, recordID, prevRecordID, delta, &state); err != nil {
 		return err
 	}
-	if err := SaveMetadata(paths.MetadataPath, meta); err != nil {
+	if err := state.SaveMetadata(); err != nil {
 		return err
 	}
 
-	l1l4, l5 := r.buildPrompt(ctx, meta, facts, summaries, sessionMsgs, logPrefix)
-	reply, finalMood, gotMood, err := r.reply(ctx, emit, channelID, userID, l1l4, l5, logPrefix)
+	l1l4, l5 := r.buildPrompt(reqCtx, state, sessionMsgs)
+	reply, finalMood, gotMood, err := r.reply(reqCtx, emit, l1l4, l5)
 	if err != nil {
 		return err
 	}
 
 	if gotMood {
-		meta.FinalMood = finalMood
-		if err := SaveMetadata(paths.MetadataPath, meta); err != nil {
+		state.Metadata.FinalMood = finalMood
+		if err := state.SaveMetadata(); err != nil {
 			return err
 		}
 	}
@@ -166,25 +165,25 @@ func (r *Runner) processDMMessage(
 	clean, controls := chat.ParseReplyControls(reply)
 	transport := chat.TransportContext{
 		Emit:      emit,
-		ChannelID: channelID,
-		UserID:    userID,
-		LogPrefix: logPrefix,
-		TypingWPM: config.AssistantTypingWPMDefault,
+		ChannelID: reqCtx.ChannelID,
+		UserID:    reqCtx.UserID,
+		LogPrefix: reqCtx.LogPrefix,
+		TypingWPM: infra.AssistantTypingWPMDefault,
 		PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
-			return chat.PostMessageHTTP(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, channelID, content)
+			return chat.PostMessageHTTP(reqCtx.Mew.WithCtx(ctx), channelID, content)
 		},
 		PostStickerHTTP: func(ctx context.Context, channelID, stickerID string) error {
-			return chat.PostStickerHTTP(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, channelID, stickerID)
+			return chat.PostStickerHTTP(reqCtx.Mew.WithCtx(ctx), channelID, stickerID)
 		},
 		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
-			return r.stickers.ResolveStickerIDByName(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, logPrefix, name)
+			return r.stickers.ResolveStickerIDByName(reqCtx.Mew.WithCtx(ctx), reqCtx.LogPrefix, name)
 		},
 	}
 
 	if err := chat.SendReply(ctx, transport, clean, controls); err != nil {
 		return err
 	}
-	r.enqueueProactive(now, paths, channelID, recordID, controls.Proactive, logPrefix)
+	r.enqueueProactive(reqCtx, now, state, recordID, controls.Proactive)
 
 	// If the model explicitly asks for a continuation, prompt it once more.
 	if controls.WantMore {
@@ -195,13 +194,13 @@ func (r *Runner) processDMMessage(
 		}
 		l5More = append(l5More, openaigo.UserMessage("(you want to say more)"))
 
-		more, moreMood, moreGotMood, moreErr := r.reply(ctx, emit, channelID, userID, l1l4, l5More, logPrefix)
+		more, moreMood, moreGotMood, moreErr := r.reply(reqCtx, emit, l1l4, l5More)
 		if moreErr != nil {
 			return moreErr
 		}
 		if moreGotMood {
-			meta.FinalMood = moreMood
-			if err := SaveMetadata(paths.MetadataPath, meta); err != nil {
+			state.Metadata.FinalMood = moreMood
+			if err := state.SaveMetadata(); err != nil {
 				return err
 			}
 		}
@@ -210,56 +209,44 @@ func (r *Runner) processDMMessage(
 		if err := chat.SendReply(ctx, transport, moreClean, moreControls); err != nil {
 			return err
 		}
-		r.enqueueProactive(now, paths, channelID, recordID, moreControls.Proactive, logPrefix)
+		r.enqueueProactive(reqCtx, now, state, recordID, moreControls.Proactive)
 	}
-	r.maybeOnDemandRemember(ctx, socketMsg.Content, sessionMsgs, facts, paths, userID, channelID, now, logPrefix)
+	r.maybeOnDemandRemember(reqCtx, socketMsg.Content, sessionMsgs, &state, now)
 	return nil
 }
 
-func (r *Runner) enqueueProactive(now time.Time, paths UserStatePaths, channelID string, recordID string, d *chat.ProactiveDirective, logPrefix string) {
-	req, ok := proactive.BuildProactiveRequest(now, channelID, recordID, d)
+func (r *Runner) enqueueProactive(c infra.AssistantRequestContext, now time.Time, s UserState, recordID string, d *chat.ProactiveDirective) {
+	req, ok := proactive.BuildProactiveRequest(now, c.ChannelID, recordID, d)
 	if !ok {
 		return
 	}
 
-	q, err := LoadProactiveQueue(paths.ProactivePath)
+	q, err := LoadProactiveQueue(s.Paths.ProactivePath)
 	if err != nil {
-		log.Printf("%s load proactive queue failed: path=%s err=%v", logPrefix, paths.ProactivePath, err)
+		log.Printf("%s load proactive queue failed: path=%s err=%v", c.LogPrefix, s.Paths.ProactivePath, err)
 		return
 	}
-	q = proactive.AppendProactiveRequest(now, q, req, config.AssistantMaxProactiveQueue)
-	if err := SaveProactiveQueue(paths.ProactivePath, q); err != nil {
-		log.Printf("%s save proactive queue failed: path=%s err=%v", logPrefix, paths.ProactivePath, err)
+	q = proactive.AppendProactiveRequest(now, q, req, infra.AssistantMaxProactiveQueue)
+	if err := SaveProactiveQueue(s.Paths.ProactivePath, q); err != nil {
+		log.Printf("%s save proactive queue failed: path=%s err=%v", c.LogPrefix, s.Paths.ProactivePath, err)
 		return
 	}
 
 	log.Printf("%s proactive queued: channel=%s record=%s at=%s reason=%q",
-		logPrefix,
+		c.LogPrefix,
 		req.ChannelID,
 		req.RecordID,
 		req.RequestAt.Format(time.RFC3339),
-		sdk.PreviewString(req.Reason, config.AssistantLogContentPreviewLen),
+		sdk.PreviewString(req.Reason, infra.AssistantLogContentPreviewLen),
 	)
 }
 
-func (r *Runner) loadUserState(userID, logPrefix string) (paths UserStatePaths, facts memory.FactsFile, summaries memory.SummariesFile, meta memory.Metadata, err error) {
-	paths = UserStatePathsFor(r.serviceType, r.botID, userID)
+func (r *Runner) loadUserState(c infra.AssistantRequestContext) (UserState, error) {
+	paths := UserStatePathsFor(r.serviceType, r.botID, c.UserID)
 	log.Printf("%s state paths: user=%s meta=%s facts=%s summaries=%s",
-		logPrefix, userID, paths.MetadataPath, paths.FactsPath, paths.SummariesPath,
+		c.LogPrefix, c.UserID, paths.MetadataPath, paths.FactsPath, paths.SummariesPath,
 	)
-	facts, err = LoadFacts(paths.FactsPath)
-	if err != nil {
-		return UserStatePaths{}, memory.FactsFile{}, memory.SummariesFile{}, memory.Metadata{}, err
-	}
-	summaries, err = LoadSummaries(paths.SummariesPath)
-	if err != nil {
-		return UserStatePaths{}, memory.FactsFile{}, memory.SummariesFile{}, memory.Metadata{}, err
-	}
-	meta, err = LoadMetadata(paths.MetadataPath)
-	if err != nil {
-		return UserStatePaths{}, memory.FactsFile{}, memory.SummariesFile{}, memory.Metadata{}, err
-	}
-	return paths, facts, summaries, meta, nil
+	return LoadUserState(paths)
 }
 
 func (r *Runner) applyTiming(meta *memory.Metadata, channelID string, now time.Time) (delta time.Duration, prevRecordID string, newSession bool) {
@@ -274,53 +261,53 @@ func (r *Runner) applyTiming(meta *memory.Metadata, channelID string, now time.T
 		if delta < 0 {
 			delta = 0
 		}
-		meta.TimeSinceLastMessage = config.AssistantTimeSincePrefix + sdk.HumanizeDuration(delta)
+		meta.TimeSinceLastMessage = infra.AssistantTimeSincePrefix + sdk.HumanizeDuration(delta)
 	} else {
-		meta.TimeSinceLastMessage = config.AssistantTimeSinceUnknown
+		meta.TimeSinceLastMessage = infra.AssistantTimeSinceUnknown
 	}
-	newSession = meta.RecordID == "" || meta.LastMessageAt.IsZero() || delta > config.AssistantSessionGap
+	newSession = meta.RecordID == "" || meta.LastMessageAt.IsZero() || delta > infra.AssistantSessionGap
 	return delta, prevRecordID, newSession
 }
 
-func (r *Runner) tryFinalizePreviousSession(ctx context.Context, logPrefix, userID string, paths UserStatePaths, meta *memory.Metadata) {
-	if meta.RecordID == "" || meta.ChannelID == "" || meta.LastSummarizedRecordID == meta.RecordID {
+func (r *Runner) tryFinalizePreviousSession(c infra.AssistantRequestContext, s *UserState) {
+	if s.Metadata.RecordID == "" || s.Metadata.ChannelID == "" || s.Metadata.LastSummarizedRecordID == s.Metadata.RecordID {
 		return
 	}
 	log.Printf("%s session rollover detected: user=%s prevRecord=%s lastSummarized=%s",
-		logPrefix, userID, meta.RecordID, meta.LastSummarizedRecordID,
+		c.LogPrefix, c.UserID, s.Metadata.RecordID, s.Metadata.LastSummarizedRecordID,
 	)
-	if err := r.finalizeRecord(ctx, logPrefix, userID, paths, meta); err != nil {
-		log.Printf("%s finalize previous record failed (will retry later): %v", logPrefix, err)
+	if err := r.finalizeRecord(c, s); err != nil {
+		log.Printf("%s finalize previous record failed (will retry later): %v", c.LogPrefix, err)
 	}
 }
 
 func (r *Runner) updateSessionState(
-	ctx context.Context,
-	userID, channelID string,
+	c infra.AssistantRequestContext,
 	now, startAt time.Time,
 	recordID, prevRecordID string,
 	delta time.Duration,
-	meta *memory.Metadata,
+	s *UserState,
 ) error {
+	meta := &s.Metadata
 	meta.RecordID = recordID
 	meta.StartAt = startAt
 	meta.LastMessageAt = now
-	meta.ChannelID = channelID
+	meta.ChannelID = c.ChannelID
 	startAtLocal := startAt
-	if r.timeLoc != nil && !startAtLocal.IsZero() {
-		startAtLocal = startAtLocal.In(r.timeLoc)
+	if c.TimeLoc != nil && !startAtLocal.IsZero() {
+		startAtLocal = startAtLocal.In(c.TimeLoc)
 	}
-	meta.SessionStartDatetime = startAtLocal.Format(config.AssistantSessionStartTimeFormat)
+	meta.SessionStartDatetime = startAtLocal.Format(infra.AssistantSessionStartTimeFormat)
 	if strings.TrimSpace(prevRecordID) != strings.TrimSpace(recordID) {
 		meta.LastFactRecordID = ""
 		meta.LastFactProcessedAt = time.Time{}
 	}
 
 	if meta.UserActivityFrequency == "" || strings.TrimSpace(prevRecordID) != strings.TrimSpace(recordID) {
-		if freq, err := r.fetcher.UserActivityFrequency(ctx, channelID, userID, startAtLocal); err == nil && strings.TrimSpace(freq) != "" {
+		if freq, err := r.fetcher.UserActivityFrequency(c.Ctx, c.ChannelID, c.UserID, startAtLocal); err == nil && strings.TrimSpace(freq) != "" {
 			meta.UserActivityFrequency = freq
 		} else if strings.TrimSpace(meta.UserActivityFrequency) == "" {
-			meta.UserActivityFrequency = config.AssistantDefaultActivity
+			meta.UserActivityFrequency = infra.AssistantDefaultActivity
 		}
 	}
 
@@ -334,185 +321,164 @@ func (r *Runner) updateSessionState(
 }
 
 func (r *Runner) buildPrompt(
-	ctx context.Context,
-	meta memory.Metadata,
-	facts memory.FactsFile,
-	summaries memory.SummariesFile,
+	c infra.AssistantRequestContext,
+	s UserState,
 	sessionMsgs []sdkapi.ChannelMessage,
-	logPrefix string,
 ) (l1l4 string, l5 []openaigo.ChatCompletionMessageParamUnion) {
-	stickerNames := strings.TrimSpace(r.stickers.StickerPromptAddon(agentctx.MewCallContext{
-		Ctx:        ctx,
-		HTTPClient: r.session.HTTPClient(),
-		APIBase:    r.apiBase,
-	}, logPrefix))
+	stickerNames := strings.TrimSpace(r.stickers.StickerPromptAddon(c.Mew, c.LogPrefix))
 	l1l4 = chat.BuildL1L4UserPrompt(chat.DeveloperInstructionsText(
-		config.AssistantSilenceToken,
-		config.AssistantWantMoreToken,
-		config.AssistantProactiveTokenPrefix,
-		config.AssistantToolCallTokenPrefix,
-		config.AssistantStickerTokenPrefix,
+		infra.AssistantSilenceToken,
+		infra.AssistantWantMoreToken,
+		infra.AssistantProactiveTokenPrefix,
+		infra.AssistantToolCallTokenPrefix,
+		infra.AssistantStickerTokenPrefix,
 		stickerNames,
-		config.DeveloperInstructionsPromptRelPath,
-		config.DeveloperInstructionsEmbeddedName,
-	), meta, facts, summaries, r.timeLoc)
-	l5, err := chat.BuildL5MessagesWithAttachments(ctx, sessionMsgs, r.botUserID, chat.UserContentPartsOptions{
-		DefaultImagePrompt:    config.DefaultImagePrompt,
-		MaxImageBytes:         config.DefaultMaxImageBytes,
-		MaxTotalImageBytes:    config.DefaultMaxTotalImageBytes,
+		infra.DeveloperInstructionsPromptRelPath,
+		infra.DeveloperInstructionsEmbeddedName,
+	), s.Metadata, s.Facts, s.Summaries, c.TimeLoc)
+	l5, err := chat.BuildL5MessagesWithAttachments(c.Ctx, sessionMsgs, r.botUserID, chat.UserContentPartsOptions{
+		DefaultImagePrompt:    infra.DefaultImagePrompt,
+		MaxImageBytes:         infra.DefaultMaxImageBytes,
+		MaxTotalImageBytes:    infra.DefaultMaxTotalImageBytes,
 		KeepEmptyWhenNoImages: true,
-		Location:              r.timeLoc,
+		Location:              c.TimeLoc,
 		Download: func(ctx context.Context, att sdkapi.AttachmentRef, limit int64) ([]byte, error) {
 			httpClient := r.session.HTTPClient()
 			return attachment.DownloadAttachmentBytes(ctx, httpClient, httpClient, r.apiBase, "", att, limit)
 		},
 	})
 	if err != nil {
-		log.Printf("%s build L5 with attachments failed (fallback to text-only): %v", logPrefix, err)
-		l5 = chat.BuildL5Messages(sessionMsgs, r.botUserID, r.timeLoc)
+		log.Printf("%s build L5 with attachments failed (fallback to text-only): %v", c.LogPrefix, err)
+		l5 = chat.BuildL5Messages(sessionMsgs, r.botUserID, c.TimeLoc)
 	}
 	log.Printf("%s prompt prepared: L1L4_len=%d L5_msgs=%d facts=%d summaries=%d",
-		logPrefix, len(l1l4), len(l5), len(facts.Facts), len(summaries.Summaries),
+		c.LogPrefix, len(l1l4), len(l5), len(s.Facts.Facts), len(s.Summaries.Summaries),
 	)
 	return l1l4, l5
 }
 
 func (r *Runner) reply(
-	ctx context.Context,
+	c infra.AssistantRequestContext,
 	emit socketio.EmitFunc,
-	channelID string,
-	userID string,
 	l1l4 string,
 	l5 []openaigo.ChatCompletionMessageParamUnion,
-	logPrefix string,
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
-	return chat.ChatWithTools(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, strings.TrimSpace(r.persona), l1l4, l5, chat.ToolHandlers{
+	return chat.ChatWithTools(c.LLM, c.Persona, l1l4, l5, chat.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
-			return tools.RunHistorySearch(agentctx.HistoryCallContext{Ctx: ctx, Fetcher: r.fetcher, TimeLoc: r.timeLoc}, channelID, keyword)
+			return tools.RunHistorySearch(c.History.WithCtx(ctx), c.ChannelID, keyword)
 		},
 		RecordSearch: func(ctx context.Context, recordID string) (any, error) {
-			return tools.RunRecordSearch(agentctx.HistoryCallContext{Ctx: ctx, Fetcher: r.fetcher, TimeLoc: r.timeLoc}, channelID, recordID)
+			return tools.RunRecordSearch(c.History.WithCtx(ctx), c.ChannelID, recordID)
 		},
 		WebSearch: func(ctx context.Context, query string) (any, error) {
-			return tools.RunWebSearch(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, query)
+			return tools.RunWebSearch(c.LLM.WithCtx(ctx), query)
 		},
 	}, chat.ChatWithToolsOptions{
-		MaxToolCalls:          config.AssistantMaxToolCalls,
-		HistorySearchToolName: config.DefaultHistorySearchToolName,
-		RecordSearchToolName:  config.DefaultRecordSearchToolName,
-		WebSearchToolName:     config.DefaultWebSearchToolName,
-		LogPrefix:             config.AssistantLogPrefix,
-		ChannelID:             channelID,
-		LLMPreviewLen:         config.AssistantLogLLMPreviewLen,
-		ToolResultPreviewLen:  config.AssistantLogToolResultPreviewLen,
+		MaxToolCalls:          infra.AssistantMaxToolCalls,
+		HistorySearchToolName: infra.DefaultHistorySearchToolName,
+		RecordSearchToolName:  infra.DefaultRecordSearchToolName,
+		WebSearchToolName:     infra.DefaultWebSearchToolName,
+		LogPrefix:             infra.AssistantLogPrefix,
+		ChannelID:             c.ChannelID,
+		LLMPreviewLen:         infra.AssistantLogLLMPreviewLen,
+		ToolResultPreviewLen:  infra.AssistantLogToolResultPreviewLen,
 		OnToolCallAssistantText: func(text string) error {
-			return chat.SendToolPrelude(ctx, chat.TransportContext{
+			return chat.SendToolPrelude(c.Ctx, chat.TransportContext{
 				Emit:      emit,
-				ChannelID: channelID,
-				UserID:    userID,
-				LogPrefix: logPrefix,
+				ChannelID: c.ChannelID,
+				UserID:    c.UserID,
+				LogPrefix: c.LogPrefix,
 				PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
-					return chat.PostMessageHTTP(agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase}, channelID, content)
+					return chat.PostMessageHTTP(c.Mew.WithCtx(ctx), channelID, content)
 				},
 			}, text)
 		},
-		SilenceToken:           config.AssistantSilenceToken,
-		WantMoreToken:          config.AssistantWantMoreToken,
-		ProactiveTokenPrefix:   config.AssistantProactiveTokenPrefix,
-		StickerTokenPrefix:     config.AssistantStickerTokenPrefix,
-		MaxLLMRetries:          config.AssistantMaxLLMRetries,
-		LLMRetryInitialBackoff: config.AssistantLLMRetryInitialBackoff,
-		LLMRetryMaxBackoff:     config.AssistantLLMRetryMaxBackoff,
+		SilenceToken:           infra.AssistantSilenceToken,
+		WantMoreToken:          infra.AssistantWantMoreToken,
+		ProactiveTokenPrefix:   infra.AssistantProactiveTokenPrefix,
+		StickerTokenPrefix:     infra.AssistantStickerTokenPrefix,
+		MaxLLMRetries:          infra.AssistantMaxLLMRetries,
+		LLMRetryInitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+		LLMRetryMaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
 	})
 }
 
 func (r *Runner) maybeOnDemandRemember(
-	ctx context.Context,
+	c infra.AssistantRequestContext,
 	userContent string,
 	sessionMsgs []sdkapi.ChannelMessage,
-	facts memory.FactsFile,
-	paths UserStatePaths,
-	userID, channelID string,
+	s *UserState,
 	now time.Time,
-	logPrefix string,
 ) {
 	if !r.shouldOnDemandRemember(userContent) {
 		return
 	}
 
-	log.Printf("%s fact engine on-demand: channel=%s user=%s", logPrefix, channelID, userID)
-	sessionText := chat.FormatSessionRecordForContext(sessionMsgs, r.timeLoc)
-	res, err := memory.ExtractFactsAndUsage(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, sessionText, facts, utils.CognitiveRetryOptions{
-		MaxRetries:     config.AssistantMaxLLMRetries,
-		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
-		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
-		LogPrefix:      logPrefix,
-		ChannelID:      channelID,
+	log.Printf("%s fact engine on-demand: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
+	sessionText := chat.FormatSessionRecordForContext(sessionMsgs, c.TimeLoc)
+	res, err := memory.ExtractFactsAndUsage(c.LLM, sessionText, s.Facts, infra.CognitiveRetryOptions{
+		MaxRetries:     infra.AssistantMaxLLMRetries,
+		InitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+		MaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
+		LogPrefix:      c.LogPrefix,
+		ChannelID:      c.ChannelID,
 	})
 	if err != nil || (len(res.Facts) == 0 && len(res.UsedFactIDs) == 0) {
 		if err != nil {
-			log.Printf("%s fact engine on-demand failed: user=%s err=%v", logPrefix, userID, err)
+			log.Printf("%s fact engine on-demand failed: user=%s err=%v", c.LogPrefix, c.UserID, err)
 		}
 		return
 	}
 
-	facts.Facts = memory.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
-	facts = memory.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
-	_ = SaveFacts(paths.FactsPath, facts)
-	log.Printf("%s facts updated (on-demand): user=%s count=%d used=%d new=%d", logPrefix, userID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
+	s.Facts.Facts = memory.TouchFactsByIDs(s.Facts.Facts, res.UsedFactIDs, now)
+	s.Facts = memory.UpsertFacts(now, s.Facts, res.Facts, infra.AssistantMaxFacts)
+	_ = s.SaveFacts()
+	log.Printf("%s facts updated (on-demand): user=%s count=%d used=%d new=%d", c.LogPrefix, c.UserID, len(s.Facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 }
 
-func (r *Runner) finalizeRecord(ctx context.Context, logPrefix, userID string, paths UserStatePaths, meta *memory.Metadata) error {
+func (r *Runner) finalizeRecord(c infra.AssistantRequestContext, s *UserState) error {
 	now := time.Now()
+	meta := &s.Metadata
 
-	facts, err := LoadFacts(paths.FactsPath)
+	msgs, err := r.fetcher.RecordSearch(c.Ctx, meta.ChannelID, meta.RecordID)
 	if err != nil {
 		return err
 	}
-	summaries, err := LoadSummaries(paths.SummariesPath)
-	if err != nil {
-		return err
-	}
+	recordText := chat.FormatSessionRecordForContext(msgs, c.TimeLoc)
 
-	msgs, err := r.fetcher.RecordSearch(ctx, meta.ChannelID, meta.RecordID)
-	if err != nil {
-		return err
-	}
-	recordText := chat.FormatSessionRecordForContext(msgs, r.timeLoc)
-
-	if summaryText, err := memory.SummarizeRecord(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, recordText, utils.CognitiveRetryOptions{
-		MaxRetries:     config.AssistantMaxLLMRetries,
-		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
-		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
-		LogPrefix:      logPrefix,
+	if summaryText, err := memory.SummarizeRecord(c.LLM, recordText, infra.CognitiveRetryOptions{
+		MaxRetries:     infra.AssistantMaxLLMRetries,
+		InitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+		MaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
+		LogPrefix:      c.LogPrefix,
 		ChannelID:      meta.ChannelID,
 	}); err == nil && strings.TrimSpace(summaryText) != "" {
-		summaries = memory.AppendSummary(now, summaries, meta.RecordID, summaryText, config.AssistantMaxSummaries)
-		_ = SaveSummaries(paths.SummariesPath, summaries)
+		s.Summaries = memory.AppendSummary(now, s.Summaries, meta.RecordID, summaryText, infra.AssistantMaxSummaries)
+		_ = s.SaveSummaries()
 		meta.LastSummarizedRecordID = meta.RecordID
-		_ = SaveMetadata(paths.MetadataPath, *meta)
+		_ = s.SaveMetadata()
 		log.Printf("%s summary saved: user=%s record=%s summaries=%d preview=%q",
-			logPrefix, userID, meta.RecordID, len(summaries.Summaries), sdk.PreviewString(summaryText, config.AssistantLogContentPreviewLen),
+			c.LogPrefix, c.UserID, meta.RecordID, len(s.Summaries.Summaries), sdk.PreviewString(summaryText, infra.AssistantLogContentPreviewLen),
 		)
 	} else if err != nil {
-		log.Printf("%s summarize failed: user=%s record=%s err=%v", logPrefix, userID, meta.RecordID, err)
+		log.Printf("%s summarize failed: user=%s record=%s err=%v", c.LogPrefix, c.UserID, meta.RecordID, err)
 	}
 
-	if res, err := memory.ExtractFactsAndUsage(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, recordText, facts, utils.CognitiveRetryOptions{
-		MaxRetries:     config.AssistantMaxLLMRetries,
-		InitialBackoff: config.AssistantLLMRetryInitialBackoff,
-		MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
-		LogPrefix:      logPrefix,
+	if res, err := memory.ExtractFactsAndUsage(c.LLM, recordText, s.Facts, infra.CognitiveRetryOptions{
+		MaxRetries:     infra.AssistantMaxLLMRetries,
+		InitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+		MaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
+		LogPrefix:      c.LogPrefix,
 		ChannelID:      meta.ChannelID,
 	}); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
-		facts.Facts = memory.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
-		facts = memory.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
-		_ = SaveFacts(paths.FactsPath, facts)
-		log.Printf("%s facts updated (end-of-session): user=%s count=%d used=%d new=%d", logPrefix, userID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
+		s.Facts.Facts = memory.TouchFactsByIDs(s.Facts.Facts, res.UsedFactIDs, now)
+		s.Facts = memory.UpsertFacts(now, s.Facts, res.Facts, infra.AssistantMaxFacts)
+		_ = s.SaveFacts()
+		log.Printf("%s facts updated (end-of-session): user=%s count=%d used=%d new=%d", c.LogPrefix, c.UserID, len(s.Facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 	} else if err != nil {
-		log.Printf("%s fact engine end-of-session failed: user=%s err=%v", logPrefix, userID, err)
+		log.Printf("%s fact engine end-of-session failed: user=%s err=%v", c.LogPrefix, c.UserID, err)
 	}
 
-	log.Printf("%s record finalized: user=%s record=%s", logPrefix, userID, meta.RecordID)
+	log.Printf("%s record finalized: user=%s record=%s", c.LogPrefix, c.UserID, meta.RecordID)
 	return nil
 }

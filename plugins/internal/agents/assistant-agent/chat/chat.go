@@ -12,7 +12,7 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/x/llm"
@@ -49,14 +49,14 @@ type ChatWithToolsOptions struct {
 }
 
 func ChatWithTools(
-	c agentctx.LLMCallContext,
+	c infra.LLMCallContext,
 	personaSystem string,
 	firstUserPrompt string,
 	l5 []openaigo.ChatCompletionMessageParamUnion,
 	handlers ToolHandlers,
 	opts ChatWithToolsOptions,
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	if opts.MaxToolCalls <= 0 {
 		opts.MaxToolCalls = 3

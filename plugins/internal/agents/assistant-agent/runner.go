@@ -12,13 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/chat"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/internal/agents/assistant-agent/memory"
 	"mew/plugins/internal/agents/assistant-agent/proactive"
 	"mew/plugins/internal/agents/assistant-agent/tools"
-	"mew/plugins/internal/agents/assistant-agent/utils"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 	"mew/plugins/pkg/api/history"
@@ -39,7 +37,7 @@ type Runner struct {
 	mewHTTPClient *http.Client
 	llmHTTPClient *http.Client
 
-	aiConfig config.AssistantConfig
+	aiConfig infra.AssistantConfig
 	timeLoc  *time.Location
 	persona  string
 
@@ -65,7 +63,7 @@ type RunnerOptions struct {
 }
 
 func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
-	mewURL := sdk.MewURLFromEnvOrAPIBase(opts.Runtime.APIBase, config.AssistantDefaultMewURL)
+	mewURL := sdk.MewURLFromEnvOrAPIBase(opts.Runtime.APIBase, infra.AssistantDefaultMewURL)
 	wsURL, err := socketio.WebsocketURL(mewURL)
 	if err != nil {
 		return nil, err
@@ -76,7 +74,7 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 		return nil, err
 	}
 
-	llmCfg, err := config.ParseAssistantConfig(opts.RawConfig)
+	llmCfg, err := infra.ParseAssistantConfig(opts.RawConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +83,7 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 		return nil, err
 	}
 
-	persona, err := chat.ReadPromptWithOverrides(config.PersonaPromptRelPath, config.PersonaPromptEmbeddedName)
+	persona, err := chat.ReadPromptWithOverrides(infra.PersonaPromptRelPath, infra.PersonaPromptEmbeddedName)
 	if err != nil {
 		return nil, fmt.Errorf("read persona failed: %w", err)
 	}
@@ -124,10 +122,10 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 			HTTPClient:         mewHTTPClient,
 			APIBase:            strings.TrimRight(opts.Runtime.APIBase, "/"),
 			UserToken:          "",
-			PageSize:           config.AssistantFetchPageSize,
-			MaxPages:           config.AssistantMaxFetchPages,
-			SessionGap:         config.AssistantSessionGap,
-			MaxSessionMessages: config.AssistantMaxSessionMessages,
+			PageSize:           infra.AssistantFetchPageSize,
+			MaxPages:           infra.AssistantMaxFetchPages,
+			SessionGap:         infra.AssistantSessionGap,
+			MaxSessionMessages: infra.AssistantMaxSessionMessages,
 		},
 		userLock:   map[string]*sync.Mutex{},
 		knownUsers: map[string]struct{}{},
@@ -136,7 +134,7 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 }
 
 func (r *Runner) Run(ctx context.Context) error {
-	logPrefix := fmt.Sprintf("%s bot=%s name=%q", config.AssistantLogPrefix, r.botID, r.botName)
+	logPrefix := fmt.Sprintf("%s bot=%s name=%q", infra.AssistantLogPrefix, r.botID, r.botName)
 
 	r.session = sdk.NewBotSession(r.apiBase, r.accessToken, r.mewHTTPClient)
 	me, err := r.session.User(ctx)
@@ -159,10 +157,10 @@ func (r *Runner) Run(ctx context.Context) error {
 		payload json.RawMessage
 		emit    socketio.EmitFunc
 	}
-	jobs := make(chan messageCreateJob, config.AssistantIncomingQueueSize)
+	jobs := make(chan messageCreateJob, infra.AssistantIncomingQueueSize)
 
 	g := sdk.NewGroup(ctx)
-	for i := 0; i < config.AssistantWorkerCount; i++ {
+	for i := 0; i < infra.AssistantWorkerCount; i++ {
 		workerID := i + 1
 		g.Go(func(ctx context.Context) {
 			for {
@@ -193,7 +191,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	})
 	g.Go(func(ctx context.Context) {
 		err := socketio.RunGatewayWithReconnectSession(ctx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
-			if eventName != config.AssistantEventMessageCreate {
+			if eventName != infra.AssistantEventMessageCreate {
 				return nil
 			}
 			if len(payload) == 0 {
@@ -205,7 +203,7 @@ func (r *Runner) Run(ctx context.Context) error {
 			select {
 			case jobs <- messageCreateJob{payload: payload, emit: emit}:
 			default:
-				log.Printf("%s incoming queue full, drop MESSAGE_CREATE: size=%d", logPrefix, config.AssistantIncomingQueueSize)
+				log.Printf("%s incoming queue full, drop MESSAGE_CREATE: size=%d", logPrefix, infra.AssistantIncomingQueueSize)
 			}
 			return nil
 		}, socketio.GatewayOptions{}, socketio.ReconnectOptions{
@@ -226,6 +224,32 @@ func (r *Runner) Run(ctx context.Context) error {
 	return nil
 }
 
+func (r *Runner) newRequestContext(ctx context.Context, userID, channelID, logPrefix string) infra.AssistantRequestContext {
+	return infra.AssistantRequestContext{
+		Ctx:       ctx,
+		UserID:    userID,
+		ChannelID: channelID,
+		LogPrefix: logPrefix,
+		TimeLoc:   r.timeLoc,
+		Persona:   strings.TrimSpace(r.persona),
+		LLM: infra.LLMCallContext{
+			Ctx:        ctx,
+			HTTPClient: r.llmHTTPClient,
+			Config:     r.aiConfig,
+		},
+		Mew: infra.MewCallContext{
+			Ctx:        ctx,
+			HTTPClient: r.session.HTTPClient(),
+			APIBase:    r.apiBase,
+		},
+		History: infra.HistoryCallContext{
+			Ctx:     ctx,
+			Fetcher: r.fetcher,
+			TimeLoc: r.timeLoc,
+		},
+	}
+}
+
 func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 	r.knownUsersMu.RLock()
 	users := make([]string, 0, len(r.knownUsers))
@@ -240,6 +264,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 		lock.Lock()
 		func() {
 			defer lock.Unlock()
+			userCtx := r.newRequestContext(ctx, userID, "", logPrefix)
 			paths := UserStatePathsFor(r.serviceType, r.botID, userID)
 			facts, err := LoadFacts(paths.FactsPath)
 			if err != nil {
@@ -249,10 +274,10 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 
 			// 记忆整理属于“梦境固化”式的后台工作，不应依赖会话状态。
 			// 它对每个用户最多每天执行一次，并持久化在 facts.json 中（LastConsolidatedAt）。
-			if updated, ran, err := memory.MaybeConsolidateFacts(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, now, facts, config.AssistantMaxFacts, utils.CognitiveRetryOptions{
-				MaxRetries:     config.AssistantMaxLLMRetries,
-				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
-				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
+			if updated, ran, err := memory.MaybeConsolidateFacts(userCtx.LLM, now, facts, infra.AssistantMaxFacts, infra.CognitiveRetryOptions{
+				MaxRetries:     infra.AssistantMaxLLMRetries,
+				InitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+				MaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
 				LogPrefix:      logPrefix,
 				ChannelID:      "",
 			}); err != nil {
@@ -273,14 +298,16 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 			if meta.LastMessageAt.IsZero() {
 				return
 			}
-			if now.Sub(meta.LastMessageAt) > config.AssistantSessionGap {
+			if now.Sub(meta.LastMessageAt) > infra.AssistantSessionGap {
 				return
 			}
 			if strings.TrimSpace(meta.LastFactRecordID) == strings.TrimSpace(meta.RecordID) && !meta.LastFactProcessedAt.IsZero() && !meta.LastMessageAt.After(meta.LastFactProcessedAt) {
 				return
 			}
 
-			sessionMsgs, recordID, _, err := r.fetcher.FetchSessionMessages(ctx, meta.ChannelID)
+			sessionCtx := userCtx
+			sessionCtx.ChannelID = meta.ChannelID
+			sessionMsgs, recordID, _, err := r.fetcher.FetchSessionMessages(sessionCtx.Ctx, meta.ChannelID)
 			if err != nil {
 				log.Printf("%s load session record failed (periodic): user=%s channel=%s err=%v", logPrefix, userID, meta.ChannelID, err)
 				return
@@ -289,11 +316,11 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 				return
 			}
 
-			sessionText := chat.FormatSessionRecordForContext(sessionMsgs, r.timeLoc)
-			res, err := memory.ExtractFactsAndUsage(agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig}, sessionText, facts, utils.CognitiveRetryOptions{
-				MaxRetries:     config.AssistantMaxLLMRetries,
-				InitialBackoff: config.AssistantLLMRetryInitialBackoff,
-				MaxBackoff:     config.AssistantLLMRetryMaxBackoff,
+			sessionText := chat.FormatSessionRecordForContext(sessionMsgs, sessionCtx.TimeLoc)
+			res, err := memory.ExtractFactsAndUsage(sessionCtx.LLM, sessionText, facts, infra.CognitiveRetryOptions{
+				MaxRetries:     infra.AssistantMaxLLMRetries,
+				InitialBackoff: infra.AssistantLLMRetryInitialBackoff,
+				MaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
 				LogPrefix:      logPrefix,
 				ChannelID:      meta.ChannelID,
 			})
@@ -303,7 +330,7 @@ func (r *Runner) runPeriodicFactEngine(ctx context.Context, logPrefix string) {
 			}
 			if len(res.Facts) > 0 || len(res.UsedFactIDs) > 0 {
 				facts.Facts = memory.TouchFactsByIDs(facts.Facts, res.UsedFactIDs, now)
-				facts = memory.UpsertFacts(now, facts, res.Facts, config.AssistantMaxFacts)
+				facts = memory.UpsertFacts(now, facts, res.Facts, infra.AssistantMaxFacts)
 				_ = SaveFacts(paths.FactsPath, facts)
 				log.Printf("%s facts updated (periodic): user=%s record=%s count=%d used=%d new=%d", logPrefix, userID, meta.RecordID, len(facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 			}
@@ -341,13 +368,19 @@ func (r *Runner) finalizeStaleSessions(ctx context.Context, logPrefix string) {
 			if meta.LastMessageAt.IsZero() {
 				return
 			}
-			if now.Sub(meta.LastMessageAt) <= config.AssistantSessionGap {
+			if now.Sub(meta.LastMessageAt) <= infra.AssistantSessionGap {
 				return
 			}
 			if meta.LastSummarizedRecordID == meta.RecordID {
 				return
 			}
-			if err := r.finalizeRecord(ctx, logPrefix, userID, paths, &meta); err != nil {
+			c := r.newRequestContext(ctx, userID, meta.ChannelID, logPrefix)
+			state, err := r.loadUserState(c)
+			if err != nil {
+				log.Printf("%s load user state failed (finalize): user=%s err=%v", logPrefix, userID, err)
+				return
+			}
+			if err := r.finalizeRecord(c, &state); err != nil {
 				log.Printf("%s finalize record failed: user=%s err=%v", logPrefix, userID, err)
 				return
 			}
@@ -402,16 +435,7 @@ func (r *Runner) runProactiveQueue(ctx context.Context, logPrefix string) {
 				summaries = s
 			}
 
-			q = proactive.RunProactiveQueueForUser(agentctx.AssistantRequestContext{
-				Ctx:       ctx,
-				UserID:    userID,
-				LogPrefix: logPrefix,
-				TimeLoc:   r.timeLoc,
-				Persona:   r.persona,
-				LLM:       agentctx.LLMCallContext{Ctx: ctx, HTTPClient: r.llmHTTPClient, Config: r.aiConfig},
-				Mew:       agentctx.MewCallContext{Ctx: ctx, HTTPClient: r.session.HTTPClient(), APIBase: r.apiBase},
-				History:   agentctx.HistoryCallContext{Ctx: ctx, Fetcher: r.fetcher, TimeLoc: r.timeLoc},
-			}, q, meta, summaries)
+			q = proactive.RunProactiveQueueForUser(r.newRequestContext(ctx, userID, "", logPrefix), q, meta, summaries)
 
 			if err := SaveProactiveQueue(paths.ProactivePath, q); err != nil {
 				log.Printf("%s save proactive queue failed: user=%s err=%v", logPrefix, userID, err)

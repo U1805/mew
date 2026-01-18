@@ -1,11 +1,10 @@
-package agentctx
+package infra
 
 import (
 	"context"
 	"net/http"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/config"
 	"mew/plugins/pkg/api/history"
 )
 
@@ -31,7 +30,12 @@ type AssistantRequestContext struct {
 type LLMCallContext struct {
 	Ctx        context.Context
 	HTTPClient *http.Client
-	Config     config.AssistantConfig
+	Config     AssistantConfig
+}
+
+func (c LLMCallContext) WithCtx(ctx context.Context) LLMCallContext {
+	c.Ctx = ctx
+	return c
 }
 
 // MewCallContext groups frequently co-traveled params used by MEW REST calls.
@@ -41,11 +45,21 @@ type MewCallContext struct {
 	APIBase    string
 }
 
+func (c MewCallContext) WithCtx(ctx context.Context) MewCallContext {
+	c.Ctx = ctx
+	return c
+}
+
 // HistoryCallContext groups frequently co-traveled params used by history tools.
 type HistoryCallContext struct {
 	Ctx     context.Context
 	Fetcher *history.Fetcher
 	TimeLoc *time.Location
+}
+
+func (c HistoryCallContext) WithCtx(ctx context.Context) HistoryCallContext {
+	c.Ctx = ctx
+	return c
 }
 
 func ContextOrBackground(ctx context.Context) context.Context {

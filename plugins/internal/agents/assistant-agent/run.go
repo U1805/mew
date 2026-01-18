@@ -1,22 +1,22 @@
 package agent
 
 import (
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/pkg"
 )
 
 func Run() error {
-	cfgTemplate, err := sdk.ConfigTemplateJSON(config.AssistantConfig{
-		ChatModel: config.ChatModelConfig{
+	cfgTemplate, err := sdk.ConfigTemplateJSON(infra.AssistantConfig{
+		ChatModel: infra.ChatModelConfig{
 			BaseURL: "https://api.openai.com/v1",
 			APIKey:  "",
 			Model:   "gpt-4o-mini",
 		},
-		User: config.UserConfig{
+		User: infra.UserConfig{
 			UserInterests: "游戏/摇滚乐",
-			Timezone:      config.DefaultTimezone,
+			Timezone:      infra.DefaultTimezone,
 		},
-		Tool: config.ToolConfig{
+		Tool: infra.ToolConfig{
 			ExaAPIKey: "",
 		},
 	})

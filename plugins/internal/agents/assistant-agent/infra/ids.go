@@ -1,4 +1,4 @@
-package utils
+package infra
 
 import (
 	"crypto/rand"
@@ -8,7 +8,7 @@ import (
 
 // CollectIDs 提取切片元素的 ID 字段（由回调提供），并返回原顺序的 ID 列表。
 //
-// 用途：将 “从已有结构里收集 ID 字段” 的逻辑统一放在 utils，避免在各处重复写 summaryIDs/factIDs。
+// 用途：将 “从已有结构里收集 ID 字段” 的逻辑统一放在 infra，避免在各处重复写 summaryIDs/factIDs。
 func CollectIDs[T any](items []T, id func(T) string) []string {
 	if len(items) == 0 || id == nil {
 		return nil

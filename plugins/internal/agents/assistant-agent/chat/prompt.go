@@ -10,8 +10,8 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/internal/agents/assistant-agent/memory"
-	"mew/plugins/internal/agents/assistant-agent/prompt"
 	"mew/plugins/pkg"
 	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/x/llm"
@@ -30,7 +30,7 @@ func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
 		}
 		return s, nil
 	}
-	s, err := prompt.ReadFile(embeddedName)
+	s, err := infra.ReadFile(embeddedName)
 	if err != nil {
 		return "", err
 	}

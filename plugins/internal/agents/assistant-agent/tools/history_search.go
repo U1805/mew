@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
 	"mew/plugins/internal/agents/assistant-agent/chat"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 )
 
-func RunHistorySearch(c agentctx.HistoryCallContext, channelID, keyword string) (any, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func RunHistorySearch(c infra.HistoryCallContext, channelID, keyword string) (any, error) {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	keyword = strings.TrimSpace(keyword)
 	if keyword == "" {
@@ -48,8 +48,8 @@ func RunHistorySearch(c agentctx.HistoryCallContext, channelID, keyword string) 
 	return map[string]any{"keyword": keyword, "messages": out}, nil
 }
 
-func RunRecordSearch(c agentctx.HistoryCallContext, channelID, recordID string) (any, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func RunRecordSearch(c infra.HistoryCallContext, channelID, recordID string) (any, error) {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	if c.Fetcher == nil {
 		return nil, fmt.Errorf("history fetcher not configured")

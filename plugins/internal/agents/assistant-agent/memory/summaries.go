@@ -7,8 +7,7 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
-	"mew/plugins/internal/agents/assistant-agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -38,7 +37,7 @@ func AppendSummary(now time.Time, summaries SummariesFile, recordID, summaryText
 		}
 	}
 	summaries.Summaries = append(summaries.Summaries, Summary{
-		SummaryID: utils.NextIDRandomHex4(utils.CollectIDs(summaries.Summaries, func(s Summary) string { return s.SummaryID }), 'S'),
+		SummaryID: infra.NextIDRandomHex4(infra.CollectIDs(summaries.Summaries, func(s Summary) string { return s.SummaryID }), 'S'),
 		RecordID:  recordID,
 		Summary:   summaryText,
 		CreatedAt: now,
@@ -49,8 +48,8 @@ func AppendSummary(now time.Time, summaries SummariesFile, recordID, summaryText
 	return summaries
 }
 
-func SummarizeRecord(c agentctx.LLMCallContext, recordText string, opts utils.CognitiveRetryOptions) (string, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func SummarizeRecord(c infra.LLMCallContext, recordText string, opts infra.CognitiveRetryOptions) (string, error) {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	system := `You are a conversation summarizer.
 Summarize the session record into 1-3 sentences, focusing on user intent, key events, and emotional tone.
@@ -63,7 +62,7 @@ Return plain text only.`
 	}
 
 	var out string
-	err = utils.RetryCognitive(ctx, opts, func() error {
+	err = infra.RetryCognitive(ctx, opts, func() error {
 		resp, err := llm.CallOpenAIChatCompletion(ctx, c.HTTPClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
 			openaigo.SystemMessage(system),
 			openaigo.UserMessage(user),

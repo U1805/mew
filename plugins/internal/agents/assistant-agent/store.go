@@ -17,6 +17,13 @@ type UserStatePaths struct {
 	ProactivePath string
 }
 
+type UserState struct {
+	Paths     UserStatePaths
+	Facts     memory.FactsFile
+	Summaries memory.SummariesFile
+	Metadata  memory.Metadata
+}
+
 func UserStatePathsFor(serviceType, botID, userID string) UserStatePaths {
 	base := sdk.BotStateDir(serviceType, botID)
 	userDir := filepath.Join(base, "users", userID)
@@ -119,4 +126,37 @@ func SaveProactiveQueue(path string, v proactive.ProactiveQueueFile) error {
 		v.Requests = []proactive.ProactiveRequest{}
 	}
 	return SaveJSONFileIndented(path, v)
+}
+
+func LoadUserState(paths UserStatePaths) (UserState, error) {
+	facts, err := LoadFacts(paths.FactsPath)
+	if err != nil {
+		return UserState{}, err
+	}
+	summaries, err := LoadSummaries(paths.SummariesPath)
+	if err != nil {
+		return UserState{}, err
+	}
+	meta, err := LoadMetadata(paths.MetadataPath)
+	if err != nil {
+		return UserState{}, err
+	}
+	return UserState{
+		Paths:     paths,
+		Facts:     facts,
+		Summaries: summaries,
+		Metadata:  meta,
+	}, nil
+}
+
+func (s UserState) SaveFacts() error {
+	return SaveFacts(s.Paths.FactsPath, s.Facts)
+}
+
+func (s UserState) SaveSummaries() error {
+	return SaveSummaries(s.Paths.SummariesPath, s.Summaries)
+}
+
+func (s UserState) SaveMetadata() error {
+	return SaveMetadata(s.Paths.MetadataPath, s.Metadata)
 }

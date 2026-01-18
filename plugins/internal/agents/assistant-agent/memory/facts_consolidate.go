@@ -9,9 +9,7 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
-	"mew/plugins/internal/agents/assistant-agent/config"
-	"mew/plugins/internal/agents/assistant-agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -64,16 +62,16 @@ type FactConsolidationSource struct {
 //   - ran：本次是否“到期并尝试执行”（即使因事实过少而跳过，也算 ran=true）
 //   - err：LLM 调用或解析失败时返回错误
 func MaybeConsolidateFacts(
-	c agentctx.LLMCallContext,
+	c infra.LLMCallContext,
 	now time.Time,
 	facts FactsFile,
 	maxFacts int,
-	opts utils.CognitiveRetryOptions,
+	opts infra.CognitiveRetryOptions,
 ) (FactsFile, bool, error) {
 	if !shouldConsolidateFacts(now, facts.LastConsolidatedAt) {
 		return facts, false, nil
 	}
-	if len(facts.Facts) < config.AssistantFactMinForConsolidation {
+	if len(facts.Facts) < infra.AssistantFactMinForConsolidation {
 		facts.LastConsolidatedAt = now
 		return facts, true, nil
 	}
@@ -100,13 +98,13 @@ func shouldConsolidateFacts(now time.Time, last time.Time) bool {
 
 // consolidateFacts 执行一次记忆整理，并在成功后写入 LastConsolidatedAt。
 func consolidateFacts(
-	c agentctx.LLMCallContext,
+	c infra.LLMCallContext,
 	now time.Time,
 	facts FactsFile,
 	maxFacts int,
-	opts utils.CognitiveRetryOptions,
+	opts infra.CognitiveRetryOptions,
 ) (FactsFile, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	openaiCfg, err := c.Config.OpenAIChatConfig()
 	if err != nil {
@@ -135,7 +133,7 @@ Rules:
 - The "new_memory" must be written in the user's language.
 - Importance is 1-10 with a conservative rubric; if unsure between 6 and 7 choose 6.
 - If a memory is explicitly a "remember this" / hard constraint, importance must be 10.
-- Prefer fewer ops; max ` + fmt.Sprintf("%d", config.AssistantFactMaxConsolidationOps) + `.
+- Prefer fewer ops; max ` + fmt.Sprintf("%d", infra.AssistantFactMaxConsolidationOps) + `.
 Return ONLY a JSON array like:
 [{"source_memories":[{"id":"F1a2b","content":"..."}],"type":"Deduplication","reasoning":"...","new_memory":"...","importance":7}]`
 
@@ -143,7 +141,7 @@ Return ONLY a JSON array like:
 		"\n\nReturn ONLY the JSON array."
 
 	var ops []FactConsolidationOp
-	err = utils.RetryCognitive(ctx, opts, func() error {
+	err = infra.RetryCognitive(ctx, opts, func() error {
 		resp, err := llm.CallOpenAIChatCompletion(ctx, c.HTTPClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
 			openaigo.SystemMessage(system),
 			openaigo.UserMessage(user),
@@ -158,7 +156,7 @@ Return ONLY a JSON array like:
 		raw := extractJSONFromText(resp.Choices[0].Message.Content)
 		logPrefix := opts.LogPrefix
 		if strings.TrimSpace(logPrefix) == "" {
-			logPrefix = config.AssistantLogPrefix
+			logPrefix = infra.AssistantLogPrefix
 		}
 		log.Printf("%s facts consolidation model_json=%s", logPrefix, raw)
 
@@ -166,8 +164,8 @@ Return ONLY a JSON array like:
 		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
 			return fmt.Errorf("consolidation invalid json: %w", err)
 		}
-		if len(parsed) > config.AssistantFactMaxConsolidationOps {
-			parsed = parsed[:config.AssistantFactMaxConsolidationOps]
+		if len(parsed) > infra.AssistantFactMaxConsolidationOps {
+			parsed = parsed[:infra.AssistantFactMaxConsolidationOps]
 		}
 		ops = parsed
 		return nil
@@ -315,7 +313,7 @@ func upsertConsolidatedFact(now time.Time, facts []Fact, consolidated Fact) []Fa
 		return facts
 	}
 
-	consolidated.FactID = utils.NextIDRandomHex4(utils.CollectIDs(facts, func(f Fact) string { return f.FactID }), 'F')
+	consolidated.FactID = infra.NextIDRandomHex4(infra.CollectIDs(facts, func(f Fact) string { return f.FactID }), 'F')
 	consolidated.Importance = clampImportance(consolidated.Importance)
 	consolidated.Frequency = clampFrequency(consolidated.Frequency)
 	consolidated.CreatedAt = now

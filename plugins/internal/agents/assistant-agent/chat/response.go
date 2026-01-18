@@ -12,8 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 )
@@ -63,14 +62,14 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 
 		t := strings.TrimSpace(lines[last])
 		switch {
-		case t == config.AssistantWantMoreToken:
+		case t == infra.AssistantWantMoreToken:
 			controls.WantMore = true
 			lines = append(lines[:last], lines[last+1:]...)
 			continue
-		case strings.HasPrefix(t, config.AssistantProactiveTokenPrefix):
+		case strings.HasPrefix(t, infra.AssistantProactiveTokenPrefix):
 			// The model may emit this as a single line:
 			//   <PROACTIVE>{"delay_seconds":180,"reason":"..."}
-			raw := strings.TrimSpace(strings.TrimPrefix(t, config.AssistantProactiveTokenPrefix))
+			raw := strings.TrimSpace(strings.TrimPrefix(t, infra.AssistantProactiveTokenPrefix))
 			if raw != "" && controls.Proactive == nil {
 				var d ProactiveDirective
 				if json.Unmarshal([]byte(raw), &d) == nil {
@@ -86,8 +85,8 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 			}
 			lines = append(lines[:last], lines[last+1:]...)
 			continue
-		case strings.HasPrefix(t, config.AssistantStickerTokenPrefix):
-			raw := strings.TrimSpace(strings.TrimPrefix(t, config.AssistantStickerTokenPrefix))
+		case strings.HasPrefix(t, infra.AssistantStickerTokenPrefix):
+			raw := strings.TrimSpace(strings.TrimPrefix(t, infra.AssistantStickerTokenPrefix))
 			if raw != "" && controls.Sticker == nil {
 				var d StickerDirective
 				if json.Unmarshal([]byte(raw), &d) == nil {
@@ -121,9 +120,9 @@ func AssistantReplyDelayForLine(line string) time.Duration {
 	if n <= 0 {
 		return 0
 	}
-	d := config.AssistantReplyDelayBase + time.Duration(n)*config.AssistantReplyDelayPerRune
-	if d > config.AssistantReplyDelayMax {
-		return config.AssistantReplyDelayMax
+	d := infra.AssistantReplyDelayBase + time.Duration(n)*infra.AssistantReplyDelayPerRune
+	if d > infra.AssistantReplyDelayMax {
+		return infra.AssistantReplyDelayMax
 	}
 	return d
 }
@@ -134,7 +133,7 @@ func AssistantTypingDelayForLine(line string, wpm int) time.Duration {
 		return 0
 	}
 	if wpm <= 0 {
-		wpm = config.AssistantTypingWPMDefault
+		wpm = infra.AssistantTypingWPMDefault
 	}
 	if wpm <= 0 {
 		return 0
@@ -170,7 +169,7 @@ func SendToolPrelude(
 	if c.Emit == nil {
 		sendErr = fmt.Errorf("emit not configured")
 	} else {
-		sendErr = c.Emit(config.AssistantUpstreamMessageCreate, map[string]any{
+		sendErr = c.Emit(infra.AssistantUpstreamMessageCreate, map[string]any{
 			"channelId": c.ChannelID,
 			"content":   text,
 		})
@@ -204,24 +203,24 @@ func SendReply(
 		log.Printf("%s empty reply: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 		return nil
 	}
-	if strings.TrimSpace(reply) == config.AssistantSilenceToken || strings.Contains(reply, config.AssistantSilenceToken) {
+	if strings.TrimSpace(reply) == infra.AssistantSilenceToken || strings.Contains(reply, infra.AssistantSilenceToken) {
 		log.Printf("%s SILENCE: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 		return nil
 	}
 
 	typingWPM := c.TypingWPM
 	if typingWPM <= 0 {
-		typingWPM = config.AssistantTypingWPMDefault
+		typingWPM = infra.AssistantTypingWPMDefault
 	}
 
 	if reply != "" {
 		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
-			c.LogPrefix, c.ChannelID, c.UserID, sdk.PreviewString(reply, config.AssistantLogContentPreviewLen),
+			c.LogPrefix, c.ChannelID, c.UserID, sdk.PreviewString(reply, infra.AssistantLogContentPreviewLen),
 		)
 
-		lines := make([]string, 0, config.AssistantMaxReplyLines)
+		lines := make([]string, 0, infra.AssistantMaxReplyLines)
 		for _, line := range strings.Split(reply, "\n") {
-			if len(lines) >= config.AssistantMaxReplyLines {
+			if len(lines) >= infra.AssistantMaxReplyLines {
 				break
 			}
 			t := strings.TrimSpace(line)
@@ -238,7 +237,7 @@ func SendReply(
 			if c.Emit == nil {
 				sendErr = fmt.Errorf("emit not configured")
 			} else {
-				sendErr = c.Emit(config.AssistantUpstreamMessageCreate, map[string]any{
+				sendErr = c.Emit(infra.AssistantUpstreamMessageCreate, map[string]any{
 					"channelId": c.ChannelID,
 					"content":   t,
 				})
@@ -278,7 +277,7 @@ func SendReply(
 		if c.Emit == nil {
 			sendErr = fmt.Errorf("emit not configured")
 		} else {
-			sendErr = c.Emit(config.AssistantUpstreamMessageCreate, map[string]any{
+			sendErr = c.Emit(infra.AssistantUpstreamMessageCreate, map[string]any{
 				"channelId": c.ChannelID,
 				"type":      "message/sticker",
 				"payload": map[string]any{
@@ -302,8 +301,8 @@ func SendReply(
 	return nil
 }
 
-func PostMessageHTTP(c agentctx.MewCallContext, channelID, content string) error {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func PostMessageHTTP(c infra.MewCallContext, channelID, content string) error {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	if c.HTTPClient == nil {
 		return fmt.Errorf("missing mew http client")
@@ -337,8 +336,8 @@ func PostMessageHTTP(c agentctx.MewCallContext, channelID, content string) error
 	return nil
 }
 
-func PostStickerHTTP(c agentctx.MewCallContext, channelID, stickerID string) error {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func PostStickerHTTP(c infra.MewCallContext, channelID, stickerID string) error {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	if c.HTTPClient == nil {
 		return fmt.Errorf("missing mew http client")

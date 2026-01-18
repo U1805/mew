@@ -8,8 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 )
 
 type exaSearchResponse struct {
@@ -23,8 +22,8 @@ type exaSearchResponse struct {
 	} `json:"results"`
 }
 
-func RunWebSearch(c agentctx.LLMCallContext, query string) (any, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func RunWebSearch(c infra.LLMCallContext, query string) (any, error) {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	query = strings.TrimSpace(query)
 	if query == "" {
@@ -47,7 +46,7 @@ func RunWebSearch(c agentctx.LLMCallContext, query string) (any, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, config.ExaSearchEndpoint, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, infra.ExaSearchEndpoint, bytes.NewReader(b))
 	if err != nil {
 		return nil, err
 	}

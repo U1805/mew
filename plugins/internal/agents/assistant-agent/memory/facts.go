@@ -9,9 +9,7 @@ import (
 
 	openaigo "github.com/openai/openai-go/v3"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
-	"mew/plugins/internal/agents/assistant-agent/config"
-	"mew/plugins/internal/agents/assistant-agent/utils"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/pkg/x/llm"
 )
 
@@ -67,7 +65,7 @@ type FactEngineResult struct {
 
 func clampImportance(v int) int {
 	if v <= 0 {
-		return config.AssistantFactDefaultImportance
+		return infra.AssistantFactDefaultImportance
 	}
 	if v < 1 {
 		return 1
@@ -114,12 +112,12 @@ func factRetentionScore(facts []Fact, i int) float64 {
 	S := I * (1.0 + math.Log(F))
 
 	index := float64(i)
-	t := ((L - 1.0 - index) / L) * config.AssistantFactRetentionRecencyScale
+	t := ((L - 1.0 - index) / L) * infra.AssistantFactRetentionRecencyScale
 	if t < 0 {
 		t = 0
 	}
 
-	return S / math.Pow(1.0+t, config.AssistantFactRetentionAlpha)
+	return S / math.Pow(1.0+t, infra.AssistantFactRetentionAlpha)
 }
 
 // ApplyFactRetentionCap 将事实列表裁剪到指定容量 cap，并通过“保留分数”淘汰最低者。
@@ -238,7 +236,7 @@ func UpsertFacts(now time.Time, facts FactsFile, newFacts []FactCandidate, maxFa
 		}
 
 		facts.Facts = append(facts.Facts, Fact{
-			FactID:         utils.NextIDRandomHex4(utils.CollectIDs(facts.Facts, func(f Fact) string { return f.FactID }), 'F'),
+			FactID:         infra.NextIDRandomHex4(infra.CollectIDs(facts.Facts, func(f Fact) string { return f.FactID }), 'F'),
 			Content:        strings.TrimSpace(nf.Content),
 			Importance:     imp,
 			Frequency:      1,
@@ -267,8 +265,8 @@ func UpsertFacts(now time.Time, facts FactsFile, newFacts []FactCandidate, maxFa
 // 兼容旧输出：
 //   - 纯 JSON string 数组：["..."]
 //   - 或对象：{"facts":["..."],"used_fact_ids":[...]}
-func ExtractFactsAndUsage(c agentctx.LLMCallContext, sessionText string, existing FactsFile, opts utils.CognitiveRetryOptions) (FactEngineResult, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func ExtractFactsAndUsage(c infra.LLMCallContext, sessionText string, existing FactsFile, opts infra.CognitiveRetryOptions) (FactEngineResult, error) {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	system := `You are a fact extraction engine.
 Extract stable, user-specific facts from the conversation.
@@ -292,7 +290,7 @@ If the user explicitly says "记住/remember", set importance=10 for that instru
 	}
 
 	var out FactEngineResult
-	err = utils.RetryCognitive(ctx, opts, func() error {
+	err = infra.RetryCognitive(ctx, opts, func() error {
 		resp, err := llm.CallOpenAIChatCompletion(ctx, c.HTTPClient, openaiCfg, []openaigo.ChatCompletionMessageParamUnion{
 			openaigo.SystemMessage(system),
 			openaigo.UserMessage(user),
@@ -417,7 +415,7 @@ func parseFactEngineResult(raw string) (FactEngineResult, error) {
 		out.Facts = make([]FactCandidate, 0, len(legacy.Facts))
 		for _, s := range legacy.Facts {
 			if t := strings.TrimSpace(s); t != "" {
-				out.Facts = append(out.Facts, FactCandidate{Content: t, Importance: config.AssistantFactDefaultImportance})
+				out.Facts = append(out.Facts, FactCandidate{Content: t, Importance: infra.AssistantFactDefaultImportance})
 			}
 		}
 		return out, nil
@@ -429,7 +427,7 @@ func parseFactEngineResult(raw string) (FactEngineResult, error) {
 		out := FactEngineResult{Facts: make([]FactCandidate, 0, len(arr))}
 		for _, s := range arr {
 			if t := strings.TrimSpace(s); t != "" {
-				out.Facts = append(out.Facts, FactCandidate{Content: t, Importance: config.AssistantFactDefaultImportance})
+				out.Facts = append(out.Facts, FactCandidate{Content: t, Importance: infra.AssistantFactDefaultImportance})
 			}
 		}
 		return out, nil

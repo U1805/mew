@@ -10,8 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"mew/plugins/internal/agents/assistant-agent/agentctx"
-	"mew/plugins/internal/agents/assistant-agent/config"
+	"mew/plugins/internal/agents/assistant-agent/infra"
 	apistickers "mew/plugins/pkg/api/stickers"
 )
 
@@ -32,7 +31,7 @@ func NewStickerService() *StickerService {
 func (s *StickerService) listConfiguredStickers(ctx context.Context, httpClient *http.Client, apiBase string, logPrefix string) ([]apistickers.Sticker, error) {
 	now := time.Now()
 	s.mu.RLock()
-	if !s.cache.FetchedAt.IsZero() && now.Sub(s.cache.FetchedAt) < config.StickerCacheTTL {
+	if !s.cache.FetchedAt.IsZero() && now.Sub(s.cache.FetchedAt) < infra.StickerCacheTTL {
 		out := append([]apistickers.Sticker(nil), s.cache.Stickers...)
 		s.mu.RUnlock()
 		return out, nil
@@ -59,8 +58,8 @@ func (s *StickerService) listConfiguredStickers(ctx context.Context, httpClient 
 	return stickers, nil
 }
 
-func (s *StickerService) StickerPromptAddon(c agentctx.MewCallContext, logPrefix string) string {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func (s *StickerService) StickerPromptAddon(c infra.MewCallContext, logPrefix string) string {
+	ctx := infra.ContextOrBackground(c.Ctx)
 	stickers, err := s.listConfiguredStickers(ctx, c.HTTPClient, c.APIBase, logPrefix)
 	if err != nil {
 		return ""
@@ -110,8 +109,8 @@ func (s *StickerService) StickerPromptAddon(c agentctx.MewCallContext, logPrefix
 	return strings.TrimSpace(b.String())
 }
 
-func (s *StickerService) ResolveStickerIDByName(c agentctx.MewCallContext, logPrefix, name string) (string, error) {
-	ctx := agentctx.ContextOrBackground(c.Ctx)
+func (s *StickerService) ResolveStickerIDByName(c infra.MewCallContext, logPrefix, name string) (string, error) {
+	ctx := infra.ContextOrBackground(c.Ctx)
 
 	name = strings.TrimSpace(name)
 	if name == "" {
