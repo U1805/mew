@@ -19,7 +19,6 @@ import (
 
 type ProactiveDirective struct {
 	DelaySeconds int    `json:"delay_seconds"`
-	DelayMinutes int    `json:"delay_minutes"`
 	Reason       string `json:"reason"`
 }
 
@@ -76,9 +75,6 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 					if d.DelaySeconds < 0 {
 						d.DelaySeconds = 0
 					}
-					if d.DelayMinutes < 0 {
-						d.DelayMinutes = 0
-					}
 					d.Reason = strings.TrimSpace(d.Reason)
 					controls.Proactive = &d
 				}
@@ -93,13 +89,6 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 					d.Name = strings.TrimSpace(d.Name)
 					if d.Name != "" {
 						controls.Sticker = &d
-					}
-				} else {
-					// Best-effort fallback: treat the raw string as a name.
-					rawName := strings.TrimSpace(raw)
-					rawName = strings.Trim(rawName, "\"")
-					if rawName != "" {
-						controls.Sticker = &StickerDirective{Name: rawName}
 					}
 				}
 			}

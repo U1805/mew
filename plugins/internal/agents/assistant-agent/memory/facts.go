@@ -261,10 +261,6 @@ func UpsertFacts(now time.Time, facts FactsFile, newFacts []FactCandidate, maxFa
 //   - 从对话中抽取“稳定、用户相关、长期有价值”的事实
 //   - 为每条新事实给出重要性分数（1-10，且遵循保守原则）
 //   - 输出本轮对话命中了哪些已有事实 ID（允许语义匹配）
-//
-// 兼容旧输出：
-//   - 纯 JSON string 数组：["..."]
-//   - 或对象：{"facts":["..."],"used_fact_ids":[...]}
 func ExtractFactsAndUsage(c infra.LLMCallContext, sessionText string, existing FactsFile, opts infra.CognitiveRetryOptions) (FactEngineResult, error) {
 	ctx := infra.ContextOrBackground(c.Ctx)
 
@@ -304,8 +300,8 @@ If the user explicitly says "记住/remember", set importance=10 for that instru
 
 		raw := extractJSONFromText(resp.Choices[0].Message.Content)
 
-		parsed, err := parseFactEngineResult(raw)
-		if err != nil {
+		var parsed FactEngineResult
+		if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
 			return fmt.Errorf("fact engine invalid json: %w (raw=%s)", err, raw)
 		}
 
@@ -389,49 +385,4 @@ func extractJSONFromText(s string) string {
 		}
 	}
 	return strings.TrimSpace(raw)
-}
-
-// parseFactEngineResult 解析 LLM 输出（兼容历史格式）。
-//
-// 支持的 JSON 形态：
-//  1. {"facts":[{"content":"...","importance":7}], "used_fact_ids":["F1a2b"]}  // 新格式
-//  2. {"facts":["..."], "used_fact_ids":["F1a2b"]}                             // 旧格式
-//  3. ["..."]                                                                // 旧格式
-func parseFactEngineResult(raw string) (FactEngineResult, error) {
-	// New shape.
-	var parsed FactEngineResult
-	if err := json.Unmarshal([]byte(raw), &parsed); err == nil {
-		return parsed, nil
-	}
-
-	// Legacy shape: {"facts":["..."], "used_fact_ids":[...]}.
-	type legacyObj struct {
-		Facts       []string `json:"facts"`
-		UsedFactIDs []string `json:"used_fact_ids"`
-	}
-	var legacy legacyObj
-	if err := json.Unmarshal([]byte(raw), &legacy); err == nil && (len(legacy.Facts) > 0 || len(legacy.UsedFactIDs) > 0) {
-		out := FactEngineResult{UsedFactIDs: legacy.UsedFactIDs}
-		out.Facts = make([]FactCandidate, 0, len(legacy.Facts))
-		for _, s := range legacy.Facts {
-			if t := strings.TrimSpace(s); t != "" {
-				out.Facts = append(out.Facts, FactCandidate{Content: t, Importance: infra.AssistantFactDefaultImportance})
-			}
-		}
-		return out, nil
-	}
-
-	// Legacy shape: plain array of strings.
-	var arr []string
-	if err := json.Unmarshal([]byte(raw), &arr); err == nil {
-		out := FactEngineResult{Facts: make([]FactCandidate, 0, len(arr))}
-		for _, s := range arr {
-			if t := strings.TrimSpace(s); t != "" {
-				out.Facts = append(out.Facts, FactCandidate{Content: t, Importance: infra.AssistantFactDefaultImportance})
-			}
-		}
-		return out, nil
-	}
-
-	return FactEngineResult{}, fmt.Errorf("unsupported json shape")
 }

@@ -25,7 +25,7 @@ func BuildProactiveRequest(now time.Time, channelID string, recordID string, d *
 		return ProactiveRequest{}, false
 	}
 
-	delay := time.Duration(d.DelaySeconds)*time.Second + time.Duration(d.DelayMinutes)*time.Minute
+	delay := time.Duration(d.DelaySeconds) * time.Second
 	if delay <= 0 {
 		delay = 3 * time.Minute
 	}

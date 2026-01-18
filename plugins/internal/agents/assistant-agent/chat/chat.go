@@ -163,9 +163,6 @@ func ChatWithTools(
 						break
 					}
 					keyword, _ := tc.Args["keyword"].(string)
-					if strings.TrimSpace(keyword) == "" {
-						keyword, _ = tc.Args["query"].(string)
-					}
 					payload, toolErr = handlers.HistorySearch(ctx, keyword)
 				case opts.RecordSearchToolName:
 					if handlers.RecordSearch == nil {
@@ -173,9 +170,6 @@ func ChatWithTools(
 						break
 					}
 					recordID, _ := tc.Args["record_id"].(string)
-					if strings.TrimSpace(recordID) == "" {
-						recordID, _ = tc.Args["recordId"].(string)
-					}
 					payload, toolErr = handlers.RecordSearch(ctx, recordID)
 					if toolErr == nil {
 						pendingRecordSearch = append(pendingRecordSearch, pendingRecordSearchResult{
@@ -189,9 +183,6 @@ func ChatWithTools(
 						break
 					}
 					query, _ := tc.Args["query"].(string)
-					if strings.TrimSpace(query) == "" {
-						query, _ = tc.Args["keyword"].(string)
-					}
 					payload, toolErr = handlers.WebSearch(ctx, query)
 				default:
 					payload = map[string]any{"error": "unknown tool: " + toolName}
@@ -345,26 +336,16 @@ func extractTrailingToolCalls(text string, prefix string) (clean string, calls [
 		}
 
 		name, _ := obj["name"].(string)
-		if strings.TrimSpace(name) == "" {
-			name, _ = obj["tool"].(string)
-		}
 		name = strings.TrimSpace(name)
 		if name == "" {
 			lines = append(lines[:last], lines[last+1:]...)
 			continue
 		}
 
-		args := map[string]any{}
-		if a, ok := obj["args"].(map[string]any); ok && a != nil {
-			args = a
-		} else {
-			// Allow shorthand: {"name":"HistorySearch","keyword":"x"}
-			for k, v := range obj {
-				if k == "name" || k == "tool" || k == "args" {
-					continue
-				}
-				args[k] = v
-			}
+		args, ok := obj["args"].(map[string]any)
+		if !ok || args == nil {
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
 		}
 
 		calls = append(calls, textToolCall{Name: name, Args: args})
