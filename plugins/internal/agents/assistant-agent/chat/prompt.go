@@ -170,6 +170,7 @@ func DeveloperInstructionsText(
 	proactiveTokenPrefix string,
 	toolCallTokenPrefix string,
 	stickerTokenPrefix string,
+	voiceTokenPrefix string,
 	availableStickerNames string,
 	relPath string,
 	embeddedName string,
@@ -191,6 +192,7 @@ func DeveloperInstructionsText(
 	out = strings.ReplaceAll(out, "{{PROACTIVE_TOKEN_PREFIX}}", proactiveTokenPrefix)
 	out = strings.ReplaceAll(out, "{{TOOL_CALL_TOKEN_PREFIX}}", toolCallTokenPrefix)
 	out = strings.ReplaceAll(out, "{{STICKER_TOKEN_PREFIX}}", stickerTokenPrefix)
+	out = strings.ReplaceAll(out, "{{VOICE_TOKEN_PREFIX}}", voiceTokenPrefix)
 	out = strings.ReplaceAll(out, "{{AVAILABLE_STICKER_NAMES}}", strings.TrimSpace(availableStickerNames))
 	return out
 }
