@@ -1,14 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { Types } from 'mongoose';
 import app from '../../app';
 import { ChannelType } from '../channel/channel.model';
 import { createMessage, getMessageById } from './message.service';
 import Server from '../server/server.model';
 import Role from '../role/role.model';
-import ServiceTypeModel from '../infra/serviceType.model';
-import BotModel from '../bot/bot.model';
-import MessageModel from './message.model';
 
 describe('Message Routes', () => {
   const userData = {
@@ -216,65 +212,6 @@ describe('Message Routes', () => {
       expect(res.body.content).toBe(messageData.content);
       expect(res.body.authorId.username).toBe(userData.username);
     });
-
-    it('should create a voice message and hydrate payload.voice.url', async () => {
-      const voiceKey = 'voice-test.webm';
-      const res = await request(app)
-        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          type: 'message/voice',
-          'plain-text': 'hello from bot',
-          payload: {
-            voice: {
-              key: voiceKey,
-              contentType: 'audio/webm',
-              size: 1234,
-              durationMs: 3200,
-            },
-          },
-        });
-
-      expect(res.statusCode).toBe(201);
-      expect(res.body.type).toBe('message/voice');
-      expect(res.body.content).toBe('');
-      expect(res.body.attachments).toEqual([]);
-      expect(res.body.plainText).toBe('hello from bot');
-      expect(res.body.payload?.voice?.key).toBe(voiceKey);
-      expect(res.body.payload?.voice?.url).toContain(voiceKey);
-    });
-
-    it('should transcribe a voice message and persist plainText', async () => {
-      const voiceKey = 'voice-stt-test.webm';
-      const createRes = await request(app)
-        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          type: 'message/voice',
-          payload: {
-            voice: {
-              key: voiceKey,
-              contentType: 'audio/webm',
-              size: 1234,
-              durationMs: 1200,
-            },
-          },
-        });
-
-      expect(createRes.statusCode).toBe(201);
-      const messageId = createRes.body._id as string;
-
-      const sttRes = await request(app)
-        .post(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}/transcribe`)
-        .set('Authorization', `Bearer ${token}`)
-        .attach('file', Buffer.from('fake-audio'), { filename: 'voice.webm', contentType: 'audio/webm' });
-
-      expect(sttRes.statusCode).toBe(200);
-      expect(sttRes.text).toBe('语音转文字结果为空');
-
-      const stored = await MessageModel.findById(messageId).lean();
-      expect(stored?.plainText).toBe('语音转文字结果为空');
-    });
   });
 
   describe('PATCH /api/servers/:serverId/channels/:channelId/messages/:messageId', () => {
@@ -389,39 +326,6 @@ describe('Message Routes', () => {
         .set('Authorization', `Bearer ${anotherToken}`);
 
       expect(res.statusCode).toBe(403);
-    });
-
-    it('should allow the bot owner to retract a message sent by their bot', async () => {
-      await ServiceTypeModel.updateOne(
-        { name: 'rss-fetcher' },
-        { $setOnInsert: { name: 'rss-fetcher' } },
-        { upsert: true }
-      );
-
-      const botCreateRes = await request(app)
-        .post('/api/users/@me/bots')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ name: 'OwnedDelBot', serviceType: 'rss-fetcher' });
-      expect(botCreateRes.statusCode).toBe(201);
-
-      const bot = await BotModel.findById(botCreateRes.body._id).lean();
-      expect(bot).toBeTruthy();
-      const botUserId = (bot as any).botUserId?.toString?.();
-      expect(typeof botUserId).toBe('string');
-
-      const botMessage = await MessageModel.create({
-        channelId: new Types.ObjectId(channelId),
-        authorId: new Types.ObjectId(botUserId),
-        content: 'bot says hi',
-      });
-
-      const res = await request(app)
-        .delete(`/api/servers/${serverId}/channels/${channelId}/messages/${botMessage._id}`)
-        .set('Authorization', `Bearer ${token}`);
-
-      expect(res.statusCode).toBe(200);
-      expect(res.body.retractedAt).toBeDefined();
-      expect(res.body.content).toBe('此消息已撤回');
     });
   });
 

@@ -3,11 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
-	"net/http"
-	"net/url"
-	"path"
 	"strings"
 	"time"
 
@@ -22,7 +18,6 @@ import (
 	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/api/attachment"
 	"mew/plugins/pkg/api/gateway/socketio"
-	"mew/plugins/pkg/api/messages"
 )
 
 func (r *Runner) handleMessageCreate(
@@ -179,54 +174,6 @@ func (r *Runner) processDMMessage(
 		},
 		PostStickerHTTP: func(ctx context.Context, channelID, stickerID string) error {
 			return chat.PostStickerHTTP(reqCtx.Mew.WithCtx(ctx), channelID, stickerID)
-		},
-		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
-			audioURL, err := tools.RunHobbyistTTS(reqCtx.LLM.WithCtx(ctx), text)
-			if err != nil {
-				return err
-			}
-
-			httpClient := reqCtx.LLM.HTTPClient
-			if httpClient == nil {
-				httpClient = http.DefaultClient
-			}
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
-			if err != nil {
-				return err
-			}
-			resp, err := httpClient.Do(req)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				return fmt.Errorf("tts audio download status=%d", resp.StatusCode)
-			}
-
-			filename := "voice.wav"
-			if u, err := url.Parse(audioURL); err == nil && u != nil {
-				if b := strings.TrimSpace(path.Base(u.Path)); b != "" && b != "." && b != "/" {
-					filename = b
-				}
-			}
-			contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
-			if contentType == "" {
-				contentType = "audio/wav"
-			}
-
-			_, err = messages.SendVoiceMessageByUploadReader(
-				ctx,
-				reqCtx.Mew.HTTPClient,
-				reqCtx.Mew.APIBase,
-				"",
-				channelID,
-				filename,
-				contentType,
-				resp.Body,
-				messages.SendVoiceMessageOptions{PlainText: text},
-			)
-			return err
 		},
 		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
 			return r.stickers.ResolveStickerIDByName(reqCtx.Mew.WithCtx(ctx), reqCtx.LogPrefix, name)
@@ -385,7 +332,6 @@ func (r *Runner) buildPrompt(
 		infra.AssistantProactiveTokenPrefix,
 		infra.AssistantToolCallTokenPrefix,
 		infra.AssistantStickerTokenPrefix,
-		infra.AssistantVoiceTokenPrefix,
 		stickerNames,
 		infra.DeveloperInstructionsPromptRelPath,
 		infra.DeveloperInstructionsEmbeddedName,

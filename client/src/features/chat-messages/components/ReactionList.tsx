@@ -12,17 +12,13 @@ interface ReactionListProps {
     onReactionClick: (emoji: string) => void;
 }
 
-const EMPTY_REACTIONS: Reaction[] = [];
-
-const ReactionList: React.FC<ReactionListProps> = ({ reactions: reactionsProp, currentUserId, onReactionClick }) => {
-    const reactions = reactionsProp ?? EMPTY_REACTIONS;
+const ReactionList: React.FC<ReactionListProps> = ({ reactions = [], currentUserId, onReactionClick }) => {
     const [displayReactions, setDisplayReactions] = useState<DisplayReaction[]>([]);
 
     useEffect(() => {
         setDisplayReactions(prev => {
-            const incoming = reactions;
-            const incomingEntries = incoming.map((r): [string, Reaction] => [r.emoji, r]);
-            const incomingMap = new Map<string, Reaction>(incomingEntries);
+            const incoming = reactions || [];
+            const incomingMap = new Map(incoming.map(r => [r.emoji, r]));
             const nextState: DisplayReaction[] = [];
             const processedEmojis = new Set<string>();
 

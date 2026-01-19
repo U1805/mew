@@ -26,15 +26,10 @@ type StickerDirective struct {
 	Name string `json:"name"`
 }
 
-type VoiceDirective struct {
-	Text string `json:"text"`
-}
-
 type ReplyControls struct {
 	WantMore  bool
 	Proactive *ProactiveDirective
 	Sticker   *StickerDirective
-	Voice     *VoiceDirective
 }
 
 type TransportContext struct {
@@ -46,7 +41,6 @@ type TransportContext struct {
 
 	PostMessageHTTP        func(ctx context.Context, channelID, content string) error
 	PostStickerHTTP        func(ctx context.Context, channelID, stickerID string) error
-	SendVoiceHTTP          func(ctx context.Context, channelID, text string) error
 	ResolveStickerIDByName func(ctx context.Context, name string) (string, error)
 }
 
@@ -95,19 +89,6 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 					d.Name = strings.TrimSpace(d.Name)
 					if d.Name != "" {
 						controls.Sticker = &d
-					}
-				}
-			}
-			lines = append(lines[:last], lines[last+1:]...)
-			continue
-		case strings.HasPrefix(t, infra.AssistantVoiceTokenPrefix):
-			raw := strings.TrimSpace(strings.TrimPrefix(t, infra.AssistantVoiceTokenPrefix))
-			if raw != "" && controls.Voice == nil {
-				var d VoiceDirective
-				if json.Unmarshal([]byte(raw), &d) == nil {
-					d.Text = strings.TrimSpace(d.Text)
-					if d.Text != "" {
-						controls.Voice = &d
 					}
 				}
 			}
@@ -206,12 +187,8 @@ func SendReply(
 	if controls.Sticker != nil {
 		stickerName = strings.TrimSpace(controls.Sticker.Name)
 	}
-	voiceText := ""
-	if controls.Voice != nil {
-		voiceText = strings.TrimSpace(controls.Voice.Text)
-	}
 
-	if reply == "" && stickerName == "" && voiceText == "" {
+	if reply == "" && stickerName == "" {
 		log.Printf("%s empty reply: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 		return nil
 	}
@@ -270,16 +247,6 @@ func SendReply(
 			}
 		}
 		log.Printf("%s reply sent: channel=%s user=%s lines=%d", c.LogPrefix, c.ChannelID, c.UserID, linesSent)
-	}
-
-	if voiceText != "" {
-		if c.SendVoiceHTTP == nil {
-			return fmt.Errorf("sendVoiceHTTP not configured")
-		}
-		if err := c.SendVoiceHTTP(ctx, c.ChannelID, voiceText); err != nil {
-			return err
-		}
-		log.Printf("%s voice sent: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 	}
 
 	if stickerName != "" {

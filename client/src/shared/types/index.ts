@@ -105,7 +105,6 @@ export interface Attachment {
   contentType: string;
   url: string;
   size: number;
-  key?: string;
 }
 
 export interface Reaction {
@@ -157,13 +156,6 @@ export interface MessagePayload {
   };
   embeds?: Embed[];
   sticker?: Sticker;
-  voice?: {
-    key: string;
-    url?: string;
-    contentType: string;
-    size: number;
-    durationMs?: number;
-  };
   [key: string]: any;
 }
 
@@ -175,7 +167,6 @@ export interface Message {
   author?: User; // Helper for client if populated
   type: string;
   content: string;
-  plainText?: string;
   payload?: MessagePayload;
   attachments?: Attachment[];
   mentions?: (string | User)[];
@@ -200,7 +191,6 @@ export interface Webhook {
 export interface Bot {
   _id: string;
   ownerId: string;
-  botUserId?: string;
   name: string;
   avatarUrl?: string;
   accessToken?: string;

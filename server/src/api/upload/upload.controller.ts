@@ -80,8 +80,6 @@ export const downloadFileHandler = asyncHandler(async (req: Request, res: Respon
       // Allow bot-friendly downloads for sticker assets referenced by messages in the channel.
       // This is important when the public S3/static domain is not reachable from bot containers.
       { 'payload.sticker.key': trimmedKey },
-      // Allow bot-friendly downloads for voice message audio referenced by messages in the channel.
-      { 'payload.voice.key': trimmedKey },
     ],
   });
   if (!allowed) {

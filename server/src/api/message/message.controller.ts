@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Types } from 'mongoose';
 import * as messageService from './message.service';
 import { createMessageSchema, getMessagesSchema, updateMessageSchema } from './message.validation';
-import { BadRequestError, UnauthorizedError } from '../../utils/errors';
+import { UnauthorizedError } from '../../utils/errors';
 import asyncHandler from '../../utils/asyncHandler';
 
 export const createMessageHandler = asyncHandler(async (req: Request, res: Response) => {
@@ -10,18 +10,13 @@ export const createMessageHandler = asyncHandler(async (req: Request, res: Respo
     throw new UnauthorizedError('Not authenticated');
   }
 
-  const { content, attachments, referencedMessageId, type, payload, plainText, 'plain-text': plainTextDashed } =
-    createMessageSchema.parse(req).body as any;
-  const resolvedPlainText =
-    (typeof plainText === 'string' ? plainText : typeof plainTextDashed === 'string' ? plainTextDashed : undefined) ??
-    undefined;
+  const { content, attachments, referencedMessageId, type, payload } = createMessageSchema.parse(req).body;
 
   const message = await messageService.createMessage({
     channelId: new Types.ObjectId(req.params.channelId),
     authorId: new Types.ObjectId(req.user.id),
     content,
     attachments,
-    ...(resolvedPlainText != null ? { plainText: resolvedPlainText } : {}),
     ...(type ? { type } : {}),
     ...(payload ? { payload } : {}),
     ...(referencedMessageId ? { referencedMessageId: new Types.ObjectId(referencedMessageId) } : {}),
@@ -99,18 +94,4 @@ export const removeReactionHandler = asyncHandler(async (req: Request, res: Resp
   );
 
   res.status(200).json(updatedMessage);
-});
-
-export const transcribeVoiceMessageHandler = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) {
-    throw new UnauthorizedError('Not authenticated');
-  }
-  if (!req.file) {
-    throw new BadRequestError('No file uploaded.');
-  }
-
-  const { channelId, messageId } = req.params as any;
-  const text = await messageService.transcribeVoiceMessage(String(channelId), String(messageId), req.file as any);
-
-  res.status(200).type('text/plain').send(text);
 });
