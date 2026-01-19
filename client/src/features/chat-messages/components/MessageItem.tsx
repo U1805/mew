@@ -217,6 +217,9 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const jpdictUserId = jpdictUserIdQuery.data || '';
   const canSendToJpdict = !!jpdictUserId && onlineStatus[jpdictUserId] === 'online';
 
+  const voice = isVoiceMessage ? message.payload?.voice : undefined;
+  const voiceSrc = typeof voice?.url === 'string' ? voice.url : '';
+
   const handleSendToJpdict = async () => {
     if (!jpdictUserId) {
       toast.error('jpdict-agent not found');
@@ -301,8 +304,12 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
     }
   };
 
-const handleTranscribeVoice = async () => {
+  const handleTranscribeVoice = async () => {
     if (!isVoiceMessage) return;
+    if (!voiceSrc) {
+      toast.error('Voice message unavailable');
+      return;
+    }
 
     // 1. 如果已经有文本，直接显示
     const existing = (typeof message.plainText === 'string' ? message.plainText : '').trim();
@@ -315,7 +322,7 @@ const handleTranscribeVoice = async () => {
     setShowVoiceTranscript(true);
     setVoiceTranscriptLoading(true);
     try {
-      const resp = await fetch(src);
+      const resp = await fetch(voiceSrc);
       if (!resp.ok) {
         throw new Error(`Failed to fetch voice file: ${resp.status}`);
       }
