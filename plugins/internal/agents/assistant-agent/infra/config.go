@@ -28,7 +28,8 @@ type UserConfig struct {
 }
 
 type ToolConfig struct {
-	ExaAPIKey string `json:"exa_api_key"`
+	ExaAPIKey          string `json:"exa_api_key"`
+	HobbyistTTSToken   string `json:"hobbyist_tts_token"`
 }
 
 type AssistantConfig struct {

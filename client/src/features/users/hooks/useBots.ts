@@ -3,13 +3,14 @@ import { botApi } from '../../../shared/services/api';
 import { Bot } from '../../../shared/types';
 import toast from 'react-hot-toast';
 
-export const useBots = () => {
+export const useBots = (opts?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ['bots'],
     queryFn: async () => {
       const res = await botApi.list();
       return res.data as Bot[];
     },
+    enabled: opts?.enabled ?? true,
   });
 };
 

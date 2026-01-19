@@ -32,6 +32,7 @@ interface MessageContextMenuProps {
   canCopy: boolean;
   canDelete: boolean;
   canSendToJpdict: boolean;
+  canTranscribeVoice: boolean;
   isRetracted: boolean;
   onAddReaction: (emoji: string) => void;
   onReply: () => void;
@@ -40,6 +41,7 @@ interface MessageContextMenuProps {
   onAddApp: () => void;
   onSpeak: () => void;
   onSendToJpdict: () => void;
+  onTranscribeVoice: () => void;
   onDelete: () => void;
 }
 
@@ -50,6 +52,7 @@ export const MessageContextMenu = ({
   canCopy,
   canDelete,
   canSendToJpdict,
+  canTranscribeVoice,
   isRetracted,
   onAddReaction,
   onReply,
@@ -58,6 +61,7 @@ export const MessageContextMenu = ({
   onAddApp,
   onSpeak,
   onSendToJpdict,
+  onTranscribeVoice,
   onDelete,
 }: MessageContextMenuProps) => {
   const disabled = isRetracted;
@@ -165,6 +169,21 @@ export const MessageContextMenu = ({
           </ContextMenu.SubTrigger>
           <ContextMenu.Portal>
             <ContextMenu.SubContent className="min-w-[210px] bg-[#111214] rounded p-1.5 shadow-xl z-[9999] border border-[#1E1F22] ml-1">
+              {canTranscribeVoice && (
+                <ContextMenu.Item
+                  className={itemClass}
+                  disabled={disabled}
+                  onSelect={() => {
+                    onTranscribeVoice();
+                  }}
+                >
+                  <span className="flex items-center gap-2">
+                    <Icon icon="mdi:text-recognition" width="18" />
+                    Transcribe
+                  </span>
+                </ContextMenu.Item>
+              )}
+
               {canSendToJpdict ? (
                 <ContextMenu.Item
                   className={itemClass}

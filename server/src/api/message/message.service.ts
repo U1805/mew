@@ -13,6 +13,8 @@ import { getS3PublicUrl } from '../../utils/s3';
 import config from '../../config';
 import Sticker from '../sticker/sticker.model';
 import UserSticker from '../userSticker/userSticker.model';
+import BotModel from '../bot/bot.model';
+import { transcribeVoiceFileToText } from '../stt/stt.service';
 
 // Convert stored attachment keys into client-consumable URLs.
 function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
@@ -28,11 +30,13 @@ function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messag
 
 function buildMessageContext(messageObject: any): string {
   const content = typeof messageObject?.content === 'string' ? messageObject.content.trim() : '';
+  const plainText = typeof messageObject?.plainText === 'string' ? messageObject.plainText.trim() : '';
   const type = typeof messageObject?.type === 'string' ? messageObject.type.trim() : '';
   const payload = messageObject?.payload && typeof messageObject.payload === 'object' ? messageObject.payload : undefined;
   const attachments = Array.isArray(messageObject?.attachments) ? messageObject.attachments : [];
 
   if (content) return content;
+  if (plainText) return plainText;
 
   const parts: string[] = [];
 
@@ -62,6 +66,17 @@ function buildMessageContext(messageObject: any): string {
     const sticker = payload?.sticker && typeof payload.sticker === 'object' ? payload.sticker : undefined;
     const stickerName = typeof sticker?.name === 'string' ? sticker.name.trim() : '';
     if (stickerName) parts.push(`sticker: ${stickerName}`);
+
+    const voice = payload?.voice && typeof payload.voice === 'object' ? payload.voice : undefined;
+    const durationMs = typeof (voice as any)?.durationMs === 'number' ? (voice as any).durationMs : undefined;
+    if (durationMs && durationMs > 0) {
+      const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+      const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+      const ss = String(totalSeconds % 60).padStart(2, '0');
+      parts.push(`voice: ${mm}:${ss}`);
+    } else if (voice) {
+      parts.push('voice');
+    }
 
     const title = typeof payload.title === 'string' ? payload.title.trim() : '';
     const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
@@ -95,11 +110,20 @@ function buildMessageContext(messageObject: any): string {
   return parts.join('\n').trim();
 }
 
-async function checkMessagePermissions(messageId: string, userId: string) {
+type MessagePermissionAction = 'update' | 'delete';
+
+async function checkMessagePermissions(messageId: string, userId: string, action: MessagePermissionAction) {
   const message = await getMessageById(messageId);
 
   if (message.authorId.toString() === userId) {
     return;
+  }
+
+  // Allow a bot owner to delete messages authored by their bot user.
+  // (Intentionally scoped to deletion only; editing remains author-only or MANAGE_MESSAGES.)
+  if (action === 'delete') {
+    const isOwner = await BotModel.exists({ botUserId: message.authorId, ownerId: userId });
+    if (isOwner) return;
   }
 
   const channel = await Channel.findById(message.channelId)
@@ -193,6 +217,14 @@ function processMessageForClient(message: any): object {
       (messageObject.payload.sticker as any).url = getS3PublicUrl(key);
     }
   }
+
+  // Hydrate voice URLs (if any).
+  if (messageObject?.payload?.voice && typeof messageObject.payload.voice === 'object') {
+    const key = (messageObject.payload.voice as any).key;
+    if (typeof key === 'string' && key) {
+      (messageObject.payload.voice as any).url = getS3PublicUrl(key);
+    }
+  }
   }
 
   // Provide a unified plain-text context string for bots/LLM consumers.
@@ -235,6 +267,11 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   if (!data.channelId || !data.authorId) {
     throw new BadRequestError('Message must have a channel and an author');
+  }
+
+  if (typeof (data as any).plainText === 'string') {
+    const trimmed = (data as any).plainText.trim();
+    (data as any).plainText = trimmed ? trimmed : undefined;
   }
 
   if (data.type === 'app/x-forward-card') {
@@ -366,6 +403,37 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
     }
   }
 
+  if (data.type === 'message/voice') {
+    const payload = data.payload && typeof data.payload === 'object' ? (data.payload as any) : {};
+    const voice = payload?.voice && typeof payload.voice === 'object' ? payload.voice : undefined;
+    const key = typeof (voice as any)?.key === 'string' ? (voice as any).key.trim() : '';
+    const contentType = typeof (voice as any)?.contentType === 'string' ? (voice as any).contentType.trim() : '';
+    const size = typeof (voice as any)?.size === 'number' ? (voice as any).size : Number.NaN;
+    const durationMsRaw = (voice as any)?.durationMs;
+    const durationMs =
+      durationMsRaw == null ? undefined : (typeof durationMsRaw === 'number' ? durationMsRaw : Number.NaN);
+
+    if (!key) throw new BadRequestError('voice.key is required for voice messages');
+    if (!contentType) throw new BadRequestError('voice.contentType is required for voice messages');
+    if (!Number.isFinite(size) || size <= 0) throw new BadRequestError('voice.size is required for voice messages');
+    if (durationMs !== undefined && (!Number.isFinite(durationMs) || durationMs <= 0)) {
+      throw new BadRequestError('voice.durationMs must be a positive number');
+    }
+
+    // Voice messages are allowed to have no content/attachments.
+    data.content = '';
+    data.attachments = [];
+    data.payload = {
+      ...(payload || {}),
+      voice: {
+        key,
+        contentType,
+        size,
+        ...(durationMs !== undefined ? { durationMs } : {}),
+      },
+    };
+  }
+
   if (data.referencedMessageId) {
     const referenced = await messageRepository.findById(data.referencedMessageId.toString());
     if (!referenced) {
@@ -457,7 +525,7 @@ export const getMessageById = async (messageId: string) => {
     userId: string,
     content: string
   ) => {
-    await checkMessagePermissions(messageId, userId);
+    await checkMessagePermissions(messageId, userId, 'update');
     const message = await getMessageById(messageId);
 
     const channel = await Channel.findById(message.channelId).lean();
@@ -484,8 +552,8 @@ export const getMessageById = async (messageId: string) => {
     return messageForClient as IMessage;
   };
 
-  export const deleteMessage = async (messageId: string, userId: string) => {
-    await checkMessagePermissions(messageId, userId);
+export const deleteMessage = async (messageId: string, userId: string) => {
+    await checkMessagePermissions(messageId, userId, 'delete');
     const message = await getMessageById(messageId);
 
     const channel = await Channel.findById(message.channelId).select('type serverId').lean();
@@ -504,8 +572,43 @@ export const getMessageById = async (messageId: string) => {
 
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
 
-    return messageForClient as IMessage;
-  };
+  return messageForClient as IMessage;
+};
+
+export const transcribeVoiceMessage = async (channelId: string, messageId: string, file: Express.Multer.File) => {
+  const message = await getMessageById(messageId);
+  if (message.channelId.toString() !== String(channelId)) {
+    throw new ForbiddenError('Message must be in the same channel');
+  }
+  if (message.type !== 'message/voice') {
+    throw new BadRequestError('Only voice messages can be transcribed');
+  }
+
+  const textRaw = await transcribeVoiceFileToText(file);
+  const text = typeof textRaw === 'string' ? textRaw.trim() : '';
+
+  message.plainText = text || undefined;
+  await messageRepository.save(message);
+
+  const channel = await Channel.findById(message.channelId).select('type serverId recipients').lean();
+  if (!channel) {
+    throw new NotFoundError('Channel not found');
+  }
+
+  const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
+  const messageForClient = attachServerId(processMessageForClient(populatedMessage), channel);
+
+  const channelIdStr = message.channelId.toString();
+  if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
+    for (const recipient of channel.recipients) {
+      socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_UPDATE', messageForClient);
+    }
+  } else {
+    socketManager.broadcast('MESSAGE_UPDATE', channelIdStr, messageForClient);
+  }
+
+  return text;
+};
 
 export const addReaction = async (
       messageId: string,

@@ -68,6 +68,10 @@ const s3Client = new S3Client({
     accessKeyId: config.s3.accessKeyId,
     secretAccessKey: config.s3.secretAccessKey,
   },
+  // Avoid adding SDK-managed flexible checksums to pre-signed PUT URLs.
+  // Some S3-compatible providers (e.g. Garage) may reject the default placeholder checksum on upload.
+  requestChecksumCalculation: 'WHEN_REQUIRED',
+  responseChecksumValidation: 'WHEN_REQUIRED',
   forcePathStyle: true, // Necessary for MinIO, Garage, etc.
 });
 
@@ -85,6 +89,8 @@ const createPresignClient = () => {
           accessKeyId: config.s3.accessKeyId,
           secretAccessKey: config.s3.secretAccessKey,
         },
+        requestChecksumCalculation: 'WHEN_REQUIRED',
+        responseChecksumValidation: 'WHEN_REQUIRED',
         forcePathStyle: true,
       }),
       basePath: base.pathname.replace(/\/+$/, '').replace(/\/{2,}/g, '/'),
