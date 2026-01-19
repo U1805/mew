@@ -18,6 +18,9 @@ import {
 import clsx from 'clsx';
 import { StickerPicker } from './StickerPicker';
 import type { Sticker } from '../../../shared/types';
+import toast from 'react-hot-toast';
+import { useVoiceRecorder } from '../../chat-voice/hooks/useVoiceRecorder';
+import { VoiceMessagePlayer } from '../../chat-voice/components/VoiceMessagePlayer';
 
 interface MessageInputProps {
   channel: Channel | null;
@@ -29,19 +32,32 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   const [attachments, setAttachments] = useState<Array<Partial<Attachment & { isUploading?: boolean; progress?: number; file?: File; localUrl?: string; error?: string; key?: string }>>>([]);
   const isUploading = attachments.some(a => a.isUploading);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
+  const [isSendingVoice, setIsSendingVoice] = useState(false);
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const voiceFileInputRef = useRef<HTMLInputElement>(null);
+  const actionMenuButtonRef = useRef<HTMLButtonElement>(null);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
   const placeholderRef = useRef('');
   const sendMessageRef = useRef<() => void>(() => {});
 
   const queryClient = useQueryClient();
   const { replyTo, clearReplyTo, setReplyTo } = useUIStore();
   const canSendMessage = channel?.permissions?.includes('SEND_MESSAGES') ?? false;
+  const voiceRecorder = useVoiceRecorder();
 
   const activeReplyTo = useMemo(() => {
     if (!replyTo || !channelId) return null;
     return replyTo.channelId === channelId ? replyTo : null;
   }, [replyTo, channelId]);
+
+  const formatMs = (ms: number) => {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const ss = String(totalSeconds % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  };
 
   const placeholderText = useMemo(() => {
     if (isUploading) return 'Uploading files...';
@@ -288,6 +304,123 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     void handleSendMessage();
   };
 
+  useEffect(() => {
+    if (!voiceRecorder.error) return;
+    toast.error(voiceRecorder.error);
+    voiceRecorder.setError(null);
+  }, [voiceRecorder.error, voiceRecorder.setError]);
+
+  useEffect(() => {
+    if (!isActionMenuOpen) return;
+
+    const onMouseDown = (e: MouseEvent) => {
+      const menu = actionMenuRef.current;
+      const btn = actionMenuButtonRef.current;
+      const target = e.target as Node | null;
+      if (!target) return;
+      if (menu?.contains(target)) return;
+      if (btn?.contains(target)) return;
+      setIsActionMenuOpen(false);
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsActionMenuOpen(false);
+    };
+
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isActionMenuOpen]);
+
+  const handleSendVoice = useCallback(async () => {
+    if (!channelId || !canSendMessage || isUploading) return;
+    if (isSendingVoice) return;
+    if (voiceRecorder.status !== 'preview' || !voiceRecorder.preview) return;
+
+    const { blob, blobUrl, mimeType, size, durationMs } = voiceRecorder.preview;
+    const currentServerId = serverId ? serverId : undefined;
+    const replySnapshot = activeReplyTo;
+    const user = useAuthStore.getState().user;
+    if (!user) return;
+
+    setIsSendingVoice(true);
+
+    const tempId = new Date().toISOString();
+    const optimistic: Message = {
+      _id: tempId,
+      channelId: channelId,
+      authorId: user,
+      content: '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      type: 'message/voice',
+      attachments: [],
+      payload: {
+        voice: {
+          key: '',
+          url: blobUrl,
+          contentType: mimeType || 'audio/webm',
+          size,
+          ...(durationMs ? { durationMs } : {}),
+        },
+      },
+      ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
+    };
+
+    queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
+      return oldData ? [...oldData, optimistic] : [optimistic];
+    });
+
+    try {
+      const file =
+        blob instanceof File
+          ? blob
+          : new File([blob], `voice-${Date.now()}.${mimeType.includes('ogg') ? 'ogg' : 'webm'}`, {
+              type: mimeType || 'audio/webm',
+            });
+
+      const uploaded: any = await uploadApi.uploadFileSmart(channelId, file);
+
+      await messageApi.send(currentServerId, channelId, {
+        type: 'message/voice',
+        payload: {
+          voice: {
+            key: uploaded.key,
+            contentType: uploaded.contentType || mimeType || 'audio/webm',
+            size: uploaded.size || file.size,
+            ...(durationMs ? { durationMs } : {}),
+          },
+        },
+        ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
+      });
+
+      voiceRecorder.cancel();
+      if (replySnapshot) clearReplyTo();
+      await queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+    } catch (err) {
+      console.error('Failed to send voice message:', err);
+      toast.error('Failed to send voice message');
+      queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
+        return oldData ? oldData.filter((m) => m._id !== tempId) : [];
+      });
+    } finally {
+      setIsSendingVoice(false);
+    }
+  }, [
+    activeReplyTo,
+    canSendMessage,
+    channelId,
+    clearReplyTo,
+    isSendingVoice,
+    isUploading,
+    queryClient,
+    serverId,
+    voiceRecorder,
+  ]);
+
   return (
     <div className="px-2 md:px-4 pb-2 md:pb-6 pt-2 flex-shrink-0 relative">
       <style>{`
@@ -341,24 +474,180 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         </div>
       )}
 
+      {(voiceRecorder.status === 'recording' || voiceRecorder.status === 'preview') && (
+        <div className="bg-[#2B2D31] border-x border-t border-[#1E1F22] rounded-t-lg px-3 py-2 flex items-center justify-between gap-3 text-sm">
+          {voiceRecorder.status === 'recording' ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="inline-flex w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-mew-textMuted">Recording</span>
+              <span className="text-white font-semibold tabular-nums">{formatMs(voiceRecorder.elapsedMs)}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 min-w-0">
+              {voiceRecorder.preview?.blobUrl ? (
+                <VoiceMessagePlayer
+                  src={voiceRecorder.preview.blobUrl}
+                  contentType={voiceRecorder.preview.mimeType}
+                  durationMs={voiceRecorder.preview.durationMs}
+                />
+              ) : (
+                <div className="text-mew-textMuted">Voice preview unavailable</div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 shrink-0">
+            {voiceRecorder.status === 'recording' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void voiceRecorder.stop()}
+                  className="px-3 py-1.5 rounded-md bg-[#1E1F22] hover:bg-[#202225] text-white text-xs font-semibold"
+                  disabled={isSendingVoice}
+                >
+                  Stop
+                </button>
+                <button
+                  type="button"
+                  onClick={() => voiceRecorder.cancel()}
+                  className="px-3 py-1.5 rounded-md bg-transparent hover:bg-[#202225] text-mew-textMuted text-xs font-semibold"
+                  disabled={isSendingVoice}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleSendVoice()}
+                  className="px-3 py-1.5 rounded-md bg-mew-accent hover:opacity-90 text-white text-xs font-semibold"
+                  disabled={isSendingVoice || !canSendMessage || isUploading}
+                >
+                  {isSendingVoice ? 'Sending…' : 'Send'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => voiceRecorder.cancel()}
+                  className="px-3 py-1.5 rounded-md bg-transparent hover:bg-[#202225] text-mew-textMuted text-xs font-semibold"
+                  disabled={isSendingVoice}
+                >
+                  Discard
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <form 
         onSubmit={(e) => { e.preventDefault(); void handleSendMessage(); }} 
         className={clsx(
             "bg-[#383A40] flex items-center relative z-20 transition-all shadow-sm",
-            attachments.length > 0 || activeReplyTo ? "rounded-b-lg border-x border-b border-[#383A40]" : "rounded-lg"
+            attachments.length > 0 || activeReplyTo || voiceRecorder.status !== 'idle'
+              ? "rounded-b-lg border-x border-b border-[#383A40]"
+              : "rounded-lg"
         )}
       >
         <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple className="hidden" />
+        <input
+          type="file"
+          ref={voiceFileInputRef}
+          accept="audio/*"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (voiceFileInputRef.current) voiceFileInputRef.current.value = '';
+            if (!f) return;
+            void voiceRecorder.loadFromFile(f);
+          }}
+          className="hidden"
+        />
         
         {/* Left Actions */}
-        <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-mew-textMuted hover:text-[#DBDEE1] p-2.5 mx-1 flex-shrink-0"
-            disabled={!canSendMessage || isUploading}
-        >
-          <Icon icon="mdi:plus-circle" width="24" height="24" />
-        </button>
+        <div className="relative mx-1 flex-shrink-0">
+          <button
+              ref={actionMenuButtonRef}
+              type="button"
+              onClick={() => {
+                if (!canSendMessage || isUploading || isSendingVoice) return;
+                setIsActionMenuOpen((v) => !v);
+              }}
+              className={clsx(
+                "group relative flex items-center justify-center p-2 rounded-full transition-colors",
+                isActionMenuOpen 
+                  ? "text-mew-text bg-white/10" 
+                  : "text-mew-textMuted hover:text-mew-text hover:bg-[#3F4147]" // Discord 风格的悬停背景
+              )}
+              disabled={!canSendMessage || isUploading || isSendingVoice}
+              aria-label="open message actions"
+              title="Actions"
+          >
+            <Icon icon="mdi:plus-circle" width="24" height="24" className={clsx(
+                "transition-transform duration-200",
+                isActionMenuOpen ? "rotate-45" : "" // 点击时旋转成 X 的效果（可选，Discord 移动端常用）
+            )} />
+          </button>
+
+          {isActionMenuOpen && (
+            <div
+              ref={actionMenuRef}
+              className="absolute left-0 bottom-full mb-3 w-[220px] rounded-md bg-[#2B2D31] shadow-[0_8px_16px_rgba(0,0,0,0.24)] p-1.5 z-50 animate-in fade-in slide-in-from-bottom-2 duration-100"
+              role="menu"
+            >
+              <button
+                type="button"
+                className="group w-full flex items-center gap-3 px-2 py-1.5 rounded-sm hover:bg-[#5865F2] hover:text-white text-[#B5BAC1] transition-colors"
+                onClick={() => {
+                  setIsActionMenuOpen(false);
+                  fileInputRef.current?.click();
+                }}
+                disabled={!canSendMessage || isUploading}
+                role="menuitem"
+              >
+                <Icon icon="mdi:file-upload-outline" width="20" height="20" className="text-[#B5BAC1] group-hover:text-white" />
+                <span className="text-[14px] font-medium">Upload file</span>
+              </button>
+
+              <button
+                type="button"
+                className="group w-full flex items-center gap-3 px-2 py-1.5 rounded-sm hover:bg-[#5865F2] hover:text-white text-[#B5BAC1] transition-colors"
+                onClick={() => {
+                  setIsActionMenuOpen(false);
+                  if (voiceRecorder.status === 'recording') return;
+                  voiceFileInputRef.current?.click();
+                }}
+                disabled={!canSendMessage || isUploading || isSendingVoice || voiceRecorder.status === 'recording'}
+                role="menuitem"
+              >
+                <Icon icon="mdi:music-note-plus" width="20" height="20" className="text-[#B5BAC1] group-hover:text-white" />
+                <span className="text-[14px] font-medium">Upload audio</span>
+              </button>
+
+              <div className="my-1 h-[1px] bg-[#1E1F22] w-full mx-auto opacity-60" /> {/* 分割线 */}
+
+              <button
+                type="button"
+                className="group w-full flex items-center gap-3 px-2 py-1.5 rounded-sm hover:bg-[#5865F2] hover:text-white text-[#B5BAC1] transition-colors"
+                onClick={() => {
+                  setIsActionMenuOpen(false);
+                  if (voiceRecorder.status === 'preview') return;
+                  if (voiceRecorder.status === 'recording') void voiceRecorder.stop();
+                  else void voiceRecorder.start();
+                }}
+                disabled={!canSendMessage || isUploading || isSendingVoice || voiceRecorder.status === 'preview'}
+                role="menuitem"
+              >
+                <Icon 
+                  icon={voiceRecorder.status === 'recording' ? 'mdi:microphone-off' : 'mdi:microphone'} 
+                  width="20" 
+                  height="20" 
+                  className="text-[#B5BAC1] group-hover:text-white"
+                />
+                <span className="text-[14px] font-medium">Record voice</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Text Area */}
         <div className="mew-chat-editor bg-transparent flex-1 disabled:cursor-not-allowed min-w-0 py-2.5 max-h-[50vh] overflow-y-auto custom-scrollbar">

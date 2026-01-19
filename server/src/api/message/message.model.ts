@@ -39,6 +39,8 @@ export interface IMessage extends Document {
   authorId: mongoose.Types.ObjectId;
   type: string;
   content: string;
+  // Plain text for voice messages: provided by sender or STT result.
+  plainText?: string;
   payload?: IMessagePayload;
   attachments?: IAttachment[];
   mentions?: mongoose.Types.ObjectId[];
@@ -68,6 +70,7 @@ const MessageSchema: Schema = new Schema(
     authorId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     type: { type: String, default: 'message/default' },
     content: { type: String },
+    plainText: { type: String },
     payload: { type: Object },
     attachments: [AttachmentSchema],
     mentions: [{ type: Schema.Types.ObjectId, ref: 'User' }],

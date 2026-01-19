@@ -15,6 +15,16 @@ export const uploadAttachment = multer({
   limits: attachmentLimits,
 });
 
+// --- Transient Uploads (in-memory; used for STT, etc.) ---
+const transientLimits = {
+  fileSize: MAX_UPLOAD_BYTES,
+};
+
+export const uploadTransient = multer({
+  storage: multer.memoryStorage(),
+  limits: transientLimits,
+});
+
 // --- Image-specific Configuration (for Avatars, Icons) ---
 const imageLimits = {
   fileSize: MAX_UPLOAD_BYTES,

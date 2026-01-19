@@ -20,6 +20,11 @@ const (
 	//   <STICKER>{"name":"Wave"}
 	AssistantStickerTokenPrefix = "<STICKER>"
 
+	// AssistantVoiceTokenPrefix is a single-line control directive emitted by the LLM.
+	// Expected format (one line):
+	//   <VOICE>{"text":"...Japanese..."}
+	AssistantVoiceTokenPrefix = "<VOICE>"
+
 	// AssistantToolCallTokenPrefix is a single-line control directive emitted by the LLM.
 	// Expected format (one line):
 	//   <TOOL>{"name":"HistorySearch","args":{"keyword":"..."}}`
@@ -79,7 +84,7 @@ const (
 
 	// AssistantTypingWPMDefault is the default typing speed simulation.
 	// WPM counts "words" as Unicode characters (runes) for this project.
-	AssistantTypingWPMDefault = 30
+	AssistantTypingWPMDefault = 100
 
 	AssistantLLMRetryInitialBackoff = 250 * time.Millisecond
 	AssistantLLMRetryMaxBackoff     = 5 * time.Second
@@ -99,6 +104,7 @@ const (
 
 	StickerCacheTTL   = 60 * time.Second
 	ExaSearchEndpoint = "https://api.exa.ai/search"
+	HobbyistTTSEndpoint = "https://gsv2p.acgnai.top/infer_single"
 
 	DefaultBaselineValence = 0.2
 	DefaultBaselineArousal = 0.1
