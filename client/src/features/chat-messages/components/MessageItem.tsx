@@ -83,6 +83,8 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const [applyFlash, setApplyFlash] = useState(false);
   const [jumpBlinkOn, setJumpBlinkOn] = useState(false);
   const [menuSelection, setMenuSelection] = useState('');
+  const [showVoiceTranscript, setShowVoiceTranscript] = useState(false);
+  const [voiceTranscriptLoading, setVoiceTranscriptLoading] = useState(false);
   const permissions = usePermissions(message.channelId);
   const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
   const itemRef = useRef<HTMLDivElement>(null);
@@ -100,6 +102,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const isInstagramCard = message.type === 'app/x-instagram-card';
   const isForwardCard = message.type === 'app/x-forward-card';
   const isJpdictCard = message.type === 'app/x-jpdict-card';
+  const isVoiceMessage = message.type === 'message/voice';
   const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isForwardCard || isJpdictCard;
   const isAuthor = user?._id?.toString() === author._id?.toString();
   const canDeleteAsBotOwner = !!user && !!author?.isBot && !!ownedBotUserIds?.has(author._id?.toString());
@@ -295,6 +298,57 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       console.error('TTS failed', err);
       toast.error('TTS failed', { id: loadingToast });
       stopActiveTts();
+    }
+  };
+
+const handleTranscribeVoice = async () => {
+    if (!isVoiceMessage) return;
+
+    // 1. 如果已经有文本，直接显示
+    const existing = (typeof message.plainText === 'string' ? message.plainText : '').trim();
+    if (existing) {
+      setShowVoiceTranscript((prev) => !prev); // 改为 toggle 更符合用户直觉
+      return;
+    }
+    
+    // 2. 如果正在显示且没有文本（可能是上次失败了），或者未显示，则开始流程
+    setShowVoiceTranscript(true);
+    setVoiceTranscriptLoading(true);
+    try {
+      const resp = await fetch(src);
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch voice file: ${resp.status}`);
+      }
+
+      const blob = await resp.blob();
+      const mimeType =
+        (typeof blob.type === 'string' && blob.type) ||
+        (typeof voice?.contentType === 'string' && voice.contentType) ||
+        'audio/webm';
+
+      const ext = mimeType.includes('ogg')
+        ? 'ogg'
+        : mimeType.includes('mpeg')
+          ? 'mp3'
+          : mimeType.includes('wav')
+            ? 'wav'
+            : mimeType.includes('mp4')
+              ? 'm4a'
+              : 'webm';
+
+      const file = new File([blob], `voice-${message._id}.${ext}`, { type: mimeType });
+      const sttRes = await messageApi.transcribeVoice(currentServerId || undefined, message.channelId, message._id, file);
+      const text = (typeof sttRes.data === 'string' ? sttRes.data : String(sttRes.data ?? '')).trim();
+
+      queryClient.setQueryData(['messages', message.channelId], (old: Message[] | undefined) => {
+        if (!old) return old;
+        return old.map((m) => (m._id === message._id ? { ...m, plainText: text } : m));
+      });
+    } catch (err) {
+      console.error('STT failed', err);
+      toast.error('Transcribe failed');
+    } finally {
+      setVoiceTranscriptLoading(false);
     }
   };
 
@@ -545,6 +599,8 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                         message={message}
                         serverId={currentServerId || undefined}
                         channelId={message.channelId}
+                        showVoiceTranscript={isVoiceMessage && showVoiceTranscript}
+                        voiceTranscriptLoading={isVoiceMessage && showVoiceTranscript && voiceTranscriptLoading}
                       />
                       {message.editedAt && (
                         <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>
@@ -570,6 +626,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
         canCopy={true}
         canDelete={isAuthor || canManageMessages || canDeleteAsBotOwner}
         canSendToJpdict={canSendToJpdict}
+        canTranscribeVoice={isVoiceMessage}
         isRetracted={isRetracted}
         onAddReaction={handleReactionClick}
         onReply={handleReply}
@@ -578,6 +635,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
         onAddApp={() => {}}
         onSpeak={handleSpeakText}
         onSendToJpdict={handleSendToJpdict}
+        onTranscribeVoice={handleTranscribeVoice}
         onDelete={() => openModal('deleteMessage', { message, author })}
       />
     </ContextMenu.Root>

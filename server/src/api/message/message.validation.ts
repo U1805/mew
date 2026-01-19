@@ -21,6 +21,9 @@ export const createMessageSchema = z.object({
   body: z
     .object({
       content: z.string().optional(), // Content can be optional if there are attachments
+      // Voice-message plaintext (sender-provided or STT result). Allow both camelCase and bot-friendly dashed key.
+      plainText: z.string().optional(),
+      'plain-text': z.string().optional(),
       attachments: z.array(attachmentSchema).optional(),
       referencedMessageId: z.string().optional(),
       type: z.string().optional(),

@@ -14,6 +14,7 @@ import config from '../../config';
 import Sticker from '../sticker/sticker.model';
 import UserSticker from '../userSticker/userSticker.model';
 import BotModel from '../bot/bot.model';
+import { transcribeVoiceFileToText } from '../stt/stt.service';
 
 // Convert stored attachment keys into client-consumable URLs.
 function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messageObject: T): T {
@@ -29,11 +30,13 @@ function hydrateAttachmentUrls<T extends { attachments?: IAttachment[] }>(messag
 
 function buildMessageContext(messageObject: any): string {
   const content = typeof messageObject?.content === 'string' ? messageObject.content.trim() : '';
+  const plainText = typeof messageObject?.plainText === 'string' ? messageObject.plainText.trim() : '';
   const type = typeof messageObject?.type === 'string' ? messageObject.type.trim() : '';
   const payload = messageObject?.payload && typeof messageObject.payload === 'object' ? messageObject.payload : undefined;
   const attachments = Array.isArray(messageObject?.attachments) ? messageObject.attachments : [];
 
   if (content) return content;
+  if (plainText) return plainText;
 
   const parts: string[] = [];
 
@@ -264,6 +267,11 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   if (!data.channelId || !data.authorId) {
     throw new BadRequestError('Message must have a channel and an author');
+  }
+
+  if (typeof (data as any).plainText === 'string') {
+    const trimmed = (data as any).plainText.trim();
+    (data as any).plainText = trimmed ? trimmed : undefined;
   }
 
   if (data.type === 'app/x-forward-card') {
@@ -544,7 +552,7 @@ export const getMessageById = async (messageId: string) => {
     return messageForClient as IMessage;
   };
 
-  export const deleteMessage = async (messageId: string, userId: string) => {
+export const deleteMessage = async (messageId: string, userId: string) => {
     await checkMessagePermissions(messageId, userId, 'delete');
     const message = await getMessageById(messageId);
 
@@ -564,8 +572,43 @@ export const getMessageById = async (messageId: string) => {
 
     socketManager.broadcast('MESSAGE_UPDATE', message.channelId.toString(), messageForClient);
 
-    return messageForClient as IMessage;
-  };
+  return messageForClient as IMessage;
+};
+
+export const transcribeVoiceMessage = async (channelId: string, messageId: string, file: Express.Multer.File) => {
+  const message = await getMessageById(messageId);
+  if (message.channelId.toString() !== String(channelId)) {
+    throw new ForbiddenError('Message must be in the same channel');
+  }
+  if (message.type !== 'message/voice') {
+    throw new BadRequestError('Only voice messages can be transcribed');
+  }
+
+  const textRaw = await transcribeVoiceFileToText(file);
+  const text = typeof textRaw === 'string' ? textRaw.trim() : '';
+
+  message.plainText = text || undefined;
+  await messageRepository.save(message);
+
+  const channel = await Channel.findById(message.channelId).select('type serverId recipients').lean();
+  if (!channel) {
+    throw new NotFoundError('Channel not found');
+  }
+
+  const populatedMessage = await message.populate('authorId', 'username discriminator avatarUrl isBot');
+  const messageForClient = attachServerId(processMessageForClient(populatedMessage), channel);
+
+  const channelIdStr = message.channelId.toString();
+  if (channel.type === 'DM' && channel.recipients && channel.recipients.length > 0) {
+    for (const recipient of channel.recipients) {
+      socketManager.broadcastToUser(recipient.toString(), 'MESSAGE_UPDATE', messageForClient);
+    }
+  } else {
+    socketManager.broadcast('MESSAGE_UPDATE', channelIdStr, messageForClient);
+  }
+
+  return text;
+};
 
 export const addReaction = async (
       messageId: string,

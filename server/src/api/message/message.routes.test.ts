@@ -224,6 +224,7 @@ describe('Message Routes', () => {
         .set('Authorization', `Bearer ${token}`)
         .send({
           type: 'message/voice',
+          'plain-text': 'hello from bot',
           payload: {
             voice: {
               key: voiceKey,
@@ -238,8 +239,41 @@ describe('Message Routes', () => {
       expect(res.body.type).toBe('message/voice');
       expect(res.body.content).toBe('');
       expect(res.body.attachments).toEqual([]);
+      expect(res.body.plainText).toBe('hello from bot');
       expect(res.body.payload?.voice?.key).toBe(voiceKey);
       expect(res.body.payload?.voice?.url).toContain(voiceKey);
+    });
+
+    it('should transcribe a voice message and persist plainText', async () => {
+      const voiceKey = 'voice-stt-test.webm';
+      const createRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          type: 'message/voice',
+          payload: {
+            voice: {
+              key: voiceKey,
+              contentType: 'audio/webm',
+              size: 1234,
+              durationMs: 1200,
+            },
+          },
+        });
+
+      expect(createRes.statusCode).toBe(201);
+      const messageId = createRes.body._id as string;
+
+      const sttRes = await request(app)
+        .post(`/api/servers/${serverId}/channels/${channelId}/messages/${messageId}/transcribe`)
+        .set('Authorization', `Bearer ${token}`)
+        .attach('file', Buffer.from('fake-audio'), { filename: 'voice.webm', contentType: 'audio/webm' });
+
+      expect(sttRes.statusCode).toBe(200);
+      expect(sttRes.text).toBe('语音转文字结果为空');
+
+      const stored = await MessageModel.findById(messageId).lean();
+      expect(stored?.plainText).toBe('语音转文字结果为空');
     });
   });
 

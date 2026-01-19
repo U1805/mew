@@ -175,6 +175,7 @@ export interface Message {
   author?: User; // Helper for client if populated
   type: string;
   content: string;
+  plainText?: string;
   payload?: MessagePayload;
   attachments?: Attachment[];
   mentions?: (string | User)[];

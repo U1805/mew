@@ -1,4 +1,6 @@
 import React from 'react';
+import { Icon } from '@iconify/react';
+import clsx from 'clsx';
 import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { AttachmentList } from '../../chat-attachments/components/AttachmentList';
@@ -10,9 +12,11 @@ interface MessageContentProps {
     message: Message;
     serverId?: string;
     channelId?: string;
+    showVoiceTranscript?: boolean;
+    voiceTranscriptLoading?: boolean;
 }
 
-const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, channelId }) => {
+const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, channelId, showVoiceTranscript, voiceTranscriptLoading }) => {
     const isRssCard = message.type === 'app/x-rss-card';
     const isPornhubCard = message.type === 'app/x-pornhub-card';
     const isTwitterCard = message.type === 'app/x-twitter-card';
@@ -55,11 +59,61 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
         const src = typeof voice?.url === 'string' ? voice.url : '';
         const contentType = typeof voice?.contentType === 'string' ? voice.contentType : undefined;
         const durationMs = typeof voice?.durationMs === 'number' ? voice.durationMs : undefined;
+        const transcript = (typeof message.plainText === 'string' ? message.plainText : '').trim();
 
-        return src ? (
-          <VoiceMessagePlayer src={src} contentType={contentType} durationMs={durationMs} />
-        ) : (
-          <div className="text-mew-textMuted italic text-sm">(voice message)</div>
+        if (!src) {
+          return (
+            <div className="flex items-center gap-2 p-2 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                <Icon icon="mdi:alert-circle-outline" width="16" />
+                <span>Voice message unavailable</span>
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col items-start gap-1 max-w-[360px]">
+            {/* 语音播放器主体 */}
+            <VoiceMessagePlayer src={src} contentType={contentType} durationMs={durationMs} />
+            
+            {/* 转录文本区域 */}
+            {showVoiceTranscript && (
+              <div className={clsx(
+                  "w-full mt-1 pl-1 border-l-2 transition-all duration-300",
+                  voiceTranscriptLoading ? "border-mew-textMuted/30" : "border-[#5865F2]"
+              )}>
+                <div className="pl-2 flex flex-col gap-1">
+                   {/* 转录标题 (Metadata style) */}
+                   <div className="flex items-center gap-1.5 select-none">
+                      <Icon icon="mdi:text-recognition" className="w-3.5 h-3.5 text-mew-textMuted" />
+                      <span className="text-[10px] font-bold text-mew-textMuted uppercase tracking-wide opacity-80">
+                        Transcription
+                      </span>
+                   </div>
+
+                   {/* 内容主体 */}
+                   <div className={clsx(
+                     "text-[0.95rem] leading-[1.375rem] text-[#DBDEE1] whitespace-pre-wrap break-words min-h-[1.5rem]",
+                     voiceTranscriptLoading && "flex items-center"
+                   )}>
+                      {voiceTranscriptLoading ? (
+                         // 仿 Discord 打字动画 (Typing indicator)
+                         <div className="flex items-center gap-1 py-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-mew-textMuted animate-[bounce_1.4s_infinite_ease-in-out_0ms]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-mew-textMuted animate-[bounce_1.4s_infinite_ease-in-out_200ms]" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-mew-textMuted animate-[bounce_1.4s_infinite_ease-in-out_400ms]" />
+                         </div>
+                      ) : transcript ? (
+                         transcript
+                      ) : (
+                         <span className="text-sm italic text-mew-textMuted opacity-80">
+                           (No speech detected)
+                         </span>
+                      )}
+                   </div>
+                </div>
+              </div>
+            )}
+          </div>
         );
     }
 

@@ -74,6 +74,10 @@ vi.mock('../../utils/s3', () => ({
   getS3PublicUrl: vi.fn((key: string) => (key.startsWith('http') ? key : `http://cdn.local/${key}`)),
 }));
 
+vi.mock('../stt/stt.service', () => ({
+  transcribeVoiceFileToText: vi.fn().mockResolvedValue('语音转文字结果为空'),
+}));
+
 import { messageRepository } from './message.repository';
 import Channel from '../channel/channel.model';
 import Member from '../member/member.model';
@@ -86,7 +90,7 @@ import { extractFirstUrl, getLinkPreviewWithSafety } from '../metadata/metadata.
 import { calculateEffectivePermissions } from '../../utils/permission.service';
 import { socketManager } from '../../gateway/events';
 
-import { createMessage, getMessagesByChannel, updateMessage } from './message.service';
+import { createMessage, getMessagesByChannel, transcribeVoiceMessage, updateMessage } from './message.service';
 
 const mkId = (id: string) => ({
   toString: () => id,
@@ -523,6 +527,38 @@ describe('message.service (unit)', () => {
     await updateMessage('m1', 'u1', 'x');
 
     expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_UPDATE', 'c1', expect.any(Object));
+  });
+
+  it('transcribeVoiceMessage updates plainText and broadcasts to DM recipients', async () => {
+    const doc = makeMessageDoc({
+      _id: mkId('m1'),
+      channelId: mkId('c1'),
+      type: 'message/voice',
+      plainText: undefined,
+    });
+
+    vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
+    vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] }));
+
+    const text = await transcribeVoiceMessage('c1', 'm1', { originalname: 'voice.webm' } as any);
+
+    expect(text).toBe('语音转文字结果为空');
+    expect(doc.plainText).toBe('语音转文字结果为空');
+    expect(socketManager.broadcast).not.toHaveBeenCalled();
+    expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u1', 'MESSAGE_UPDATE', expect.any(Object));
+    expect(socketManager.broadcastToUser).toHaveBeenCalledWith('u2', 'MESSAGE_UPDATE', expect.any(Object));
+  });
+
+  it('transcribeVoiceMessage rejects non-voice messages', async () => {
+    const doc = makeMessageDoc({
+      _id: mkId('m1'),
+      channelId: mkId('c1'),
+      type: 'message/default',
+    });
+
+    vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
+    await expect(transcribeVoiceMessage('c1', 'm1', { originalname: 'x.txt' } as any)).rejects.toBeInstanceOf(BadRequestError);
   });
 });
 
