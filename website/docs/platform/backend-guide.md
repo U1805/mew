@@ -44,20 +44,32 @@ pnpm --filter server dev
 
 | 变量名 | 描述 |
 | :--- | :--- |
-| `MONGO_URI` | MongoDB 数据库的连接字符串。 |
-| `JWT_SECRET` | 用于签发和验证 JSON Web Token (JWT) 的密钥，请务必设置为一个复杂的随机字符串。 |
+| `PORT` | HTTP 监听端口（默认 `3000`）。 |
+| `MONGO_URI` | MongoDB 数据库的连接字符串（默认 `mongodb://localhost:27017/mew`）。 |
+| `JWT_SECRET` | 用于签发和验证 JSON Web Token (JWT) 的密钥。生产环境缺失会直接启动失败。 |
+| `MEW_ADMIN_SECRET` | 内部基础设施通信的共享密钥，用于 Bot Service 引导注册、`/api/infra/*` 与 `/infra` 命名空间鉴权等。生产环境缺失会直接启动失败。 |
 
 #### 可选配置
 
 | 变量名 | 描述 |
 | :--- | :--- |
-| `MEW_CORS_ORIGINS` | API 允许跨域请求的来源列表，用逗号分隔。生产环境强烈建议显式配置。 |
-| `MEW_ADMIN_SECRET` | 内部基础设施通信的共享密钥，用于 Bot Service 引导注册、`/infra` 命名空间鉴权等。 |
-| `MEW_TRUST_PROXY` | Express 的 `trust proxy` 设置。当你将后端部署在 Nginx 等反向代理之后时，此项至关重要，用于正确获取客户端 IP。 |
-| `MEW_INFRA_ALLOWED_IPS` | 基础设施接口（如 `/api/bots`）的 IP 白名单，用逗号分隔。为空则仅允许私网 IP。 |
-| `S3_*` | 配置 S3 兼容的对象存储服务（如 MinIO），用于存储用户头像和附件。 |
+| `JWT_EXPIRES_IN` | Access Token 有效期（支持 `30m` / `2h` / 秒数），默认 `30m`。 |
+| `REFRESH_TOKEN_EXPIRES_IN` | Refresh Token 有效期（支持 `30d` / `12h` / 秒数），默认 `30d`。 |
+| `MEW_ALLOW_USER_REGISTRATION` | 是否允许开放注册（`/api/auth/register`），默认 `true`。 |
+| `MEW_CORS_ORIGINS` | API 允许跨域请求的来源列表，用逗号分隔。支持 `*`。开发环境下留空会默认放行任意 Origin；生产环境强烈建议显式配置。 |
+| `MEW_TRUST_PROXY` | Express 的 `trust proxy` 设置。默认 `loopback`。当你将后端部署在 Nginx 等反向代理之后时，此项至关重要，用于正确获取客户端 IP。 |
+| `MEW_ENABLE_RATE_LIMIT` | 在非生产环境也启用基础限流（`true`/`false`）。生产环境默认开启。 |
+| `MEW_INFRA_ALLOWED_IPS` | 基础设施接口（如 `/api/bots/bootstrap`、`/api/infra/service-types/register`）的 IP 白名单，用逗号分隔。为空则仅允许私网 IP + loopback。 |
+| `MEW_STATIC_URL` | 覆盖 API 返回的文件公开 URL 基址（`/static/<key>`）与预签名上传 URL 基址（`/presign/...`），用于在 Docker/Nginx 场景下对外暴露可访问的地址。 |
+| `LIMIT_FILE_SIZE` | 上传大小上限（单位：MB），默认 `50`。 |
+| `S3_ENDPOINT` / `S3_PORT` | S3 API 访问地址（默认 `localhost:3900`）。 |
+| `S3_WEB_ENDPOINT` / `S3_WEB_PORT` | 文件公开访问域名与端口（默认 `web.garage.localhost:3902`，实际会拼成 `bucket.webEndpoint`）。 |
+| `S3_BUCKET_NAME` | 存储桶名称（未配置时默认 `mew`；本项目 `docker-compose.yml`/`server/.env.example` 默认使用 `mew-bucket`）。 |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | S3 访问凭证。生产环境必须显式提供（或通过 `S3_CREDENTIALS_FILE` 提供）。 |
+| `S3_CREDENTIALS_FILE` | 从文件读取 `{accessKeyId, secretAccessKey}`（适合 Docker 初始化场景）。 |
+| `S3_USE_SSL` / `S3_REGION` | S3 连接协议与区域等配置。 |
 | `S3_CORS_ORIGINS` | 对象存储的 CORS 允许列表，用于支持浏览器直传文件。默认会沿用 `MEW_CORS_ORIGINS` 的值。 |
-| `S3_PRESIGN_EXPIRES_SECONDS`| 浏览器直传时，预签名上传 URL 的有效时间（单位：秒）。 |
+| `S3_PRESIGN_EXPIRES_SECONDS`| 浏览器直传时，预签名上传 URL 的有效时间（单位：秒），默认 `60`。 |
 
 ---
 
@@ -70,13 +82,23 @@ pnpm --filter server dev
 所有 API 路由的注册入口位于 `server/src/app.ts`，主要挂载点如下：
 - `/api/health`：健康检查
 - `/api/auth`：注册与登录
-- `/api/users`：当前用户信息 (`/@me`)、服务器与 DM 频道列表、用户搜索
+- `/api/users`：当前用户信息 (`/@me`)、服务器与 DM 频道列表、用户搜索等
 - `/api/servers`：服务器管理，其下嵌套子资源路由，如：
-  - `/:serverId/channels`: 频道管理
-  - `/:serverId/roles`: 角色管理
-  - `/:serverId/members`: 成员管理
-- `/api/invites`：处理邀请链接
-- `/api/bots`: 内部 Bot 服务引导接口
+  - `/:serverId/channels`：频道管理
+  - `/:serverId/members`：成员管理
+  - `/:serverId/invites`：服务器内邀请管理
+  - `/:serverId/stickers`：服务器贴纸
+  - `/:serverId/search`：服务器内搜索
+  - `/:serverId/bots`：Bot 邀请/绑定相关
+  - `/:serverId/roles`：角色管理
+  - `/:serverId/categories`：频道分类
+- `/api/channels`：频道通用接口
+  - `/:channelId/uploads`：附件上传（预签名直传 / 服务器中转 / 按 key 下载）
+- `/api/invites`：公开邀请链接
+- `/api/webhooks`：Webhook 执行与文件上传（含 presign/upload）
+- `/api/bots`：Bot bootstrap（infra-only）与 Bot 自身配置更新
+- `/api/infra`：基础设施接口（服务类型注册、可用服务查询等）
+- `/api/tts`：文本转语音（TTS）
 
 #### 模块组织
 
@@ -117,6 +139,7 @@ WebSocket 网关是实现实时体验的核心，入口位于 `server/src/server
 - **连接鉴权**：客户端发起 WebSocket 连接时，会通过 `server/src/gateway/middleware.ts` 进行 JWT 鉴权。
 - **房间管理**：用户成功连接后，会根据其所在服务器、频道和自身 ID 加入不同的 Socket.IO 房间 (Room)，便于精准推送事件。
 - **事件广播**：`Service` 层在完成数据操作后，会调用 `socketManager.broadcast(...)` 等封装好的函数，向特定房间广播事件（如 `MESSAGE_CREATE`），通知所有相关的客户端更新视图。
+- **基础设施命名空间 (`/infra`)**：用于 Bot Service 等内部服务的在线状态与能力同步，使用 `X-Mew-Admin-Secret`（或握手参数 `adminSecret`）+ `serviceType` 进行鉴权。
 
 ## 文件上传 (S3 兼容)
 

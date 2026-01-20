@@ -15,11 +15,12 @@ slug: /guide/client-guide
 -   将不同 `type` 的消息分发给对应的渲染器，实现丰富的消息展示效果。
 
 :::info 技术栈速览
--   **框架**: React 18
+-   **框架**: React 19
 -   **构建工具**: Vite
 -   **状态管理**: Zustand (客户端 UI 状态) + TanStack Query (服务端数据缓存)
--   **样式**: TailwindCSS
--   **测试**: Vitest + MSW
+-   **样式**: TailwindCSS（通过 `cdn.tailwindcss.com` 注入，配置位于 `client/index.html`）
+-   **富文本编辑**: Tiptap
+-   **测试**: Vitest + MSW（`happy-dom` 环境）
 :::
 
 在开始之前，建议先熟悉项目所依赖的核心接口：
@@ -58,9 +59,12 @@ slug: /guide/client-guide
 项目采用“功能优先 (Feature-First)”的目录组织方式。对于新加入的开发者，以下是几个关键的入口文件，可以帮助你快速定位代码：
 
 -   `client/src/layout/Layout.tsx`：**主布局组件**。这里是应用的顶层结构，也是挂载全局 Socket 事件监听的最佳位置。
--   `client/src/shared/services/*`：**服务层**。封装了 HTTP (axios) 和 Socket.IO 客户端的单例与核心逻辑。
+-   `client/src/shared/http.ts`：**HTTP 客户端**（axios 实例与拦截器等）。
+-   `client/src/shared/services/socket.ts`：**Socket 客户端单例**（Socket.IO client）。
+-   `client/src/shared/*.api.ts`：**API 模块**。按资源拆分的请求封装（user/server/channel/message/...）。
 -   `client/src/shared/hooks/*`：**自定义 Hooks**。这里封装了对 TanStack Query 数据获取和 Socket 事件订阅的通用逻辑，是业务组件获取数据的主要方式。
 -   `client/src/shared/stores/*`：**状态管理 (Zustand)**。存放纯客户端状态，如 UI 状态、未读消息计数、用户认证信息等。
+-   `client/src/shared/types/index.ts`：**共享类型定义**。用于对齐前端与 API 的数据结构。
 
 ---
 
@@ -95,6 +99,7 @@ Socket 客户端单例位于 `client/src/shared/services/socket.ts`。
 -   `CATEGORY_*`: 分组的创建/更新/删除。
 -   `MEMBER_*`: 成员的加入/离开/信息更新。
 -   `PERMISSIONS_UPDATE`: 权限变更。
+-   `STICKER_*`: 服务器贴纸的创建/更新/删除。
 
 #### `useSocketMessages(channelId)`
 负责监听当前所在频道内的消息相关事件。
