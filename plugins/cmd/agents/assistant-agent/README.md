@@ -42,3 +42,12 @@
 ```bash
 go run ./plugins/cmd/agents/assistant-agent.go
 ```
+
+## 致谢
+
+- Subaru Prompt
+> This [prompt](https://linux.do/t/topic/784164) designs originally authored by [CJACK (CJackHwang)](https://github.com/CJackHwang).
+- TTS from [AI Hobbyist TTS](https://tts.acgnai.top/)
+> GPT-SoVITS 开发者：@花儿不哭  
+> 模型训练者：@红血球AE3803 & @白菜工厂1145号员工  
+> 推理特化包适配 & 在线推理：@AI-Hobbyist
