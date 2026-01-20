@@ -65,4 +65,21 @@ Follow the Semantic Versioning standard (`v<Major>.<Minor>.<Patch>`) for the ver
 4.  **Impact Note**: For breaking changes, explicitly state why it is breaking or what it affects.
 
 
-总结一下最新的提交到最新的tag之间的代码更新，帮我写一个 git tag message (english), 在根目录新建一个md文件写入其中。
+## Action Instructions
+
+Analyze the commit history from the **latest Git tag** to the **current HEAD** (equivalent to `git log $(git describe --tags --abbrev=0)..HEAD`) and perform the following actions:
+
+1.  **Analyze & Categorize**:
+    -   Read the commit messages and group them into "New Features", "Bug Fixes", or "Breaking Changes".
+    -   Identify specific modules/scopes for grouping features.
+
+2.  **Determine Version**:
+    -   Identify the previous version number from the git tags.
+    -   **Propose the next version number** strictly following the "Versioning Specifications" based on the analysis of the changes (e.g., if you see a breaking change, bump Major; if only features, bump Minor).
+
+3.  **Generate Content**:
+    -   Draft the release notes in English following the **Format** defined above.
+    -   Ensure the `<Summary Title>` is catchy and summarizes the essence of this release.
+
+4.  **Output**:
+    -   Create or overwrite a file named `tag_commit_message.md` in the root directory with the generated content.

@@ -50,10 +50,26 @@ Includes token validation, user information mapping, and session management feat
 ```
 
 ---
+
+## Action Instructions
+
+Based on the user's input, summarize the code updates and generate an English commit message following the Gitmoji format defined above. 
+
+**Output Action:**  
+Create or overwrite a file named `commit_message.md` in the root directory with the generated content.
+
+**Trigger Handling:**
+
+1.  **If user asks for "本次提交修改" (Staged Changes):**
+    -   Analyze the changes in the git staging area (equivalent to `git diff --cached` or `git diff --staged`).
+    -   **Constraint:** You must read the actual diff content line-by-line. Do not assume context outside of these changes.
+
+2.  **If user asks for "本次分支修改" (Branch Changes):**
+    -   Analyze the difference between the current branch and the `main` branch (equivalent to `git diff main...HEAD`).
+    -   Summarize the cumulative work done on this branch.
+
+**Final Reminder:**  
+After creating the file, please remind the user to exclude `commit_message.md` from the commit to avoid committing the message file itself.
+
+---
 **Usage Instructions**: Please tell me about your code changes, and I will generate the corresponding commit message.
-
-
-
-总结一下更新帮我写一个 git commit message (english), 在根目录新建一个md文件写入其中。
-
-如果要求提交则需要在 commit 时记得排除这个临时文件
