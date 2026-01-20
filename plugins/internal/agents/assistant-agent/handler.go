@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"time"
@@ -186,15 +188,15 @@ func (r *Runner) processDMMessage(
 				return err
 			}
 
-			httpClient := reqCtx.LLM.HTTPClient
-			if httpClient == nil {
-				httpClient = http.DefaultClient
+			downloadClient := reqCtx.LLM.HTTPClient
+			if downloadClient == nil {
+				downloadClient = http.DefaultClient
 			}
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
 			if err != nil {
 				return err
 			}
-			resp, err := httpClient.Do(req)
+			resp, err := downloadClient.Do(req)
 			if err != nil {
 				return err
 			}
@@ -215,15 +217,45 @@ func (r *Runner) processDMMessage(
 				contentType = "audio/wav"
 			}
 
+			tmpPattern := "mew-tts-*"
+			if ext := strings.TrimSpace(path.Ext(filename)); ext != "" {
+				tmpPattern = "mew-tts-*" + ext
+			}
+			tmp, err := os.CreateTemp("", tmpPattern)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = tmp.Close()
+				_ = os.Remove(tmp.Name())
+			}()
+			if _, err := io.Copy(tmp, resp.Body); err != nil {
+				return err
+			}
+			if _, err := tmp.Seek(0, 0); err != nil {
+				return err
+			}
+
+			uploadClient := reqCtx.Mew.HTTPClient
+			if uploadClient == nil {
+				uploadClient = http.DefaultClient
+			}
+			uploadClient30s := uploadClient
+			if uploadClient.Timeout != 30*time.Second {
+				c := *uploadClient
+				c.Timeout = 30 * time.Second
+				uploadClient30s = &c
+			}
+
 			_, err = messages.SendVoiceMessageByUploadReader(
 				ctx,
-				reqCtx.Mew.HTTPClient,
+				uploadClient30s,
 				reqCtx.Mew.APIBase,
 				"",
 				channelID,
 				filename,
 				contentType,
-				resp.Body,
+				tmp,
 				messages.SendVoiceMessageOptions{PlainText: text},
 			)
 			return err
