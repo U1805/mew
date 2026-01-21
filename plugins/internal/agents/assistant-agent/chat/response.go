@@ -67,6 +67,8 @@ type TransportContext struct {
 	UserID    string
 	LogPrefix string
 	TypingWPM int
+	// Sleep overrides SleepWithContext for delay simulation (useful for tests).
+	Sleep func(ctx context.Context, d time.Duration)
 
 	PostMessageHTTP        func(ctx context.Context, channelID, content string) error
 	PostStickerHTTP        func(ctx context.Context, channelID, stickerID string) error
@@ -430,7 +432,12 @@ func SendReply(
 		typingWPM = infra.AssistantTypingWPMDefault
 	}
 
-	if reply != "" {
+	sleep := c.Sleep
+	if sleep == nil {
+		sleep = SleepWithContext
+	}
+
+	if reply != "" || len(controls.Parts) != 0 {
 		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
 			c.LogPrefix, c.ChannelID, c.UserID, sdk.PreviewString(reply, infra.AssistantLogContentPreviewLen),
 		)
@@ -497,7 +504,12 @@ func SendReply(
 				log.Printf("%s voice sent: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 			case ReplyPartText:
 				t := ev.text
-				SleepWithContext(ctx, AssistantTypingDelayForLineMaybeSkipFirst(t, typingWPM, linesSent == 0))
+				delay := AssistantTypingDelayForLineMaybeSkipFirst(t, typingWPM, linesSent == 0)
+				// If the next event is non-text (voice/sticker), don't hold it back with typing simulation.
+				if i < len(events)-1 && (events[i+1].kind == ReplyPartVoice || events[i+1].kind == ReplyPartSticker) {
+					delay = 0
+				}
+				sleep(ctx, delay)
 				var sendErr error
 				if c.Emit == nil {
 					sendErr = fmt.Errorf("emit not configured")
@@ -520,7 +532,7 @@ func SendReply(
 				linesSent++
 				// Keep the "pause between text lines" behavior, but don't delay before a sticker.
 				if i < len(events)-1 && events[i+1].kind == ReplyPartText {
-					SleepWithContext(ctx, AssistantReplyDelayForLine(t))
+					sleep(ctx, AssistantReplyDelayForLine(t))
 				}
 			default:
 			}

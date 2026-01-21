@@ -2,7 +2,9 @@ package chat
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseReplyControls_StickerInMiddle(t *testing.T) {
@@ -192,5 +194,81 @@ func TestSendReply_VoiceSentInBetweenTextLines(t *testing.T) {
 	}
 	if len(events) != 3 || events[0] != "text:a" || events[1] != "voice:hello-tts" || events[2] != "text:b" {
 		t.Fatalf("unexpected events: %#v", events)
+	}
+}
+
+func TestSendReply_VoiceOnlyDirectiveSendsVoice(t *testing.T) {
+	clean, controls := ParseReplyControls("<VOICE>{\"text\":\"hello-tts\"}")
+	if clean != "" {
+		t.Fatalf("unexpected clean: %q", clean)
+	}
+	if len(controls.Parts) != 1 || controls.Parts[0].Kind != ReplyPartVoice {
+		t.Fatalf("unexpected parts: %#v", controls.Parts)
+	}
+
+	var events []string
+	var sleeps []time.Duration
+	err := SendReply(context.Background(), TransportContext{
+		Emit: func(event string, payload any) error {
+			events = append(events, event)
+			return nil
+		},
+		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
+			events = append(events, "voice:"+text)
+			return nil
+		},
+		Sleep: func(ctx context.Context, d time.Duration) {
+			sleeps = append(sleeps, d)
+		},
+		ChannelID: "c1",
+		UserID:    "u1",
+		LogPrefix: "[test]",
+		TypingWPM: 60,
+	}, clean, controls)
+	if err != nil {
+		t.Fatalf("SendReply err: %v", err)
+	}
+	if len(events) != 1 || events[0] != "voice:hello-tts" {
+		t.Fatalf("unexpected events: %#v", events)
+	}
+	if len(sleeps) != 0 {
+		t.Fatalf("expected no sleeps, got: %#v", sleeps)
+	}
+}
+
+func TestSendReply_SkipsTypingDelayBeforeVoice(t *testing.T) {
+	line := strings.Repeat("a", 120)
+	clean, controls := ParseReplyControls(line + "\n<VOICE>{\"text\":\"hello-tts\"}\nbye")
+	if clean == "" {
+		t.Fatalf("expected non-empty clean")
+	}
+
+	var sleeps []time.Duration
+	err := SendReply(context.Background(), TransportContext{
+		Emit: func(event string, payload any) error {
+			return nil
+		},
+		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
+			return nil
+		},
+		Sleep: func(ctx context.Context, d time.Duration) {
+			sleeps = append(sleeps, d)
+		},
+		ChannelID: "c1",
+		UserID:    "u1",
+		LogPrefix: "[test]",
+		TypingWPM: 60,
+	}, clean, controls)
+	if err != nil {
+		t.Fatalf("SendReply err: %v", err)
+	}
+	if len(sleeps) < 2 {
+		t.Fatalf("expected at least 2 sleep calls, got: %#v", sleeps)
+	}
+	if sleeps[0] != 0 {
+		t.Fatalf("expected zero typing delay before voice, got: %v", sleeps[0])
+	}
+	if sleeps[1] <= 0 {
+		t.Fatalf("expected positive typing delay for trailing text, got: %v", sleeps[1])
 	}
 }
