@@ -267,6 +267,17 @@ func AssistantTypingDelayForLine(line string, wpm int) time.Duration {
 	return time.Duration(n) * time.Minute / time.Duration(wpm)
 }
 
+func AssistantTypingDelayForLineMaybeSkipFirst(line string, wpm int, isFirstMessage bool) time.Duration {
+	effectiveWPM := wpm
+	if effectiveWPM <= 0 {
+		effectiveWPM = infra.AssistantTypingWPMDefault
+	}
+	if isFirstMessage && effectiveWPM == infra.AssistantTypingWPMDefault {
+		return 0
+	}
+	return AssistantTypingDelayForLine(line, effectiveWPM)
+}
+
 func SleepWithContext(ctx context.Context, d time.Duration) {
 	if d <= 0 {
 		return
@@ -458,7 +469,7 @@ func SendReply(
 				}
 			case ReplyPartText:
 				t := ev.text
-				SleepWithContext(ctx, AssistantTypingDelayForLine(t, typingWPM))
+				SleepWithContext(ctx, AssistantTypingDelayForLineMaybeSkipFirst(t, typingWPM, linesSent == 0))
 				var sendErr error
 				if c.Emit == nil {
 					sendErr = fmt.Errorf("emit not configured")

@@ -351,7 +351,7 @@ func sendReplyHTTP(ctx context.Context, channelID string, reply string, typingWP
 	}
 
 	for i, t := range lines {
-		chat.SleepWithContext(ctx, chat.AssistantTypingDelayForLine(t, typingWPM))
+		chat.SleepWithContext(ctx, chat.AssistantTypingDelayForLineMaybeSkipFirst(t, typingWPM, i == 0))
 		if err := postLine(t); err != nil {
 			return err
 		}
