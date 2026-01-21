@@ -3,13 +3,7 @@ package agent
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"net/url"
-	"os"
-	"path"
 	"strings"
 	"time"
 
@@ -24,7 +18,6 @@ import (
 	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/api/attachment"
 	"mew/plugins/pkg/api/gateway/socketio"
-	"mew/plugins/pkg/api/messages"
 )
 
 func (r *Runner) handleMessageCreate(
@@ -94,11 +87,20 @@ func (r *Runner) handleMessageCreate(
 	r.knownUsers[userID] = struct{}{}
 	r.knownUsersMu.Unlock()
 
-	lock := r.userMutex(userID)
-	lock.Lock()
-	defer lock.Unlock()
-
-	return r.processDMMessage(ctx, logPrefix, msg, emit)
+	r.conversations.get(channelID, userID).Submit(chat.ConversationRequest{
+		Ctx:       ctx,
+		Transport: r.buildChatTransport(r.newRequestContext(ctx, userID, channelID, logPrefix), emit),
+		Run: func(runCtx context.Context, send func([]chat.SendEvent), prelude func(string)) error {
+			if err := r.processDMMessage(runCtx, logPrefix, msg, send, prelude); err != nil {
+				if runCtx.Err() != nil {
+					return nil
+				}
+				return err
+			}
+			return nil
+		},
+	})
+	return nil
 }
 
 func (r *Runner) isOwnAuthor(authorRaw json.RawMessage) bool {
@@ -121,7 +123,8 @@ func (r *Runner) processDMMessage(
 	ctx context.Context,
 	logPrefix string,
 	socketMsg sdkapi.ChannelMessage,
-	emit socketio.EmitFunc,
+	send func([]chat.SendEvent),
+	prelude func(string),
 ) error {
 	userID := socketMsg.AuthorID()
 	channelID := socketMsg.ChannelID
@@ -157,7 +160,12 @@ func (r *Runner) processDMMessage(
 	}
 
 	l1l4, l5 := r.buildPrompt(reqCtx, state, sessionMsgs)
-	reply, finalMood, gotMood, err := r.reply(reqCtx, emit, l1l4, l5)
+	reply, finalMood, gotMood, err := r.reply(reqCtx, l1l4, l5, func(text string) error {
+		if prelude != nil {
+			prelude(text)
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -170,103 +178,8 @@ func (r *Runner) processDMMessage(
 	}
 
 	clean, controls := chat.ParseReplyControls(reply)
-	transport := chat.TransportContext{
-		Emit:      emit,
-		ChannelID: reqCtx.ChannelID,
-		UserID:    reqCtx.UserID,
-		LogPrefix: reqCtx.LogPrefix,
-		TypingWPM: infra.AssistantTypingWPMDefault,
-		PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
-			return chat.PostMessageHTTP(reqCtx.Mew.WithCtx(ctx), channelID, content)
-		},
-		PostStickerHTTP: func(ctx context.Context, channelID, stickerID string) error {
-			return chat.PostStickerHTTP(reqCtx.Mew.WithCtx(ctx), channelID, stickerID)
-		},
-		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
-			audioURL, err := tools.RunHobbyistTTS(reqCtx.LLM.WithCtx(ctx), text)
-			if err != nil {
-				return err
-			}
-
-			downloadClient := reqCtx.LLM.HTTPClient
-			if downloadClient == nil {
-				downloadClient = http.DefaultClient
-			}
-			req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
-			if err != nil {
-				return err
-			}
-			resp, err := downloadClient.Do(req)
-			if err != nil {
-				return err
-			}
-			defer resp.Body.Close()
-
-			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-				return fmt.Errorf("tts audio download status=%d", resp.StatusCode)
-			}
-
-			filename := "voice.wav"
-			if u, err := url.Parse(audioURL); err == nil && u != nil {
-				if b := strings.TrimSpace(path.Base(u.Path)); b != "" && b != "." && b != "/" {
-					filename = b
-				}
-			}
-			contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
-			if contentType == "" {
-				contentType = "audio/wav"
-			}
-
-			tmpPattern := "mew-tts-*"
-			if ext := strings.TrimSpace(path.Ext(filename)); ext != "" {
-				tmpPattern = "mew-tts-*" + ext
-			}
-			tmp, err := os.CreateTemp("", tmpPattern)
-			if err != nil {
-				return err
-			}
-			defer func() {
-				_ = tmp.Close()
-				_ = os.Remove(tmp.Name())
-			}()
-			if _, err := io.Copy(tmp, resp.Body); err != nil {
-				return err
-			}
-			if _, err := tmp.Seek(0, 0); err != nil {
-				return err
-			}
-
-			uploadClient := reqCtx.Mew.HTTPClient
-			if uploadClient == nil {
-				uploadClient = http.DefaultClient
-			}
-			uploadClient30s := uploadClient
-			if uploadClient.Timeout != 30*time.Second {
-				c := *uploadClient
-				c.Timeout = 30 * time.Second
-				uploadClient30s = &c
-			}
-
-			_, err = messages.SendVoiceMessageByUploadReader(
-				ctx,
-				uploadClient30s,
-				reqCtx.Mew.APIBase,
-				"",
-				channelID,
-				filename,
-				contentType,
-				tmp,
-				messages.SendVoiceMessageOptions{PlainText: text},
-			)
-			return err
-		},
-		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
-			return r.stickers.ResolveStickerIDByName(reqCtx.Mew.WithCtx(ctx), reqCtx.LogPrefix, name)
-		},
-	}
-
-	if err := chat.SendReply(ctx, transport, clean, controls); err != nil {
-		return err
+	if send != nil {
+		send(chat.BuildSendEvents(clean, controls))
 	}
 	r.enqueueProactive(reqCtx, now, state, recordID, controls.Proactive)
 
@@ -279,7 +192,12 @@ func (r *Runner) processDMMessage(
 		}
 		l5More = append(l5More, openaigo.UserMessage("(you want to say more)"))
 
-		more, moreMood, moreGotMood, moreErr := r.reply(reqCtx, emit, l1l4, l5More)
+		more, moreMood, moreGotMood, moreErr := r.reply(reqCtx, l1l4, l5More, func(text string) error {
+			if prelude != nil {
+				prelude(text)
+			}
+			return nil
+		})
 		if moreErr != nil {
 			return moreErr
 		}
@@ -291,8 +209,8 @@ func (r *Runner) processDMMessage(
 		}
 
 		moreClean, moreControls := chat.ParseReplyControls(more)
-		if err := chat.SendReply(ctx, transport, moreClean, moreControls); err != nil {
-			return err
+		if send != nil {
+			send(chat.BuildSendEvents(moreClean, moreControls))
 		}
 		r.enqueueProactive(reqCtx, now, state, recordID, moreControls.Proactive)
 	}
@@ -445,9 +363,9 @@ func (r *Runner) buildPrompt(
 
 func (r *Runner) reply(
 	c infra.AssistantRequestContext,
-	emit socketio.EmitFunc,
 	l1l4 string,
 	l5 []openaigo.ChatCompletionMessageParamUnion,
+	onToolPrelude func(text string) error,
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
 	handlers := chat.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
@@ -470,15 +388,10 @@ func (r *Runner) reply(
 		LLMPreviewLen:         infra.AssistantLogLLMPreviewLen,
 		ToolResultPreviewLen:  infra.AssistantLogToolResultPreviewLen,
 		OnToolCallAssistantText: func(text string) error {
-			return chat.SendToolPrelude(c.Ctx, chat.TransportContext{
-				Emit:      emit,
-				ChannelID: c.ChannelID,
-				UserID:    c.UserID,
-				LogPrefix: c.LogPrefix,
-				PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
-					return chat.PostMessageHTTP(c.Mew.WithCtx(ctx), channelID, content)
-				},
-			}, text)
+			if onToolPrelude == nil {
+				return nil
+			}
+			return onToolPrelude(text)
 		},
 		SilenceToken:           infra.AssistantSilenceToken,
 		WantMoreToken:          infra.AssistantWantMoreToken,

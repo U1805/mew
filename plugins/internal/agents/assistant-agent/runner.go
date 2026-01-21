@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,6 +23,7 @@ import (
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 	"mew/plugins/pkg/api/history"
+	"mew/plugins/pkg/api/messages"
 )
 
 type Runner struct {
@@ -51,6 +55,138 @@ type Runner struct {
 	knownUsers   map[string]struct{}
 
 	stickers *tools.StickerService
+
+	conversations *conversationManager
+}
+
+type conversationManager struct {
+	r *Runner
+
+	mu    sync.Mutex
+	convs map[chat.ConversationKey]*chat.ConversationCoordinator
+}
+
+func newConversationManager(r *Runner) *conversationManager {
+	return &conversationManager{
+		r:     r,
+		convs: map[chat.ConversationKey]*chat.ConversationCoordinator{},
+	}
+}
+
+func (m *conversationManager) get(channelID, userID string) *chat.ConversationCoordinator {
+	k := chat.ConversationKey{
+		ChannelID: strings.TrimSpace(channelID),
+		UserID:    strings.TrimSpace(userID),
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if c, ok := m.convs[k]; ok {
+		return c
+	}
+	c := chat.NewConversationCoordinator(k)
+	m.convs[k] = c
+	return c
+}
+
+func (r *Runner) buildChatTransport(c infra.AssistantRequestContext, emit socketio.EmitFunc) chat.TransportContext {
+	return chat.TransportContext{
+		Emit:      emit,
+		ChannelID: c.ChannelID,
+		UserID:    c.UserID,
+		LogPrefix: c.LogPrefix,
+		TypingWPM: infra.AssistantTypingWPMDefault,
+		PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
+			return chat.PostMessageHTTP(c.Mew.WithCtx(ctx), channelID, content)
+		},
+		PostStickerHTTP: func(ctx context.Context, channelID, stickerID string) error {
+			return chat.PostStickerHTTP(c.Mew.WithCtx(ctx), channelID, stickerID)
+		},
+		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
+			return r.sendVoiceHTTP(c, ctx, channelID, text)
+		},
+		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
+			return r.stickers.ResolveStickerIDByName(c.Mew.WithCtx(ctx), c.LogPrefix, name)
+		},
+	}
+}
+
+func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Context, channelID, text string) error {
+	audioURL, err := tools.RunHobbyistTTS(c.LLM.WithCtx(ctx), text)
+	if err != nil {
+		return err
+	}
+
+	downloadClient := c.LLM.HTTPClient
+	if downloadClient == nil {
+		downloadClient = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("tts audio download status=%d", resp.StatusCode)
+	}
+
+	filename := "voice.wav"
+	if u, err := url.Parse(audioURL); err == nil && u != nil {
+		if b := strings.TrimSpace(path.Base(u.Path)); b != "" && b != "." && b != "/" {
+			filename = b
+		}
+	}
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "audio/wav"
+	}
+
+	tmpPattern := "mew-tts-*"
+	if ext := strings.TrimSpace(path.Ext(filename)); ext != "" {
+		tmpPattern = "mew-tts-*" + ext
+	}
+	tmp, err := os.CreateTemp("", tmpPattern)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+	}()
+	if _, err := io.Copy(tmp, resp.Body); err != nil {
+		return err
+	}
+	if _, err := tmp.Seek(0, 0); err != nil {
+		return err
+	}
+
+	uploadClient := c.Mew.HTTPClient
+	if uploadClient == nil {
+		uploadClient = http.DefaultClient
+	}
+	uploadClient30s := uploadClient
+	if uploadClient.Timeout != 30*time.Second {
+		cloned := *uploadClient
+		cloned.Timeout = 30 * time.Second
+		uploadClient30s = &cloned
+	}
+
+	_, err = messages.SendVoiceMessageByUploadReader(
+		ctx,
+		uploadClient30s,
+		c.Mew.APIBase,
+		"",
+		channelID,
+		filename,
+		contentType,
+		tmp,
+		messages.SendVoiceMessageOptions{PlainText: text},
+	)
+	return err
 }
 
 type RunnerOptions struct {
@@ -130,6 +266,7 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 		userLock:   map[string]*sync.Mutex{},
 		knownUsers: map[string]struct{}{},
 	}
+	r.conversations = newConversationManager(r)
 	return r, nil
 }
 
