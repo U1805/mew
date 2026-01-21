@@ -20,13 +20,17 @@ API 设计遵循**职责分离**的原则：
 ## 默认网关地址
 
 - **本地开发环境**: `http://localhost:3000` (直连 Node.js 服务)
-- **Docker Compose 部署**: `http://localhost` (通过 Nginx 反向代理，路径为 `/socket.io`)
+- **Docker Compose 部署**: `http://localhost:151` (通过 Nginx 反向代理，路径为 `/socket.io`)
 
 ## 认证方式
 
 客户端在发起连接时，需要通过 `auth.token` 字段传入用户的 `JWT`。
 
 服务端认证逻辑参见: `server/src/gateway/middleware.ts`。
+
+:::info CORS
+当前 Socket.IO 服务端配置为 `origin: '*'`（允许任意 Origin 发起握手），但仍然必须提供有效的 JWT 才能建立已认证的连接。
+:::
 
 ## 连接示例
 
@@ -75,15 +79,37 @@ socket.on('disconnect', (reason) => {
 
 ---
 
+## 客户端上行事件
+
+:::caution 建议优先使用 REST
+上行事件目前仅提供最小能力，用于简化部分客户端实现。由于其校验链路与 REST API 不完全一致，推荐优先使用 `POST /channels/:channelId/messages` 或 `POST /servers/:serverId/channels/:channelId/messages` 来创建消息。
+:::
+
+### `message/create`
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `channelId` | `string` | 目标频道 ID（DM/服务器频道均可）。 |
+| `content` | `string` | 文本内容（可选，但需与 `attachments` 至少提供一个）。 |
+| `attachments` | `any[]` | 附件元数据数组（可选）。 |
+| `referencedMessageId` | `string` | 被引用的消息 ID（可选）。 |
+| `type` / `payload` | `string` / `object` | 自定义消息类型与载荷（可选）。 |
+| `plainText` | `string` | 用于搜索/展示的纯文本（可选）。 |
+
+- **成功后的反馈**：服务端不会直接 `ack` 返回对象；客户端会通过常规下行事件（如 `MESSAGE_CREATE`）收到结果。
+- **失败时**：服务端会向当前 socket 发送 `error` 事件，Payload: `{ "message": "Failed to create message" }`。
+
+---
+
 ## 服务端下行事件
 
 ### 连接与在线状态
 
 | 事件名                 | Payload                                               | 触发时机                               |
 | ---------------------- | ----------------------------------------------------- | -------------------------------------- |
-| `ready`                | `void`                                                | 连接成功并加入所有房间后。             |
-| `PRESENCE_INITIAL_STATE` | `string[]` (在线用户的 userId 列表)                    | `ready` 事件后，下发初始在线用户列表。   |
+| `PRESENCE_INITIAL_STATE` | `string[]` (在线用户的 userId 列表)                    | 连接成功后，下发初始在线用户列表。     |
 | `PRESENCE_UPDATE`      | `{ userId: string, status: 'online' \| 'offline' }` | 有用户上线或下线时（全局广播）。       |
+| `ready`                | `void`                                                | 完成房间加入与初始化推送后。           |
 
 ### 消息事件
 
@@ -111,6 +137,16 @@ socket.on('disconnect', (reason) => {
 | `CATEGORY_UPDATE` | `Category` (更新后的分组对象)            |
 | `CATEGORY_DELETE` | `{ categoryId: string }`                 |
 
+### 贴纸事件
+
+广播至 `serverId` 房间
+
+| 事件名            | Payload                                |
+| ----------------- | -------------------------------------- |
+| `STICKER_CREATE`  | `Sticker` (创建后的贴纸对象)           |
+| `STICKER_UPDATE`  | `Sticker` (更新后的贴纸对象)           |
+| `STICKER_DELETE`  | `{ stickerId: string }`                |
+
 ### DM 频道事件
 
 广播至 `userId` 房间
@@ -129,3 +165,23 @@ socket.on('disconnect', (reason) => {
 | `MEMBER_JOIN`        | `{ serverId: string, userId: string }`                        | 对应 `serverId` 房间                                     |
 | `MEMBER_LEAVE`       | `{ serverId: string, userId: string }`                        | 对应 `serverId` 房间                                     |
 | `PERMISSIONS_UPDATE` | `{ serverId: string, channelId?: string, userId?: string }` | 主要广播至 `serverId` 房间，部分场景会定向推送到 `userId` |
+
+---
+
+## 基础设施命名空间 (`/infra`)
+
+:::caution 内部用途
+`/infra` 命名空间主要用于 Bot Service 等内部服务，不建议普通客户端直接使用。
+:::
+
+### 认证方式
+
+连接时需要同时提供：
+- **Admin Secret**：`X-Mew-Admin-Secret` 请求头，或握手参数 `adminSecret`
+- **serviceType**：握手参数 `serviceType`（会作为房间名使用）
+
+### 服务端下行事件
+
+| 事件名                     | Payload                                      | 描述 |
+| -------------------------- | -------------------------------------------- | ---- |
+| `SYSTEM_BOT_CONFIG_UPDATE` | `{ serviceType: string, botId: string }`     | 某个 Bot 配置发生变更，提示服务侧进行同步/重载 |

@@ -41,12 +41,20 @@ export interface UserRef {
   username: string;
   discriminator: string; // 用户标识符，用于区分同名用户
   avatarUrl?: string;
-  isBot?: boolean;
+  isBot: boolean;
+  dmEnabled?: boolean; // 仅 Bot 用户可能出现（例如用户搜索结果）
+}
+
+export interface UserNotificationSettings {
+  soundEnabled: boolean;
+  soundVolume: number; // 0..1
+  desktopEnabled: boolean;
 }
 
 // 完整的当前用户信息
 export interface UserMe extends UserRef {
   email: string;
+  notificationSettings?: UserNotificationSettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,12 +105,15 @@ export interface Reaction {
 export interface Message {
   _id: string;
   channelId: string;
+  serverId?: string; // 仅服务器频道消息会附带
   authorId: UserRef | string; // API 返回时通常会填充为 UserRef 对象
   type: string; // 默认为 'message/default'
   content?: string;
+  // 语音消息的纯文本（可由发送方提供或由 STT 写回）
+  plainText?: string;
   // 用于 Bot/LLM 的统一纯文本上下文
   context?: string;
-  payload?: Record<string, any>; // 用于卡片消息等复杂结构
+  payload?: MessagePayload; // 用于卡片消息等复杂结构
   attachments?: Attachment[];
   mentions?: string[]; // 提及的用户 ID 列表
   referencedMessageId?: string; // 回复的消息 ID
@@ -112,11 +123,41 @@ export interface Message {
   editedAt?: string;
   retractedAt?: string; // 撤回时间
 }
+
+export interface Embed {
+  url: string;
+  title?: string;
+  siteName?: string;
+  description?: string;
+  images?: string[];
+  mediaType?: string;
+  contentType?: string;
+  videos?: any[];
+  favicons?: string[];
+}
+
+export interface VoicePayload {
+  key: string;
+  url?: string;
+  contentType: string;
+  size: number;
+  durationMs?: number;
+}
+
+export interface MessagePayload {
+  webhookName?: string;
+  overrides?: { username?: string; avatarUrl?: string };
+  embeds?: Embed[];
+  sticker?: Sticker;
+  voice?: VoicePayload;
+  [key: string]: any;
+}
 ```
 
 **关键点说明**:
 - `authorId` 在大多数情况下会被 `populate`（填充）为一个 `UserRef` 对象。
 - `attachments` 数组中的每个对象的 `key` 字段会被后端补全为可访问的 `url`。
+- 在服务器频道中，消息对象会额外附加 `serverId` 字段；DM 消息通常不包含该字段。
 - Webhook 发送的消息，其作者信息（用户名、头像）可能会被 `payload.overrides` 中的内容覆盖后返回。
 
 ---
@@ -136,6 +177,7 @@ export type Permission =
   | 'KICK_MEMBERS'
   | 'CREATE_INVITE'
   | 'MANAGE_SERVER'
+  | 'MANAGE_STICKERS'
   | 'MANAGE_WEBHOOKS'
   | 'MANAGE_CHANNEL'
   | 'SEND_MESSAGES'
@@ -171,6 +213,7 @@ export interface ServerMember {
   roleIds: string[];
   isOwner: boolean;
   nickname?: string | null;
+  notificationLevel?: 'ALL_MESSAGES' | 'MENTIONS_ONLY' | 'MUTE';
   createdAt: string;
   updatedAt: string;
 
@@ -314,6 +357,39 @@ export interface Bot {
 ```
 
 ---
+
+### Sticker / UserSticker (贴纸)
+
+- **来源**: `server/src/api/sticker/*`, `server/src/api/userSticker/*`
+
+贴纸分为两类：
+- **服务器贴纸**：归属于某个 `serverId`，并通过 WebSocket 广播 `STICKER_*` 事件同步给同服务器用户。
+- **个人贴纸**：归属于某个 `userId`（在 API 返回中表现为 `ownerId`）。
+
+```ts title="TypeScript 定义"
+export type StickerScope = 'server' | 'user';
+
+export interface Sticker {
+  _id: string;
+  scope: StickerScope;
+  serverId?: string;
+  ownerId?: string;
+  name: string;
+  description?: string;
+  format: 'png' | 'gif' | 'webp' | 'jpg';
+  contentType: string;
+  size: number;
+  key?: string;
+  url: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+```
+
+:::info
+贴纸的 `url` 字段在返回时会被补全为可直接访问的地址；数据库中存储的通常是 `key`。
+:::
 
 ## 底层与内部模型
 
