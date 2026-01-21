@@ -1,7 +1,7 @@
 ---
 slug: assistant-agent/conversation-queues
 title: Assistant Agent 交互队列设计
-date: 2026-01-21
+date: 2026-01-22
 tags: [assistant-agent]
 ---
 
@@ -73,14 +73,17 @@ graph TD
     我们引入了一个单调递增的 `generation` 计数器：
 
     1. **版本迭代**：每次收到用户的新消息，`generation++`。
-    2. **请求标记**：所有的 Request 和 Send Event 都携带当前的 `generation`。
+    2. **世代绑定**：每条新消息和进入 Send Queue 的 batch 分配一个 `generation` 都携带当前的 `generation`。
     3. **惰性丢弃**：
-       - **Request Queue**：新消息到来时，立即取消正在执行的请求，并丢弃旧请求。
-       - **Send Queue**：在实际调用 API 发送前，校验 `Event.generation == Current.generation`。若不匹配，直接丢弃。
+       - **Request Queue (Thinking)**：新消息到来时，取消当前正在执行的处理，并丢弃旧的 pending request，只保留最新输入。
+       - **Send Queue (Speaking)**：发送线程在出队一个 batch时，校验 `batch.generation == current.generation`。若不匹配，直接跳过该 batch。  
+       同时，Send Queue 会切换到新的 ctx，从而让正在发送/等待延迟的动作尽快退出。  
+       batch 在发送完成后会立刻被丢弃，不会在队列里保留“已发送历史”。
 
     Send Queue 中是“已解析但未发送”的事件流，包括工具调用的前置提示 `Tool Prelude`、分段的长文本、Sticker、生成的语音
 
-    为了让“打断”彻底生效，所有的输出行为都必须收敛到这个队列中。只有这样，当用户打断时，我们才能在最后拦截住那些已经生成但还没发出去的废话。
+    为了让“打断”彻底生效，与该次会话实时回复相关的所有输出行为都必须收敛到这个队列中。只有这样，当用户打断时，我们才能在最后拦截住那些已经生成但还没发出去的废话。  
+    （注：后台/定时触发的 proactive 消息属于另一条发送路径，不在该队列的“打断拦截”范围内。）
   </TabItem>
   <TabItem value="isolation" label="隔离粒度">
     为了防止“群聊中 A 说话打断了 B 的回复”，我们采用了细粒度的隔离策略。
@@ -127,11 +130,11 @@ sequenceDiagram
     U->>H: Message 2 (Interrupt!)
     H->>C: Submit(m2)
     Note over C: Gen = 2<br/>Cancel Gen 1 Context
-    C->>Q: Reset Queue (Target Gen=2)
+    C->>Q: Reset Send Context (Gen=2)
     
     %% 旧任务的残余动作
     Q->>G: Send(Part B)... 
-    Note right of Q: ❌ Drop (Gen 1 < 2)
+    Note right of Q: ❌ Exit fast / Drop batch (Gen mismatch or ctx cancelled)
     
     %% 新任务开始
     C->>L: Run(Gen=2)
@@ -149,12 +152,15 @@ sequenceDiagram
 ### 关键路径
 
 1.  **可中断的发送循环**
-    发送逻辑不再是简单的 `for range`，而是必须在每一步检查 `ctx.Done()` 和 `generation` 版本。
+    发送逻辑不再是简单的 `for range`：在每一步都检查 `ctx.Done()`（确保“打断”能尽快生效）；并在出队时按 batch 校验 `generation`（避免旧世代残余被发送）。
 
 2.  **状态写入的原子性**
-    虽然对话可以被抢占，但 **记忆（L3/L4）** 的写入必须串行化。如果旧请求在被取消前已经产生了新的长期记忆（如更新了用户画像），该操作应当原子化完成，避免数据竞态。
+    虽然对话可以被抢占，但 **记忆（L3/L4）** 的写入需要串行化：如果旧请求在被取消前已经进入“写入阶段”，该写入应当原子化完成，避免数据竞态。  
+    现阶段工程实现的会话隔离 Key 是 `(channelID, userID)`，因此在“同一用户多频道并发”的场景下，记忆写入仍可能并发；这属于当前实现边界（见下）。
 
 ### 局限性
 
 *   **无法撤回已发送消息**：抢占机制只能阻止“未发生”的动作。Subaru 无法撤回已经推送到客户端的消息。
 *   **工具副作用**：如果旧请求触发了具有外部副作用的工具（如 `SendEmail`），且工具已经开始执行，则通常难以从外部中断。
+*   **取消不是“强制终止”**：抢占依赖 `ctx` 取消信号。如果某段工具调用/IO 不响应取消，旧请求可能延迟退出，从而影响“立即停止”的体验。
+*   **跨频道的用户级串行化**：当同一用户在多个频道同时与 Subaru 交互时，会话隔离会让处理并发发生；若要对用户记忆实现严格串行化，需要额外引入 `userID` 维度的写入锁或事务化机制。

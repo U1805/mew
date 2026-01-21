@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"mew/plugins/internal/agents/assistant-agent/infra"
@@ -13,6 +14,11 @@ import (
 type ConversationKey struct {
 	ChannelID string
 	UserID    string
+}
+
+type queuedRequest struct {
+	req ConversationRequest
+	gen int64
 }
 
 type ConversationRequest struct {
@@ -30,8 +36,9 @@ type ConversationCoordinator struct {
 	startOnce sync.Once
 	parent    context.Context
 
-	reqCh chan ConversationRequest
-	sendQ *SendQueue
+	genCounter int64
+	reqCh      chan queuedRequest
+	sendQ      *SendQueue
 }
 
 func NewConversationCoordinator(key ConversationKey) *ConversationCoordinator {
@@ -39,7 +46,7 @@ func NewConversationCoordinator(key ConversationKey) *ConversationCoordinator {
 	key.UserID = strings.TrimSpace(key.UserID)
 	return &ConversationCoordinator{
 		key:   key,
-		reqCh: make(chan ConversationRequest, 1),
+		reqCh: make(chan queuedRequest, 1),
 		sendQ: NewSendQueue(),
 	}
 }
@@ -53,9 +60,12 @@ func (c *ConversationCoordinator) Submit(req ConversationRequest) {
 		go c.run()
 	})
 
+	gen := atomic.AddInt64(&c.genCounter, 1)
+	queued := queuedRequest{req: req, gen: gen}
+
 	// Overwrite semantics: keep only the latest pending request.
 	select {
-	case c.reqCh <- req:
+	case c.reqCh <- queued:
 		return
 	default:
 	}
@@ -64,7 +74,7 @@ func (c *ConversationCoordinator) Submit(req ConversationRequest) {
 	default:
 	}
 	select {
-	case c.reqCh <- req:
+	case c.reqCh <- queued:
 	default:
 	}
 }
@@ -76,7 +86,7 @@ func (c *ConversationCoordinator) run() {
 	}
 
 	var current *inflight
-	var gen int64
+	var pending *queuedRequest
 
 	cancelAndWait := func() {
 		if current == nil {
@@ -100,33 +110,35 @@ func (c *ConversationCoordinator) run() {
 	}
 
 	for {
-		var req ConversationRequest
-		select {
-		case <-c.parent.Done():
-			cancelAndWait()
-			return
-		case req = <-c.reqCh:
+		var latest queuedRequest
+		if pending != nil {
+			latest = *pending
+			pending = nil
+		} else {
+			select {
+			case <-c.parent.Done():
+				cancelAndWait()
+				return
+			case latest = <-c.reqCh:
+			}
 		}
-
-		latest := req
-	Drain:
 		for {
 			select {
 			case next := <-c.reqCh:
 				latest = next
 			default:
-				break Drain
+				goto Start
 			}
 		}
 
+	Start:
 		cancelAndWait()
 
-		gen++
 		runCtx, cancel := context.WithCancel(c.parent)
 		done := make(chan struct{})
 		current = &inflight{cancel: cancel, done: done}
 
-		c.sendQ.Reset(runCtx, gen, latest.Transport)
+		c.sendQ.Reset(runCtx, latest.gen, latest.req.Transport)
 
 		go func(req ConversationRequest, generation int64) {
 			defer close(done)
@@ -134,29 +146,19 @@ func (c *ConversationCoordinator) run() {
 				return
 			}
 			_ = req.Run(runCtx,
-				func(events []SendEvent) { c.sendQ.Enqueue(generation, events) },
-				func(text string) { c.sendQ.EnqueueToolPrelude(generation, text) },
+				func(events []SendEvent) { c.sendQ.Enqueue(runCtx, generation, events) },
+				func(text string) { c.sendQ.EnqueueToolPrelude(runCtx, generation, text) },
 			)
-		}(latest, gen)
+		}(latest.req, latest.gen)
 
 		select {
 		case <-done:
 			current = nil
 		case next := <-c.reqCh:
 			// A newer user message arrived: cancel the current run, then continue with the newest.
-			select {
-			case c.reqCh <- next:
-			default:
-				select {
-				case <-c.reqCh:
-				default:
-				}
-				select {
-				case c.reqCh <- next:
-				default:
-				}
-			}
+			pending = &next
 			cancelAndWait()
+			current = nil
 		}
 	}
 }
@@ -199,32 +201,26 @@ func (q *SendQueue) Reset(ctx context.Context, gen int64, transport TransportCon
 	q.transport = transport
 }
 
-func (q *SendQueue) Enqueue(gen int64, events []SendEvent) {
+func (q *SendQueue) Enqueue(ctx context.Context, gen int64, events []SendEvent) {
 	if len(events) == 0 {
 		return
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	b := sendBatch{gen: gen, events: events}
 	select {
 	case q.ch <- b:
-		return
-	default:
-		select {
-		case <-q.ch:
-		default:
-		}
-		select {
-		case q.ch <- b:
-		default:
-		}
+	case <-ctx.Done():
 	}
 }
 
-func (q *SendQueue) EnqueueToolPrelude(gen int64, text string) {
+func (q *SendQueue) EnqueueToolPrelude(ctx context.Context, gen int64, text string) {
 	text = strings.TrimSpace(text)
 	if text == "" {
 		return
 	}
-	q.Enqueue(gen, []SendEvent{{Kind: ReplyPartText, Text: text, Immediate: true}})
+	q.Enqueue(ctx, gen, []SendEvent{{Kind: ReplyPartText, Text: text, Immediate: true}})
 }
 
 func (q *SendQueue) run() {

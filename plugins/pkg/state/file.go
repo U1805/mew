@@ -4,10 +4,30 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 )
+
+var fileMu sync.Map // map[path]*sync.Mutex
+
+func mutexForPath(path string) *sync.Mutex {
+	if v, ok := fileMu.Load(path); ok {
+		if mu, ok := v.(*sync.Mutex); ok && mu != nil {
+			return mu
+		}
+	}
+	mu := &sync.Mutex{}
+	actual, _ := fileMu.LoadOrStore(path, mu)
+	if out, ok := actual.(*sync.Mutex); ok && out != nil {
+		return out
+	}
+	return mu
+}
 
 func LoadJSONFile[T any](path string) (T, error) {
 	var zero T
+	mu := mutexForPath(path)
+	mu.Lock()
+	defer mu.Unlock()
 	b, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -22,6 +42,9 @@ func LoadJSONFile[T any](path string) (T, error) {
 }
 
 func SaveJSONFile(path string, v any) error {
+	mu := mutexForPath(path)
+	mu.Lock()
+	defer mu.Unlock()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -41,6 +64,9 @@ func SaveJSONFile(path string, v any) error {
 }
 
 func SaveJSONFileIndented(path string, v any) error {
+	mu := mutexForPath(path)
+	mu.Lock()
+	defer mu.Unlock()
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}

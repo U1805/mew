@@ -126,6 +126,12 @@ func (r *Runner) processDMMessage(
 	send func([]chat.SendEvent),
 	prelude func(string),
 ) error {
+	select {
+	case <-ctx.Done():
+		return nil
+	default:
+	}
+
 	userID := socketMsg.AuthorID()
 	channelID := socketMsg.ChannelID
 	reqCtx := r.newRequestContext(ctx, userID, channelID, logPrefix)
@@ -461,7 +467,10 @@ func (r *Runner) maybeOnDemandRemember(
 
 	s.Facts.Facts = memory.TouchFactsByIDs(s.Facts.Facts, res.UsedFactIDs, now)
 	s.Facts = memory.UpsertFacts(now, s.Facts, res.Facts, infra.AssistantMaxFacts)
-	_ = s.SaveFacts()
+	if err := s.SaveFacts(); err != nil {
+		log.Printf("%s save facts failed (on-demand): user=%s err=%v", c.LogPrefix, c.UserID, err)
+		return
+	}
 	log.Printf("%s facts updated (on-demand): user=%s count=%d used=%d new=%d", c.LogPrefix, c.UserID, len(s.Facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 }
 
@@ -483,9 +492,13 @@ func (r *Runner) finalizeRecord(c infra.AssistantRequestContext, s *UserState) e
 		ChannelID:      meta.ChannelID,
 	}); err == nil && strings.TrimSpace(summaryText) != "" {
 		s.Summaries = memory.AppendSummary(now, s.Summaries, meta.RecordID, summaryText, infra.AssistantMaxSummaries)
-		_ = s.SaveSummaries()
+		if err := s.SaveSummaries(); err != nil {
+			log.Printf("%s save summaries failed: user=%s record=%s err=%v", c.LogPrefix, c.UserID, meta.RecordID, err)
+		}
 		meta.LastSummarizedRecordID = meta.RecordID
-		_ = s.SaveMetadata()
+		if err := s.SaveMetadata(); err != nil {
+			log.Printf("%s save metadata failed (after summary): user=%s record=%s err=%v", c.LogPrefix, c.UserID, meta.RecordID, err)
+		}
 		log.Printf("%s summary saved: user=%s record=%s summaries=%d preview=%q",
 			c.LogPrefix, c.UserID, meta.RecordID, len(s.Summaries.Summaries), sdk.PreviewString(summaryText, infra.AssistantLogContentPreviewLen),
 		)
@@ -502,7 +515,9 @@ func (r *Runner) finalizeRecord(c infra.AssistantRequestContext, s *UserState) e
 	}); err == nil && (len(res.Facts) > 0 || len(res.UsedFactIDs) > 0) {
 		s.Facts.Facts = memory.TouchFactsByIDs(s.Facts.Facts, res.UsedFactIDs, now)
 		s.Facts = memory.UpsertFacts(now, s.Facts, res.Facts, infra.AssistantMaxFacts)
-		_ = s.SaveFacts()
+		if err := s.SaveFacts(); err != nil {
+			log.Printf("%s save facts failed (end-of-session): user=%s record=%s err=%v", c.LogPrefix, c.UserID, meta.RecordID, err)
+		}
 		log.Printf("%s facts updated (end-of-session): user=%s count=%d used=%d new=%d", c.LogPrefix, c.UserID, len(s.Facts.Facts), len(res.UsedFactIDs), len(res.Facts))
 	} else if err != nil {
 		log.Printf("%s fact engine end-of-session failed: user=%s err=%v", c.LogPrefix, c.UserID, err)
