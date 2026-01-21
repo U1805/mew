@@ -35,12 +35,14 @@ type VoiceDirective struct {
 }
 
 type ReplyControls struct {
+	Silence   bool
 	WantMore  bool
 	Proactive *ProactiveDirective
 	Sticker   *StickerDirective
 	Stickers  []StickerDirective
 	Parts     []ReplyPart
 	Voice     *VoiceDirective
+	Voices    []VoiceDirective
 }
 
 type ReplyPartKind string
@@ -48,6 +50,7 @@ type ReplyPartKind string
 const (
 	ReplyPartText    ReplyPartKind = "text"
 	ReplyPartSticker ReplyPartKind = "sticker"
+	ReplyPartVoice   ReplyPartKind = "voice"
 )
 
 type ReplyPart struct {
@@ -55,6 +58,7 @@ type ReplyPart struct {
 	Text string
 
 	StickerName string
+	VoiceText   string
 }
 
 type TransportContext struct {
@@ -77,6 +81,12 @@ type TransportContext struct {
 
 func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 	s := strings.ReplaceAll(reply, "\r\n", "\n")
+
+	// If the model explicitly ends with <SILENCE>, treat it as a "send nothing" directive.
+	// This is stricter than the truncation safeguard below, which exists to prevent protocol leakage.
+	if strings.HasSuffix(strings.TrimSpace(s), infra.AssistantSilenceToken) {
+		return "", ReplyControls{Silence: true}
+	}
 
 	// Sometimes the model mistakenly emits control tokens in the middle. Once we see one,
 	// we truncate the rest so we don't accidentally send any content after it.
@@ -110,7 +120,7 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 	toks := []tok{
 		{prefix: infra.AssistantProactiveTokenPrefix, kind: ""},
 		{prefix: infra.AssistantStickerTokenPrefix, kind: ReplyPartSticker},
-		{prefix: infra.AssistantVoiceTokenPrefix, kind: ""},
+		{prefix: infra.AssistantVoiceTokenPrefix, kind: ReplyPartVoice},
 	}
 
 	parseJSONObject := func(s string, start int) (objText string, end int, ok bool) {
@@ -192,6 +202,19 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 					parts = append(parts, ReplyPart{Kind: ReplyPartSticker, StickerName: d.Name})
 				}
 			}
+		case ReplyPartVoice:
+			var d VoiceDirective
+			if json.Unmarshal([]byte(obj), &d) == nil {
+				d.Text = strings.TrimSpace(d.Text)
+				if d.Text != "" {
+					if controls.Voice == nil {
+						controls.Voice = &VoiceDirective{Text: d.Text}
+					}
+					controls.Voices = append(controls.Voices, VoiceDirective{Text: d.Text})
+					flushText()
+					parts = append(parts, ReplyPart{Kind: ReplyPartVoice, VoiceText: d.Text})
+				}
+			}
 		default:
 			if next.prefix == infra.AssistantProactiveTokenPrefix {
 				if controls.Proactive == nil {
@@ -202,17 +225,6 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 						}
 						d.Reason = strings.TrimSpace(d.Reason)
 						controls.Proactive = &d
-					}
-				}
-			}
-			if next.prefix == infra.AssistantVoiceTokenPrefix {
-				if controls.Voice == nil {
-					var d VoiceDirective
-					if json.Unmarshal([]byte(obj), &d) == nil {
-						d.Text = strings.TrimSpace(d.Text)
-						if d.Text != "" {
-							controls.Voice = &d
-						}
 					}
 				}
 			}
@@ -330,13 +342,18 @@ func SendReply(
 	reply string,
 	controls ReplyControls,
 ) error {
+	if controls.Silence {
+		log.Printf("%s SILENCE: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
+		return nil
+	}
+
 	reply = strings.TrimSpace(reply)
 	stickerName := ""
 	if controls.Sticker != nil {
 		stickerName = strings.TrimSpace(controls.Sticker.Name)
 	}
 	voiceText := ""
-	if controls.Voice != nil {
+	if len(controls.Parts) == 0 && controls.Voice != nil {
 		voiceText = strings.TrimSpace(controls.Voice.Text)
 	}
 
@@ -399,7 +416,7 @@ func SendReply(
 		return nil
 	}
 
-	if reply == "" && stickerName == "" && voiceText == "" && len(controls.Stickers) == 0 {
+	if reply == "" && stickerName == "" && voiceText == "" && len(controls.Stickers) == 0 && len(controls.Voices) == 0 {
 		log.Printf("%s empty reply: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 		return nil
 	}
@@ -422,6 +439,7 @@ func SendReply(
 			kind        ReplyPartKind
 			text        string
 			stickerName string
+			voiceText   string
 		}
 
 		events := make([]sendEvent, 0, infra.AssistantMaxReplyLines+4)
@@ -444,6 +462,8 @@ func SendReply(
 				switch part.Kind {
 				case ReplyPartSticker:
 					events = append(events, sendEvent{kind: ReplyPartSticker, stickerName: part.StickerName})
+				case ReplyPartVoice:
+					events = append(events, sendEvent{kind: ReplyPartVoice, voiceText: part.VoiceText})
 				case ReplyPartText:
 					for _, line := range strings.Split(strings.ReplaceAll(part.Text, "\r\n", "\n"), "\n") {
 						if len(events) >= infra.AssistantMaxReplyLines {
@@ -467,6 +487,14 @@ func SendReply(
 				if err := sendStickerByName(ev.stickerName); err != nil {
 					return err
 				}
+			case ReplyPartVoice:
+				if c.SendVoiceHTTP == nil {
+					return fmt.Errorf("sendVoiceHTTP not configured")
+				}
+				if err := c.SendVoiceHTTP(ctx, c.ChannelID, ev.voiceText); err != nil {
+					return err
+				}
+				log.Printf("%s voice sent: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
 			case ReplyPartText:
 				t := ev.text
 				SleepWithContext(ctx, AssistantTypingDelayForLineMaybeSkipFirst(t, typingWPM, linesSent == 0))

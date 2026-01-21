@@ -20,18 +20,21 @@ import (
 
 var assistantFinalMoodLineRe = regexp.MustCompile(`(?im)^[\t ]*final_mood\s*:\s*\{[^}]*\}[\t ]*(\r?\n)?`)
 var assistantInlineControlDirectiveRe = regexp.MustCompile(`(?is)` +
-	`<WANT_MORE>` +
+	`<SILENCE>` +
+	`|<WANT_MORE>` +
 	`|<PROACTIVE>\s*\{[^}]*\}` +
 	`|<STICKER>\s*\{[^}]*\}` +
 	`|<VOICE>\s*\{[^}]*\}`)
 var assistantControlDirectiveLineRe = regexp.MustCompile(`(?m)^[\t ]*(?:` +
-	`<WANT_MORE>` +
+	`<SILENCE>` +
+	`|<WANT_MORE>` +
 	`|<PROACTIVE>.*` +
 	`|<STICKER>.*` +
 	`|<VOICE>.*` +
 	`|<TOOL>.*` +
 	`|</TOOL>.*` +
 	`)[\t ]*(\r?\n)?`)
+
 func stripAssistantControlDirectives(text string) string {
 	if strings.TrimSpace(text) == "" {
 		return ""

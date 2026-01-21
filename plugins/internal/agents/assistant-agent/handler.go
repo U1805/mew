@@ -484,6 +484,7 @@ func (r *Runner) reply(
 		WantMoreToken:          infra.AssistantWantMoreToken,
 		ProactiveTokenPrefix:   infra.AssistantProactiveTokenPrefix,
 		StickerTokenPrefix:     infra.AssistantStickerTokenPrefix,
+		VoiceTokenPrefix:       infra.AssistantVoiceTokenPrefix,
 		MaxLLMRetries:          infra.AssistantMaxLLMRetries,
 		LLMRetryInitialBackoff: infra.AssistantLLMRetryInitialBackoff,
 		LLMRetryMaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
