@@ -415,11 +415,11 @@ func (r *Runner) reply(
 	var lastErr error
 	baseL5 := append([]openaigo.ChatCompletionMessageParamUnion(nil), l5...)
 
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < 5; attempt++ {
 		msgs := baseL5
-		if attempt > 0 {
+		if attempt == 1 {
 			msgs = append(append([]openaigo.ChatCompletionMessageParamUnion(nil), baseL5...),
-				openaigo.UserMessage("Your previous reply contained only final_mood. Reply with message content (or <SILENCE>) and include final_mood at the end."),
+				openaigo.UserMessage("(SYSTEM_INFO: You must reply with NON-EMPTY message content, and final_mood at the end)"),
 			)
 		}
 
