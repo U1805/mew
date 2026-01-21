@@ -185,7 +185,7 @@ func (r *Runner) processDMMessage(
 
 	clean, controls := chat.ParseReplyControls(reply)
 	if send != nil {
-		send(chat.BuildSendEvents(clean, controls))
+		send(r.buildSendEventsWithVoicePrefetch(reqCtx, ctx, clean, controls))
 	}
 	r.enqueueProactive(reqCtx, now, state, recordID, controls.Proactive)
 
@@ -216,7 +216,7 @@ func (r *Runner) processDMMessage(
 
 		moreClean, moreControls := chat.ParseReplyControls(more)
 		if send != nil {
-			send(chat.BuildSendEvents(moreClean, moreControls))
+			send(r.buildSendEventsWithVoicePrefetch(reqCtx, ctx, moreClean, moreControls))
 		}
 		r.enqueueProactive(reqCtx, now, state, recordID, moreControls.Proactive)
 	}

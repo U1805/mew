@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"mew/plugins/internal/agents/assistant-agent/infra"
@@ -60,6 +61,56 @@ type ReplyPart struct {
 	VoiceText   string
 }
 
+type PreparedVoice struct {
+	TempPath    string
+	Filename    string
+	ContentType string
+	PlainText   string
+}
+
+type VoiceFuture struct {
+	done chan struct{}
+
+	mu       sync.Mutex
+	resolved bool
+	prepared *PreparedVoice
+	err      error
+}
+
+func NewVoiceFuture() *VoiceFuture {
+	return &VoiceFuture{done: make(chan struct{})}
+}
+
+func (f *VoiceFuture) Resolve(prepared *PreparedVoice, err error) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	if f.resolved {
+		f.mu.Unlock()
+		return
+	}
+	f.prepared = prepared
+	f.err = err
+	f.resolved = true
+	close(f.done)
+	f.mu.Unlock()
+}
+
+func (f *VoiceFuture) Wait(ctx context.Context) (*PreparedVoice, error) {
+	if f == nil {
+		return nil, fmt.Errorf("voice future is nil")
+	}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-f.done:
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.prepared, f.err
+}
+
 // SendEvent is a parsed outbound message chunk (text / sticker / voice).
 // It is used by the assistant-agent send queue to stream replies while supporting cancellation.
 type SendEvent struct {
@@ -73,6 +124,9 @@ type SendEvent struct {
 
 	// VoiceText is used when Kind==ReplyPartVoice.
 	VoiceText string
+	// VoiceFuture is an optional prefetch handle for Kind==ReplyPartVoice.
+	// When present, SendEvents will wait for it and upload the prepared audio (if supported).
+	VoiceFuture *VoiceFuture
 
 	// Immediate skips typing simulation + inter-line delay for this event.
 	// Useful for "tool prelude" messages that should appear instantly.
@@ -91,6 +145,7 @@ type TransportContext struct {
 	PostMessageHTTP        func(ctx context.Context, channelID, content string) error
 	PostStickerHTTP        func(ctx context.Context, channelID, stickerID string) error
 	SendVoiceHTTP          func(ctx context.Context, channelID, text string) error
+	SendVoicePreparedHTTP  func(ctx context.Context, channelID string, v PreparedVoice) error
 	ResolveStickerIDByName func(ctx context.Context, name string) (string, error)
 
 	// StickerSendProbability overrides infra.AssistantStickerSendProbability when non-nil.
@@ -214,12 +269,14 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 			if json.Unmarshal([]byte(obj), &d) == nil {
 				d.Name = strings.TrimSpace(d.Name)
 				if d.Name != "" {
+					// Only the first sticker directive is allowed to produce an outbound sticker.
+					// Later stickers are discarded (but still removed from the text stream).
 					if controls.Sticker == nil {
 						controls.Sticker = &StickerDirective{Name: d.Name}
+						controls.Stickers = append(controls.Stickers, d)
+						flushText()
+						parts = append(parts, ReplyPart{Kind: ReplyPartSticker, StickerName: d.Name})
 					}
-					controls.Stickers = append(controls.Stickers, d)
-					flushText()
-					parts = append(parts, ReplyPart{Kind: ReplyPartSticker, StickerName: d.Name})
 				}
 			}
 		case ReplyPartVoice:
@@ -227,12 +284,14 @@ func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
 			if json.Unmarshal([]byte(obj), &d) == nil {
 				d.Text = strings.TrimSpace(d.Text)
 				if d.Text != "" {
+					// Only the first voice directive is allowed to produce an outbound voice message.
+					// Later voices are discarded (but still removed from the text stream).
 					if controls.Voice == nil {
 						controls.Voice = &VoiceDirective{Text: d.Text}
+						controls.Voices = append(controls.Voices, VoiceDirective{Text: d.Text})
+						flushText()
+						parts = append(parts, ReplyPart{Kind: ReplyPartVoice, VoiceText: d.Text})
 					}
-					controls.Voices = append(controls.Voices, VoiceDirective{Text: d.Text})
-					flushText()
-					parts = append(parts, ReplyPart{Kind: ReplyPartVoice, VoiceText: d.Text})
 				}
 			}
 		default:
@@ -537,6 +596,19 @@ func SendEvents(ctx context.Context, c TransportContext, events []SendEvent) err
 				return err
 			}
 		case ReplyPartVoice:
+			if ev.VoiceFuture != nil && c.SendVoicePreparedHTTP != nil {
+				v, err := ev.VoiceFuture.Wait(ctx)
+				if err != nil {
+					return err
+				}
+				if v != nil {
+					if err := c.SendVoicePreparedHTTP(ctx, c.ChannelID, *v); err != nil {
+						return err
+					}
+					log.Printf("%s voice sent: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
+					continue
+				}
+			}
 			if c.SendVoiceHTTP == nil {
 				return fmt.Errorf("sendVoiceHTTP not configured")
 			}

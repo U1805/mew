@@ -272,3 +272,85 @@ func TestSendReply_SkipsTypingDelayBeforeVoice(t *testing.T) {
 		t.Fatalf("expected positive typing delay for trailing text, got: %v", sleeps[1])
 	}
 }
+
+func TestParseReplyControls_MultipleVoicesOnlyFirstKept(t *testing.T) {
+	in := "a\n<VOICE>{\"text\":\"v1\"}\nb\n<VOICE>{\"text\":\"v2\"}\nc"
+	clean, controls := ParseReplyControls(in)
+	if clean != "a\nb\nc" {
+		t.Fatalf("unexpected clean: %q", clean)
+	}
+	voiceParts := 0
+	for _, p := range controls.Parts {
+		if p.Kind == ReplyPartVoice {
+			voiceParts++
+			if p.VoiceText != "v1" {
+				t.Fatalf("unexpected voice text: %q", p.VoiceText)
+			}
+		}
+	}
+	if voiceParts != 1 {
+		t.Fatalf("expected 1 voice part, got: %d (%#v)", voiceParts, controls.Parts)
+	}
+}
+
+func TestParseReplyControls_MultipleStickersOnlyFirstKept(t *testing.T) {
+	in := "a\n<STICKER>{\"name\":\"Wave\"}\nb\n<STICKER>{\"name\":\"Hello\"}\nc"
+	clean, controls := ParseReplyControls(in)
+	if clean != "a\nb\nc" {
+		t.Fatalf("unexpected clean: %q", clean)
+	}
+	stickerParts := 0
+	for _, p := range controls.Parts {
+		if p.Kind == ReplyPartSticker {
+			stickerParts++
+			if p.StickerName != "Wave" {
+				t.Fatalf("unexpected sticker name: %q", p.StickerName)
+			}
+		}
+	}
+	if stickerParts != 1 {
+		t.Fatalf("expected 1 sticker part, got: %d (%#v)", stickerParts, controls.Parts)
+	}
+}
+
+func TestSendEvents_VoiceFutureUsesPreparedUpload(t *testing.T) {
+	fut := NewVoiceFuture()
+	go func() {
+		time.Sleep(10 * time.Millisecond)
+		fut.Resolve(&PreparedVoice{TempPath: "x", Filename: "f.wav", ContentType: "audio/wav", PlainText: "hello"}, nil)
+	}()
+
+	var out []string
+	err := SendEvents(context.Background(), TransportContext{
+		Emit: func(event string, payload any) error {
+			m, _ := payload.(map[string]any)
+			if content, _ := m["content"].(string); content != "" {
+				out = append(out, "text:"+content)
+			}
+			return nil
+		},
+		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
+			t.Fatalf("SendVoiceHTTP should not be called when SendVoicePreparedHTTP is available")
+			return nil
+		},
+		SendVoicePreparedHTTP: func(ctx context.Context, channelID string, v PreparedVoice) error {
+			out = append(out, "voice-prepared:"+v.PlainText)
+			return nil
+		},
+		Sleep:     func(ctx context.Context, d time.Duration) {},
+		ChannelID: "c1",
+		UserID:    "u1",
+		LogPrefix: "[test]",
+		TypingWPM: 1_000_000_000,
+	}, []SendEvent{
+		{Kind: ReplyPartText, Text: "a"},
+		{Kind: ReplyPartVoice, VoiceText: "hello", VoiceFuture: fut},
+		{Kind: ReplyPartText, Text: "b"},
+	})
+	if err != nil {
+		t.Fatalf("SendEvents err: %v", err)
+	}
+	if len(out) != 3 || out[0] != "text:a" || out[1] != "voice-prepared:hello" || out[2] != "text:b" {
+		t.Fatalf("unexpected out: %#v", out)
+	}
+}

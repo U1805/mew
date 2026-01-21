@@ -104,16 +104,19 @@ func (r *Runner) buildChatTransport(c infra.AssistantRequestContext, emit socket
 		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
 			return r.sendVoiceHTTP(c, ctx, channelID, text)
 		},
+		SendVoicePreparedHTTP: func(ctx context.Context, channelID string, v chat.PreparedVoice) error {
+			return r.sendPreparedVoiceHTTP(c, ctx, channelID, v)
+		},
 		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
 			return r.stickers.ResolveStickerIDByName(c.Mew.WithCtx(ctx), c.LogPrefix, name)
 		},
 	}
 }
 
-func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Context, channelID, text string) error {
+func (r *Runner) prepareVoiceAudio(c infra.AssistantRequestContext, ctx context.Context, text string) (chat.PreparedVoice, error) {
 	audioURL, err := tools.RunHobbyistTTS(c.LLM.WithCtx(ctx), text)
 	if err != nil {
-		return err
+		return chat.PreparedVoice{}, err
 	}
 
 	downloadClient := c.LLM.HTTPClient
@@ -122,16 +125,16 @@ func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Cont
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
 	if err != nil {
-		return err
+		return chat.PreparedVoice{}, err
 	}
 	resp, err := downloadClient.Do(req)
 	if err != nil {
-		return err
+		return chat.PreparedVoice{}, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("tts audio download status=%d", resp.StatusCode)
+		return chat.PreparedVoice{}, fmt.Errorf("tts audio download status=%d", resp.StatusCode)
 	}
 
 	filename := "voice.wav"
@@ -151,19 +154,29 @@ func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Cont
 	}
 	tmp, err := os.CreateTemp("", tmpPattern)
 	if err != nil {
-		return err
+		return chat.PreparedVoice{}, err
 	}
 	defer func() {
 		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
 	}()
 	if _, err := io.Copy(tmp, resp.Body); err != nil {
-		return err
+		_ = os.Remove(tmp.Name())
+		return chat.PreparedVoice{}, err
 	}
-	if _, err := tmp.Seek(0, 0); err != nil {
-		return err
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return chat.PreparedVoice{}, err
 	}
 
+	return chat.PreparedVoice{
+		TempPath:    tmp.Name(),
+		Filename:    filename,
+		ContentType: contentType,
+		PlainText:   text,
+	}, nil
+}
+
+func (r *Runner) sendPreparedVoiceHTTP(c infra.AssistantRequestContext, ctx context.Context, channelID string, v chat.PreparedVoice) error {
 	uploadClient := c.Mew.HTTPClient
 	if uploadClient == nil {
 		uploadClient = http.DefaultClient
@@ -175,18 +188,76 @@ func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Cont
 		uploadClient30s = &cloned
 	}
 
+	f, err := os.Open(v.TempPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(v.TempPath)
+	}()
+
 	_, err = messages.SendVoiceMessageByUploadReader(
 		ctx,
 		uploadClient30s,
 		c.Mew.APIBase,
 		"",
 		channelID,
-		filename,
-		contentType,
-		tmp,
-		messages.SendVoiceMessageOptions{PlainText: text},
+		v.Filename,
+		v.ContentType,
+		f,
+		messages.SendVoiceMessageOptions{PlainText: v.PlainText},
 	)
 	return err
+}
+
+func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Context, channelID, text string) error {
+	v, err := r.prepareVoiceAudio(c, ctx, text)
+	if err != nil {
+		return err
+	}
+	return r.sendPreparedVoiceHTTP(c, ctx, channelID, v)
+}
+
+func (r *Runner) buildSendEventsWithVoicePrefetch(
+	c infra.AssistantRequestContext,
+	ctx context.Context,
+	clean string,
+	controls chat.ReplyControls,
+) []chat.SendEvent {
+	events := chat.BuildSendEvents(clean, controls)
+	var voiceText string
+	for _, ev := range events {
+		if ev.Kind == chat.ReplyPartVoice && strings.TrimSpace(ev.VoiceText) != "" {
+			voiceText = strings.TrimSpace(ev.VoiceText)
+			break
+		}
+	}
+	if voiceText == "" {
+		return events
+	}
+
+	fut := chat.NewVoiceFuture()
+	go func() {
+		v, err := r.prepareVoiceAudio(c, ctx, voiceText)
+		if err == nil && strings.TrimSpace(v.TempPath) != "" {
+			go func(p string) {
+				<-ctx.Done()
+				_ = os.Remove(p)
+			}(v.TempPath)
+			fut.Resolve(&v, nil)
+			return
+		}
+		fut.Resolve(nil, err)
+	}()
+
+	for i := range events {
+		if events[i].Kind == chat.ReplyPartVoice {
+			events[i].VoiceFuture = fut
+			break
+		}
+	}
+	return events
 }
 
 type RunnerOptions struct {
