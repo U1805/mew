@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -20,6 +23,7 @@ import (
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 	"mew/plugins/pkg/api/history"
+	"mew/plugins/pkg/api/messages"
 )
 
 type Runner struct {
@@ -51,6 +55,209 @@ type Runner struct {
 	knownUsers   map[string]struct{}
 
 	stickers *tools.StickerService
+
+	conversations *conversationManager
+}
+
+type conversationManager struct {
+	r *Runner
+
+	mu    sync.Mutex
+	convs map[chat.ConversationKey]*chat.ConversationCoordinator
+}
+
+func newConversationManager(r *Runner) *conversationManager {
+	return &conversationManager{
+		r:     r,
+		convs: map[chat.ConversationKey]*chat.ConversationCoordinator{},
+	}
+}
+
+func (m *conversationManager) get(channelID, userID string) *chat.ConversationCoordinator {
+	k := chat.ConversationKey{
+		ChannelID: strings.TrimSpace(channelID),
+		UserID:    strings.TrimSpace(userID),
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if c, ok := m.convs[k]; ok {
+		return c
+	}
+	c := chat.NewConversationCoordinator(k)
+	m.convs[k] = c
+	return c
+}
+
+func (r *Runner) buildChatTransport(c infra.AssistantRequestContext, emit socketio.EmitFunc) chat.TransportContext {
+	return chat.TransportContext{
+		Emit:      emit,
+		ChannelID: c.ChannelID,
+		UserID:    c.UserID,
+		LogPrefix: c.LogPrefix,
+		TypingWPM: infra.AssistantTypingWPMDefault,
+		PostMessageHTTP: func(ctx context.Context, channelID, content string) error {
+			return chat.PostMessageHTTP(c.Mew.WithCtx(ctx), channelID, content)
+		},
+		PostStickerHTTP: func(ctx context.Context, channelID, stickerID string) error {
+			return chat.PostStickerHTTP(c.Mew.WithCtx(ctx), channelID, stickerID)
+		},
+		SendVoiceHTTP: func(ctx context.Context, channelID, text string) error {
+			return r.sendVoiceHTTP(c, ctx, channelID, text)
+		},
+		SendVoicePreparedHTTP: func(ctx context.Context, channelID string, v chat.PreparedVoice) error {
+			return r.sendPreparedVoiceHTTP(c, ctx, channelID, v)
+		},
+		ResolveStickerIDByName: func(ctx context.Context, name string) (string, error) {
+			return r.stickers.ResolveStickerIDByName(c.Mew.WithCtx(ctx), c.LogPrefix, name)
+		},
+	}
+}
+
+func (r *Runner) prepareVoiceAudio(c infra.AssistantRequestContext, ctx context.Context, text string) (chat.PreparedVoice, error) {
+	audioURL, err := tools.RunHobbyistTTS(c.LLM.WithCtx(ctx), text)
+	if err != nil {
+		return chat.PreparedVoice{}, err
+	}
+
+	downloadClient := c.LLM.HTTPClient
+	if downloadClient == nil {
+		downloadClient = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, audioURL, nil)
+	if err != nil {
+		return chat.PreparedVoice{}, err
+	}
+	resp, err := downloadClient.Do(req)
+	if err != nil {
+		return chat.PreparedVoice{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return chat.PreparedVoice{}, fmt.Errorf("tts audio download status=%d", resp.StatusCode)
+	}
+
+	filename := "voice.wav"
+	if u, err := url.Parse(audioURL); err == nil && u != nil {
+		if b := strings.TrimSpace(path.Base(u.Path)); b != "" && b != "." && b != "/" {
+			filename = b
+		}
+	}
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "audio/wav"
+	}
+
+	tmpPattern := "mew-tts-*"
+	if ext := strings.TrimSpace(path.Ext(filename)); ext != "" {
+		tmpPattern = "mew-tts-*" + ext
+	}
+	tmp, err := os.CreateTemp("", tmpPattern)
+	if err != nil {
+		return chat.PreparedVoice{}, err
+	}
+	defer func() {
+		_ = tmp.Close()
+	}()
+	if _, err := io.Copy(tmp, resp.Body); err != nil {
+		_ = os.Remove(tmp.Name())
+		return chat.PreparedVoice{}, err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return chat.PreparedVoice{}, err
+	}
+
+	return chat.PreparedVoice{
+		TempPath:    tmp.Name(),
+		Filename:    filename,
+		ContentType: contentType,
+		PlainText:   text,
+	}, nil
+}
+
+func (r *Runner) sendPreparedVoiceHTTP(c infra.AssistantRequestContext, ctx context.Context, channelID string, v chat.PreparedVoice) error {
+	uploadClient := c.Mew.HTTPClient
+	if uploadClient == nil {
+		uploadClient = http.DefaultClient
+	}
+	uploadClient30s := uploadClient
+	if uploadClient.Timeout != 30*time.Second {
+		cloned := *uploadClient
+		cloned.Timeout = 30 * time.Second
+		uploadClient30s = &cloned
+	}
+
+	f, err := os.Open(v.TempPath)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(v.TempPath)
+	}()
+
+	_, err = messages.SendVoiceMessageByUploadReader(
+		ctx,
+		uploadClient30s,
+		c.Mew.APIBase,
+		"",
+		channelID,
+		v.Filename,
+		v.ContentType,
+		f,
+		messages.SendVoiceMessageOptions{PlainText: v.PlainText},
+	)
+	return err
+}
+
+func (r *Runner) sendVoiceHTTP(c infra.AssistantRequestContext, ctx context.Context, channelID, text string) error {
+	v, err := r.prepareVoiceAudio(c, ctx, text)
+	if err != nil {
+		return err
+	}
+	return r.sendPreparedVoiceHTTP(c, ctx, channelID, v)
+}
+
+func (r *Runner) buildSendEventsWithVoicePrefetch(
+	c infra.AssistantRequestContext,
+	ctx context.Context,
+	clean string,
+	controls chat.ReplyControls,
+) []chat.SendEvent {
+	events := chat.BuildSendEvents(clean, controls)
+	var voiceText string
+	for _, ev := range events {
+		if ev.Kind == chat.ReplyPartVoice && strings.TrimSpace(ev.VoiceText) != "" {
+			voiceText = strings.TrimSpace(ev.VoiceText)
+			break
+		}
+	}
+	if voiceText == "" {
+		return events
+	}
+
+	fut := chat.NewVoiceFuture()
+	go func() {
+		v, err := r.prepareVoiceAudio(c, ctx, voiceText)
+		if err == nil && strings.TrimSpace(v.TempPath) != "" {
+			go func(p string) {
+				<-ctx.Done()
+				_ = os.Remove(p)
+			}(v.TempPath)
+			fut.Resolve(&v, nil)
+			return
+		}
+		fut.Resolve(nil, err)
+	}()
+
+	for i := range events {
+		if events[i].Kind == chat.ReplyPartVoice {
+			events[i].VoiceFuture = fut
+			break
+		}
+	}
+	return events
 }
 
 type RunnerOptions struct {
@@ -130,6 +337,7 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 		userLock:   map[string]*sync.Mutex{},
 		knownUsers: map[string]struct{}{},
 	}
+	r.conversations = newConversationManager(r)
 	return r, nil
 }
 
