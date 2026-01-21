@@ -188,6 +188,24 @@ describe('message.service (unit)', () => {
     expect(result[0].context).toContain('url: https://example.com');
   });
 
+  it('getMessagesByChannel prefixes voice plainText in context', async () => {
+    const msg: any = {
+      _id: 'm1',
+      channelId: 'c1',
+      authorId: { username: 'orig', avatarUrl: 'orig.png', isBot: false },
+      type: 'message/voice',
+      content: '',
+      plainText: 'hello from bot',
+      payload: { voice: { key: 'voice.webm', contentType: 'audio/webm', size: 123, durationMs: 1200 } },
+      attachments: [],
+    };
+    vi.mocked(messageRepository.findByChannel).mockResolvedValue([msg] as any);
+
+    const result: any = await getMessagesByChannel({ channelId: 'c1', limit: 20 });
+
+    expect(result[0].context).toBe('voice: hello from bot');
+  });
+
   it('getMessagesByChannel derives context from forwarded message payload', async () => {
     const msg: any = {
       _id: 'm1',

@@ -240,6 +240,7 @@ describe('Message Routes', () => {
       expect(res.body.content).toBe('');
       expect(res.body.attachments).toEqual([]);
       expect(res.body.plainText).toBe('hello from bot');
+      expect(res.body.context).toBe('voice: hello from bot');
       expect(res.body.payload?.voice?.key).toBe(voiceKey);
       expect(res.body.payload?.voice?.url).toContain(voiceKey);
     });

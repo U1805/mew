@@ -69,6 +69,7 @@ func TestStripAssistantControlDirectives_RemovesControlsAndMood(t *testing.T) {
 	in := strings.Join([]string{
 		"hi",
 		"<STICKER>{\"name\":\"Wave\"}",
+		"voice: abc123",
 		"final_mood: {\"valence\": 0.1, \"arousal\": 0.2}",
 		"<WANT_MORE>",
 		"<PROACTIVE>{\"delay_seconds\":1,\"reason\":\"x\"}",

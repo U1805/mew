@@ -36,6 +36,7 @@ function buildMessageContext(messageObject: any): string {
   const attachments = Array.isArray(messageObject?.attachments) ? messageObject.attachments : [];
 
   if (content) return content;
+  if (type === 'message/voice' && plainText) return `voice: ${plainText}`;
   if (plainText) return plainText;
 
   const parts: string[] = [];

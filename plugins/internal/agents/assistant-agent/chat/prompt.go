@@ -19,6 +19,7 @@ import (
 )
 
 var assistantFinalMoodLineRe = regexp.MustCompile(`(?im)^[\t ]*final_mood\s*:\s*\{[^}]*\}[\t ]*(\r?\n)?`)
+var assistantVoiceLineRe = regexp.MustCompile(`(?im)^[\t ]*voice\s*:\s*.*[\t ]*(\r?\n)?`)
 var assistantInlineControlDirectiveRe = regexp.MustCompile(`(?is)` +
 	`<SILENCE>` +
 	`|<WANT_MORE>` +
@@ -42,6 +43,7 @@ func stripAssistantControlDirectives(text string) string {
 	s := strings.ReplaceAll(text, "\r\n", "\n")
 	s = assistantInlineControlDirectiveRe.ReplaceAllString(s, "")
 	s = assistantFinalMoodLineRe.ReplaceAllString(s, "")
+	s = assistantVoiceLineRe.ReplaceAllString(s, "")
 	s = assistantControlDirectiveLineRe.ReplaceAllString(s, "")
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
