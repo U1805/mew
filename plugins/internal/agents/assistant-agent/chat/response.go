@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +18,8 @@ import (
 	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 )
+
+var finalMoodTokenRe = regexp.MustCompile(`(?is)\bfinal_mood\s*:`)
 
 type ProactiveDirective struct {
 	DelaySeconds int    `json:"delay_seconds"`
@@ -34,7 +38,23 @@ type ReplyControls struct {
 	WantMore  bool
 	Proactive *ProactiveDirective
 	Sticker   *StickerDirective
+	Stickers  []StickerDirective
+	Parts     []ReplyPart
 	Voice     *VoiceDirective
+}
+
+type ReplyPartKind string
+
+const (
+	ReplyPartText    ReplyPartKind = "text"
+	ReplyPartSticker ReplyPartKind = "sticker"
+)
+
+type ReplyPart struct {
+	Kind ReplyPartKind
+	Text string
+
+	StickerName string
 }
 
 type TransportContext struct {
@@ -48,78 +68,176 @@ type TransportContext struct {
 	PostStickerHTTP        func(ctx context.Context, channelID, stickerID string) error
 	SendVoiceHTTP          func(ctx context.Context, channelID, text string) error
 	ResolveStickerIDByName func(ctx context.Context, name string) (string, error)
+
+	// StickerSendProbability overrides infra.AssistantStickerSendProbability when non-nil.
+	StickerSendProbability *float64
+	// StickerSendRandom overrides rand.Float64 when non-nil (useful for tests).
+	StickerSendRandom func() float64
 }
 
 func ParseReplyControls(reply string) (clean string, controls ReplyControls) {
-	lines := strings.Split(strings.ReplaceAll(reply, "\r\n", "\n"), "\n")
+	s := strings.ReplaceAll(reply, "\r\n", "\n")
 
-	for {
-		last := -1
-		for i := len(lines) - 1; i >= 0; i-- {
-			if strings.TrimSpace(lines[i]) != "" {
-				last = i
-				break
+	// Sometimes the model mistakenly emits control tokens in the middle. Once we see one,
+	// we truncate the rest so we don't accidentally send any content after it.
+	cutAt := -1
+	if i := strings.Index(s, infra.AssistantSilenceToken); i >= 0 && (cutAt < 0 || i < cutAt) {
+		cutAt = i
+	}
+	if i := strings.Index(s, infra.AssistantWantMoreToken); i >= 0 && (cutAt < 0 || i < cutAt) {
+		cutAt = i
+	}
+	if i := strings.Index(s, infra.AssistantToolCallTokenPrefix); i >= 0 && (cutAt < 0 || i < cutAt) {
+		cutAt = i
+	}
+	if i := strings.Index(s, "</TOOL>"); i >= 0 && (cutAt < 0 || i < cutAt) {
+		cutAt = i
+	}
+	if loc := finalMoodTokenRe.FindStringIndex(s); loc != nil && (cutAt < 0 || loc[0] < cutAt) {
+		cutAt = loc[0]
+	}
+	if cutAt >= 0 {
+		if strings.HasPrefix(s[cutAt:], infra.AssistantWantMoreToken) {
+			controls.WantMore = true
+		}
+		s = s[:cutAt]
+	}
+
+	type tok struct {
+		prefix string
+		kind   ReplyPartKind
+	}
+	toks := []tok{
+		{prefix: infra.AssistantProactiveTokenPrefix, kind: ""},
+		{prefix: infra.AssistantStickerTokenPrefix, kind: ReplyPartSticker},
+		{prefix: infra.AssistantVoiceTokenPrefix, kind: ""},
+	}
+
+	parseJSONObject := func(s string, start int) (objText string, end int, ok bool) {
+		i := start
+		for i < len(s) && (s[i] == ' ' || s[i] == '\t') {
+			i++
+		}
+		if i >= len(s) || s[i] != '{' {
+			return "", start, false
+		}
+		depth := 0
+		for j := i; j < len(s); j++ {
+			switch s[j] {
+			case '{':
+				depth++
+			case '}':
+				depth--
+				if depth == 0 {
+					return s[i : j+1], j + 1, true
+				}
 			}
 		}
-		if last < 0 {
+		return "", start, false
+	}
+
+	var parts []ReplyPart
+	var textBuf strings.Builder
+	flushText := func() {
+		if textBuf.Len() == 0 {
+			return
+		}
+		parts = append(parts, ReplyPart{Kind: ReplyPartText, Text: textBuf.String()})
+		textBuf.Reset()
+	}
+
+	for i := 0; i < len(s); {
+		nextPos := -1
+		var next tok
+		for _, t := range toks {
+			if t.prefix == "" {
+				continue
+			}
+			p := strings.Index(s[i:], t.prefix)
+			if p < 0 {
+				continue
+			}
+			p += i
+			if nextPos < 0 || p < nextPos {
+				nextPos = p
+				next = t
+			}
+		}
+		if nextPos < 0 {
+			textBuf.WriteString(s[i:])
 			break
 		}
 
-		t := strings.TrimSpace(lines[last])
-		switch {
-		case t == infra.AssistantWantMoreToken:
-			controls.WantMore = true
-			lines = append(lines[:last], lines[last+1:]...)
-			continue
-		case strings.HasPrefix(t, infra.AssistantProactiveTokenPrefix):
-			// The model may emit this as a single line:
-			//   <PROACTIVE>{"delay_seconds":180,"reason":"..."}
-			raw := strings.TrimSpace(strings.TrimPrefix(t, infra.AssistantProactiveTokenPrefix))
-			if raw != "" && controls.Proactive == nil {
-				var d ProactiveDirective
-				if json.Unmarshal([]byte(raw), &d) == nil {
-					if d.DelaySeconds < 0 {
-						d.DelaySeconds = 0
-					}
-					d.Reason = strings.TrimSpace(d.Reason)
-					controls.Proactive = &d
-				}
-			}
-			lines = append(lines[:last], lines[last+1:]...)
-			continue
-		case strings.HasPrefix(t, infra.AssistantStickerTokenPrefix):
-			raw := strings.TrimSpace(strings.TrimPrefix(t, infra.AssistantStickerTokenPrefix))
-			if raw != "" && controls.Sticker == nil {
-				var d StickerDirective
-				if json.Unmarshal([]byte(raw), &d) == nil {
-					d.Name = strings.TrimSpace(d.Name)
-					if d.Name != "" {
-						controls.Sticker = &d
-					}
-				}
-			}
-			lines = append(lines[:last], lines[last+1:]...)
-			continue
-		case strings.HasPrefix(t, infra.AssistantVoiceTokenPrefix):
-			raw := strings.TrimSpace(strings.TrimPrefix(t, infra.AssistantVoiceTokenPrefix))
-			if raw != "" && controls.Voice == nil {
-				var d VoiceDirective
-				if json.Unmarshal([]byte(raw), &d) == nil {
-					d.Text = strings.TrimSpace(d.Text)
-					if d.Text != "" {
-						controls.Voice = &d
-					}
-				}
-			}
-			lines = append(lines[:last], lines[last+1:]...)
-			continue
-		default:
-			// Stop when the last non-empty line is not a control directive.
-		}
-		break
-	}
+		textBuf.WriteString(s[i:nextPos])
+		i = nextPos + len(next.prefix)
 
-	clean = strings.TrimSpace(strings.Join(lines, "\n"))
+		obj, end, ok := parseJSONObject(s, i)
+		if !ok {
+			// Malformed directive: drop the token prefix and continue.
+			continue
+		}
+		i = end
+
+		switch next.kind {
+		case ReplyPartSticker:
+			var d StickerDirective
+			if json.Unmarshal([]byte(obj), &d) == nil {
+				d.Name = strings.TrimSpace(d.Name)
+				if d.Name != "" {
+					if controls.Sticker == nil {
+						controls.Sticker = &StickerDirective{Name: d.Name}
+					}
+					controls.Stickers = append(controls.Stickers, d)
+					flushText()
+					parts = append(parts, ReplyPart{Kind: ReplyPartSticker, StickerName: d.Name})
+				}
+			}
+		default:
+			if next.prefix == infra.AssistantProactiveTokenPrefix {
+				if controls.Proactive == nil {
+					var d ProactiveDirective
+					if json.Unmarshal([]byte(obj), &d) == nil {
+						if d.DelaySeconds < 0 {
+							d.DelaySeconds = 0
+						}
+						d.Reason = strings.TrimSpace(d.Reason)
+						controls.Proactive = &d
+					}
+				}
+			}
+			if next.prefix == infra.AssistantVoiceTokenPrefix {
+				if controls.Voice == nil {
+					var d VoiceDirective
+					if json.Unmarshal([]byte(obj), &d) == nil {
+						d.Text = strings.TrimSpace(d.Text)
+						if d.Text != "" {
+							controls.Voice = &d
+						}
+					}
+				}
+			}
+		}
+	}
+	flushText()
+	controls.Parts = parts
+
+	// Build clean text for downstream logic (e.g. proactive pipeline).
+	var cleanBuf strings.Builder
+	for _, p := range parts {
+		if p.Kind == ReplyPartText {
+			cleanBuf.WriteString(p.Text)
+		}
+	}
+	lines := strings.Split(strings.ReplaceAll(cleanBuf.String(), "\r\n", "\n"), "\n")
+	outLines := make([]string, 0, len(lines))
+	for _, line := range lines {
+		t := strings.TrimSpace(line)
+		if t == "" {
+			continue
+		}
+		outLines = append(outLines, t)
+	}
+	clean = strings.TrimSpace(strings.Join(outLines, "\n"))
 	return clean, controls
 }
 
@@ -211,87 +329,36 @@ func SendReply(
 		voiceText = strings.TrimSpace(controls.Voice.Text)
 	}
 
-	if reply == "" && stickerName == "" && voiceText == "" {
-		log.Printf("%s empty reply: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
-		return nil
-	}
-	if strings.TrimSpace(reply) == infra.AssistantSilenceToken || strings.Contains(reply, infra.AssistantSilenceToken) {
-		log.Printf("%s SILENCE: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
-		return nil
-	}
-
-	typingWPM := c.TypingWPM
-	if typingWPM <= 0 {
-		typingWPM = infra.AssistantTypingWPMDefault
-	}
-
-	if reply != "" {
-		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
-			c.LogPrefix, c.ChannelID, c.UserID, sdk.PreviewString(reply, infra.AssistantLogContentPreviewLen),
-		)
-
-		lines := make([]string, 0, infra.AssistantMaxReplyLines)
-		for _, line := range strings.Split(reply, "\n") {
-			if len(lines) >= infra.AssistantMaxReplyLines {
-				break
-			}
-			t := strings.TrimSpace(line)
-			if t == "" {
-				continue
-			}
-			lines = append(lines, t)
+	sendStickerByName := func(name string) error {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil
 		}
 
-		linesSent := 0
-		for i, t := range lines {
-			SleepWithContext(ctx, AssistantTypingDelayForLine(t, typingWPM))
-			var sendErr error
-			if c.Emit == nil {
-				sendErr = fmt.Errorf("emit not configured")
-			} else {
-				sendErr = c.Emit(infra.AssistantUpstreamMessageCreate, map[string]any{
-					"channelId": c.ChannelID,
-					"content":   t,
-				})
+		p := infra.AssistantStickerSendProbability
+		if c.StickerSendProbability != nil {
+			p = *c.StickerSendProbability
+		}
+		if p >= 0 && p < 1 {
+			r := rand.Float64
+			if c.StickerSendRandom != nil {
+				r = c.StickerSendRandom
 			}
-			if sendErr != nil {
-				// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
-				if c.PostMessageHTTP == nil {
-					return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, fmt.Errorf("postMessageHTTP not configured"))
-				}
-				if err := c.PostMessageHTTP(ctx, c.ChannelID, t); err != nil {
-					return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
-				}
-				log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", c.LogPrefix, c.ChannelID, c.UserID, sendErr)
-			}
-			linesSent++
-			if i < len(lines)-1 {
-				SleepWithContext(ctx, AssistantReplyDelayForLine(t))
+			if r() >= p {
+				log.Printf("%s sticker intercepted: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, name)
+				return nil
 			}
 		}
-		log.Printf("%s reply sent: channel=%s user=%s lines=%d", c.LogPrefix, c.ChannelID, c.UserID, linesSent)
-	}
 
-	if voiceText != "" {
-		if c.SendVoiceHTTP == nil {
-			return fmt.Errorf("sendVoiceHTTP not configured")
-		}
-		if err := c.SendVoiceHTTP(ctx, c.ChannelID, voiceText); err != nil {
-			return err
-		}
-		log.Printf("%s voice sent: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
-	}
-
-	if stickerName != "" {
 		if c.ResolveStickerIDByName == nil {
 			return fmt.Errorf("resolveStickerIDByName not configured")
 		}
-		stickerID, err := c.ResolveStickerIDByName(ctx, stickerName)
+		stickerID, err := c.ResolveStickerIDByName(ctx, name)
 		if err != nil {
 			return err
 		}
 		if strings.TrimSpace(stickerID) == "" {
-			log.Printf("%s sticker not found in group: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, stickerName)
+			log.Printf("%s sticker not found in group: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, name)
 			return nil
 		}
 
@@ -317,7 +384,126 @@ func SendReply(
 			}
 			log.Printf("%s gateway sticker send failed, fallback to http ok: channel=%s user=%s err=%v", c.LogPrefix, c.ChannelID, c.UserID, sendErr)
 		}
-		log.Printf("%s sticker sent: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, stickerName)
+		log.Printf("%s sticker sent: channel=%s user=%s name=%q", c.LogPrefix, c.ChannelID, c.UserID, name)
+		return nil
+	}
+
+	if reply == "" && stickerName == "" && voiceText == "" && len(controls.Stickers) == 0 {
+		log.Printf("%s empty reply: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
+		return nil
+	}
+	if strings.TrimSpace(reply) == infra.AssistantSilenceToken || strings.Contains(reply, infra.AssistantSilenceToken) {
+		log.Printf("%s SILENCE: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
+		return nil
+	}
+
+	typingWPM := c.TypingWPM
+	if typingWPM <= 0 {
+		typingWPM = infra.AssistantTypingWPMDefault
+	}
+
+	if reply != "" {
+		log.Printf("%s reply ready: channel=%s user=%s preview=%q",
+			c.LogPrefix, c.ChannelID, c.UserID, sdk.PreviewString(reply, infra.AssistantLogContentPreviewLen),
+		)
+
+		type sendEvent struct {
+			kind        ReplyPartKind
+			text        string
+			stickerName string
+		}
+
+		events := make([]sendEvent, 0, infra.AssistantMaxReplyLines+4)
+		if len(controls.Parts) == 0 {
+			for _, line := range strings.Split(reply, "\n") {
+				if len(events) >= infra.AssistantMaxReplyLines {
+					break
+				}
+				t := strings.TrimSpace(line)
+				if t == "" {
+					continue
+				}
+				events = append(events, sendEvent{kind: ReplyPartText, text: t})
+			}
+		} else {
+			for _, part := range controls.Parts {
+				if len(events) >= infra.AssistantMaxReplyLines {
+					break
+				}
+				switch part.Kind {
+				case ReplyPartSticker:
+					events = append(events, sendEvent{kind: ReplyPartSticker, stickerName: part.StickerName})
+				case ReplyPartText:
+					for _, line := range strings.Split(strings.ReplaceAll(part.Text, "\r\n", "\n"), "\n") {
+						if len(events) >= infra.AssistantMaxReplyLines {
+							break
+						}
+						t := strings.TrimSpace(line)
+						if t == "" {
+							continue
+						}
+						events = append(events, sendEvent{kind: ReplyPartText, text: t})
+					}
+				default:
+				}
+			}
+		}
+
+		linesSent := 0
+		for i, ev := range events {
+			switch ev.kind {
+			case ReplyPartSticker:
+				if err := sendStickerByName(ev.stickerName); err != nil {
+					return err
+				}
+			case ReplyPartText:
+				t := ev.text
+				SleepWithContext(ctx, AssistantTypingDelayForLine(t, typingWPM))
+				var sendErr error
+				if c.Emit == nil {
+					sendErr = fmt.Errorf("emit not configured")
+				} else {
+					sendErr = c.Emit(infra.AssistantUpstreamMessageCreate, map[string]any{
+						"channelId": c.ChannelID,
+						"content":   t,
+					})
+				}
+				if sendErr != nil {
+					// Fallback: if the gateway is disconnected between reply generation and send, use REST API.
+					if c.PostMessageHTTP == nil {
+						return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, fmt.Errorf("postMessageHTTP not configured"))
+					}
+					if err := c.PostMessageHTTP(ctx, c.ChannelID, t); err != nil {
+						return fmt.Errorf("send message failed (gateway=%v http=%v)", sendErr, err)
+					}
+					log.Printf("%s gateway send failed, fallback to http ok: channel=%s user=%s err=%v", c.LogPrefix, c.ChannelID, c.UserID, sendErr)
+				}
+				linesSent++
+				// Keep the "pause between text lines" behavior, but don't delay before a sticker.
+				if i < len(events)-1 && events[i+1].kind == ReplyPartText {
+					SleepWithContext(ctx, AssistantReplyDelayForLine(t))
+				}
+			default:
+			}
+		}
+		log.Printf("%s reply sent: channel=%s user=%s lines=%d", c.LogPrefix, c.ChannelID, c.UserID, linesSent)
+	}
+
+	if voiceText != "" {
+		if c.SendVoiceHTTP == nil {
+			return fmt.Errorf("sendVoiceHTTP not configured")
+		}
+		if err := c.SendVoiceHTTP(ctx, c.ChannelID, voiceText); err != nil {
+			return err
+		}
+		log.Printf("%s voice sent: channel=%s user=%s", c.LogPrefix, c.ChannelID, c.UserID)
+	}
+
+	// Back-compat: if a sticker directive exists but wasn't emitted as part of the stream, send it at the end.
+	if stickerName != "" && len(controls.Parts) == 0 {
+		if err := sendStickerByName(stickerName); err != nil {
+			return err
+		}
 	}
 
 	return nil
