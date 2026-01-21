@@ -121,17 +121,12 @@ func (s *StickerService) ResolveStickerIDByName(c infra.MewCallContext, logPrefi
 		return "", err
 	}
 
-	// Case-insensitive exact match first.
+	// Strict whitelist: only allow case-insensitive exact matches against the configured sticker list.
+	// This prevents the agent from sending unintended stickers when the LLM outputs a name that isn't
+	// present in the prompt's sticker table.
 	target := strings.ToLower(name)
 	for _, s := range stickers {
 		if strings.ToLower(strings.TrimSpace(s.Name)) == target && strings.TrimSpace(s.ID) != "" {
-			return strings.TrimSpace(s.ID), nil
-		}
-	}
-
-	// Fallback: substring match (first hit).
-	for _, s := range stickers {
-		if strings.Contains(strings.ToLower(strings.TrimSpace(s.Name)), target) && strings.TrimSpace(s.ID) != "" {
 			return strings.TrimSpace(s.ID), nil
 		}
 	}
