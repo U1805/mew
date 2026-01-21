@@ -64,3 +64,18 @@ func TestBuildL1L4UserPrompt_SessionStartDatetime_FallsBackToStoredString(t *tes
 		t.Fatalf("expected session_start_datetime to fall back to stored string, got: %q", out)
 	}
 }
+
+func TestStripAssistantControlDirectives_RemovesControlsAndMood(t *testing.T) {
+	in := strings.Join([]string{
+		"hi",
+		"<STICKER>{\"name\":\"Wave\"}",
+		"final_mood: {\"valence\": 0.1, \"arousal\": 0.2}",
+		"<WANT_MORE>",
+		"<PROACTIVE>{\"delay_seconds\":1,\"reason\":\"x\"}",
+		"ok",
+	}, "\n")
+	out := stripAssistantControlDirectives(in)
+	if out != "hi\nok" {
+		t.Fatalf("unexpected output: %q", out)
+	}
+}

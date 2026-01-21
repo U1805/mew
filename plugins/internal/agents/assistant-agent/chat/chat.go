@@ -41,6 +41,7 @@ type ChatWithToolsOptions struct {
 	WantMoreToken        string
 	ProactiveTokenPrefix string
 	StickerTokenPrefix   string
+	VoiceTokenPrefix     string
 
 	// LLM call retries (for flaky upstreams returning errors or empty choices).
 	MaxLLMRetries          int
@@ -137,6 +138,7 @@ func ChatWithTools(
 				WantMoreToken:        opts.WantMoreToken,
 				ProactiveTokenPrefix: opts.ProactiveTokenPrefix,
 				StickerTokenPrefix:   opts.StickerTokenPrefix,
+				VoiceTokenPrefix:     opts.VoiceTokenPrefix,
 			})
 			if opts.OnToolCallAssistantText != nil && strings.TrimSpace(cleanText) != "" {
 				if err := opts.OnToolCallAssistantText(strings.TrimSpace(cleanText)); err != nil {
@@ -266,6 +268,7 @@ type stripTrailingControlLinesOpts struct {
 	WantMoreToken        string
 	ProactiveTokenPrefix string
 	StickerTokenPrefix   string
+	VoiceTokenPrefix     string
 }
 
 func stripTrailingControlLines(text string, opts stripTrailingControlLinesOpts) string {
@@ -294,6 +297,9 @@ func stripTrailingControlLines(text string, opts stripTrailingControlLinesOpts) 
 			lines = append(lines[:last], lines[last+1:]...)
 			continue
 		case opts.StickerTokenPrefix != "" && strings.HasPrefix(t, strings.TrimSpace(opts.StickerTokenPrefix)):
+			lines = append(lines[:last], lines[last+1:]...)
+			continue
+		case opts.VoiceTokenPrefix != "" && strings.HasPrefix(t, strings.TrimSpace(opts.VoiceTokenPrefix)):
 			lines = append(lines[:last], lines[last+1:]...)
 			continue
 		default:

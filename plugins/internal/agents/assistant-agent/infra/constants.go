@@ -10,6 +10,11 @@ const (
 	AssistantSilenceToken  = "<SILENCE>"
 	AssistantWantMoreToken = "<WANT_MORE>"
 
+	// AssistantStickerSendProbability controls how often the agent will actually send a sticker
+	// when a <STICKER>{...} directive is present.
+	// Example: 0.7 means ~30% of sticker sends are intercepted (skipped).
+	AssistantStickerSendProbability = 0.7
+
 	// AssistantProactiveTokenPrefix is a single-line control directive emitted by the LLM.
 	// Expected format (one line):
 	//   <PROACTIVE>{"delay_seconds":180,"reason":"..."}
@@ -78,13 +83,13 @@ const (
 	AssistantTimeSincePrefix  = "~"
 	AssistantTimeSinceUnknown = "unknown"
 
-	AssistantReplyDelayBase    = 350 * time.Millisecond
+	AssistantReplyDelayBase    = 0 * time.Millisecond // 350 * time.Millisecond
 	AssistantReplyDelayPerRune = 60 * time.Millisecond
 	AssistantReplyDelayMax     = 3500 * time.Millisecond
 
 	// AssistantTypingWPMDefault is the default typing speed simulation.
 	// WPM counts "words" as Unicode characters (runes) for this project.
-	AssistantTypingWPMDefault = 100
+	AssistantTypingWPMDefault = 180
 
 	AssistantLLMRetryInitialBackoff = 250 * time.Millisecond
 	AssistantLLMRetryMaxBackoff     = 5 * time.Second

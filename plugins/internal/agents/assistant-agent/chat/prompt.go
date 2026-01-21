@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,43 @@ import (
 	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/x/llm"
 )
+
+var assistantFinalMoodLineRe = regexp.MustCompile(`(?im)^[\t ]*final_mood\s*:\s*\{[^}]*\}[\t ]*(\r?\n)?`)
+var assistantInlineControlDirectiveRe = regexp.MustCompile(`(?is)` +
+	`<SILENCE>` +
+	`|<WANT_MORE>` +
+	`|<PROACTIVE>\s*\{[^}]*\}` +
+	`|<STICKER>\s*\{[^}]*\}` +
+	`|<VOICE>\s*\{[^}]*\}`)
+var assistantControlDirectiveLineRe = regexp.MustCompile(`(?m)^[\t ]*(?:` +
+	`<SILENCE>` +
+	`|<WANT_MORE>` +
+	`|<PROACTIVE>.*` +
+	`|<STICKER>.*` +
+	`|<VOICE>.*` +
+	`|<TOOL>.*` +
+	`|</TOOL>.*` +
+	`)[\t ]*(\r?\n)?`)
+
+func stripAssistantControlDirectives(text string) string {
+	if strings.TrimSpace(text) == "" {
+		return ""
+	}
+	s := strings.ReplaceAll(text, "\r\n", "\n")
+	s = assistantInlineControlDirectiveRe.ReplaceAllString(s, "")
+	s = assistantFinalMoodLineRe.ReplaceAllString(s, "")
+	s = assistantControlDirectiveLineRe.ReplaceAllString(s, "")
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		t := strings.TrimSpace(line)
+		if t == "" {
+			continue
+		}
+		out = append(out, t)
+	}
+	return strings.TrimSpace(strings.Join(out, "\n"))
+}
 
 func ReadPromptWithOverrides(relPath, embeddedName string) (string, error) {
 	paths := sdk.CandidateDataFilePaths(relPath)
@@ -240,7 +278,10 @@ func BuildL5Messages(sessionMsgs []sdkapi.ChannelMessage, botUserID string, loc 
 		if !hasPendingAssistant {
 			return
 		}
-		out = append(out, openaigo.AssistantMessage(pendingAssistant))
+		clean := stripAssistantControlDirectives(pendingAssistant)
+		if strings.TrimSpace(clean) != "" {
+			out = append(out, openaigo.AssistantMessage(clean))
+		}
 		pendingAssistant = ""
 		hasPendingAssistant = false
 	}
@@ -318,7 +359,10 @@ func BuildL5MessagesWithAttachments(ctx context.Context, sessionMsgs []sdkapi.Ch
 		if !hasPendingAssistant {
 			return
 		}
-		out = append(out, openaigo.AssistantMessage(pendingAssistant))
+		clean := stripAssistantControlDirectives(pendingAssistant)
+		if strings.TrimSpace(clean) != "" {
+			out = append(out, openaigo.AssistantMessage(clean))
+		}
 		pendingAssistant = ""
 		hasPendingAssistant = false
 	}

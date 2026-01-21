@@ -449,7 +449,7 @@ func (r *Runner) reply(
 	l1l4 string,
 	l5 []openaigo.ChatCompletionMessageParamUnion,
 ) (reply string, finalMood memory.Mood, gotMood bool, err error) {
-	return chat.ChatWithTools(c.LLM, c.Persona, l1l4, l5, chat.ToolHandlers{
+	handlers := chat.ToolHandlers{
 		HistorySearch: func(ctx context.Context, keyword string) (any, error) {
 			return tools.RunHistorySearch(c.History.WithCtx(ctx), c.ChannelID, keyword)
 		},
@@ -459,7 +459,8 @@ func (r *Runner) reply(
 		WebSearch: func(ctx context.Context, query string) (any, error) {
 			return tools.RunWebSearch(c.LLM.WithCtx(ctx), query)
 		},
-	}, chat.ChatWithToolsOptions{
+	}
+	opts := chat.ChatWithToolsOptions{
 		MaxToolCalls:          infra.AssistantMaxToolCalls,
 		HistorySearchToolName: infra.DefaultHistorySearchToolName,
 		RecordSearchToolName:  infra.DefaultRecordSearchToolName,
@@ -483,10 +484,39 @@ func (r *Runner) reply(
 		WantMoreToken:          infra.AssistantWantMoreToken,
 		ProactiveTokenPrefix:   infra.AssistantProactiveTokenPrefix,
 		StickerTokenPrefix:     infra.AssistantStickerTokenPrefix,
+		VoiceTokenPrefix:       infra.AssistantVoiceTokenPrefix,
 		MaxLLMRetries:          infra.AssistantMaxLLMRetries,
 		LLMRetryInitialBackoff: infra.AssistantLLMRetryInitialBackoff,
 		LLMRetryMaxBackoff:     infra.AssistantLLMRetryMaxBackoff,
-	})
+	}
+
+	var lastReply string
+	var lastMood memory.Mood
+	var lastGotMood bool
+	var lastErr error
+	baseL5 := append([]openaigo.ChatCompletionMessageParamUnion(nil), l5...)
+
+	for attempt := 0; attempt < 2; attempt++ {
+		msgs := baseL5
+		if attempt > 0 {
+			msgs = append(append([]openaigo.ChatCompletionMessageParamUnion(nil), baseL5...),
+				openaigo.UserMessage("Your previous reply contained only final_mood. Reply with message content (or <SILENCE>) and include final_mood at the end."),
+			)
+		}
+
+		out, mood, ok, err := chat.ChatWithTools(c.LLM, c.Persona, l1l4, msgs, handlers, opts)
+		lastReply, lastMood, lastGotMood, lastErr = out, mood, ok, err
+		if err != nil {
+			break
+		}
+		// Disallow replies that are only final_mood (allow <SILENCE> + final_mood).
+		if ok && strings.TrimSpace(out) == "" {
+			continue
+		}
+		return out, mood, ok, nil
+	}
+
+	return lastReply, lastMood, lastGotMood, lastErr
 }
 
 func (r *Runner) maybeOnDemandRemember(
