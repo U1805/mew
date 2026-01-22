@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef, type MouseEvent } from 'react';
+import { useState, useEffect, useRef, type MouseEvent } from 'react';
 import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
@@ -15,6 +15,7 @@ import { channelApi, infraApi, messageApi, ttsApi } from '../../../shared/servic
 import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
+import { getMessageBestEffortText } from '../../../shared/utils/messageText';
 
 interface MessageItemProps {
   message: Message;
@@ -35,21 +36,6 @@ const stopActiveTts = () => {
     URL.revokeObjectURL(activeTtsUrl);
     activeTtsUrl = null;
   }
-};
-
-const getMessageBestEffortText = (message: Message) => {
-  const payloadForwarded = (message.payload as any)?.forwardedMessage;
-  return (
-    (typeof message.content === 'string' && message.content.trim()
-      ? message.content
-      : typeof (message.payload as any)?.content === 'string' && (message.payload as any).content.trim()
-        ? (message.payload as any).content
-        : typeof payloadForwarded?.content === 'string' && payloadForwarded.content.trim()
-          ? payloadForwarded.content
-          : typeof (message.payload as any)?.url === 'string'
-            ? (message.payload as any).url
-            : '') || ''
-  );
 };
 
 const getSelectionTextWithin = (container: HTMLElement | null) => {

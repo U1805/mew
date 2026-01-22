@@ -111,16 +111,27 @@ func consolidateFacts(
 		return FactsFile{}, err
 	}
 
-	system := `You are a memory consolidation engine for a personal assistant.
+	system := `You are a high-fidelity memory consolidation engine for a personal assistant.
+Your goal is to organize facts while STRICTLY PRESERVING SPECIFIC DETAILS.
+Avoid over-abstraction. Information density is more important than brevity.
+Avoid over-abstraction. Information density is more important than brevity.
+
 Your task: look at existing user facts and produce a SMALL list of consolidation operations.
 Only output operations when you are highly confident.
-Do NOT rewrite all memories; focus only on similar/related ones.
 
-Operation types:
-- Deduplication: merge semantically identical facts.
-- Generalization: derive a higher-level preference from repeated observations.
-- Inference: connect related facts into a more useful composite fact.
-- Conflict: resolve contradictions by preserving change history ("used to", "now").
+Operation types & Strict Rules:
+- Deduplication: Merge facts ONLY if they are semantically identical. 
+  * CRITICAL: Do not merge if one fact contains specific details (e.g., "likes Sony headphones") and the other is generic ("likes headphones"). Keep the specific one.
+- Generalization: Identify patterns but RETAIN EXAMPLES. 
+  * Bad: "User likes fruit" (derived from apples/bananas).
+  * Good: "User likes fruits, specifically apples and bananas."
+- Inference: Connect related facts only if 100% logically implied. Do not guess.
+- Conflict: Resolve contradictions. Use "formerly... now..." format for status changes.
+
+Golden Rules for "new_memory":
+1. ENTITY PRESERVATION: Never delete Proper Nouns, Numbers, Dates, Brand Names, or Locations.
+2. SPECIFICITY OVER BREVITY: "Gym at 6pm on Mondays" is better than "Exercises weekly."
+3. CONTEXT RETENTION: If a preference has a specific context (e.g., "only drinks wine with dinner"), keep the condition.
 
 For each NEW fact, provide an importance score 1-10:
 - 1-2: trivial, no long-term value (small talk, fleeting bodily actions).

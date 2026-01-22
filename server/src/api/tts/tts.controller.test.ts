@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import { BadRequestError } from '../../utils/errors';
 
@@ -23,6 +23,10 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('tts.controller', () => {
   it('rejects missing text', async () => {
     const req = { body: {} } as unknown as Request;
@@ -36,13 +40,80 @@ describe('tts.controller', () => {
   });
 
   it('rejects too long text', async () => {
-    const req = { body: { text: 'a'.repeat(2001) } } as unknown as Request;
+    const req = { body: { text: 'a'.repeat(12001) } } as unknown as Request;
     const res = createRes();
     const next = vi.fn() as unknown as NextFunction;
 
     await synthesizeTts(req, res, next);
 
     expect(next).toHaveBeenCalledWith(expect.any(BadRequestError));
+  });
+
+  it('splits long text into multiple upstream calls and concatenates', async () => {
+    const req = { body: { text: `${'a'.repeat(1790)}。${'b'.repeat(1790)}。` } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(Buffer.from([1, 2]))
+      .mockResolvedValueOnce(Buffer.from([3, 4]));
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledTimes(2);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(Buffer.from([1, 2, 3, 4]));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('hard-splits when there are no delimiters', async () => {
+    const req = { body: { text: 'a'.repeat(1805) } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(Buffer.from([1]))
+      .mockResolvedValueOnce(Buffer.from([2]));
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledTimes(2);
+    expect(res.send).toHaveBeenCalledWith(Buffer.from([1, 2]));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('appends a token into the current chunk when it fits', async () => {
+    const req = { body: { text: `${'a'.repeat(1699)}。${'b'.repeat(50)}。${'c'.repeat(100)}` } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(Buffer.from([1]))
+      .mockResolvedValueOnce(Buffer.from([2]));
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledTimes(2);
+    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(1, `${'a'.repeat(1699)}。${'b'.repeat(50)}。`, 'doubao');
+    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(2, 'c'.repeat(100), 'doubao');
+    expect(res.send).toHaveBeenCalledWith(Buffer.from([1, 2]));
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('flushes to a new chunk when appending would exceed the limit', async () => {
+    const req = { body: { text: `${'a'.repeat(1790)}\n${'b'.repeat(30)}` } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(Buffer.from([1]))
+      .mockResolvedValueOnce(Buffer.from([2]));
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledTimes(2);
+    expect(res.send).toHaveBeenCalledWith(Buffer.from([1, 2]));
+    expect(next).not.toHaveBeenCalled();
   });
 
   it('synthesizes trimmed text and returns audio/mpeg', async () => {

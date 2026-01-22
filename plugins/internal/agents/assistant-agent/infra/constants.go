@@ -42,7 +42,7 @@ const (
 	AssistantMaxToolCalls       = 3
 	AssistantMaxLLMRetries      = 5
 	AssistantMaxFacts           = 30
-	AssistantMaxSummaries       = 30
+	AssistantMaxSummaries       = 20
 	AssistantMaxProactiveQueue  = 16
 
 	// AssistantFactDefaultImportance is the conservative fallback importance score (1-10)
@@ -83,13 +83,13 @@ const (
 	AssistantTimeSincePrefix  = "~"
 	AssistantTimeSinceUnknown = "unknown"
 
-	AssistantReplyDelayBase    = 0 * time.Millisecond // 350 * time.Millisecond
+	AssistantReplyDelayBase    = 350 * time.Millisecond
 	AssistantReplyDelayPerRune = 60 * time.Millisecond
-	AssistantReplyDelayMax     = 3500 * time.Millisecond
+	AssistantReplyDelayMax     = 2500 * time.Millisecond
 
 	// AssistantTypingWPMDefault is the default typing speed simulation.
 	// WPM counts "words" as Unicode characters (runes) for this project.
-	AssistantTypingWPMDefault = 180
+	AssistantTypingWPMDefault = 150
 
 	AssistantLLMRetryInitialBackoff = 250 * time.Millisecond
 	AssistantLLMRetryMaxBackoff     = 5 * time.Second
