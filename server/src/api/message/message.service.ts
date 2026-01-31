@@ -6,7 +6,7 @@ import { calculateEffectivePermissions } from '../../utils/permission.service';
 import Member from '../member/member.model';
 import Role from '../role/role.model';
 import Server from '../server/server.model';
-import Channel from '../channel/channel.model';
+import Channel, { ChannelType } from '../channel/channel.model';
 import mentionService from './mention.service';
 import mongoose from 'mongoose';
 import { getS3PublicUrl } from '../../utils/s3';
@@ -256,6 +256,9 @@ export const getMessagesByChannel = async (options: GetMessagesOptions) => {
     messageRepository.findByChannel(options),
     Channel.findById(options.channelId).select('type serverId').lean(),
   ]);
+  if (channel?.type === ChannelType.GUILD_WEB) {
+    return [];
+  }
   const processed = messages.map(processMessageForClient);
   return channel ? processed.map((m) => attachServerId(m, channel)) : processed;
 };
@@ -264,6 +267,10 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
   const channel = await Channel.findById(data.channelId).lean();
   if (!channel) {
     throw new NotFoundError('Channel not found');
+  }
+
+  if (channel.type === ChannelType.GUILD_WEB) {
+    throw new BadRequestError('Messages are not supported in web channels');
   }
 
   if (!data.channelId || !data.authorId) {

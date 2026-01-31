@@ -47,7 +47,7 @@ export const ServerChannelList: React.FC = () => {
   const canManageServer = serverPermissions.has('MANAGE_SERVER') || serverPermissions.has('ADMINISTRATOR');
 
   channels?.forEach(channel => {
-      if (channel.type !== ChannelType.GUILD_TEXT) return;
+      if (channel.type !== ChannelType.GUILD_TEXT && channel.type !== ChannelType.GUILD_WEB) return;
       if (channel.categoryId) {
           if (!channelsByCategory[channel.categoryId]) {
               channelsByCategory[channel.categoryId] = [];

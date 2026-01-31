@@ -70,4 +70,9 @@ describe('useMessages', () => {
 
     expect(result.current.data).toBeUndefined();
   });
+
+  it('does not fetch when disabled', () => {
+    renderHook(() => useMessages('server-1', 'channel-1', { enabled: false }), { wrapper: createWrapper() });
+    expect(messageApi.list).not.toHaveBeenCalled();
+  });
 });

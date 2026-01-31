@@ -5,8 +5,17 @@ export const createChannelSchema = z.object({
   body: z.object({
     name: z.string().min(1, 'Channel name is required'),
     // 确保枚举值匹配前端发送的字符串
-    type: z.enum([ChannelType.GUILD_TEXT, ChannelType.DM]),
+    type: z.enum([ChannelType.GUILD_TEXT, ChannelType.GUILD_WEB]),
     categoryId: z.string().optional(),
+    url: z.string().trim().url().max(2048).optional(),
+  }).superRefine((val, ctx) => {
+    if (val.type === ChannelType.GUILD_WEB) {
+      if (!val.url) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'URL is required for web channels' });
+      }
+    } else if (val.url) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['url'], message: 'URL is only applicable to web channels' });
+    }
   }),
   // 新增：显式校验 serverId 参数
   params: z.object({
@@ -19,6 +28,7 @@ export const updateChannelSchema = z.object({
     name: z.string().min(1, 'Channel name is required').optional(),
     categoryId: z.string().nullable().optional(),
     topic: z.string().max(1024, 'Topic must be 1024 or fewer characters long').optional(),
+    url: z.string().trim().url().max(2048).optional(),
   }),
   // update 路由通常只有 channelId，但在 REST 设计中若包含 serverId 也可校验
   params: z.object({

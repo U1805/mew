@@ -3,11 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Message } from '../types';
 
-export const useSocketMessages = (channelId: string | null) => {
+export const useSocketMessages = (channelId: string | null, options?: { enabled?: boolean }) => {
   const queryClient = useQueryClient();
+  const enabled = options?.enabled ?? true;
 
   useEffect(() => {
-    if (!channelId) return;
+    if (!channelId || !enabled) return;
 
     const socket = getSocket();
     if (!socket) return;
@@ -64,5 +65,5 @@ export const useSocketMessages = (channelId: string | null) => {
       socket.off('MESSAGE_REACTION_ADD', handleUpdateMessage);
       socket.off('MESSAGE_REACTION_REMOVE', handleUpdateMessage);
     };
-  }, [channelId, queryClient]);
+  }, [channelId, enabled, queryClient]);
 };

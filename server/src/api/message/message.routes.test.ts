@@ -116,6 +116,21 @@ describe('Message Routes', () => {
   describe('POST /api/servers/:serverId/channels/:channelId/messages', () => {
     let memberToken = '';
 
+    it('should reject posting messages to a web channel', async () => {
+      const webChannelRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'web', type: ChannelType.GUILD_WEB, url: 'https://example.com' });
+      const webChannelId = webChannelRes.body._id;
+
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels/${webChannelId}/messages`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ content: 'hello' });
+
+      expect(res.statusCode).toBe(400);
+    });
+
     describe('with permissions and mentions', () => {
       let everyoneRole: any;
       let memberToken = ''; // This will be the regular member

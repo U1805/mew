@@ -88,6 +88,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
   }, [isDmSearchOpen, setDmSearchQuery]);
 
   const isDM = channel?.type === ChannelType.DM;
+  const isWeb = channel?.type === ChannelType.GUILD_WEB;
   
   let title = channel?.name || 'channel';
   let otherUser: any = null;
@@ -158,6 +159,8 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
       <div className={clsx("text-mew-textMuted mr-2 flex items-center justify-center", mobileSearchActive && "hidden")}>
           {isDM ? (
               <Icon icon="mdi:at" width="24" height="24" />
+          ) : isWeb ? (
+              <Icon icon="mdi:web" width="24" height="24" />
           ) : (
               <Icon icon="mdi:pound" width="24" height="24" />
           )}
@@ -176,15 +179,15 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
       )}
 
       {!isDM && !mobileSearchActive && (
-          <span className="text-xs text-mew-textMuted border-l border-mew-textMuted pl-2 ml-2 hidden md:block truncate max-w-[300px]">
-            {channel?.topic || `Welcome to #${title}`}
-          </span>
+        <span className="text-xs text-mew-textMuted border-l border-mew-textMuted pl-2 ml-2 hidden md:block truncate max-w-[300px]">
+          {isWeb ? (channel?.url || 'No URL set') : (channel?.topic || `Welcome to #${title}`)}
+        </span>
       )}
       
       <div className="ml-auto flex items-center space-x-3 text-mew-textMuted flex-shrink-0">
         {/* Mobile Search Icon Trigger */}
         <button 
-          className={clsx("lg:hidden hover:text-mew-text p-1 active:bg-[#35373C] rounded", mobileSearchActive && "hidden")}
+          className={clsx("lg:hidden hover:text-mew-text p-1 active:bg-[#35373C] rounded", (mobileSearchActive || isWeb) && "hidden")}
           onClick={handleMobileSearchStart}
         >
            <Icon icon="mdi:magnify" width="22" />
@@ -192,6 +195,18 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
 
         <Icon icon="mdi:bell" className="hover:text-mew-text cursor-pointer hidden sm:block" width="22" />
         <Icon icon="mdi:pin" className="hover:text-mew-text cursor-pointer hidden sm:block" width="22" />
+
+        {isWeb && channel?.url && (
+          <a
+            href={channel.url}
+            target="_blank"
+            rel="noreferrer"
+            className={clsx("p-1 hover:text-mew-text transition-colors hidden sm:block", mobileSearchActive && "hidden")}
+            title="Open in new tab"
+          >
+            <Icon icon="mdi:open-in-new" width="22" />
+          </a>
+        )}
 
         {!isDM && (
             <button 
@@ -203,7 +218,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
         )}
 
         {/* Desktop Search Inputs */}
-        {!isDM && currentServerId && (
+        {!isDM && !isWeb && currentServerId && (
             <div className={clsx("relative hidden lg:block transition-all", isSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
             <input 
                 type="text" 

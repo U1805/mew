@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import { IChannel, IChannelUpdate } from './channel.model';
+import { ChannelType, IChannel, IChannelUpdate } from './channel.model';
 import Server, { IServer } from '../server/server.model';
 import Role, { IRole } from '../role/role.model';
 import { calculateEffectivePermissions, syncUsersPermissionsForChannel } from '../../utils/permission.service';
@@ -65,6 +65,13 @@ const channelService = {
     // Check for topic separately to allow setting an empty topic
     if (channelData.topic !== undefined) {
         channel.topic = channelData.topic;
+    }
+
+    if (channelData.url !== undefined) {
+      if (channel.type !== ChannelType.GUILD_WEB) {
+        throw new BadRequestError('URL is only applicable to web channels.');
+      }
+      channel.url = channelData.url;
     }
 
     const updatedChannel = await channelRepository.save(channel);

@@ -16,6 +16,7 @@ import { ChannelSettingsOverviewTab } from '../../channel-settings/components/Ch
 import { ChannelSettingsIntegrationsTab } from '../../channel-settings/components/ChannelSettingsIntegrationsTab';
 import { makeEmptyOverride, type DisplayOverride, type PermissionState } from '../../channel-settings/model/constants';
 import { ChannelSettingsPermissionsTab } from '../../channel-settings/components/ChannelSettingsPermissionsTab';
+import { ChannelType } from '../../../shared/types';
 
 export const ChannelSettingsModal = () => {
   const { closeModal, modalData, openModal } = useModalStore();
@@ -25,6 +26,7 @@ export const ChannelSettingsModal = () => {
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [topic, setTopic] = useState('');
+  const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ChannelSettingsTab>('overview');
   
@@ -77,6 +79,7 @@ export const ChannelSettingsModal = () => {
       setName(modalData.channel.name || '');
       setCategoryId(modalData.channel.categoryId || '');
       setTopic(modalData.channel.topic || '');
+      setUrl(modalData.channel.url || '');
     }
   }, [modalData]);
 
@@ -86,11 +89,13 @@ export const ChannelSettingsModal = () => {
       if (!currentServerId || !modalData?.channel) return;
       setIsLoading(true);
       try {
+          const isWeb = modalData.channel.type === ChannelType.GUILD_WEB;
           const catId = categoryId === '' ? null : categoryId;
           await channelApi.update(currentServerId, modalData.channel._id, {
               name,
               categoryId: catId,
               topic,
+              ...(isWeb ? { url: url.trim() } : {}),
           });
           queryClient.invalidateQueries({ queryKey: ['channels', currentServerId] });
           queryClient.invalidateQueries({ queryKey: ['channel', modalData.channel._id] });
@@ -214,7 +219,12 @@ export const ChannelSettingsModal = () => {
          
          {/* Sidebar (Left) */}
          <ChannelSettingsSidebar
-             title={<>{modalData?.channel?.name || 'CHANNEL'} TEXT CHANNELS</>}
+             title={
+               <>
+                 {modalData?.channel?.name || 'CHANNEL'}{' '}
+                 {modalData?.channel?.type === ChannelType.GUILD_WEB ? 'WEB' : 'TEXT'} CHANNEL
+               </>
+             }
              activeTab={activeTab}
              mobileMenuOpen={mobileMenuOpen}
              onClose={closeModal}
@@ -252,6 +262,9 @@ export const ChannelSettingsModal = () => {
                      categories={categories}
                      topic={topic}
                      onTopicChange={setTopic}
+                     channelType={modalData.channel.type}
+                     url={url}
+                     onUrlChange={setUrl}
                      isSaving={isLoading}
                      onSave={handleChannelUpdate}
                      onCancel={closeModal}

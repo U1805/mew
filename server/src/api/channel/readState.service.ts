@@ -14,7 +14,10 @@ const readStateService = {
       if (!channel.recipients || !channel.recipients.map(id => id.toString()).includes(userId)) {
         throw new ForbiddenError('You do not have access to this DM channel.');
       }
-    } else if (channel.type === 'GUILD_TEXT') {
+    } else {
+      if (!channel.serverId) {
+        throw new ForbiddenError('This channel is not associated with a server.');
+      }
       const member = await ServerMember.findOne({ serverId: channel.serverId, userId });
       if (!member) {
         throw new ForbiddenError('You are not a member of this server.');

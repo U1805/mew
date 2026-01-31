@@ -23,6 +23,8 @@ const ChatArea: React.FC = () => {
 
   const { data: channel } = useChannel(currentServerId, currentChannelId);
   const isDM = channel?.type === ChannelType.DM;
+  const isWeb = channel?.type === ChannelType.GUILD_WEB;
+  const messageFeaturesEnabled = !!channel && !isWeb;
 
   const {
     data: messages = [],
@@ -30,8 +32,8 @@ const ChatArea: React.FC = () => {
     fetchOlder,
     isFetchingOlder,
     hasMoreOlder,
-  } = useMessages(currentServerId, currentChannelId);
-  useSocketMessages(currentChannelId);
+  } = useMessages(currentServerId, currentChannelId, { enabled: messageFeaturesEnabled });
+  useSocketMessages(currentChannelId, { enabled: messageFeaturesEnabled });
 
   // --- 空状态处理 (未选择频道) ---
   if (!currentChannelId) {
@@ -65,20 +67,56 @@ const ChatArea: React.FC = () => {
       <ChatHeader channel={channel || null} isMemberListOpen={isMemberListOpen} toggleMemberList={toggleMemberList} />
       <div className="flex flex-1 overflow-hidden relative">
         <div className="flex flex-col flex-1 min-w-0 min-h-0">
-          <MessageList
-            messages={messages}
-            isLoading={isLoading}
-            isFetchingOlder={isFetchingOlder}
-            hasMoreOlder={hasMoreOlder}
-            onLoadOlder={fetchOlder}
-            channel={channel || null}
-            channelId={currentChannelId}
-          />
-          <MessageInput channel={channel || null} serverId={currentServerId} channelId={currentChannelId} />
+          {isWeb ? (
+            <div className="flex flex-col flex-1 min-h-0">
+              <div className="px-4 py-2 border-b border-mew-darkest bg-mew-dark flex items-center gap-3">
+                <div className="text-xs text-mew-textMuted truncate flex-1">
+                  {channel?.url || 'No URL set. Update this channel in settings.'}
+                </div>
+                {channel?.url && (
+                  <a
+                    href={channel.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-medium text-mew-textMuted hover:text-white hover:underline whitespace-nowrap"
+                  >
+                    Open
+                  </a>
+                )}
+              </div>
+              {channel?.url ? (
+                <iframe
+                  title={channel?.name || 'Web Channel'}
+                  src={channel.url}
+                  className="w-full h-full border-0 bg-white"
+                  // Note: many sites rely on cookies/localStorage for auth; without `allow-same-origin` they often break.
+                  // Even with this, some sites still disallow iframe embedding via CSP/X-Frame-Options or third-party cookie policies.
+                  sandbox="allow-same-origin allow-forms allow-modals allow-popups allow-popups-to-escape-sandbox allow-scripts allow-top-navigation-by-user-activation"
+                />
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-mew-textMuted">
+                  Set a URL for this channel in settings.
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <MessageList
+                messages={messages}
+                isLoading={isLoading}
+                isFetchingOlder={isFetchingOlder}
+                hasMoreOlder={hasMoreOlder}
+                onLoadOlder={fetchOlder}
+                channel={channel || null}
+                channelId={currentChannelId}
+              />
+              <MessageInput channel={channel || null} serverId={currentServerId} channelId={currentChannelId} />
+            </>
+          )}
         </div>
         
-        <SearchResultsPanel />
-        {isDM && <DmSearchResultsPanel />}
+        {!isWeb && <SearchResultsPanel />}
+        {!isWeb && isDM && <DmSearchResultsPanel />}
         
         {/* Always render MemberList, it handles its own visibility/animation */}
         {currentServerId && <MemberList />}

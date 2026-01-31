@@ -1,7 +1,7 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { Channel } from '../../../shared/types';
+import { Channel, ChannelType } from '../../../shared/types';
 import { useUnreadStore } from '../../../shared/stores';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 
@@ -19,6 +19,13 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
     const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
     const hasUnread = unreadChannelIds.has(channel._id);
 
+    const channelIcon =
+      channel.type === ChannelType.GUILD_WEB
+        ? 'mdi:web'
+        : channel.type === ChannelType.DM
+          ? 'mdi:at'
+          : 'mdi:pound';
+
     return (
         <div
             onClick={onClick}
@@ -32,7 +39,7 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
             )}
         >
             <div className="flex items-center min-w-0 overflow-hidden flex-1 mr-1">
-                <Icon icon="mdi:pound" width="20" height="20" className={clsx("mr-1.5 flex-shrink-0", hasUnread ? "text-white" : "text-[#80848E]")} />
+                <Icon icon={channelIcon} width="20" height="20" className={clsx("mr-1.5 flex-shrink-0", hasUnread ? "text-white" : "text-[#80848E]")} />
                 <span className={clsx("text-sm truncate", hasUnread ? "font-bold" : "font-medium")}>{channel.name}</span>
                 {/* Unread Indicator - Right side of name */}
                 {hasUnread && !isActive && (
