@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import Channel, { IChannel } from './channel.model';
+import Channel, { ChannelType, IChannel } from './channel.model';
 import { ChannelReadState } from './readState.model';
 import { DM_PERMISSIONS } from '../../constants/permissions';
 
@@ -21,7 +21,7 @@ class ChannelRepository {
     const serverObjectId = new mongoose.Types.ObjectId(serverId);
 
     const channels = await Channel.aggregate([
-      { $match: { serverId: serverObjectId, type: 'GUILD_TEXT' } },
+      { $match: { serverId: serverObjectId, type: { $in: [ChannelType.GUILD_TEXT, ChannelType.GUILD_WEB] } } },
       {
         $lookup: {
           from: 'messages',

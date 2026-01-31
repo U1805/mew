@@ -75,6 +75,7 @@ export interface Category {
 
 export enum ChannelType {
   GUILD_TEXT = 'GUILD_TEXT',
+  GUILD_WEB = 'GUILD_WEB',
   DM = 'DM',
 }
 
@@ -89,6 +90,7 @@ export interface Channel {
   _id: string;
   name?: string;
   topic?: string;
+  url?: string;
   type: ChannelType;
   serverId?: string;
   categoryId?: string;

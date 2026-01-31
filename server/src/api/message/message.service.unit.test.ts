@@ -16,6 +16,11 @@ vi.mock('../channel/channel.model', () => ({
   default: {
     findById: vi.fn(),
   },
+  ChannelType: {
+    GUILD_TEXT: 'GUILD_TEXT',
+    GUILD_WEB: 'GUILD_WEB',
+    DM: 'DM',
+  },
 }));
 
 vi.mock('../member/member.model', () => ({

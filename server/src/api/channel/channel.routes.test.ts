@@ -40,6 +40,28 @@ describe('Channel Routes', () => {
       expect(res.body.serverId).toBe(serverId);
     });
 
+    it('should create a new web channel with a URL', async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'web', type: ChannelType.GUILD_WEB, url: 'https://example.com' });
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.name).toBe('web');
+      expect(res.body.type).toBe(ChannelType.GUILD_WEB);
+      expect(res.body.url).toBe('https://example.com');
+      expect(res.body.serverId).toBe(serverId);
+    });
+
+    it('should return 400 when creating a web channel without a URL', async () => {
+      const res = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'web', type: ChannelType.GUILD_WEB });
+
+      expect(res.statusCode).toBe(400);
+    });
+
     it('should return 403 if a user tries to create a channel in a server they do not own', async () => {
       const attackerData = { email: 'attacker@example.com', username: 'attacker', password: 'password123' };
       await request(app).post('/api/auth/register').send(attackerData);
@@ -138,6 +160,31 @@ describe('Channel Routes', () => {
 
       expect(res.statusCode).toBe(200);
       expect(res.body.name).toBe(updatedData.name);
+    });
+
+    it("should update a web channel's URL successfully", async () => {
+      const createRes = await request(app)
+        .post(`/api/servers/${serverId}/channels`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ name: 'WebToUpdate', type: ChannelType.GUILD_WEB, url: 'https://example.com' });
+      const webChannelId = createRes.body._id;
+
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${webChannelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ url: 'https://openai.com' });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.url).toBe('https://openai.com');
+    });
+
+    it('should return 400 when updating a non-web channel URL', async () => {
+      const res = await request(app)
+        .patch(`/api/servers/${serverId}/channels/${channelId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ url: 'https://example.com' });
+
+      expect(res.statusCode).toBe(400);
     });
 
     it("should update the channel's category successfully", async () => {

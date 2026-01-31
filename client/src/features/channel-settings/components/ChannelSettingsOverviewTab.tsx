@@ -1,4 +1,4 @@
-import type { Category } from '../../../shared/types';
+import { ChannelType, type Category } from '../../../shared/types';
 
 export const ChannelSettingsOverviewTab: React.FC<{
   name: string;
@@ -8,10 +8,13 @@ export const ChannelSettingsOverviewTab: React.FC<{
   categories: Category[] | undefined;
   topic: string;
   onTopicChange: (next: string) => void;
+  channelType: ChannelType;
+  url: string;
+  onUrlChange: (next: string) => void;
   isSaving: boolean;
   onSave: () => void;
   onCancel: () => void;
-}> = ({ name, onNameChange, categoryId, onCategoryChange, categories, topic, onTopicChange, isSaving, onSave, onCancel }) => {
+}> = ({ name, onNameChange, categoryId, onCategoryChange, categories, topic, onTopicChange, channelType, url, onUrlChange, isSaving, onSave, onCancel }) => {
   return (
     <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-10 p-4 md:p-0">
       <h2 className="text-xl font-bold text-white mb-6 hidden md:block">Overview</h2>
@@ -41,6 +44,19 @@ export const ChannelSettingsOverviewTab: React.FC<{
             ))}
           </select>
         </div>
+
+        {channelType === ChannelType.GUILD_WEB && (
+          <div>
+            <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Web URL</label>
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => onUrlChange(e.target.value)}
+              className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
+              placeholder="https://example.com"
+            />
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Channel Topic</label>

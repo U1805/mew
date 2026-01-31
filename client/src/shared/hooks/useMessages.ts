@@ -12,10 +12,15 @@ const sortAsc = (messages: Message[]) =>
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
-export const useMessages = (serverId: string | null, channelId: string | null) => {
+export const useMessages = (
+  serverId: string | null,
+  channelId: string | null,
+  options?: { enabled?: boolean }
+) => {
   const queryClient = useQueryClient();
   const [isFetchingOlder, setIsFetchingOlder] = useState(false);
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  const enabled = options?.enabled ?? true;
 
   useEffect(() => {
     setIsFetchingOlder(false);
@@ -33,11 +38,12 @@ export const useMessages = (serverId: string | null, channelId: string | null) =
       setHasMoreOlder((res.data as Message[]).length === DEFAULT_PAGE_SIZE);
       return initial;
     },
-    enabled: !!channelId,
+    enabled: !!channelId && enabled,
     refetchOnWindowFocus: false,
   });
 
   const fetchOlder = useCallback(async () => {
+    if (!enabled) return;
     if (!channelId) return;
     if (isFetchingOlder || !hasMoreOlder) return;
 
@@ -72,7 +78,7 @@ export const useMessages = (serverId: string | null, channelId: string | null) =
     } finally {
       setIsFetchingOlder(false);
     }
-  }, [channelId, hasMoreOlder, isFetchingOlder, queryClient, serverId]);
+  }, [channelId, enabled, hasMoreOlder, isFetchingOlder, queryClient, serverId]);
 
   return useMemo(
     () => ({
