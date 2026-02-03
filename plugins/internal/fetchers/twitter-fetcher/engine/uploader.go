@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"mew/plugins/pkg"
 	"mew/plugins/internal/fetchers/twitter-fetcher/source"
+	"mew/plugins/pkg"
 )
 
 type Uploader struct {
@@ -42,7 +42,7 @@ func NewUploader(
 }
 
 func (u *Uploader) uploadWithCache(ctx context.Context, remoteURL, fallbackFilename string) string {
-	src := strings.TrimSpace(remoteURL)
+	src := NormalizeMediaURL(remoteURL)
 	if src == "" {
 		return ""
 	}
@@ -84,21 +84,27 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 	text := BuildTweetText(display)
 
 	s3Images := make([]string, 0, len(display.Images))
+	images := make([]string, 0, len(display.Images))
 	for _, img := range display.Images {
-		key := u.uploadWithCache(ctx, img, "image"+path.Ext(strings.TrimSpace(img)))
+		norm := NormalizeMediaURL(img)
+		if norm != "" {
+			images = append(images, norm)
+		}
+		key := u.uploadWithCache(ctx, norm, "image"+path.Ext(norm))
 		if key != "" {
 			s3Images = append(s3Images, key)
 		}
 	}
 
 	videoURL, videoCT := PickBestVideoURL(display.Video)
+	videoURL = NormalizeMediaURL(videoURL)
 	s3Video := ""
 	coverURL := ""
 	s3Cover := ""
 	if display.Video != nil {
-		coverURL = strings.TrimSpace(display.Video.CoverURL)
+		coverURL = NormalizeMediaURL(display.Video.CoverURL)
 		if coverURL != "" {
-			s3Cover = u.uploadWithCache(ctx, coverURL, "cover"+path.Ext(strings.TrimSpace(coverURL)))
+			s3Cover = u.uploadWithCache(ctx, coverURL, "cover"+path.Ext(coverURL))
 		}
 		if strings.TrimSpace(videoURL) != "" {
 			s3Video = u.uploadWithCache(ctx, videoURL, "video.mp4")
@@ -114,7 +120,7 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 		"author_name":   author.Name,
 		"author_handle": author.Handle,
 		"author_avatar": author.ProfileImageURL,
-		"images":        display.Images,
+		"images":        images,
 		"video_url":     videoURL,
 		"cover_url":     coverURL,
 		"like_count":    display.FavoriteCount,
@@ -167,21 +173,27 @@ func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline
 	text := BuildTweetText(t)
 
 	s3Images := make([]string, 0, len(t.Images))
+	images := make([]string, 0, len(t.Images))
 	for _, img := range t.Images {
-		key := u.uploadWithCache(ctx, img, "image"+path.Ext(strings.TrimSpace(img)))
+		norm := NormalizeMediaURL(img)
+		if norm != "" {
+			images = append(images, norm)
+		}
+		key := u.uploadWithCache(ctx, norm, "image"+path.Ext(norm))
 		if key != "" {
 			s3Images = append(s3Images, key)
 		}
 	}
 
 	videoURL, videoCT := PickBestVideoURL(t.Video)
+	videoURL = NormalizeMediaURL(videoURL)
 	s3Video := ""
 	coverURL := ""
 	s3Cover := ""
 	if t.Video != nil {
-		coverURL = strings.TrimSpace(t.Video.CoverURL)
+		coverURL = NormalizeMediaURL(t.Video.CoverURL)
 		if coverURL != "" {
-			s3Cover = u.uploadWithCache(ctx, coverURL, "cover"+path.Ext(strings.TrimSpace(coverURL)))
+			s3Cover = u.uploadWithCache(ctx, coverURL, "cover"+path.Ext(coverURL))
 		}
 		if strings.TrimSpace(videoURL) != "" {
 			s3Video = u.uploadWithCache(ctx, videoURL, "video.mp4")
@@ -196,7 +208,7 @@ func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline
 		"author_name":   author.Name,
 		"author_handle": author.Handle,
 		"author_avatar": author.ProfileImageURL,
-		"images":        t.Images,
+		"images":        images,
 		"video_url":     videoURL,
 		"cover_url":     coverURL,
 		"like_count":    t.FavoriteCount,
