@@ -2,15 +2,26 @@ package app
 
 import (
 	"mew/plugins/internal/agents/jpdict-agent/agent"
-	"mew/plugins/internal/agents/jpdict-agent/config"
 	"mew/plugins/pkg"
 )
 
 func Run() error {
-	cfgTemplate, err := sdk.ConfigTemplateJSON(config.JpdictConfig{
-		BaseURL: "https://api.openai.com/v1",
-		APIKey:  "",
-		Model:   "gpt-4o-mini",
+	cfgTemplate, err := sdk.ConfigTemplateJSON(map[string]any{
+		"base_url": map[string]any{
+			"type":     "url",
+			"desc":     "OpenAI-compatible base URL (e.g. https://api.openai.com/v1)",
+			"required": true,
+		},
+		"api_key": map[string]any{
+			"type":     "token",
+			"desc":     "API key",
+			"required": true,
+		},
+		"model": map[string]any{
+			"type":     "string",
+			"desc":     "Model name (e.g. gpt-4o-mini)",
+			"required": true,
+		},
 	})
 	if err != nil {
 		return err

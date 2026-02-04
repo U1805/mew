@@ -1,23 +1,51 @@
 package agent
 
 import (
-	"mew/plugins/internal/agents/assistant-agent/infra"
 	"mew/plugins/pkg"
 )
 
 func Run() error {
-	cfgTemplate, err := sdk.ConfigTemplateJSON(infra.AssistantConfig{
-		ChatModel: infra.ChatModelConfig{
-			BaseURL: "https://api.openai.com/v1",
-			APIKey:  "",
-			Model:   "gpt-4o-mini",
+	cfgTemplate, err := sdk.ConfigTemplateJSON(map[string]any{
+		"chat_model": map[string]any{
+			"base_url": map[string]any{
+				"type":     "url",
+				"desc":     "OpenAI-compatible base URL (e.g. https://api.openai.com/v1)",
+				"required": true,
+			},
+			"api_key": map[string]any{
+				"type":     "token",
+				"desc":     "API key",
+				"required": true,
+			},
+			"model": map[string]any{
+				"type":     "string",
+				"desc":     "Model name (e.g. gpt-4o-mini)",
+				"required": true,
+			},
 		},
-		User: infra.UserConfig{
-			UserInterests: "游戏/摇滚乐",
-			Timezone:      infra.DefaultTimezone,
+		"user": map[string]any{
+			"user_interests": map[string]any{
+				"type":     "string",
+				"desc":     "Injected into persona prompt as {{USER_INTERESTS}}",
+				"required": false,
+			},
+			"timezone": map[string]any{
+				"type":     "string",
+				"desc":     "IANA TZ name or offset (e.g. Asia/Shanghai, +08:00). Empty means default",
+				"required": false,
+			},
 		},
-		Tool: infra.ToolConfig{
-			ExaAPIKey: "",
+		"tool": map[string]any{
+			"exa_api_key": map[string]any{
+				"type":     "token",
+				"desc":     "Exa API key (optional)",
+				"required": false,
+			},
+			"hobbyist_tts_token": map[string]any{
+				"type":     "token",
+				"desc":     "Hobbyist TTS token (optional)",
+				"required": false,
+			},
 		},
 	})
 	if err != nil {

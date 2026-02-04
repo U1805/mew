@@ -2,14 +2,37 @@ package engine
 
 import (
 	"mew/plugins/internal/fetchers/pornhub-fetcher/config"
-	"mew/plugins/pkg"
+	sdk "mew/plugins/pkg"
 )
 
 func RunService() error {
 	configTemplate, _ := sdk.ConfigTemplateJSON([]any{
 		map[string]any{
-			"username":              "some_user",
-			"webhook":               "http://mew-server/api/webhooks/<webhookId>/<token>",
+			"username": map[string]any{
+				"type":     "string",
+				"desc":     "Pornhub username",
+				"required": true,
+			},
+			"webhook": map[string]any{
+				"type":     "url",
+				"desc":     "Webhook to target channel",
+				"required": true,
+			},
+			"interval": map[string]any{
+				"type":     "int",
+				"desc":     "Polling interval (seconds). Default: 43200",
+				"required": false,
+			},
+			"enabled": map[string]any{
+				"type":     "bool",
+				"desc":     "Enable this task",
+				"required": false,
+			},
+			"send_history_on_start": map[string]any{
+				"type":     "bool",
+				"desc":     "Send recent history on startup",
+				"required": false,
+			},
 		},
 	})
 

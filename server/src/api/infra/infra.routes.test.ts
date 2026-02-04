@@ -49,6 +49,41 @@ describe('Infra routes (/api/infra)', () => {
     );
   });
 
+  it('accepts structured configTemplate and stores as JSON string', async () => {
+    const registerRes = await request(app)
+      .post('/api/infra/service-types/register')
+      .set('X-Mew-Admin-Secret', process.env.MEW_ADMIN_SECRET!)
+      .send({
+        serviceType: 'rss-fetcher',
+        configTemplate: [
+          {
+            webhook: { type: 'url', desc: 'target channel webhook', required: true },
+          },
+        ],
+      });
+
+    expect(registerRes.statusCode).toBe(200);
+
+    const userData = { email: 'infra-user3@example.com', username: 'infrauser3', password: 'password123' };
+    await request(app).post('/api/auth/register').send(userData);
+    const loginRes = await request(app).post('/api/auth/login').send({ email: userData.email, password: userData.password });
+    const token = loginRes.body.token;
+
+    const listRes = await request(app)
+      .get('/api/infra/available-services?includeOffline=1')
+      .set('Authorization', `Bearer ${token}`);
+
+    expect(listRes.statusCode).toBe(200);
+    expect(listRes.body.services).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          serviceType: 'rss-fetcher',
+          configTemplate: expect.stringContaining('"webhook"'),
+        }),
+      ])
+    );
+  });
+
   it('rejects reserved service types', async () => {
     const registerRes = await request(app)
       .post('/api/infra/service-types/register')
