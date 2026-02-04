@@ -1,15 +1,33 @@
 package engine
 
 import (
-	"mew/plugins/pkg"
 	"mew/plugins/internal/fetchers/test-fetcher/config"
+	sdk "mew/plugins/pkg"
 )
 
 func RunService() error {
 	configTemplate, _ := sdk.ConfigTemplateJSON([]any{
 		map[string]any{
-			"webhook":  "http://mew-server/api/webhooks/<webhookId>/<token>",
-			"content":  "test message",
+			"webhook": map[string]any{
+				"type":     "url",
+				"desc":     "Webhook to target channel",
+				"required": true,
+			},
+			"content": map[string]any{
+				"type":     "string",
+				"desc":     "Message content to post",
+				"required": true,
+			},
+			"interval": map[string]any{
+				"type":     "int",
+				"desc":     "Polling interval (seconds). Default: 30",
+				"required": false,
+			},
+			"enabled": map[string]any{
+				"type":     "bool",
+				"desc":     "Enable this task",
+				"required": false,
+			},
 		},
 	})
 

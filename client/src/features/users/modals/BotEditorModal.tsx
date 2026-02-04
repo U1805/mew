@@ -9,6 +9,14 @@ import { useCreateBot, useUpdateBot, useDeleteBot, useRegenerateBotToken } from 
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { infraApi } from '../../../shared/services/api';
 import type { AvailableService } from '../../../shared/services/infra.api';
+import {
+  ConfigTemplateForm,
+  buildInitialValueFromSchema,
+  cleanValueForConfig,
+  hydrateValueFromSchema,
+  isTemplateSchemaLike,
+  validateValueAgainstSchema,
+} from '../components/ConfigTemplateForm';
 
 export const BotEditorModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
@@ -20,6 +28,9 @@ export const BotEditorModal: React.FC = () => {
   const [serviceType, setServiceType] = useState(internalBot?.serviceType || '');
   const [dmEnabled, setDmEnabled] = useState(internalBot?.dmEnabled || false);
   const [config, setConfig] = useState(internalBot?.config || '{}');
+  const [configMode, setConfigMode] = useState<'visual' | 'json'>('json');
+  const [configSchema, setConfigSchema] = useState<any>(null);
+  const [visualValue, setVisualValue] = useState<any>(undefined);
   const [configError, setConfigError] = useState('');
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
@@ -57,6 +68,14 @@ export const BotEditorModal: React.FC = () => {
   const serviceOptions = (availableServices || []).filter((s) => s.online || (isEditing && s.serviceType === serviceType));
   const selectedService = (availableServices || []).find((s) => s.serviceType === serviceType);
 
+  const safeParseJSON = (raw: string): any | undefined => {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return undefined;
+    }
+  };
+
   useEffect(() => {
     if (isEditing) return;
     if (serviceType) return;
@@ -67,15 +86,54 @@ export const BotEditorModal: React.FC = () => {
   }, [isEditing, serviceOptions, serviceType]);
 
   useEffect(() => {
+    const raw = selectedService?.configTemplate || '';
+    const parsed = raw.trim() ? safeParseJSON(raw) : undefined;
+    if (parsed && isTemplateSchemaLike(parsed)) {
+      setConfigSchema(parsed);
+      setConfigMode('visual');
+    } else {
+      setConfigSchema(null);
+      setConfigMode('json');
+    }
+    setVisualValue(undefined);
+  }, [selectedService?.configTemplate]);
+
+  useEffect(() => {
+    if (!configSchema) return;
+    if (configMode !== 'visual') return;
+
+    const base =
+      visualValue === undefined
+        ? ((): any => {
+            const parsed = safeParseJSON(config);
+            if (parsed !== undefined) return hydrateValueFromSchema(configSchema, parsed);
+            return buildInitialValueFromSchema(configSchema);
+          })()
+        : visualValue;
+    if (base !== visualValue) setVisualValue(base);
+
+    const cleaned = cleanValueForConfig(configSchema, base);
+    const errs = validateValueAgainstSchema(configSchema, cleaned);
+    if (errs.length > 0) {
+      setConfigError(errs[0] + (errs.length > 1 ? ` (+${errs.length - 1} more)` : ''));
+    } else {
+      setConfigError('');
+    }
+    setConfig(cleaned === undefined ? '{}' : JSON.stringify(cleaned, null, 2));
+  }, [configMode, configSchema, visualValue]);
+
+  useEffect(() => {
     if (isEditing) return;
     if (!serviceType) return;
+    if (configSchema) return; // schema templates use visual editor instead of auto-inserting JSON examples
+
     const template = selectedService?.configTemplate || '';
     if (!template.trim()) return;
 
     const current = config.trim();
     if (current && current !== '{}' && current !== 'null') return;
     if (config !== template) setConfig(template);
-  }, [config, isEditing, selectedService?.configTemplate, serviceType]);
+  }, [config, configSchema, isEditing, selectedService?.configTemplate, serviceType]);
 
   useEffect(() => {
     const initialValues = modalData?.bot as Bot | undefined;
@@ -89,13 +147,14 @@ export const BotEditorModal: React.FC = () => {
   }, [modalData]);
 
   useEffect(() => {
+    if (configMode !== 'json') return;
     try {
       JSON.parse(config);
       setConfigError('');
     } catch {
       setConfigError('Invalid JSON format');
     }
-  }, [config]);
+  }, [config, configMode]);
 
   const handleConfigChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setConfig(e.target.value);
@@ -349,27 +408,70 @@ export const BotEditorModal: React.FC = () => {
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-bold text-mew-textMuted uppercase">Configuration (JSON)</label>
-                  <button
-                    type="button"
-                    onClick={handleFormatConfig}
-                    disabled={!config.trim() || !!configError}
-                    className="flex items-center gap-1.5 text-xs text-mew-textMuted hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Format JSON"
-                  >
-                    <Icon icon="mdi:format-indent-increase" width="16" />
-                    Format
-                  </button>
-                </div>
-                <textarea
-                  value={config}
-                  onChange={handleConfigChange}
-                  className={clsx(
-                    "w-full bg-[#1E1F22] text-white font-mono text-sm p-3 rounded border focus:outline-none min-h-[120px] resize-y",
-                    configError ? "border-red-500" : "border-transparent focus:border-mew-textMuted"
+                  <div className="flex items-center gap-3">
+                    <label className="block text-xs font-bold text-mew-textMuted uppercase">
+                      Configuration {configSchema ? '' : '(JSON)'}
+                    </label>
+                    {configSchema && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setConfigMode('visual')}
+                          className={clsx(
+                            'text-xs font-medium px-2 py-1 rounded',
+                            configMode === 'visual' ? 'bg-[#1E1F22] text-white' : 'bg-transparent text-mew-textMuted hover:text-white'
+                          )}
+                        >
+                          Visual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfigMode('json')}
+                          className={clsx(
+                            'text-xs font-medium px-2 py-1 rounded',
+                            configMode === 'json' ? 'bg-[#1E1F22] text-white' : 'bg-transparent text-mew-textMuted hover:text-white'
+                          )}
+                        >
+                          JSON
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {configMode === 'json' && (
+                    <button
+                      type="button"
+                      onClick={handleFormatConfig}
+                      disabled={!config.trim() || !!configError}
+                      className="flex items-center gap-1.5 text-xs text-mew-textMuted hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Format JSON"
+                    >
+                      <Icon icon="mdi:format-indent-increase" width="16" />
+                      Format
+                    </button>
                   )}
-                  spellCheck={false}
-                />
+                </div>
+
+                {configSchema && configMode === 'visual' ? (
+                  <div className={clsx('bg-[#1E1F22] rounded border p-3', configError ? 'border-red-500' : 'border-transparent')}>
+                    <ConfigTemplateForm
+                      schema={configSchema}
+                      value={visualValue === undefined ? buildInitialValueFromSchema(configSchema) : visualValue}
+                      onChange={setVisualValue}
+                    />
+                  </div>
+                ) : (
+                  <textarea
+                    value={config}
+                    onChange={handleConfigChange}
+                    className={clsx(
+                      "w-full bg-[#1E1F22] text-white font-mono text-sm p-3 rounded border focus:outline-none min-h-[120px] resize-y",
+                      configError ? "border-red-500" : "border-transparent focus:border-mew-textMuted"
+                    )}
+                    spellCheck={false}
+                  />
+                )}
+
                 {configError && <div className="text-red-400 text-xs mt-1">{configError}</div>}
               </div>
             </div>

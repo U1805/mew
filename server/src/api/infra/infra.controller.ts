@@ -45,7 +45,19 @@ export const registerServiceTypeHandler = asyncHandler(async (req: Request, res:
   const serverName = String((req.body?.serverName as string) || '').trim() || serviceType;
   const icon = String((req.body?.icon as string) || '').trim();
   const description = String((req.body?.description as string) || '').trim();
-  const configTemplate = String((req.body?.configTemplate as string) || '');
+
+  // Allow configTemplate to be either a JSON string (legacy) or a structured JSON value (object/array).
+  const rawConfigTemplate = (req.body as any)?.configTemplate;
+  let configTemplate = '';
+  if (typeof rawConfigTemplate === 'string') {
+    configTemplate = rawConfigTemplate;
+  } else if (rawConfigTemplate != null) {
+    try {
+      configTemplate = JSON.stringify(rawConfigTemplate);
+    } catch {
+      configTemplate = '';
+    }
+  }
 
   await ServiceTypeModel.updateOne(
     { name: serviceType },

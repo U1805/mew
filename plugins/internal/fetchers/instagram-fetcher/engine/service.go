@@ -2,14 +2,37 @@ package engine
 
 import (
 	"mew/plugins/internal/fetchers/instagram-fetcher/config"
-	"mew/plugins/pkg"
+	sdk "mew/plugins/pkg"
 )
 
 func RunService() error {
 	configTemplate, _ := sdk.ConfigTemplateJSON([]any{
 		map[string]any{
-			"username":              "xxxxxx",
-			"webhook":               "http://mew-server/api/webhooks/<webhookId>/<token>",
+			"username": map[string]any{
+				"type":     "string",
+				"desc":     "Instagram username",
+				"required": true,
+			},
+			"webhook": map[string]any{
+				"type":     "url",
+				"desc":     "Webhook to target channel",
+				"required": true,
+			},
+			"interval": map[string]any{
+				"type":     "int",
+				"desc":     "Polling interval (seconds). Default: 3600",
+				"required": false,
+			},
+			"enabled": map[string]any{
+				"type":     "bool",
+				"desc":     "Enable this task",
+				"required": false,
+			},
+			"send_history_on_start": map[string]any{
+				"type":     "bool",
+				"desc":     "Send recent history on startup",
+				"required": false,
+			},
 		},
 	})
 

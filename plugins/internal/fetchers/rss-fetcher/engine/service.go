@@ -2,14 +2,42 @@ package engine
 
 import (
 	"mew/plugins/internal/fetchers/rss-fetcher/config"
-	"mew/plugins/pkg"
+	sdk "mew/plugins/pkg"
 )
 
 func RunService() error {
 	configTemplate, _ := sdk.ConfigTemplateJSON([]any{
 		map[string]any{
-			"rss_url":               "https://example.com/feed.xml",
-			"webhook":               "http://mew-server/api/webhooks/<webhookId>/<token>",
+			"rss_url": map[string]any{
+				"type":     "url",
+				"desc":     "RSS feed URL",
+				"required": true,
+			},
+			"webhook": map[string]any{
+				"type":     "url",
+				"desc":     "Webhook to target channel",
+				"required": true,
+			},
+			"interval": map[string]any{
+				"type":     "int",
+				"desc":     "Polling interval (seconds). Default: 300",
+				"required": false,
+			},
+			"enabled": map[string]any{
+				"type":     "bool",
+				"desc":     "Enable this task",
+				"required": false,
+			},
+			"send_history_on_start": map[string]any{
+				"type":     "bool",
+				"desc":     "Send recent history on startup",
+				"required": false,
+			},
+			"max_items_per_poll": map[string]any{
+				"type":     "int",
+				"desc":     "Max items per poll (1..20). Default: 5",
+				"required": false,
+			},
 		},
 	})
 
