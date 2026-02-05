@@ -22,8 +22,13 @@ vi.mock('./user.repository', () => ({
   },
 }));
 
+vi.mock('../auth/refreshToken.service', () => ({
+  revokeAllRefreshTokensForUserId: vi.fn(),
+}));
+
 import userService from './user.service';
 import { userRepository } from './user.repository';
+import { revokeAllRefreshTokensForUserId } from '../auth/refreshToken.service';
 
 describe('user.service', () => {
   beforeEach(() => {
@@ -90,6 +95,7 @@ describe('user.service', () => {
 
     expect(bcrypt.hash).toHaveBeenCalledWith('new', 10);
     expect(userRepository.updateById).toHaveBeenCalledWith('u1', { password: 'hashed-new' });
+    expect(revokeAllRefreshTokensForUserId).toHaveBeenCalledWith('u1');
   });
 });
 

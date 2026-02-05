@@ -8,17 +8,16 @@ const api = axios.create({
   withCredentials: true,
 });
 
-let refreshPromise: Promise<string> | null = null;
+let refreshPromise: Promise<void> | null = null;
 
 const shouldSkipRefresh = (url: string | undefined) => {
   if (!url) return false;
   return url.includes('/auth/login') || url.includes('/auth/register') || url.includes('/auth/refresh') || url.includes('/auth/logout');
 };
 
-const refreshAccessToken = async (): Promise<string> => {
+const refreshAccessToken = async (): Promise<void> => {
   // Use a separate request to avoid interceptor recursion.
-  const res = await axios.post(`${API_URL}/auth/refresh`, {}, { withCredentials: true });
-  return res.data?.token as string;
+  await axios.post(`${API_URL}/auth/refresh-cookie`, {}, { withCredentials: true });
 };
 
 api.interceptors.response.use(
@@ -40,8 +39,7 @@ api.interceptors.response.use(
         });
       }
 
-      const newToken = await refreshPromise;
-      if (!newToken) throw error;
+      await refreshPromise;
       return api(originalConfig);
     } catch {
       await useAuthStore.getState().logout();

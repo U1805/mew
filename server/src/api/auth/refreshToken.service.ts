@@ -95,3 +95,8 @@ export const revokeRefreshToken = async (refreshToken: string) => {
   await existing.save();
 };
 
+export const revokeAllRefreshTokensForUserId = async (userId: string | mongoose.Types.ObjectId) => {
+  const id = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+  const now = new Date();
+  await RefreshToken.updateMany({ userId: id, revokedAt: null }, { $set: { revokedAt: now } });
+};

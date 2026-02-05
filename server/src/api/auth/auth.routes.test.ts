@@ -93,6 +93,64 @@ describe('Auth Routes', () => {
     });
   });
 
+  describe('cookie-only auth endpoints', () => {
+    it('POST /api/auth/register-cookie returns user without token', async () => {
+      const userData = {
+        email: 'register-cookie-1@example.com',
+        username: 'registercookie1',
+        password: 'password123',
+      };
+      const res = await request(app).post('/api/auth/register-cookie').send(userData);
+      expect(res.statusCode).toBe(201);
+      expect(res.body.user.email).toBe(userData.email);
+      expect(res.body.token).toBeUndefined();
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('POST /api/auth/login-cookie returns user without token', async () => {
+      const userData = {
+        email: 'login-cookie-1@example.com',
+        username: 'logincookie1',
+        password: 'password123',
+      };
+      await request(app).post('/api/auth/register').send(userData);
+      const res = await request(app).post('/api/auth/login-cookie').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: true,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.user.email).toBe(userData.email);
+      expect(res.body.token).toBeUndefined();
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('POST /api/auth/refresh-cookie rotates refresh token and returns user without token', async () => {
+      const userData = {
+        email: 'refresh-cookie-1@example.com',
+        username: 'refreshcookie1',
+        password: 'password123',
+      };
+
+      await request(app).post('/api/auth/register').send(userData);
+      const loginRes = await request(app).post('/api/auth/login-cookie').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: true,
+      });
+
+      expect(loginRes.statusCode).toBe(200);
+      const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+
+      const refreshRes = await request(app).post('/api/auth/refresh-cookie').set('Cookie', cookies || []);
+      expect(refreshRes.statusCode).toBe(200);
+      expect(refreshRes.body.user).toBeDefined();
+      expect(refreshRes.body.token).toBeUndefined();
+      expect(refreshRes.headers['set-cookie']).toBeDefined();
+    });
+  });
+
   describe('POST /api/auth/bot', () => {
     it('should exchange bot accessToken for a JWT', async () => {
       const botUser = await User.create({

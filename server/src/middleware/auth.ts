@@ -24,7 +24,12 @@ export const protect = (req: Request, res: Response, next: NextFunction) => {
   }
 
   try {
-    const user = jwt.verify(token, config.jwtSecret) as { id: string; username: string };
+    const verifyOptions: jwt.VerifyOptions = {
+      algorithms: ['HS256'],
+      ...(config.jwtIssuer ? { issuer: config.jwtIssuer } : {}),
+      ...(config.jwtAudience ? { audience: config.jwtAudience } : {}),
+    };
+    const user = jwt.verify(token, config.jwtSecret, verifyOptions) as { id: string; username: string };
     req.user = user;
     next();
   } catch (e) {

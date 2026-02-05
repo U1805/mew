@@ -63,6 +63,8 @@ import * as botService from './bot.service';
 import * as botRepository from './bot.repository';
 import { uploadFile } from '../../utils/s3';
 import ServiceTypeModel from '../infra/serviceType.model';
+import { encryptBotAccessToken, hashBotAccessToken } from './botAccessToken.crypto';
+import config from '../../config';
 
 describe('bot.service', () => {
   beforeEach(() => {
@@ -73,7 +75,8 @@ describe('bot.service', () => {
 
   it('createBot returns accessToken on creation', async () => {
     const savedBot: any = {
-      accessToken: 't'.repeat(32),
+      accessToken: hashBotAccessToken('t'.repeat(32)),
+      accessTokenEnc: 'enc',
       serviceType: 'rss-fetcher',
       _id: 'b1',
       save: vi.fn().mockResolvedValue({}),
@@ -87,7 +90,7 @@ describe('bot.service', () => {
       expect.objectContaining({
         name: 'MyBot',
         ownerId: 'u1',
-        accessToken: 't'.repeat(32),
+        accessToken: hashBotAccessToken('t'.repeat(32)),
         serviceType: 'rss-fetcher',
       })
     );
@@ -96,7 +99,8 @@ describe('bot.service', () => {
 
   it('createBot uploads avatar when provided', async () => {
     const savedBot: any = {
-      accessToken: 't'.repeat(32),
+      accessToken: hashBotAccessToken('t'.repeat(32)),
+      accessTokenEnc: 'enc',
       serviceType: 'rss-fetcher',
       _id: 'b1',
       save: vi.fn().mockResolvedValue({}),
@@ -134,24 +138,37 @@ describe('bot.service', () => {
 
   it('regenerateAccessToken updates token and saves', async () => {
     vi.mocked(nanoid).mockReturnValueOnce('n'.repeat(32));
-    const botDoc: any = { accessToken: 'old', save: vi.fn().mockResolvedValue({}) };
+    const botDoc: any = { accessToken: hashBotAccessToken('old'), accessTokenEnc: 'enc', save: vi.fn().mockResolvedValue({}) };
     vi.mocked(botRepository.findByIdWithToken).mockResolvedValue(botDoc);
 
     const token = await botService.regenerateAccessToken('b1', 'u1');
 
     expect(token).toBe('n'.repeat(32));
-    expect(botDoc.accessToken).toBe('n'.repeat(32));
+    expect(botDoc.accessToken).toBe(hashBotAccessToken('n'.repeat(32)));
     expect(botDoc.save).toHaveBeenCalledTimes(1);
   });
 
   it('bootstrapBots returns bots with tokens', async () => {
     vi.mocked(botRepository.findByServiceTypeWithToken).mockResolvedValue([
-      { _id: 'b1', name: 'Bot1', config: '{}', accessToken: 't'.repeat(32), serviceType: 'rss-fetcher', dmEnabled: false } as any,
+      // Legacy-style bot (plaintext token, no accessTokenEnc) should still be bootstrappable.
+      { _id: 'b1', name: 'Bot1', config: '{}', accessToken: 't'.repeat(32), accessTokenEnc: '', serviceType: 'rss-fetcher', dmEnabled: false } as any,
     ]);
 
     const result = await botService.bootstrapBots('rss-fetcher');
     expect(result).toEqual([
       expect.objectContaining({ _id: 'b1', serviceType: 'rss-fetcher', accessToken: 't'.repeat(32) }),
     ]);
+  });
+
+  it('bootstrapBots decrypts encrypted tokens (v2 storage)', async () => {
+    const raw = 't'.repeat(32);
+    const keyMaterial = (config as any).botTokenEncKey || (config as any).adminSecret || (config as any).jwtSecret;
+    const enc = encryptBotAccessToken(raw, String(keyMaterial));
+    vi.mocked(botRepository.findByServiceTypeWithToken).mockResolvedValue([
+      { _id: 'b1', name: 'Bot1', config: '{}', accessToken: hashBotAccessToken(raw), accessTokenEnc: enc, serviceType: 'rss-fetcher', dmEnabled: false } as any,
+    ]);
+
+    const result: any = await botService.bootstrapBots('rss-fetcher');
+    expect(result[0].accessToken).toBe(raw);
   });
 });

@@ -6,6 +6,7 @@ export interface IBot extends Document {
   name: string;
   avatarUrl?: string;
   accessToken: string;
+  accessTokenEnc?: string;
   serviceType: string;
   dmEnabled: boolean;
   config: string; // JSON string
@@ -28,6 +29,10 @@ const BotSchema: Schema = new Schema(
       required: true,
       unique: true,
       select: false
+    },
+    accessTokenEnc: {
+      type: String,
+      select: false,
     },
     serviceType: {
       type: String,

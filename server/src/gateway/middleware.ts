@@ -21,7 +21,12 @@ export const authMiddleware = (socket: Socket, next: (err?: Error) => void) => {
   }
 
   try {
-    const user = jwt.verify(token, config.jwtSecret) as { id: string; username: string; discriminator?: string };
+    const verifyOptions: jwt.VerifyOptions = {
+      algorithms: ['HS256'],
+      ...(config.jwtIssuer ? { issuer: config.jwtIssuer } : {}),
+      ...(config.jwtAudience ? { audience: config.jwtAudience } : {}),
+    };
+    const user = jwt.verify(token, config.jwtSecret, verifyOptions) as { id: string; username: string; discriminator?: string };
     socket.user = user;
     next();
   } catch (e) {

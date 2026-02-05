@@ -7,9 +7,17 @@ import { userRepository } from '../user/user.repository';
 import { getS3PublicUrl } from '../../utils/s3';
 import * as botRepository from '../bot/bot.repository';
 import { ensureBotUserExists } from '../bot/bot.service';
+import { encryptBotAccessToken, hashBotAccessToken } from '../bot/botAccessToken.crypto';
+
+const botTokenKeyMaterial = () => config.botTokenEncKey || config.adminSecret || config.jwtSecret;
 
 export const signAccessToken = (payload: { id: any; username: string; discriminator?: string }) =>
-  jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpiresIn });
+  jwt.sign(payload, config.jwtSecret, {
+    algorithm: 'HS256',
+    expiresIn: config.jwtExpiresIn,
+    ...(config.jwtIssuer ? { issuer: config.jwtIssuer } : {}),
+    ...(config.jwtAudience ? { audience: config.jwtAudience } : {}),
+  });
 
 export const login = async (loginData: Pick<IUser, 'email' | 'password'>) => {
   const { email, password } = loginData;
@@ -53,6 +61,21 @@ export const loginBot = async (data: { accessToken?: string }) => {
   const bot = await botRepository.findByAccessToken(accessToken);
   if (!bot) {
     throw new UnauthorizedError('Invalid bot token');
+  }
+
+  // Backward-compatible migration: older bots stored plaintext tokens in DB.
+  // New storage keeps a hash for lookup + encrypted token for infra bootstrap retrieval.
+  const botAny: any = bot as any;
+  const legacyPlaintext = typeof botAny.accessToken === 'string' && botAny.accessToken === accessToken;
+  const missingEnc = !botAny.accessTokenEnc || typeof botAny.accessTokenEnc !== 'string' || botAny.accessTokenEnc.trim() === '';
+  if (legacyPlaintext || missingEnc) {
+    try {
+      botAny.accessTokenEnc = encryptBotAccessToken(accessToken, botTokenKeyMaterial());
+      botAny.accessToken = hashBotAccessToken(accessToken);
+      await botAny.save();
+    } catch {
+      // Best-effort migration; proceed with the current session.
+    }
   }
 
   await ensureBotUserExists(bot);

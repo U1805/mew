@@ -7,6 +7,8 @@ import { uploadFile, getS3PublicUrl } from '../../utils/s3';
 import ServiceTypeModel from '../infra/serviceType.model';
 import { socketManager } from '../../gateway/events';
 import UserModel from '../user/user.model';
+import config from '../../config';
+import { decryptBotAccessToken, encryptBotAccessToken, hashBotAccessToken } from './botAccessToken.crypto';
 
 const generateAccessToken = () => nanoid(32);
 
@@ -47,6 +49,31 @@ const createBotUser = async (bot: IBot, avatarKey?: string) => {
 
   await botUser.save();
   return botUser;
+};
+
+const botTokenKeyMaterial = () => config.botTokenEncKey || config.adminSecret || config.jwtSecret;
+
+const getRawAccessToken = async (bot: any): Promise<string> => {
+  const enc = typeof bot?.accessTokenEnc === 'string' ? bot.accessTokenEnc.trim() : '';
+  if (enc) {
+    return decryptBotAccessToken(enc, botTokenKeyMaterial());
+  }
+
+  const legacy = typeof bot?.accessToken === 'string' ? bot.accessToken.trim() : '';
+  // Legacy tokens were 32-char nanoid; hashed tokens are 64-char hex.
+  if (legacy && legacy.length === 32) {
+    // Best-effort migrate legacy plaintext to hashed+encrypted storage.
+    try {
+      bot.accessTokenEnc = encryptBotAccessToken(legacy, botTokenKeyMaterial());
+      bot.accessToken = hashBotAccessToken(legacy);
+      if (typeof bot.save === 'function') await bot.save();
+    } catch {
+      // ignore migration failures
+    }
+    return legacy;
+  }
+
+  throw new BadRequestError('Bot access token is not available. Regenerate the token and re-bootstrap the service.');
 };
 
 export const ensureBotUserExists = async (bot: IBot, avatarKey?: string) => {
@@ -99,7 +126,9 @@ export const createBot = async (
   }
   await assertServiceTypeAllowed(botData.serviceType);
 
-  const accessToken = generateAccessToken();
+  const rawAccessToken = generateAccessToken();
+  const tokenHash = hashBotAccessToken(rawAccessToken);
+  const tokenEnc = encryptBotAccessToken(rawAccessToken, botTokenKeyMaterial());
   let avatarKey: string | undefined;
   let avatarUrl: string | undefined;
 
@@ -113,7 +142,8 @@ export const createBot = async (
   const newBot = await botRepository.create({
     ...botData,
     ownerId: ownerId as any,
-    accessToken,
+    accessToken: tokenHash,
+    accessTokenEnc: tokenEnc,
     avatarUrl,
   });
 
@@ -124,7 +154,7 @@ export const createBot = async (
   // For the create operation ONLY, return the full object with the token.
   // Subsequent fetches (e.g., getBotById) will correctly omit it.
   const botObject = newBot.toObject();
-  botObject.accessToken = newBot.accessToken;
+  botObject.accessToken = rawAccessToken;
   return botObject;
 };
 
@@ -216,7 +246,8 @@ export const regenerateAccessToken = async (
   }
 
   const newAccessToken = generateAccessToken();
-  bot.accessToken = newAccessToken;
+  (bot as any).accessTokenEnc = encryptBotAccessToken(newAccessToken, botTokenKeyMaterial());
+  bot.accessToken = hashBotAccessToken(newAccessToken);
   await bot.save();
 
   return newAccessToken;
@@ -225,14 +256,16 @@ export const regenerateAccessToken = async (
 export const bootstrapBots = async (serviceType: string) => {
   await assertServiceTypeAllowed(serviceType);
   const bots = await botRepository.findByServiceTypeWithToken(serviceType);
-  return bots.map((bot) => ({
-    _id: bot._id,
-    name: bot.name,
-    config: bot.config,
-    accessToken: bot.accessToken,
-    serviceType: normalizeServiceType(bot.serviceType),
-    dmEnabled: bot.dmEnabled,
-  }));
+  return Promise.all(
+    bots.map(async (bot: any) => ({
+      _id: bot._id,
+      name: bot.name,
+      config: bot.config,
+      accessToken: await getRawAccessToken(bot),
+      serviceType: normalizeServiceType(bot.serviceType),
+      dmEnabled: bot.dmEnabled,
+    }))
+  );
 };
 
 export const bootstrapBotById = async (botId: string, expectedServiceType?: string) => {
@@ -250,7 +283,7 @@ export const bootstrapBotById = async (botId: string, expectedServiceType?: stri
     _id: bot._id,
     name: bot.name,
     config: bot.config,
-    accessToken: bot.accessToken,
+    accessToken: await getRawAccessToken(bot as any),
     serviceType: effectiveServiceType,
     dmEnabled: bot.dmEnabled,
   };
