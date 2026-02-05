@@ -14,11 +14,12 @@ const Layout = lazy(() => import('./layout/Layout'));
 const ModalManager = lazy(() => import('./layout/modals/ModalManager'));
 
 const App = () => {
-  const token = useAuthStore((state) => state.token);
+  const authStatus = useAuthStore((state) => state.status);
   const openModal = useModalStore((state) => state.openModal);
 
   const applyRoute = () => {
-    const tokenNow = useAuthStore.getState().token;
+    const statusNow = useAuthStore.getState().status;
+    const authedNow = statusNow === 'authenticated';
     const path = window.location.pathname;
 
     if (path.length > 1 && path.endsWith('/')) {
@@ -27,7 +28,7 @@ const App = () => {
     }
 
     if (path === '/') {
-      safeReplaceState(tokenNow ? '/channels/@me' : '/login');
+      safeReplaceState(authedNow ? '/channels/@me' : '/login');
       return;
     }
 
@@ -35,7 +36,7 @@ const App = () => {
       const code = path.split('/invite/')[1];
       if (code) sessionStorage.setItem('mew_invite_code', code);
       sessionStorage.setItem('mew_post_login_path', '/channels/@me');
-      safeReplaceState(tokenNow ? '/channels/@me' : '/login');
+      safeReplaceState(authedNow ? '/channels/@me' : '/login');
       return;
     }
 
@@ -43,7 +44,7 @@ const App = () => {
     if (authMode) {
       useUIStore.getState().hydrateSettingsClosedFromRoute();
 
-      if (tokenNow) {
+      if (authedNow) {
         const desired = sessionStorage.getItem('mew_post_login_path') || '/channels/@me';
         sessionStorage.removeItem('mew_post_login_path');
         safeReplaceState(desired);
@@ -53,7 +54,7 @@ const App = () => {
 
     const settingsTab = parseSettingsPathname(path);
     if (settingsTab) {
-      if (!tokenNow) {
+      if (!authedNow) {
         sessionStorage.setItem('mew_post_login_path', path);
         safeReplaceState('/login');
         return;
@@ -67,7 +68,7 @@ const App = () => {
 
     const channelRoute = parseChannelsPathname(path);
     if (channelRoute) {
-      if (!tokenNow) {
+      if (!authedNow) {
         sessionStorage.setItem('mew_post_login_path', path);
         safeReplaceState('/login');
         return;
@@ -77,26 +78,31 @@ const App = () => {
       return;
     }
 
-    safeReplaceState(tokenNow ? '/channels/@me' : '/login');
+    safeReplaceState(authedNow ? '/channels/@me' : '/login');
   };
 
   useEffect(() => {
+    // Bootstrap auth session from cookies (access token + refresh token).
+    void useAuthStore.getState().hydrate().finally(() => {
+      applyRoute();
+    });
+
     applyRoute();
     return addNavigationListener(applyRoute);
   }, []);
 
   useEffect(() => {
     applyRoute();
-  }, [token]);
+  }, [authStatus]);
 
   useEffect(() => {
-    if (!token) {
+    if (authStatus !== 'authenticated') {
       queryClient.clear();
     }
-  }, [token]);
+  }, [authStatus]);
 
   useEffect(() => {
-    if (token) {
+    if (authStatus === 'authenticated') {
         const pendingInvite = sessionStorage.getItem('mew_invite_code');
         if (pendingInvite) {
             sessionStorage.removeItem('mew_invite_code');
@@ -105,10 +111,10 @@ const App = () => {
             }, 500);
         }
     }
-  }, [token, openModal]);
+  }, [authStatus, openModal]);
 
   useEffect(() => {
-    if (!token) return;
+    if (authStatus !== 'authenticated') return;
 
     const socket = getSocket();
     if (!socket) return;
@@ -127,12 +133,12 @@ const App = () => {
     return () => {
       socket.off('SERVER_KICK', handleServerKick);
     };
-  }, [token]);
+  }, [authStatus]);
 
   return (
     <QueryClientProvider client={queryClient}>
       <Suspense fallback={null}>
-        {token ? <Layout /> : <AuthScreen />}
+        {authStatus === 'unknown' ? null : authStatus === 'authenticated' ? <Layout /> : <AuthScreen />}
       </Suspense>
       <Suspense fallback={null}>
         <ModalManager />

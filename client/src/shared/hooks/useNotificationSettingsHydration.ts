@@ -23,8 +23,8 @@ const sameChannelLevels = (
 };
 
 export const useNotificationSettingsHydration = (servers: Server[] | undefined) => {
-  const token = useAuthStore((s) => s.token);
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const status = useAuthStore((s) => s.status);
+  const setUser = useAuthStore((s) => s.setUser);
 
   const setUserSettings = useNotificationSettingsStore((s) => s.setUserSettings);
   const setServerLevel = useNotificationSettingsStore((s) => s.setServerLevel);
@@ -39,7 +39,7 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
   }, [servers]);
 
   useEffect(() => {
-    if (!token) return;
+    if (status !== 'authenticated') return;
 
     let cancelled = false;
     (async () => {
@@ -55,8 +55,7 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
 
         const currentUser = useAuthStore.getState().user;
         if (currentUser && !sameUserNotificationSettings(currentUser.notificationSettings, settings)) {
-          const remember = !!localStorage.getItem('mew_token');
-          setAuth(token, { ...currentUser, notificationSettings: settings }, remember);
+          setUser({ ...currentUser, notificationSettings: settings });
         }
       } catch {
         // best-effort
@@ -66,10 +65,10 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
     return () => {
       cancelled = true;
     };
-  }, [token, setAuth, setUserSettings]);
+  }, [status, setUser, setUserSettings]);
 
   useEffect(() => {
-    if (!token) return;
+    if (status !== 'authenticated') return;
 
     let cancelled = false;
     (async () => {
@@ -91,10 +90,10 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
     return () => {
       cancelled = true;
     };
-  }, [token, setChannelLevels]);
+  }, [status, setChannelLevels]);
 
   useEffect(() => {
-    if (!token) return;
+    if (status !== 'authenticated') return;
     if (!serverIdsKey) return;
 
     let cancelled = false;
@@ -129,6 +128,6 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
     return () => {
       cancelled = true;
     };
-  }, [token, serverIdsKey, setServerLevel]);
+  }, [status, serverIdsKey, setServerLevel]);
 };
 

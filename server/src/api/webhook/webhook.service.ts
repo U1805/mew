@@ -286,7 +286,7 @@ export const executeWebhook = async (webhookId: string, token: string, payload: 
       },
     };
 
-    const createdMessage = await MessageService.createMessage(messageData);
+    const createdMessage = await MessageService.createMessage(messageData, { bypassPermissions: true });
 
     return createdMessage;
 };

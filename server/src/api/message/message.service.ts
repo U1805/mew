@@ -263,7 +263,10 @@ export const getMessagesByChannel = async (options: GetMessagesOptions) => {
   return channel ? processed.map((m) => attachServerId(m, channel)) : processed;
 };
 
-export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> => {
+export const createMessage = async (
+  data: Partial<IMessage>,
+  opts?: { bypassPermissions?: boolean }
+): Promise<IMessage> => {
   const channel = await Channel.findById(data.channelId).lean();
   if (!channel) {
     throw new NotFoundError('Channel not found');
@@ -275,6 +278,53 @@ export const createMessage = async (data: Partial<IMessage>): Promise<IMessage> 
 
   if (!data.channelId || !data.authorId) {
     throw new BadRequestError('Message must have a channel and an author');
+  }
+
+  if (!opts?.bypassPermissions) {
+    // Enforce authorization at the service layer (do not rely on HTTP route middleware).
+    // This protects WebSocket and any other call sites equally.
+    const authorIdStr = typeof data.authorId === 'string' ? data.authorId : (data.authorId as any)?.toString?.();
+    if (!authorIdStr) {
+      throw new BadRequestError('Message must have a channel and an author');
+    }
+
+    if (channel.type === ChannelType.DM) {
+      const recipients = Array.isArray((channel as any).recipients) ? (channel as any).recipients : [];
+      const canSend = recipients.some((r: any) => r?.toString?.() === authorIdStr);
+      if (!canSend) {
+        throw new ForbiddenError('You are not a member of this DM channel.');
+      }
+    } else {
+      const serverId = channel.serverId?.toString?.();
+      if (!serverId) {
+        throw new ForbiddenError('Permission check failed: Invalid channel.');
+      }
+
+      const [member, roles, server] = await Promise.all([
+        Member.findOne({ userId: authorIdStr, serverId }).lean(),
+        Role.find({ serverId: serverId as any }).select('_id permissions position').lean(),
+        Server.findById(serverId).select('everyoneRoleId').lean(),
+      ]);
+
+      if (!member) {
+        throw new ForbiddenError('You are not a member of this server.');
+      }
+
+      if (!member.isOwner) {
+        if (!server || !server.everyoneRoleId) {
+          throw new Error('Server configuration error.');
+        }
+        const everyoneRole = roles.find((r) => r._id.equals(server.everyoneRoleId!));
+        if (!everyoneRole) {
+          throw new Error('Server configuration error: @everyone role not found.');
+        }
+
+        const permissions = calculateEffectivePermissions(member as any, roles as any, everyoneRole as any, channel as any);
+        if (!permissions.has('SEND_MESSAGES')) {
+          throw new ForbiddenError('You do not have permission to send messages in this channel.');
+        }
+      }
+    }
   }
 
   if (typeof (data as any).plainText === 'string') {

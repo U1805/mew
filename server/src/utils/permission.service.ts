@@ -49,6 +49,9 @@ export function calculateEffectivePermissions(
       VALID_PERMISSIONS.has(p as Permission)
     ) as Permission[]
   );
+
+  // Backwards-compatible default: guild channels are viewable unless explicitly denied.
+  basePermissions.add('VIEW_CHANNEL');
   const memberRoles: IRole[] = [];
 
   for (const roleId of member.roleIds) {

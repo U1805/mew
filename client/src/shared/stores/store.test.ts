@@ -1,6 +1,6 @@
 import { useAuthStore } from '.';
 import { act } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { User } from '../types';
 
 const mockUser: User = {
@@ -11,50 +11,44 @@ const mockUser: User = {
     createdAt: new Date().toISOString()
 };
 
+vi.mock('../services/api', () => ({
+  authApi: {
+    logout: vi.fn().mockResolvedValue({}),
+    refresh: vi.fn().mockResolvedValue({}),
+    getMe: vi.fn().mockResolvedValue({ data: mockUser }),
+  },
+}));
+
 describe('useAuthStore', () => {
   beforeEach(() => {
     // Reset the store before each test
     act(() => {
-      useAuthStore.setState({ token: null, user: null });
+      useAuthStore.setState({ status: 'unknown', user: null });
     });
     localStorage.clear();
-    sessionStorage.clear();
   });
 
-  it('setAuth should update token and user in state and localStorage', () => {
+  it('setUser should update user in state and localStorage', () => {
     act(() => {
-      useAuthStore.getState().setAuth('fake-token', mockUser, true);
+      useAuthStore.getState().setUser(mockUser);
     });
 
-    expect(useAuthStore.getState().token).toBe('fake-token');
+    expect(useAuthStore.getState().status).toBe('authenticated');
     expect(useAuthStore.getState().user).toEqual(mockUser);
-    expect(localStorage.getItem('mew_token')).toBe('fake-token');
     expect(localStorage.getItem('mew_user')).toBe(JSON.stringify(mockUser));
-    expect(sessionStorage.getItem('mew_token')).toBeNull();
   });
 
-  it('setAuth should update token and user in state and sessionStorage', () => {
+  it('logout should clear user from state and localStorage', async () => {
     act(() => {
-      useAuthStore.getState().setAuth('fake-token-session', mockUser, false);
+      useAuthStore.getState().setUser(mockUser);
     });
 
-    expect(useAuthStore.getState().token).toBe('fake-token-session');
-    expect(sessionStorage.getItem('mew_token')).toBe('fake-token-session');
-    expect(localStorage.getItem('mew_token')).toBeNull();
-  });
-
-  it('logout should clear token and user from state and storage', () => {
-    act(() => {
-      useAuthStore.getState().setAuth('fake-token', mockUser, true);
+    await act(async () => {
+      await useAuthStore.getState().logout();
     });
 
-    act(() => {
-      useAuthStore.getState().logout();
-    });
-
-    expect(useAuthStore.getState().token).toBeNull();
+    expect(useAuthStore.getState().status).toBe('unauthenticated');
     expect(useAuthStore.getState().user).toBeNull();
-    expect(localStorage.getItem('mew_token')).toBeNull();
-    expect(sessionStorage.getItem('mew_token')).toBeNull();
+    expect(localStorage.getItem('mew_user')).toBeNull();
   });
 });

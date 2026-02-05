@@ -8,14 +8,6 @@ const api = axios.create({
   withCredentials: true,
 });
 
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
 let refreshPromise: Promise<string> | null = null;
 
 const shouldSkipRefresh = (url: string | undefined) => {
@@ -50,16 +42,9 @@ api.interceptors.response.use(
 
       const newToken = await refreshPromise;
       if (!newToken) throw error;
-
-      const remember = !!localStorage.getItem('mew_token');
-      const currentUser = useAuthStore.getState().user;
-      useAuthStore.getState().setAuth(newToken, currentUser, remember);
-
-      originalConfig.headers = originalConfig.headers || {};
-      originalConfig.headers.Authorization = `Bearer ${newToken}`;
       return api(originalConfig);
     } catch {
-      useAuthStore.getState().logout();
+      await useAuthStore.getState().logout();
       throw error;
     }
   }

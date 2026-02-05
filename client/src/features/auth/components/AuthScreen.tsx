@@ -16,7 +16,8 @@ export const AuthScreen = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const setUser = useAuthStore((state) => state.setUser);
+  const hydrate = useAuthStore((state) => state.hydrate);
   const logout = useAuthStore((state) => state.logout);
 
   useEffect(() => {
@@ -63,20 +64,12 @@ export const AuthScreen = () => {
     setError('');
     setNotice('');
 
-    const shouldRemember = isLogin ? rememberMe : true;
     try {
       if (isLogin) {
         const res = await authApi.login({ email, password, rememberMe: rememberMe });
-        const token = res.data.token as string;
         const user = res.data.user ?? null;
-        setAuth(token, user, shouldRemember);
-
-        try {
-          const userRes = await authApi.getMe();
-          setAuth(token, userRes.data, shouldRemember);
-        } catch (userErr) {
-          console.error('Failed to fetch user profile', userErr);
-        }
+        if (user) setUser(user);
+        else await hydrate();
       } else {
         if (allowRegistration === false) {
           setIsLogin(true);
@@ -85,16 +78,10 @@ export const AuthScreen = () => {
           return;
         }
         const res = await authApi.register({ email, username, password });
-        const token = res.data.token as string | undefined;
         const user = res.data.user ?? null;
 
-        if (token) {
-          setAuth(token, user, shouldRemember);
-        } else {
-          setIsLogin(true);
-          navigateAuth('login', { replace: true });
-          setNotice('Registration successful. Please log in.');
-        }
+        if (user) setUser(user);
+        else await hydrate();
       }
     } catch (err: any) {
       const message = getApiErrorMessage(err, 'An error occurred');
@@ -107,7 +94,7 @@ export const AuthScreen = () => {
       }
 
       setError(message);
-      if (isLogin) logout();
+      if (isLogin) void logout();
     }
   };
 

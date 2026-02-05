@@ -12,20 +12,8 @@ import {
   revokeRefreshToken,
   rotateRefreshToken,
 } from './refreshToken.service';
-
-const readCookie = (req: Request, name: string): string | null => {
-  const raw = req.headers.cookie;
-  if (!raw) return null;
-  const parts = raw.split(';');
-  for (const part of parts) {
-    const idx = part.indexOf('=');
-    if (idx === -1) continue;
-    const k = part.slice(0, idx).trim();
-    if (k !== name) continue;
-    return decodeURIComponent(part.slice(idx + 1).trim());
-  }
-  return null;
-};
+import { buildAccessTokenCookieOptions, getAccessTokenCookieName } from './accessTokenCookie.service';
+import { readCookie } from '../../utils/cookies';
 
 const isSecureCookie = () => (process.env.NODE_ENV || '').toLowerCase() === 'production';
 
@@ -39,6 +27,12 @@ export const loginHandler = asyncHandler(async (req: Request, res: Response, nex
     rememberMe: req.body?.rememberMe !== false,
   });
 
+  const isPersistent = issued.isPersistent;
+  res.cookie(
+    getAccessTokenCookieName(),
+    token,
+    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent, jwtExpiresIn: config.jwtExpiresIn })
+  );
   res.cookie(
     getRefreshTokenCookieName(),
     issued.refreshToken,
@@ -58,6 +52,11 @@ export const botLoginHandler = asyncHandler(async (req: Request, res: Response) 
     rememberMe: true,
   });
 
+  res.cookie(
+    getAccessTokenCookieName(),
+    token,
+    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: true, jwtExpiresIn: config.jwtExpiresIn })
+  );
   res.cookie(
     getRefreshTokenCookieName(),
     issued.refreshToken,
@@ -81,6 +80,11 @@ export const registerHandler = asyncHandler(async (req: Request, res: Response, 
   });
 
   res.cookie(
+    getAccessTokenCookieName(),
+    token,
+    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: true, jwtExpiresIn: config.jwtExpiresIn })
+  );
+  res.cookie(
     getRefreshTokenCookieName(),
     issued.refreshToken,
     buildRefreshTokenCookieOptions({ maxAgeMs: issued.maxAgeMs, secure: isSecureCookie() })
@@ -95,7 +99,7 @@ export const getAuthConfigHandler = asyncHandler(async (req: Request, res: Respo
 
 export const refreshHandler = asyncHandler(async (req: Request, res: Response) => {
   const cookieName = getRefreshTokenCookieName();
-  const refreshToken = readCookie(req, cookieName);
+  const refreshToken = readCookie(req.headers.cookie, cookieName);
   if (!refreshToken) {
     return res.status(401).json({ message: 'Unauthorized: No refresh token provided' });
   }
@@ -104,11 +108,14 @@ export const refreshHandler = asyncHandler(async (req: Request, res: Response) =
     refreshToken,
     createdByIp: req.ip,
     userAgent: req.headers['user-agent'] || null,
-    rememberMe: true,
   });
 
   if (!rotated) {
     res.clearCookie(cookieName, buildRefreshTokenCookieOptions({ secure: isSecureCookie() }));
+    res.clearCookie(
+      getAccessTokenCookieName(),
+      buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: false, jwtExpiresIn: config.jwtExpiresIn })
+    );
     return res.status(401).json({ message: 'Unauthorized: Invalid refresh token' });
   }
 
@@ -122,24 +129,34 @@ export const refreshHandler = asyncHandler(async (req: Request, res: Response) =
   if (!user) {
     await revokeRefreshToken(rotated.refreshToken);
     res.clearCookie(cookieName, buildRefreshTokenCookieOptions({ secure: isSecureCookie() }));
+    res.clearCookie(
+      getAccessTokenCookieName(),
+      buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: false, jwtExpiresIn: config.jwtExpiresIn })
+    );
     return res.status(401).json({ message: 'Unauthorized: User not found' });
   }
 
-  const payload = { id: user._id, username: user.username, discriminator: (user as any).discriminator };
-  const token = authService.signAccessToken(payload);
-
   const userObj: any = user.toObject ? user.toObject() : user;
   if (userObj.avatarUrl) userObj.avatarUrl = getS3PublicUrl(userObj.avatarUrl);
+
+  const payload = { id: user._id, username: user.username, discriminator: (user as any).discriminator };
+  const token = authService.signAccessToken(payload);
+  res.cookie(
+    getAccessTokenCookieName(),
+    token,
+    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: rotated.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
+  );
 
   return res.status(200).json({ token, user: userObj });
 });
 
 export const logoutHandler = asyncHandler(async (req: Request, res: Response) => {
   const cookieName = getRefreshTokenCookieName();
-  const refreshToken = readCookie(req, cookieName);
+  const refreshToken = readCookie(req.headers.cookie, cookieName);
   if (refreshToken) {
     await revokeRefreshToken(refreshToken);
   }
   res.clearCookie(cookieName, buildRefreshTokenCookieOptions({ secure: isSecureCookie() }));
+  res.clearCookie(getAccessTokenCookieName(), buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: false, jwtExpiresIn: config.jwtExpiresIn }));
   return res.status(204).send();
 });

@@ -1,49 +1,59 @@
 import { create } from 'zustand';
 import { usePresenceStore } from './presenceStore';
-import { disconnectSocket, updateSocketAuthToken } from '../services/socket';
+import { disconnectSocket } from '../services/socket';
 import { User } from '../types';
 import { useNotificationSettingsStore } from './notificationSettingsStore';
 
 export interface AuthState {
-  token: string | null;
+  status: 'unknown' | 'authenticated' | 'unauthenticated';
   user: User | null;
-  setAuth: (token: string, user: User | null, remember?: boolean) => void;
-  logout: () => void;
+  setUser: (user: User | null) => void;
+  hydrate: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
-  token: localStorage.getItem('mew_token') || sessionStorage.getItem('mew_token'),
-  user: JSON.parse(localStorage.getItem('mew_user') || sessionStorage.getItem('mew_user') || 'null'),
+  status: 'unknown',
+  user: JSON.parse(localStorage.getItem('mew_user') || 'null'),
 
-  setAuth: (token: string, user: User | null, remember: boolean = true) => {
-    const prevToken = get().token;
-    const storage = remember ? localStorage : sessionStorage;
-    const otherStorage = remember ? sessionStorage : localStorage;
-
-    storage.setItem('mew_token', token);
-    if (user) {
-      storage.setItem('mew_user', JSON.stringify(user));
-    } else {
-      storage.removeItem('mew_user');
-    }
-
-    otherStorage.removeItem('mew_token');
-    otherStorage.removeItem('mew_user');
-
-    set({ token, user });
+  setUser: (user: User | null) => {
+    if (user) localStorage.setItem('mew_user', JSON.stringify(user));
+    else localStorage.removeItem('mew_user');
+    set({ user, status: user ? 'authenticated' : 'unauthenticated' });
     useNotificationSettingsStore.getState().hydrateFromUser(user);
+  },
 
-    if (prevToken && prevToken !== token) {
-      updateSocketAuthToken(token);
+  hydrate: async () => {
+    try {
+      const { authApi } = await import('../services/api');
+      // First try /users/@me directly (access token cookie may still be valid).
+      const me = await authApi.getMe();
+      get().setUser(me.data);
+    } catch (err: any) {
+      // Best-effort refresh, then retry /users/@me.
+      try {
+        const { authApi } = await import('../services/api');
+        await authApi.refresh();
+        const me = await authApi.getMe();
+        get().setUser(me.data);
+      } catch {
+        set({ status: 'unauthenticated', user: null });
+        localStorage.removeItem('mew_user');
+        useNotificationSettingsStore.getState().clear();
+      }
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('mew_token');
+  logout: async () => {
+    try {
+      const { authApi } = await import('../services/api');
+      await authApi.logout();
+    } catch {
+      // ignore
+    }
+
     localStorage.removeItem('mew_user');
-    sessionStorage.removeItem('mew_token');
-    sessionStorage.removeItem('mew_user');
-    set({ token: null, user: null });
+    set({ status: 'unauthenticated', user: null });
     disconnectSocket();
     usePresenceStore.getState().clearOnlineStatus();
     useNotificationSettingsStore.getState().clear();

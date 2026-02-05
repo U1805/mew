@@ -1,5 +1,6 @@
 import { Server as SocketIOServer } from 'socket.io';
 import http from 'http';
+import config from '../config';
 
 export class SocketManager {
   private io: SocketIOServer | null = null;
@@ -7,8 +8,14 @@ export class SocketManager {
   init(server: http.Server) {
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: '*',
+        origin: (origin, cb) => {
+          if (!origin) return cb(null, true);
+          if (config.cors.allowAnyOrigin) return cb(null, true);
+          if (config.cors.allowedOrigins.includes(origin)) return cb(null, true);
+          return cb(null, false);
+        },
         methods: ['GET', 'POST'],
+        credentials: true,
       },
     });
     return this.io;

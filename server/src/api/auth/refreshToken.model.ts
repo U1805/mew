@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IRefreshToken extends Document {
   userId: mongoose.Types.ObjectId;
   tokenHash: string;
+  isPersistent: boolean;
   expiresAt: Date;
   revokedAt?: Date | null;
   replacedByTokenId?: mongoose.Types.ObjectId | null;
@@ -16,6 +17,7 @@ const RefreshTokenSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     tokenHash: { type: String, required: true, unique: true, index: true },
+    isPersistent: { type: Boolean, default: true },
     expiresAt: { type: Date, required: true },
     revokedAt: { type: Date, default: null },
     replacedByTokenId: { type: Schema.Types.ObjectId, default: null },

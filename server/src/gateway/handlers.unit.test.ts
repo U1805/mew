@@ -12,6 +12,18 @@ vi.mock('../api/member/member.model', () => ({
   },
 }));
 
+vi.mock('../api/server/server.model', () => ({
+  default: {
+    find: vi.fn(),
+  },
+}));
+
+vi.mock('../api/role/role.model', () => ({
+  default: {
+    find: vi.fn(),
+  },
+}));
+
 vi.mock('../api/message/message.service', () => ({
   createMessage: vi.fn(),
 }));
@@ -24,11 +36,22 @@ vi.mock('./presence.service', () => ({
 
 import Channel from '../api/channel/channel.model';
 import ServerMember from '../api/member/member.model';
+import Server from '../api/server/server.model';
+import Role from '../api/role/role.model';
 import { createMessage } from '../api/message/message.service';
 import { addUserOnline, removeUserOnline } from './presence.service';
 import { registerConnectionHandlers } from './handlers';
 
 const mkId = (id: string) => ({ toString: () => id });
+
+const makeLeanQuery = <T,>(value: T) => ({
+  select: vi.fn().mockReturnThis(),
+  lean: vi.fn().mockResolvedValue(value),
+});
+
+const makeSelectLeanQuery = <T,>(value: T) => ({
+  select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(value) }),
+});
 
 const createMockSocket = (user?: { id: string; username: string }) => {
   const handlers = new Map<string, Function>();
@@ -63,9 +86,30 @@ describe('gateway/handlers registerConnectionHandlers', () => {
   it('joins DM/server rooms and sets up presence + ready', async () => {
     vi.mocked((Channel as any).find)
       .mockResolvedValueOnce([{ _id: mkId('dm1') }, { _id: mkId('dm2') }]) // DMs
-      .mockResolvedValueOnce([{ _id: mkId('c1') }]); // channels in servers
+      .mockReturnValueOnce(
+        makeSelectLeanQuery([{ _id: mkId('c1'), serverId: mkId('s1'), type: 'GUILD_TEXT', permissionOverrides: [] }])
+      ); // channels in servers
 
-    vi.mocked((ServerMember as any).find).mockResolvedValue([{ serverId: mkId('s1') }, { serverId: mkId('s2') }]);
+    vi.mocked((ServerMember as any).find).mockReturnValue(
+      makeLeanQuery([
+        { serverId: mkId('s1'), userId: mkId('u1'), roleIds: [], isOwner: false },
+        { serverId: mkId('s2'), userId: mkId('u1'), roleIds: [], isOwner: false },
+      ])
+    );
+
+    vi.mocked((Server as any).find).mockReturnValue(
+      makeSelectLeanQuery([
+        { _id: mkId('s1'), everyoneRoleId: mkId('re1') },
+        { _id: mkId('s2'), everyoneRoleId: mkId('re2') },
+      ])
+    );
+
+    vi.mocked((Role as any).find).mockReturnValue(
+      makeSelectLeanQuery([
+        { _id: mkId('re1'), serverId: mkId('s1'), permissions: [], position: 0 },
+        { _id: mkId('re2'), serverId: mkId('s2'), permissions: [], position: 0 },
+      ])
+    );
 
     const io: any = { emit: vi.fn() };
     const socket = createMockSocket({ id: 'u1', username: 'alice' });
@@ -88,7 +132,7 @@ describe('gateway/handlers registerConnectionHandlers', () => {
   it('swallows joinUserRooms errors and still sets presence', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked((Channel as any).find).mockRejectedValue(new Error('db down'));
-    vi.mocked((ServerMember as any).find).mockResolvedValue([]);
+    vi.mocked((ServerMember as any).find).mockReturnValue(makeLeanQuery([]));
 
     const io: any = { emit: vi.fn() };
     const socket = createMockSocket({ id: 'u1', username: 'alice' });
@@ -103,7 +147,7 @@ describe('gateway/handlers registerConnectionHandlers', () => {
 
   it('handles message/create and injects authorId', async () => {
     vi.mocked((Channel as any).find).mockResolvedValue([]);
-    vi.mocked((ServerMember as any).find).mockResolvedValue([]);
+    vi.mocked((ServerMember as any).find).mockReturnValue(makeLeanQuery([]));
     vi.mocked(createMessage).mockResolvedValue({} as any);
 
     const io: any = { emit: vi.fn() };
@@ -119,7 +163,7 @@ describe('gateway/handlers registerConnectionHandlers', () => {
 
   it('message/create returns early when socket.user becomes unavailable', async () => {
     vi.mocked((Channel as any).find).mockResolvedValue([]);
-    vi.mocked((ServerMember as any).find).mockResolvedValue([]);
+    vi.mocked((ServerMember as any).find).mockReturnValue(makeLeanQuery([]));
     vi.mocked(createMessage).mockResolvedValue({} as any);
 
     const io: any = { emit: vi.fn() };
@@ -137,7 +181,7 @@ describe('gateway/handlers registerConnectionHandlers', () => {
   it('emits error when message/create fails', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked((Channel as any).find).mockResolvedValue([]);
-    vi.mocked((ServerMember as any).find).mockResolvedValue([]);
+    vi.mocked((ServerMember as any).find).mockReturnValue(makeLeanQuery([]));
     vi.mocked(createMessage).mockRejectedValue(new Error('boom'));
 
     const io: any = { emit: vi.fn() };

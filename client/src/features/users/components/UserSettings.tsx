@@ -18,7 +18,7 @@ import type { SettingsTab } from '../../../shared/router/settingsRoute';
 
 const UserSettings: React.FC = () => {
     const { isSettingsOpen, closeSettings, settingsTab: activeTab, selectSettingsTab } = useUIStore();
-    const { user, logout, setAuth, token } = useAuthStore();
+    const { user, logout, setUser, status } = useAuthStore();
     const notif = useNotificationSettingsStore((s) => s.user);
     const setNotif = useNotificationSettingsStore((s) => s.setUserSettings);
 
@@ -77,8 +77,7 @@ const UserSettings: React.FC = () => {
         setIsUploading(true);
         try {
             const res = await userApi.updateProfile(formData);
-            const remember = !!localStorage.getItem('mew_token');
-            setAuth(token!, res.data, remember);
+            setUser(res.data);
             toast.success("Avatar updated!");
             cancelUpload();
         } catch (error) {
@@ -96,8 +95,7 @@ const UserSettings: React.FC = () => {
         setIsUpdatingUsername(true);
         try {
             const res = await userApi.updateProfile({ username: newUsername.trim() });
-            const remember = !!localStorage.getItem('mew_token');
-            setAuth(token!, res.data, remember);
+            setUser(res.data);
             toast.success("Username updated!");
             setIsEditUsernameModalOpen(false);
         } catch (error) {
@@ -125,15 +123,13 @@ const UserSettings: React.FC = () => {
     };
 
     const persistNotificationSettings = async (next: Partial<typeof notif>) => {
-        if (!token || !user) return;
+        if (status !== 'authenticated' || !user) return;
         setIsUpdatingNotifications(true);
         try {
             const res = await userApi.updateNotificationSettings(next);
             const settings = res.data as { soundEnabled: boolean; soundVolume: number; desktopEnabled: boolean };
             setNotif(settings);
-
-            const remember = !!localStorage.getItem('mew_token');
-            setAuth(token, { ...user, notificationSettings: settings }, remember);
+            setUser({ ...user, notificationSettings: settings });
         } catch (error) {
             toast.error(getApiErrorMessage(error, 'Failed to update notification settings'));
             throw error;

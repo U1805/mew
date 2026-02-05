@@ -17,7 +17,7 @@ const router = Router({ mergeParams: true });
 router.use(protect);
 
 router.post('/', authorizeChannel('SEND_MESSAGES'), createMessageHandler);
-router.get('/', getMessagesHandler);
+router.get('/', authorizeChannel('VIEW_CHANNEL'), getMessagesHandler);
 router.patch('/:messageId', updateMessageHandler);
 router.delete('/:messageId', deleteMessageHandler);
 

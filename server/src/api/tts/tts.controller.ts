@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { BadRequestError } from '../../utils/errors';
 import { ttsService } from './tts.service';
 
-const TTS_CHUNK_SIZE = 500;
+const TTS_CHUNK_SIZE = 1800;
 const TTS_MAX_CHARS = 12000;
 
 const splitTtsText = (input: string) => {
