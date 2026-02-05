@@ -2,6 +2,10 @@ import { Suspense, lazy, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getSocket } from './shared/services/socket';
 import { useAuthStore, useModalStore, useUIStore } from './shared/stores';
+import { parseChannelsPathname } from './shared/router/channelsRoute';
+import { parseAuthPathname } from './shared/router/authRoute';
+import { parseSettingsPathname } from './shared/router/settingsRoute';
+import { addNavigationListener, safeReplaceState } from './shared/router/history';
 
 const queryClient = new QueryClient();
 
@@ -13,16 +17,85 @@ const App = () => {
   const token = useAuthStore((state) => state.token);
   const openModal = useModalStore((state) => state.openModal);
 
-  useEffect(() => {
+  const applyRoute = () => {
+    const tokenNow = useAuthStore.getState().token;
     const path = window.location.pathname;
-    if (path.startsWith('/invite/')) {
-        const code = path.split('/invite/')[1];
-        if (code) {
-            sessionStorage.setItem('mew_invite_code', code);
-            window.history.replaceState({}, document.title, '/');
-        }
+
+    if (path.length > 1 && path.endsWith('/')) {
+      safeReplaceState(path.replace(/\/+$/g, ''));
+      return;
     }
 
+    if (path === '/') {
+      safeReplaceState(tokenNow ? '/channels/@me' : '/login');
+      return;
+    }
+
+    if (path.startsWith('/invite/')) {
+      const code = path.split('/invite/')[1];
+      if (code) sessionStorage.setItem('mew_invite_code', code);
+      sessionStorage.setItem('mew_post_login_path', '/channels/@me');
+      safeReplaceState(tokenNow ? '/channels/@me' : '/login');
+      return;
+    }
+
+    const authMode = parseAuthPathname(path);
+    if (authMode) {
+      useUIStore.getState().hydrateSettingsClosedFromRoute();
+
+      if (tokenNow) {
+        const desired = sessionStorage.getItem('mew_post_login_path') || '/channels/@me';
+        sessionStorage.removeItem('mew_post_login_path');
+        safeReplaceState(desired);
+      }
+      return;
+    }
+
+    const settingsTab = parseSettingsPathname(path);
+    if (settingsTab) {
+      if (!tokenNow) {
+        sessionStorage.setItem('mew_post_login_path', path);
+        safeReplaceState('/login');
+        return;
+      }
+
+      useUIStore.getState().hydrateSettingsFromRoute(settingsTab);
+      return;
+    }
+
+    useUIStore.getState().hydrateSettingsClosedFromRoute();
+
+    const channelRoute = parseChannelsPathname(path);
+    if (channelRoute) {
+      if (!tokenNow) {
+        sessionStorage.setItem('mew_post_login_path', path);
+        safeReplaceState('/login');
+        return;
+      }
+
+      useUIStore.getState().hydrateFromRoute(channelRoute.serverId, channelRoute.channelId);
+      return;
+    }
+
+    safeReplaceState(tokenNow ? '/channels/@me' : '/login');
+  };
+
+  useEffect(() => {
+    applyRoute();
+    return addNavigationListener(applyRoute);
+  }, []);
+
+  useEffect(() => {
+    applyRoute();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      queryClient.clear();
+    }
+  }, [token]);
+
+  useEffect(() => {
     if (token) {
         const pendingInvite = sessionStorage.getItem('mew_invite_code');
         if (pendingInvite) {

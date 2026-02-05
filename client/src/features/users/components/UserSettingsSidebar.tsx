@@ -2,13 +2,14 @@ import React from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { SidebarItem } from './UserSettingsSidebarItem';
+import type { SettingsTab } from '../../../shared/router/settingsRoute';
 
 export const UserSettingsSidebar: React.FC<{
-  activeTab: string;
+  activeTab: SettingsTab;
   mobileMenuOpen: boolean;
   onClose: () => void;
   onLogout: () => void;
-  onTabClick: (tab: string) => void;
+  onTabClick: (tab: SettingsTab) => void;
 }> = ({ activeTab, mobileMenuOpen, onClose, onLogout, onTabClick }) => {
   return (
     <div

@@ -4,6 +4,8 @@ import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
 import { useAuthStore } from '../../../shared/stores';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
+import { parseAuthPathname, navigateAuth } from '../../../shared/router/authRoute';
+import { addNavigationListener } from '../../../shared/router/history';
 
 export const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -16,6 +18,17 @@ export const AuthScreen = () => {
   const [notice, setNotice] = useState('');
   const setAuth = useAuthStore((state) => state.setAuth);
   const logout = useAuthStore((state) => state.logout);
+
+  useEffect(() => {
+    const syncFromPath = () => {
+      const mode = parseAuthPathname(window.location.pathname);
+      if (mode === 'register') setIsLogin(false);
+      if (mode === 'login') setIsLogin(true);
+    };
+
+    syncFromPath();
+    return addNavigationListener(syncFromPath);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -41,6 +54,7 @@ export const AuthScreen = () => {
   useEffect(() => {
     if (allowRegistration === false && !isLogin) {
       setIsLogin(true);
+      navigateAuth('login', { replace: true });
     }
   }, [allowRegistration, isLogin]);
 
@@ -66,6 +80,7 @@ export const AuthScreen = () => {
       } else {
         if (allowRegistration === false) {
           setIsLogin(true);
+          navigateAuth('login', { replace: true });
           setError('Registration is disabled. Please contact an admin.');
           return;
         }
@@ -77,6 +92,7 @@ export const AuthScreen = () => {
           setAuth(token, user, shouldRemember);
         } else {
           setIsLogin(true);
+          navigateAuth('login', { replace: true });
           setNotice('Registration successful. Please log in.');
         }
       }
@@ -173,7 +189,9 @@ export const AuthScreen = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setIsLogin(!isLogin);
+                  const nextIsLogin = !isLogin;
+                  setIsLogin(nextIsLogin);
+                  navigateAuth(nextIsLogin ? 'login' : 'register');
                   setError('');
                   setNotice('');
                 }}

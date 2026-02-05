@@ -14,14 +14,14 @@ import { UserStickerPanel } from './UserStickerPanel';
 import { UserSettingsSidebar } from './UserSettingsSidebar';
 import { UserSettingsAccountTab } from './UserSettingsAccountTab';
 import { UserSettingsNotificationsTab } from './UserSettingsNotificationsTab';
+import type { SettingsTab } from '../../../shared/router/settingsRoute';
 
 const UserSettings: React.FC = () => {
-    const { isSettingsOpen, closeSettings } = useUIStore();
+    const { isSettingsOpen, closeSettings, settingsTab: activeTab, selectSettingsTab } = useUIStore();
     const { user, logout, setAuth, token } = useAuthStore();
     const notif = useNotificationSettingsStore((s) => s.user);
     const setNotif = useNotificationSettingsStore((s) => s.setUserSettings);
 
-    const [activeTab, setActiveTab] = useState('account');
     const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -142,8 +142,8 @@ const UserSettings: React.FC = () => {
         }
     };
 
-    const handleTabClick = (tab: string) => {
-        setActiveTab(tab);
+    const handleTabClick = (tab: SettingsTab) => {
+        selectSettingsTab(tab);
         setMobileMenuOpen(false);
     };
 

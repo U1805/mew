@@ -46,8 +46,8 @@ const authorizeChannelRead = asyncHandler(async (req, _res, next) => {
 });
 router.use('/:channelId/messages', authorizeChannelRead, messageRoutes);
 
-router.get('/:channelId/search', validate(searchMessagesSchema), searchChannelMessagesHandler);
-router.post('/:channelId/ack', validate(ackChannelSchema), ackChannelHandler);
+router.get('/:channelId/search', authorizeChannelRead, validate(searchMessagesSchema), searchChannelMessagesHandler);
+router.post('/:channelId/ack', authorizeChannelRead, validate(ackChannelSchema), ackChannelHandler);
 
 router.get('/:channelId/notification-settings', authorizeChannelRead, asyncHandler(async (req, res) => {
   if (!req.user) throw new UnauthorizedError('Not authenticated');

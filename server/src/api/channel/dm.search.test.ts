@@ -63,6 +63,13 @@ describe('Channel Search Routes: GET /api/channels/:channelId/search', () => {
     expect(res.statusCode).toBe(400);
   });
 
+  it('should return 401 when searching without a token', async () => {
+    const res = await request(app)
+      .get(`/api/channels/${dmChannelId}/search?q=cats`);
+
+    expect(res.statusCode).toBe(401);
+  });
+
   it('should search only within this DM channel', async () => {
     const res = await request(app)
       .get(`/api/channels/${dmChannelId}/search?q=cats`)
@@ -167,6 +174,13 @@ describe('Channel Search Routes: GET /api/channels/:channelId/search', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.length).toBeGreaterThan(0);
     expect(res.body[0].channelId).toBe(guildChannelId);
+  });
+
+  it('returns 401 for reading channel messages without a token', async () => {
+    const res = await request(app)
+      .get(`/api/channels/${dmChannelId}/messages?limit=5`);
+
+    expect(res.statusCode).toBe(401);
   });
 
   it('blocks reading server channel messages via /api/channels/:channelId/messages for non-members', async () => {
