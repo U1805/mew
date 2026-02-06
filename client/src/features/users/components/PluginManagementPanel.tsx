@@ -286,7 +286,11 @@ const EmptyState: React.FC = () => {
   );
 };
 
-export const PluginManagementPanel: React.FC = () => {
+export const BotServiceStatusPanel: React.FC<{
+  title: string;
+  subtitle?: string;
+  className?: string;
+}> = ({ title, subtitle, className }) => {
   const { t } = useI18n();
   const { data: services, isLoading } = useQuery({
     queryKey: ['availableServices'],
@@ -308,19 +312,21 @@ export const PluginManagementPanel: React.FC = () => {
   }, [services]);
 
   const [selectedService, setSelectedService] = React.useState<AvailableService | null>(null);
+  const [isExpanded, setIsExpanded] = React.useState(false);
   const closeDetails = React.useCallback(() => setSelectedService(null), []);
 
+  const initialCount = 4;
+  const hasMore = sorted.length > initialCount;
+  const visibleServices = isExpanded ? sorted : sorted.slice(0, initialCount);
+
   return (
-    <div className="w-full h-full pb-10">
-      {/* Header Section */}
+    <div className={`w-full h-full ${className || ''}`.trim()}>
       <div className="mb-6">
         <h2 className="text-xl font-bold text-[#F2F3F5] flex items-center gap-2">
           <Icon icon="mdi:toy-brick" className="text-[#5865F2]" />
-          {t('settings.plugins')}
+          {title}
         </h2>
-        <p className="text-[#949BA4] text-sm mt-1">
-          {t('plugin.subtitle')}
-        </p>
+        {subtitle && <p className="text-[#949BA4] text-sm mt-1">{subtitle}</p>}
       </div>
 
       {isLoading ? (
@@ -332,18 +338,44 @@ export const PluginManagementPanel: React.FC = () => {
       ) : !sorted || sorted.length === 0 ? (
         <EmptyState />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
-          {sorted.map((service) => (
-            <ServiceCard
-              key={`${service.serviceType}-${service.serverName}`}
-              service={service}
-              onOpenDetails={setSelectedService}
-            />
-          ))}
-        </div>
+        <>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
+            {visibleServices.map((service) => (
+              <ServiceCard
+                key={`${service.serviceType}-${service.serverName}`}
+                service={service}
+                onOpenDetails={setSelectedService}
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded((prev) => !prev)}
+              className="group mt-4 w-full flex items-center justify-center gap-2 py-3 rounded-lg border border-dashed border-[#4E5058] hover:border-[#B5BAC1] bg-[#2B2D31]/30 hover:bg-[#2B2D31] transition-all duration-200 focus:outline-none active:scale-[0.98]"
+            >
+              <span className="text-sm font-semibold text-[#949BA4] group-hover:text-[#F2F3F5] transition-colors">
+                {isExpanded ? t('plugin.showLess') : t('plugin.showMore')}
+              </span>
+              <Icon 
+                icon={isExpanded ? "mdi:chevron-up" : "mdi:chevron-down"} 
+                className={`text-[#949BA4] group-hover:text-[#F2F3F5] transition-transform duration-200 ${
+                  isExpanded ? 'group-hover:-translate-y-0.5' : 'group-hover:translate-y-0.5'
+                }`}
+                width="18" 
+              />
+            </button>
+          )}
+        </>
       )}
 
       {selectedService && <ServiceDetailsModal service={selectedService} onClose={closeDetails} />}
     </div>
   );
+};
+
+export const PluginManagementPanel: React.FC = () => {
+  const { t } = useI18n();
+  return <BotServiceStatusPanel title={t('settings.plugins')} subtitle={t('plugin.subtitle')} className="pb-10" />;
 };

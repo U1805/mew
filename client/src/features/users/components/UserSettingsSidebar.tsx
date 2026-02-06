@@ -34,8 +34,6 @@ export const UserSettingsSidebar: React.FC<{
         <SidebarItem label={t('settings.myAccount')} isActive={activeTab === 'account'} onClick={() => onTabClick('account')} />
         <SidebarItem label={t('settings.profiles')} />
         <SidebarItem label={t('settings.stickers')} isActive={activeTab === 'stickers'} onClick={() => onTabClick('stickers')} />
-        <SidebarItem label={t('settings.plugins')} isActive={activeTab === 'plugins'} onClick={() => onTabClick('plugins')} />
-        <SidebarItem label={t('settings.bots')} isActive={activeTab === 'bots'} onClick={() => onTabClick('bots')} />
         <SidebarItem label={t('settings.privacySafety')} />
         <SidebarItem label={t('settings.familyCenter')} />
         <SidebarItem label={t('settings.authorizedApps')} />
@@ -51,6 +49,7 @@ export const UserSettingsSidebar: React.FC<{
         <SidebarItem label={t('settings.voiceVideo')} />
         <SidebarItem label={t('settings.textImages')} />
         <SidebarItem label={t('settings.notifications')} isActive={activeTab === 'notifications'} onClick={() => onTabClick('notifications')} />
+        <SidebarItem label={t('settings.bots')} isActive={activeTab === 'bots' || activeTab === 'plugins'} onClick={() => onTabClick('bots')} />
 
         <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50" />
 

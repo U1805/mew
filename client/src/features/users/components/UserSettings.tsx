@@ -9,7 +9,6 @@ import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 import { BotManagementPanel } from './BotManagementPanel';
-import { PluginManagementPanel } from './PluginManagementPanel';
 import { UserStickerPanel } from './UserStickerPanel';
 import { UserSettingsSidebar } from './UserSettingsSidebar';
 import { UserSettingsAccountTab } from './UserSettingsAccountTab';
@@ -159,7 +158,7 @@ const UserSettings: React.FC = () => {
 
             {/* Main Content (Center) */}
             <div className={clsx(
-                "flex-1 bg-[#313338] pt-0 md:pt-[60px] px-0 md:px-10 max-w-full md:max-w-[740px] overflow-y-auto custom-scrollbar flex flex-col h-full",
+                "flex-1 bg-[#313338] flex flex-col h-full min-w-0", // min-w-0 prevents flex items from overflowing
                 !mobileMenuOpen ? "flex" : "hidden md:flex"
             )}>
 
@@ -176,43 +175,39 @@ const UserSettings: React.FC = () => {
                     </span>
                 </div>
 
-                <div className="p-4 md:p-0 pb-10">
-                    {activeTab === 'account' && (
-                        <UserSettingsAccountTab
-                            user={user}
-                            isUploading={isUploading}
-                            fileInputRef={fileInputRef}
-                            onAvatarClick={handleAvatarClick}
-                            onAvatarFileChange={handleFileChange}
-                            onEditDisplayName={() => setIsEditUsernameModalOpen(true)}
-                            onChangePassword={() => setIsChangePasswordModalOpen(true)}
-                        />
-                    )}
+                <div className="flex-1 overflow-y-auto discord-scrollbar px-4 md:px-10 pt-4 md:pt-[60px] pb-10">
+                    <div className="max-w-full md:max-w-[740px]">
+                        {activeTab === 'account' && (
+                            <UserSettingsAccountTab
+                                user={user}
+                                isUploading={isUploading}
+                                fileInputRef={fileInputRef}
+                                onAvatarClick={handleAvatarClick}
+                                onAvatarFileChange={handleFileChange}
+                                onEditDisplayName={() => setIsEditUsernameModalOpen(true)}
+                                onChangePassword={() => setIsChangePasswordModalOpen(true)}
+                            />
+                        )}
 
-                    {activeTab === 'plugins' && <PluginManagementPanel />}
-                    {activeTab === 'bots' && <BotManagementPanel />}
-                    {activeTab === 'stickers' && <UserStickerPanel />}
+                        {(activeTab === 'bots' || activeTab === 'plugins') && <BotManagementPanel />}
+                        {activeTab === 'stickers' && <UserStickerPanel />}
 
-                    {/* 
-                     * =========================================
-                     * NOTIFICATION TAB (Updated & Discord-styled)
-                     * =========================================
-                     */}
-                    {activeTab === 'notifications' && (
-                        <UserSettingsNotificationsTab
-                            notif={notif}
-                            isUpdatingNotifications={isUpdatingNotifications}
-                            setNotif={setNotif}
-                            persistNotificationSettings={persistNotificationSettings}
-                        />
-                    )}
+                        {activeTab === 'notifications' && (
+                            <UserSettingsNotificationsTab
+                                notif={notif}
+                                isUpdatingNotifications={isUpdatingNotifications}
+                                setNotif={setNotif}
+                                persistNotificationSettings={persistNotificationSettings}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Close Button Column (Right) - Desktop Only */}
-            <div className="hidden md:block w-[18%] min-w-[60px] pt-[60px] pl-5">
+            <div className="hidden md:block w-[18%] min-w-[60px] max-w-[200px] pt-[60px] pl-5">
                 <div
-                    className="flex flex-col items-center cursor-pointer group"
+                    className="flex flex-col items-center cursor-pointer group sticky top-[60px]"
                     onClick={closeSettings}
                 >
                     <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">

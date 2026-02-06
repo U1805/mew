@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react';
 import { useModalStore } from '../../../shared/stores';
 import { useBots } from '../hooks/useBots';
 import { useI18n } from '../../../shared/i18n';
+import { BotServiceStatusPanel } from './PluginManagementPanel';
 
 export const BotManagementPanel = () => {
   const { openModal } = useModalStore();
@@ -10,7 +11,13 @@ export const BotManagementPanel = () => {
 
   return (
     <div className="animate-fade-in pb-10">
-      <div className="flex items-center justify-between mb-6">
+      <BotServiceStatusPanel
+        title={t('bot.management.serviceStatusTitle')}
+        subtitle={t('plugin.subtitle')}
+        className="mb-10"
+      />
+
+      <div className="flex items-center justify-between mb-6 border-t border-[#26272D] pt-6">
         <h2 className="text-xl font-bold text-white">{t('bot.management.title')}</h2>
         <button
           onClick={() => openModal('manageBot')}
