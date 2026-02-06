@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -34,6 +34,42 @@ const UserSettings: React.FC = () => {
     const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+    const [displayedTab, setDisplayedTab] = useState<SettingsTab>(activeTab);
+    const [tabTransition, setTabTransition] = useState<'idle' | 'out' | 'in'>('idle');
+    const [tabDirection, setTabDirection] = useState<'forward' | 'backward'>('forward');
+
+    useEffect(() => {
+        if (!isSettingsOpen) return;
+        const tabOrder: SettingsTab[] = ['account', 'stickers', 'notifications', 'bots', 'plugins'];
+        if (activeTab === displayedTab) return;
+
+        const currentIndex = tabOrder.indexOf(displayedTab);
+        const nextIndex = tabOrder.indexOf(activeTab);
+        const isForward = nextIndex >= currentIndex;
+
+        setTabDirection(isForward ? 'forward' : 'backward');
+        setTabTransition('out');
+
+        const switchTimer = window.setTimeout(() => {
+            setDisplayedTab(activeTab);
+            setTabTransition('in');
+        }, 140);
+
+        const settleTimer = window.setTimeout(() => {
+            setTabTransition('idle');
+        }, 320);
+
+        return () => {
+            window.clearTimeout(switchTimer);
+            window.clearTimeout(settleTimer);
+        };
+    }, [activeTab, displayedTab, isSettingsOpen]);
+
+    useEffect(() => {
+        if (!isSettingsOpen) return;
+        setDisplayedTab(activeTab);
+        setTabTransition('idle');
+    }, [isSettingsOpen]);
 
     if (!isSettingsOpen) return null;
 
@@ -145,7 +181,7 @@ const UserSettings: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans selection:bg-mew-accent selection:text-white">
+        <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in settings-shell-enter text-mew-text font-sans selection:bg-mew-accent selection:text-white">
 
             {/* Sidebar (Left) */}
             <UserSettingsSidebar
@@ -159,6 +195,7 @@ const UserSettings: React.FC = () => {
             {/* Main Content (Center) */}
             <div className={clsx(
                 "flex-1 bg-[#313338] flex flex-col h-full min-w-0", // min-w-0 prevents flex items from overflowing
+                "settings-main-enter",
                 !mobileMenuOpen ? "flex" : "hidden md:flex"
             )}>
 
@@ -170,14 +207,22 @@ const UserSettings: React.FC = () => {
                     >
                         <Icon icon="mdi:arrow-left" width="24" />
                     </button>
-                    <span className="font-bold text-lg text-white capitalize">
+                    <span key={activeTab} className="font-bold text-lg text-white capitalize animate-fade-in">
                         {activeTab === 'account' ? t('settings.myAccount') : t(`settings.${activeTab}`)}
                     </span>
                 </div>
 
                 <div className="flex-1 overflow-y-auto discord-scrollbar px-4 md:px-10 pt-4 md:pt-[60px] pb-10">
-                    <div className="max-w-full md:max-w-[740px]">
-                        {activeTab === 'account' && (
+                    <div
+                        className={clsx(
+                            "max-w-full md:max-w-[740px]",
+                            tabTransition === 'out' && tabDirection === 'forward' && 'settings-tab-out-left',
+                            tabTransition === 'out' && tabDirection === 'backward' && 'settings-tab-out-right',
+                            tabTransition === 'in' && tabDirection === 'forward' && 'settings-tab-in-right',
+                            tabTransition === 'in' && tabDirection === 'backward' && 'settings-tab-in-left'
+                        )}
+                    >
+                        {displayedTab === 'account' && (
                             <UserSettingsAccountTab
                                 user={user}
                                 isUploading={isUploading}
@@ -189,10 +234,10 @@ const UserSettings: React.FC = () => {
                             />
                         )}
 
-                        {(activeTab === 'bots' || activeTab === 'plugins') && <BotManagementPanel />}
-                        {activeTab === 'stickers' && <UserStickerPanel />}
+                        {(displayedTab === 'bots' || displayedTab === 'plugins') && <BotManagementPanel />}
+                        {displayedTab === 'stickers' && <UserStickerPanel />}
 
-                        {activeTab === 'notifications' && (
+                        {displayedTab === 'notifications' && (
                             <UserSettingsNotificationsTab
                                 notif={notif}
                                 isUpdatingNotifications={isUpdatingNotifications}
@@ -205,7 +250,7 @@ const UserSettings: React.FC = () => {
             </div>
 
             {/* Close Button Column (Right) - Desktop Only */}
-            <div className="hidden md:block w-[18%] min-w-[60px] max-w-[200px] pt-[60px] pl-5">
+            <div className="hidden md:block w-[18%] min-w-[60px] max-w-[200px] pt-[60px] pl-5 settings-close-enter">
                 <div
                     className="flex flex-col items-center cursor-pointer group sticky top-[60px]"
                     onClick={closeSettings}

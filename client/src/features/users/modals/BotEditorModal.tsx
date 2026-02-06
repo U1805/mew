@@ -268,7 +268,7 @@ export const BotEditorModal: React.FC = () => {
           <p className="text-mew-textMuted text-sm">{t('bot.editor.subtitle')}</p>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
+        <div className="flex-1 overflow-y-auto discord-scrollbar p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="flex gap-6 items-start">
               <div className="flex-shrink-0">

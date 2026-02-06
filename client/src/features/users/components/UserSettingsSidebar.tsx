@@ -17,7 +17,7 @@ export const UserSettingsSidebar: React.FC<{
   return (
     <div
       className={clsx(
-        'w-full md:w-[35%] md:min-w-[218px] bg-[#2B2D31] flex-col md:items-end pt-4 md:pt-[60px] pb-4 px-2 overflow-y-auto z-10 custom-scrollbar',
+        'w-full md:w-[35%] md:min-w-[218px] bg-[#2B2D31] flex-col md:items-end pt-4 md:pt-[60px] pb-4 px-2 overflow-y-auto z-10 custom-scrollbar settings-sidebar-enter',
         mobileMenuOpen ? 'flex' : 'hidden md:flex'
       )}
     >
