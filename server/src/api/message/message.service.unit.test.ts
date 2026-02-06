@@ -567,7 +567,7 @@ describe('message.service (unit)', () => {
     vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
     vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] }));
 
-    const text = await transcribeVoiceMessage('c1', 'm1', { originalname: 'voice.webm' } as any);
+    const text = await transcribeVoiceMessage('c1', 'm1', 'u1', { originalname: 'voice.webm' } as any);
 
     expect(text).toBe('语音转文字结果为空');
     expect(doc.plainText).toBe('语音转文字结果为空');
@@ -584,7 +584,8 @@ describe('message.service (unit)', () => {
     });
 
     vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
-    await expect(transcribeVoiceMessage('c1', 'm1', { originalname: 'x.txt' } as any)).rejects.toBeInstanceOf(BadRequestError);
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1')] }));
+    await expect(transcribeVoiceMessage('c1', 'm1', 'u1', { originalname: 'x.txt' } as any)).rejects.toBeInstanceOf(BadRequestError);
   });
 });
 

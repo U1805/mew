@@ -42,5 +42,15 @@ describe('Auth CSRF', () => {
     expect(res.statusCode).toBe(201);
     expect(res.body?.user?.email).toBe('csrf-ok-1@example.com');
   });
-});
 
+  it('rejects unsafe cookie-auth requests without Origin when CSRF token is missing', async () => {
+    const user = { email: 'csrf-cookie-1@example.com', username: 'csrfcookie1', password: 'password123' };
+    const regRes = await request(app).post('/api/auth/register').send(user);
+    expect(regRes.statusCode).toBe(201);
+    const authCookies = regRes.headers['set-cookie'] as string[] | undefined;
+
+    const res = await request(app).post('/api/auth/logout').set('Cookie', authCookies || []);
+    expect(res.statusCode).toBe(403);
+    expect(res.body?.message).toContain('CSRF');
+  });
+});

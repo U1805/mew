@@ -110,7 +110,7 @@ export const transcribeVoiceMessageHandler = asyncHandler(async (req: Request, r
   }
 
   const { channelId, messageId } = req.params as any;
-  const text = await messageService.transcribeVoiceMessage(String(channelId), String(messageId), req.file as any);
+  const text = await messageService.transcribeVoiceMessage(String(channelId), String(messageId), req.user.id, req.file as any);
 
   res.status(200).type('text/plain').send(text);
 });

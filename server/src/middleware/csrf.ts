@@ -1,6 +1,8 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express';
 import crypto from 'crypto';
 import { readCookie } from '../utils/cookies';
+import { getAccessTokenCookieName } from '../api/auth/accessTokenCookie.service';
+import { getRefreshTokenCookieName } from '../api/auth/refreshToken.service';
 
 const CSRF_COOKIE_NAME = 'mew_csrf_token';
 const CSRF_HEADER_NAME = 'x-mew-csrf-token';
@@ -43,8 +45,14 @@ export const requireCsrf: RequestHandler = (req: Request, res: Response, next: N
   const method = (req.method || '').toUpperCase();
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return next();
 
+  const path = String(req.path || '').toLowerCase();
+  const isSessionMutationPath = path === '/refresh' || path === '/refresh-cookie' || path === '/logout';
+  const hasAccessCookie = !!readCookie(req.headers.cookie, getAccessTokenCookieName());
+  const hasRefreshCookie = !!readCookie(req.headers.cookie, getRefreshTokenCookieName());
   const origin = req.headers.origin;
-  if (!origin) return next();
+  // Always enforce CSRF for endpoints that mutate auth session state.
+  // Otherwise, enforce when request looks browser-originated or carries auth cookies.
+  if (!isSessionMutationPath && !origin && !hasAccessCookie && !hasRefreshCookie) return next();
 
   const cookieToken = readCookie(req.headers.cookie, CSRF_COOKIE_NAME);
   const headerToken = readHeaderToken(req);
@@ -55,4 +63,3 @@ export const requireCsrf: RequestHandler = (req: Request, res: Response, next: N
 
   return next();
 };
-
