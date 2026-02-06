@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { nanoid } from 'nanoid';
-import { NotFoundError } from '../../utils/errors';
+import { BadRequestError, NotFoundError } from '../../utils/errors';
 
 vi.mock('nanoid', () => ({
   nanoid: vi.fn(),
@@ -20,6 +20,8 @@ vi.mock('./bot.repository', () => ({
   deleteById: vi.fn(),
   findByIdWithToken: vi.fn(),
   findByServiceTypeWithToken: vi.fn(),
+  findByIdWithTokenUnscoped: vi.fn(),
+  updateByIdForBotUserId: vi.fn(),
 }));
 
 vi.mock('../../utils/s3', () => ({
@@ -170,5 +172,109 @@ describe('bot.service', () => {
 
     const result: any = await botService.bootstrapBots('rss-fetcher');
     expect(result[0].accessToken).toBe(raw);
+  });
+
+  it('createBot throws when serviceType is missing', async () => {
+    await expect(botService.createBot('u1', { name: 'MyBot' } as any)).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('createBot throws when serviceType is unknown', async () => {
+    vi.mocked((ServiceTypeModel as any).exists).mockResolvedValue(false);
+    await expect(botService.createBot('u1', { name: 'MyBot', serviceType: 'unknown' } as any)).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('updateBot uploads avatar when file has no key', async () => {
+    vi.mocked(botRepository.findById).mockResolvedValue({ _id: 'b1', serviceType: 'rss-fetcher', botUserId: 'u-bot' } as any);
+    vi.mocked(uploadFile as any).mockResolvedValue({ key: 'uploaded.png' });
+    vi.mocked(botRepository.updateById).mockResolvedValue({
+      _id: 'b1',
+      name: 'New',
+      serviceType: 'rss-fetcher',
+      botUserId: 'u-bot',
+      toObject: () => ({ _id: 'b1', name: 'New', serviceType: 'rss-fetcher', avatarUrl: 'http://cdn.local/uploaded.png' }),
+      save: vi.fn().mockResolvedValue({}),
+    } as any);
+
+    const file = { originalname: 'a.png', mimetype: 'image/png', size: 10 } as any;
+    const result: any = await botService.updateBot('b1', 'u1', { name: 'New', serviceType: 'rss-fetcher' } as any, file);
+    expect(uploadFile).toHaveBeenCalledWith(file);
+    expect(result.avatarUrl).toContain('uploaded.png');
+  });
+
+  it('updateBot throws when updated bot is unexpectedly null', async () => {
+    vi.mocked(botRepository.findById).mockResolvedValue({ _id: 'b1', serviceType: 'rss-fetcher', botUserId: 'u-bot' } as any);
+    vi.mocked(botRepository.updateById).mockResolvedValue(null as any);
+    await expect(botService.updateBot('b1', 'u1', { name: 'New', serviceType: 'rss-fetcher' } as any)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('deleteBot throws when bot is missing', async () => {
+    vi.mocked(botRepository.deleteById).mockResolvedValue(null as any);
+    await expect(botService.deleteBot('b1', 'u1')).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('bootstrapBots throws when token is not recoverable', async () => {
+    vi.mocked(botRepository.findByServiceTypeWithToken).mockResolvedValue([
+      { _id: 'b1', name: 'Bot1', config: '{}', accessToken: 'x'.repeat(64), accessTokenEnc: '', serviceType: 'rss-fetcher', dmEnabled: false } as any,
+    ]);
+    await expect(botService.bootstrapBots('rss-fetcher')).rejects.toBeInstanceOf(BadRequestError);
+  });
+
+  it('bootstrapBotById validates existence and expectedServiceType', async () => {
+    vi.mocked(botRepository.findByIdWithTokenUnscoped).mockResolvedValueOnce(null as any);
+    await expect(botService.bootstrapBotById('b1')).rejects.toBeInstanceOf(NotFoundError);
+
+    vi.mocked(botRepository.findByIdWithTokenUnscoped).mockResolvedValueOnce({
+      _id: 'b1',
+      name: 'Bot1',
+      config: '{}',
+      accessToken: 't'.repeat(32),
+      accessTokenEnc: '',
+      serviceType: 'rss-fetcher',
+      dmEnabled: false,
+    } as any);
+    await expect(botService.bootstrapBotById('b1', 'twitter-fetcher')).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it('bootstrapBotById returns normalized serviceType and token', async () => {
+    vi.mocked(botRepository.findByIdWithTokenUnscoped).mockResolvedValue({
+      _id: 'b1',
+      name: 'Bot1',
+      config: '{}',
+      accessToken: 't'.repeat(32),
+      accessTokenEnc: '',
+      serviceType: undefined,
+      dmEnabled: true,
+      save: vi.fn().mockResolvedValue(undefined),
+    } as any);
+    const r: any = await botService.bootstrapBotById('b1');
+    expect(r.serviceType).toBe('rss-fetcher');
+    expect(r.accessToken).toBe('t'.repeat(32));
+    expect(r.dmEnabled).toBe(true);
+  });
+
+  it('updateBotConfigAsBot validates ownership and writes merged config', async () => {
+    vi.mocked(botRepository.findByIdWithTokenUnscoped)
+      .mockResolvedValueOnce(null as any)
+      .mockResolvedValueOnce({ _id: 'b1', botUserId: 'u-other', config: '{}', serviceType: 'rss-fetcher' } as any)
+      .mockResolvedValueOnce({ _id: 'b1', botUserId: 'u-bot', config: '{bad-json', serviceType: 'rss-fetcher' } as any)
+      .mockResolvedValueOnce({ _id: 'b1', botUserId: 'u-bot', config: '{"foo":"bar"}', serviceType: 'rss-fetcher' } as any);
+
+    vi.mocked(botRepository.updateByIdForBotUserId)
+      .mockResolvedValueOnce(null as any)
+      .mockResolvedValueOnce({ _id: 'b1', serviceType: 'rss-fetcher', config: '{"system_prompt":"p1"}' } as any)
+      .mockResolvedValueOnce({ _id: 'b1', serviceType: 'rss-fetcher', config: '{"foo":"bar","system_prompt":"p2"}' } as any);
+
+    await expect(botService.updateBotConfigAsBot('b1', 'u-bot', { system_prompt: 'x' })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(botService.updateBotConfigAsBot('b1', 'u-bot', { system_prompt: 'x' })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(botService.updateBotConfigAsBot('b1', 'u-bot', { system_prompt: 'p1' })).rejects.toBeInstanceOf(NotFoundError);
+
+    const updated: any = await botService.updateBotConfigAsBot('b1', 'u-bot', { system_prompt: 'p2' });
+    expect(updated).toBeDefined();
+
+    const firstUpdateArg = vi.mocked(botRepository.updateByIdForBotUserId).mock.calls[0]?.[2] as any;
+    const secondUpdateArg = vi.mocked(botRepository.updateByIdForBotUserId).mock.calls[1]?.[2] as any;
+    expect(firstUpdateArg.config).toContain('"system_prompt":"p1"');
+    expect(secondUpdateArg.config).toContain('"foo":"bar"');
+    expect(secondUpdateArg.config).toContain('"system_prompt":"p2"');
   });
 });
