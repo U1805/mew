@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 
 import { CHANNEL_PERMS, type DisplayOverride, type PermissionState } from '../model/constants';
+import { useI18n } from '../../../shared/i18n';
 
 export const ChannelSettingsPermissionsTab: React.FC<{
   isLoading: boolean;
@@ -28,8 +29,10 @@ export const ChannelSettingsPermissionsTab: React.FC<{
   onSave,
   isSaving,
 }) => {
+  const { t } = useI18n();
+
   if (isLoading) {
-    return <div className="flex h-full w-full items-center justify-center text-mew-textMuted">Loading permissions...</div>;
+    return <div className="flex h-full w-full items-center justify-center text-mew-textMuted">{t('channel.permissions.loading')}</div>;
   }
 
   return (
@@ -42,7 +45,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
           )}
         >
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xs font-bold text-mew-textMuted uppercase">Roles / Members</h3>
+            <h3 className="text-xs font-bold text-mew-textMuted uppercase">{t('channel.permissions.rolesMembers')}</h3>
             <button onClick={onAddOverride} className="text-mew-textMuted hover:text-white">
               <Icon icon="mdi:plus" width="18" />
             </button>
@@ -86,9 +89,9 @@ export const ChannelSettingsPermissionsTab: React.FC<{
                   <Icon icon="mdi:arrow-left" width="24" />
                 </button>
                 <div>
-                  <h2 className="text-lg font-bold text-white mb-1">Advanced Permissions</h2>
+                  <h2 className="text-lg font-bold text-white mb-1">{t('channel.permissions.advanced')}</h2>
                   <p className="text-sm text-mew-textMuted leading-tight">
-                    Override for <strong className="text-white">{currentDisplayOverride.name}</strong>
+                    {t('channel.permissions.overrideFor')} <strong className="text-white">{currentDisplayOverride.name}</strong>
                   </p>
                 </div>
               </div>
@@ -97,7 +100,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
                 {CHANNEL_PERMS.map((group) => (
                   <div key={group.group} className="mb-6">
                     <h3 className="text-xs font-bold text-mew-textMuted uppercase mb-2 border-b border-[#3F4147] pb-1">
-                      {group.group} Permissions
+                      {group.group} {t('channel.permissions.groupSuffix')}
                     </h3>
                     <div className="space-y-0.5">
                       {group.perms.map((perm) => {
@@ -120,7 +123,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
                                     : 'border-[#4E5058] text-[#B5BAC1] hover:border-red-500'
                                 )}
                                 onClick={() => onUpdatePermission(perm.id, 'deny')}
-                                title="Deny"
+                                title={t('channel.permissions.deny')}
                               >
                                 <Icon icon="mdi:close" width="20" />
                               </div>
@@ -130,7 +133,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
                                   state === 'inherit' ? 'bg-[#4E5058] border-[#4E5058] text-white' : 'border-[#4E5058] text-[#B5BAC1]'
                                 )}
                                 onClick={() => onUpdatePermission(perm.id, 'inherit')}
-                                title="Inherit"
+                                title={t('channel.permissions.inherit')}
                               >
                                 <span className="text-lg font-bold">/</span>
                               </div>
@@ -142,7 +145,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
                                     : 'border-[#4E5058] text-[#B5BAC1] hover:border-green-500'
                                 )}
                                 onClick={() => onUpdatePermission(perm.id, 'allow')}
-                                title="Allow"
+                                title={t('channel.permissions.allow')}
                               >
                                 <Icon icon="mdi:check" width="20" />
                               </div>
@@ -157,7 +160,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
             </div>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-mew-textMuted p-4 text-center">
-              Select a role or member to edit permissions.
+              {t('channel.permissions.select')}
             </div>
           )}
         </div>
@@ -169,7 +172,7 @@ export const ChannelSettingsPermissionsTab: React.FC<{
           onClick={onSave}
           disabled={isSaving}
         >
-          {isSaving ? 'Saving...' : 'Save Changes'}
+          {isSaving ? t('common.saving') : t('common.saveChanges')}
         </button>
       </div>
     </>

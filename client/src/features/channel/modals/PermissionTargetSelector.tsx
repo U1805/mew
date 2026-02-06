@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Role, ServerMember } from '../../../shared/types';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { useI18n } from '../../../shared/i18n';
 
 interface Props {
   roles: Role[];
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export const PermissionTargetSelector: React.FC<Props> = ({ roles, members, existingTargetIds, onSelect, onClose }) => {
+  const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
 
   const selectableTargets = useMemo(() => {
@@ -43,12 +45,12 @@ export const PermissionTargetSelector: React.FC<Props> = ({ roles, members, exis
   return (
     <div className="bg-[#313338] rounded-lg w-full max-w-md flex flex-col h-[500px]">
       <div className="p-4 border-b border-mew-divider flex-shrink-0">
-        <h2 className="text-lg font-bold text-white mb-2">Add a Role or Member</h2>
+        <h2 className="text-lg font-bold text-white mb-2">{t('channel.permissions.addTargetTitle')}</h2>
         <div className="relative">
           <Icon icon="mdi:magnify" className="absolute left-2 top-1/2 -translate-y-1/2 text-mew-textMuted" />
           <input
             type="text"
-            placeholder="Search roles and members..."
+            placeholder={t('channel.permissions.searchRolesMembers')}
             className="w-full bg-[#202225] border-none rounded p-2 pl-8 text-white focus:outline-none focus:ring-1 focus:ring-mew-accent transition-all"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -78,7 +80,7 @@ export const PermissionTargetSelector: React.FC<Props> = ({ roles, members, exis
             </span>
           </div>
         )) : (
-            <div className="text-center text-mew-textMuted p-8">No roles or members to add.</div>
+            <div className="text-center text-mew-textMuted p-8">{t('channel.permissions.noTargetToAdd')}</div>
         )}
       </div>
     </div>

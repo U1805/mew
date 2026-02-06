@@ -4,8 +4,10 @@ import { format } from 'date-fns';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { messageApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { useI18n } from '../../../shared/i18n';
 
 export const DeleteMessageModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
@@ -28,7 +30,7 @@ export const DeleteMessageModal: React.FC = () => {
           if (m._id === message._id) {
             return {
               ...m,
-              content: '(message deleted)',
+              content: t('message.deleted'),
               retractedAt: new Date().toISOString(),
               attachments: [],
               payload: {},
@@ -50,9 +52,9 @@ export const DeleteMessageModal: React.FC = () => {
 
   return (
     <ConfirmModal
-      title="Delete Message"
-      description="Are you sure you want to delete this message?"
-      confirmText="Delete"
+      title={t('message.delete.title')}
+      description={t('message.delete.description')}
+      confirmText={t('message.delete.confirm')}
       onConfirm={handleConfirm}
       onCancel={closeModal}
       isLoading={isLoading}
@@ -62,14 +64,14 @@ export const DeleteMessageModal: React.FC = () => {
         <div className="flex items-start">
           <div className="w-10 h-10 rounded-full bg-mew-accent flex items-center justify-center text-white font-semibold mr-3 flex-shrink-0 mt-0.5">
             {author?.avatarUrl ? (
-              <img src={author.avatarUrl} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+              <img src={author.avatarUrl} alt={t('modal.preview')} className="w-full h-full rounded-full object-cover" />
             ) : (
               author?.username?.slice(0, 2).toUpperCase() || '?'
             )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center mb-1">
-              <span className="font-bold text-white mr-1.5">{author?.username || 'Unknown'}</span>
+              <span className="font-bold text-white mr-1.5">{author?.username || t('common.unknown')}</span>
               <span className="text-xs text-mew-textMuted">
                 {message.createdAt && !isNaN(new Date(message.createdAt).getTime())
                   ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a')

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import { ServerMember } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
 
 interface MentionSuggestionListProps {
   serverId: string;
@@ -11,6 +12,7 @@ interface MentionSuggestionListProps {
 }
 
 export const MentionSuggestionList = ({ serverId, query, onSelect, onClose }: MentionSuggestionListProps) => {
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -78,7 +80,7 @@ export const MentionSuggestionList = ({ serverId, query, onSelect, onClose }: Me
   return (
     <div className="absolute bottom-full left-0 mb-2 w-64 bg-[#2B2D31] rounded-md shadow-xl border border-[#1E1F22] overflow-hidden z-50">
       <div className="text-xs font-bold text-mew-textMuted uppercase px-3 py-2 bg-[#1E1F22]">
-        Members
+        {t('common.members')}
       </div>
       <div className="max-h-[200px] overflow-y-auto custom-scrollbar p-1">
         {filteredMembers.map((member, index) => (
@@ -105,7 +107,7 @@ export const MentionSuggestionList = ({ serverId, query, onSelect, onClose }: Me
             )}
             <span className="truncate font-medium text-sm">{member.userId.username}</span>
             {(member as any).isGlobal ? (
-                <span className="ml-2 text-xs text-mew-textMuted truncate">Notify everyone online or all members</span>
+                <span className="ml-2 text-xs text-mew-textMuted truncate">{t('mention.notifyAll')}</span>
             ) : (
                 <span className="ml-1 text-xs text-mew-textMuted">#{member.userId.discriminator || '????'}</span>
             )}

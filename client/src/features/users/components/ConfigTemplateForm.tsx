@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { useI18n } from '../../../shared/i18n';
 
 // ==========================================
 // Logic / Types (Preserved)
@@ -197,16 +198,19 @@ const FieldLabel: React.FC<{
   label: string;
   required?: boolean;
   className?: string;
-}> = ({ label, required, className }) => (
-  <div className={clsx("flex items-center mb-2", className)}>
-    <label className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wide leading-none select-none">
-      {label}
-    </label>
-    {required && (
-      <span className="text-[#F23F42] text-sm leading-none ml-1 font-sans" title="Required">*</span>
-    )}
-  </div>
-);
+}> = ({ label, required, className }) => {
+  const { t } = useI18n();
+  return (
+    <div className={clsx("flex items-center mb-2", className)}>
+      <label className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wide leading-none select-none">
+        {label}
+      </label>
+      {required && (
+        <span className="text-[#F23F42] text-sm leading-none ml-1 font-sans" title={t('config.required')}>*</span>
+      )}
+    </div>
+  );
+};
 
 const FieldDescription: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   if (!children) return null;
@@ -239,6 +243,7 @@ const PrimitiveField: React.FC<{
   onChange: (nextValue: any) => void;
   hideLabel?: boolean;
 }> = ({ name, descriptor, value, onChange, hideLabel }) => {
+  const { t } = useI18n();
   const required = requiredOf(descriptor);
   const desc = (descriptor.desc || '').trim() || undefined;
   const [revealToken, setRevealToken] = React.useState(false);
@@ -281,7 +286,7 @@ const PrimitiveField: React.FC<{
               "w-full bg-[#1E1F22] text-[#DBDEE1] rounded-[3px] py-2.5 px-3 text-sm font-medium select-none",
               "border-none outline-none transition-all pr-16"
             )}
-            aria-label={`${name} (hidden)`}
+            aria-label={t('config.hiddenField', { name })}
           >
             {'•'.repeat(16)}
           </div>
@@ -289,7 +294,7 @@ const PrimitiveField: React.FC<{
           <DiscordInput
             type={descriptor.type === 'int' || descriptor.type === 'float' ? 'number' : (descriptor.type === 'url' ? 'url' : 'text')}
             step={descriptor.type === 'float' ? 'any' : (descriptor.type === 'int' ? '1' : undefined)}
-            placeholder={descriptor.type === 'url' ? 'https://example.com' : undefined}
+            placeholder={descriptor.type === 'url' ? t('channel.create.webUrlPlaceholder') : undefined}
             value={value === null || value === undefined ? '' : String(value)}
             className={descriptor.type === 'token' ? 'pr-16' : undefined}
             onChange={(e) => {
@@ -321,8 +326,8 @@ const PrimitiveField: React.FC<{
                 }
               }}
               className="text-[#949BA4] hover:text-white transition-colors"
-              title={copied ? 'Copied' : 'Copy'}
-              aria-label={copied ? 'Copied token' : 'Copy token'}
+              title={copied ? t('message.copy.success') : t('invite.create.copy')}
+              aria-label={copied ? t('config.tokenCopied') : t('config.copyToken')}
             >
               <Icon icon={copied ? 'mdi:check' : 'mdi:content-copy'} width="16" />
             </button>
@@ -331,8 +336,8 @@ const PrimitiveField: React.FC<{
               type="button"
               onClick={() => setRevealToken(!revealToken)}
               className="text-[#949BA4] hover:text-white transition-colors"
-              title={revealToken ? 'Hide' : 'Show'}
-              aria-label={revealToken ? 'Hide token' : 'Show token'}
+              title={revealToken ? t('config.hide') : t('config.show')}
+              aria-label={revealToken ? t('config.hideToken') : t('config.showToken')}
             >
               <Icon icon={revealToken ? 'mdi:eye-off-outline' : 'mdi:eye-outline'} width="18" />
             </button>
@@ -350,12 +355,13 @@ const SchemaNodeField: React.FC<{
   onValueChange: (next: any) => void;
   level?: number;
 }> = ({ schema, value, name, onValueChange, level = 0 }) => {
+  const { t } = useI18n();
   
   // --- Primitive Case ---
   if (isTemplateDescriptor(schema)) {
     return (
-      <PrimitiveField
-        name={name || 'Value'}
+        <PrimitiveField
+        name={name || t('config.value')}
         descriptor={schema}
         value={value}
         onChange={onValueChange}
@@ -372,7 +378,7 @@ const SchemaNodeField: React.FC<{
       <div className="space-y-3">
         <div className="flex items-end justify-between border-b border-[#3F4147] pb-2 mb-2">
            <div className="text-xs font-bold text-[#B5BAC1] uppercase tracking-wide">
-             {name ? `${name} (List)` : 'Items'}
+             {name ? `${name} (${t('config.list')})` : t('config.items')}
            </div>
            {/* Discord Secondary Button Style for Add */}
            <button
@@ -380,14 +386,14 @@ const SchemaNodeField: React.FC<{
             onClick={() => onValueChange([...(arr || []), buildInitialValueFromSchema(itemSchema)])}
             className="flex items-center gap-1.5 px-3 py-1 bg-[#4E5058] hover:bg-[#6D6F78] text-white text-xs font-medium rounded-[3px] transition-colors"
           >
-            Add Item
+            {t('config.addItem')}
           </button>
         </div>
         
         {arr.length === 0 ? (
           <div className="p-6 bg-[#2B2D31] border border-dashed border-[#4E5058] rounded-[4px] flex flex-col items-center justify-center text-center">
             <Icon icon="mdi:playlist-remove" width="24" className="text-[#949BA4] mb-2" />
-            <span className="text-xs text-[#949BA4]">This list is empty.</span>
+            <span className="text-xs text-[#949BA4]">{t('config.listEmpty')}</span>
           </div>
         ) : (
           <div className="space-y-2">
@@ -406,7 +412,7 @@ const SchemaNodeField: React.FC<{
                     type="button"
                     onClick={() => onValueChange(arr.filter((_: any, i: number) => i !== idx))}
                     className="text-[#949BA4] hover:text-[#DA373C] transition-colors"
-                    title="Remove Item"
+                    title={t('config.removeItem')}
                   >
                     <Icon icon="mdi:trash-can" width="16" />
                   </button>

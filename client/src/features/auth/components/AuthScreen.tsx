@@ -6,8 +6,11 @@ import { useAuthStore } from '../../../shared/stores';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
 import { parseAuthPathname, navigateAuth } from '../../../shared/router/authRoute';
 import { addNavigationListener } from '../../../shared/router/history';
+import { useI18n } from '../../../shared/i18n';
+import { LanguageSelector } from '../../../shared/components/LanguageSelector';
 
 export const AuthScreen = () => {
+  const { t } = useI18n();
   const [isLogin, setIsLogin] = useState(true);
   const [allowRegistration, setAllowRegistration] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
@@ -74,7 +77,7 @@ export const AuthScreen = () => {
         if (allowRegistration === false) {
           setIsLogin(true);
           navigateAuth('login', { replace: true });
-          setError('Registration is disabled. Please contact an admin.');
+          setError(t('auth.registrationDisabled'));
           return;
         }
         const res = await authApi.register({ email, username, password });
@@ -84,12 +87,12 @@ export const AuthScreen = () => {
         else await hydrate();
       }
     } catch (err: any) {
-      const message = getApiErrorMessage(err, 'An error occurred');
+      const message = getApiErrorMessage(err, t('auth.genericError'));
       const status = err?.response?.status as number | undefined;
 
       if (!isLogin && status === 403) {
         setIsLogin(true);
-        setError(message || 'Registration is disabled. Please contact an admin.');
+        setError(message || t('auth.registrationDisabled'));
         return;
       }
 
@@ -102,8 +105,8 @@ export const AuthScreen = () => {
     <div className="w-screen h-screen flex items-center justify-center bg-[url('https://picsum.photos/1920/1080?blur=5')] bg-cover">
       <div className="bg-[#313338] p-8 rounded shadow-2xl w-full max-w-md animate-fade-in-up">
         <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white mb-1">Welcome back!</h2>
-            <p className="text-mew-textMuted">We&rsquo;re so excited to see you again!</p>
+            <h2 className="text-2xl font-bold text-white mb-1">{t('auth.welcomeBack')}</h2>
+            <p className="text-mew-textMuted">{t('auth.welcomeSubtitle')}</p>
         </div>
         
         {error && <div className="bg-red-500/10 border border-red-500 text-red-500 text-sm p-2 rounded mb-4">{error}</div>}
@@ -112,7 +115,7 @@ export const AuthScreen = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
-              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Username</label>
+              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-1">{t('auth.username')}</label>
               <input
                 type="text"
                 required
@@ -123,7 +126,7 @@ export const AuthScreen = () => {
             </div>
           )}
           <div>
-            <label htmlFor="email" className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Email</label>
+            <label htmlFor="email" className="block text-xs font-bold text-mew-textMuted uppercase mb-1">{t('auth.email')}</label>
             <input id="email"
               type="email"
               required
@@ -133,7 +136,7 @@ export const AuthScreen = () => {
             />
           </div>
           <div>
-            <label htmlFor="password" className="block text-xs font-bold text-mew-textMuted uppercase mb-1">Password</label>
+            <label htmlFor="password" className="block text-xs font-bold text-mew-textMuted uppercase mb-1">{t('auth.password')}</label>
             <input id="password"
               type="password"
               required
@@ -155,9 +158,9 @@ export const AuthScreen = () => {
                       )}>
                           {rememberMe && <Icon icon="mdi:check" className="text-white text-xs" />}
                       </div>
-                      <span className="text-xs text-mew-textMuted select-none group-hover:text-mew-text">Remember Me</span>
+                      <span className="text-xs text-mew-textMuted select-none group-hover:text-mew-text">{t('auth.rememberMe')}</span>
                   </div>
-                  <div className="text-xs text-mew-accent hover:underline cursor-pointer">Forgot your password?</div>
+                  <div className="text-xs text-mew-accent hover:underline cursor-pointer">{t('auth.forgotPassword')}</div>
               </div>
           )}
 
@@ -165,14 +168,14 @@ export const AuthScreen = () => {
             type="submit"
             className="w-full bg-mew-accent hover:bg-mew-accentHover text-white font-medium py-2.5 rounded transition-colors"
           >
-            {isLogin ? 'Log In' : 'Register'}
+            {isLogin ? t('auth.logIn') : t('auth.register')}
           </button>
         </form>
 
         <div className="mt-4 text-sm text-mew-textMuted flex gap-1">
           {allowRegistration ? (
             <>
-              {isLogin ? "Need an account?" : "Already have an account?"}
+              {isLogin ? t('auth.needAccount') : t('auth.alreadyHaveAccount')}
               <button
                 type="button"
                 onClick={() => {
@@ -184,7 +187,7 @@ export const AuthScreen = () => {
                 }}
                 className="text-mew-accent hover:underline"
               >
-                {isLogin ? 'Register' : 'Log in'}
+                {isLogin ? t('auth.register') : t('auth.logInLink')}
               </button>
             </>
           ) : allowRegistration === false ? (
@@ -192,6 +195,10 @@ export const AuthScreen = () => {
           ) : (
             <span />
           )}
+        </div>
+
+        <div className="mt-4">
+          <LanguageSelector className="w-full bg-[#1E1F22] border-none rounded p-2.5 text-white focus:outline-none focus:ring-2 focus:ring-mew-accent transition-all text-sm" />
         </div>
       </div>
     </div>

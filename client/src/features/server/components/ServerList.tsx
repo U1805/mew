@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { useServersWithChannels } from '../hooks/useServersWithChannels';
+import { useI18n } from '../../../shared/i18n';
 
 const MewLogo = (props: SVGProps<SVGSVGElement>) => (
   <svg
@@ -16,6 +17,7 @@ const MewLogo = (props: SVGProps<SVGSVGElement>) => (
 );
 
 const ServerList = () => {
+  const { t } = useI18n();
   const { currentServerId, setCurrentServer } = useUIStore();
   const { openModal } = useModalStore();
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
@@ -91,7 +93,7 @@ const ServerList = () => {
       <button 
         onClick={() => openModal('joinServer')}
         className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-mew-text hover:bg-[#35373C] hover:text-white transition-all duration-200 hover:rounded-[16px]"
-        title="Join a Server"
+        title={t('server.join.title')}
       >
         <Icon icon="mdi:compass-outline" width="24" height="24" />
       </button>

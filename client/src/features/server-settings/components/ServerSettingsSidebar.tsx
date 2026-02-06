@@ -1,6 +1,7 @@
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { SidebarItem } from './ServerSettingsSidebarItem';
+import { useI18n } from '../../../shared/i18n';
 
 export type ServerSettingsTab = 'overview' | 'roles' | 'emoji' | 'stickers';
 
@@ -11,6 +12,8 @@ export const ServerSettingsSidebar: React.FC<{
   onTabClick: (tab: ServerSettingsTab) => void;
   onDeleteServer: () => void;
 }> = ({ activeTab, mobileMenuOpen, onClose, onTabClick, onDeleteServer }) => {
+  const { t } = useI18n();
+
   return (
     <div
       className={clsx(
@@ -23,22 +26,22 @@ export const ServerSettingsSidebar: React.FC<{
     >
       <div className="w-full md:w-[192px] px-4 md:px-1.5">
         <div className="flex md:hidden items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Server Settings</h2>
+          <h2 className="text-lg font-bold text-white">{t('server.settings.title')}</h2>
           <button onClick={onClose} className="p-2 text-mew-textMuted hover:text-white">
             <Icon icon="mdi:close" width="24" />
           </button>
         </div>
-        <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 hidden md:block">Server Settings</h2>
-        <SidebarItem label="Overview" isActive={activeTab === 'overview'} onClick={() => onTabClick('overview')} />
-        <SidebarItem label="Roles" isActive={activeTab === 'roles'} onClick={() => onTabClick('roles')} />
-        <SidebarItem label="Emoji" isActive={activeTab === 'emoji'} onClick={() => onTabClick('emoji')} />
-        <SidebarItem label="Stickers" isActive={activeTab === 'stickers'} onClick={() => onTabClick('stickers')} />
+        <h2 className="text-xs font-bold text-mew-textMuted uppercase mb-3 px-2.5 hidden md:block">{t('server.settings.title')}</h2>
+        <SidebarItem label={t('server.settings.overview')} isActive={activeTab === 'overview'} onClick={() => onTabClick('overview')} />
+        <SidebarItem label={t('server.settings.roles')} isActive={activeTab === 'roles'} onClick={() => onTabClick('roles')} />
+        <SidebarItem label={t('server.settings.emoji')} isActive={activeTab === 'emoji'} onClick={() => onTabClick('emoji')} />
+        <SidebarItem label={t('server.settings.stickers')} isActive={activeTab === 'stickers'} onClick={() => onTabClick('stickers')} />
         <div className="h-[1px] bg-mew-divider my-2 mx-2 opacity-50" />
         <div
           className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] font-medium text-sm cursor-pointer mb-0.5 flex justify-between group text-red-400"
           onClick={onDeleteServer}
         >
-          <span>Delete Server</span>
+          <span>{t('server.settings.deleteServer')}</span>
           <Icon icon="mdi:trash-can-outline" />
         </div>
       </div>

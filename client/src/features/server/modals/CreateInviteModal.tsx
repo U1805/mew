@@ -4,8 +4,10 @@ import clsx from 'clsx';
 import { Invite } from '../../../shared/types';
 import { inviteApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useI18n } from '../../../shared/i18n';
 
 export const CreateInviteModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal } = useModalStore();
   const { currentServerId } = useUIStore();
 
@@ -31,16 +33,16 @@ export const CreateInviteModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
          <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in p-4">
              <div className="flex justify-between items-center mb-2">
-                 <h2 className="text-sm font-bold text-white uppercase">Invite Friends</h2>
+                 <h2 className="text-sm font-bold text-white uppercase">{t('invite.create.title')}</h2>
                  <Icon icon="mdi:close" className="text-mew-textMuted cursor-pointer hover:text-white" onClick={closeModal} />
              </div>
              <div className="text-mew-text text-sm mb-4">
-                 Share this link with others to grant them access to this server.
+                 {t('invite.create.subtitle')}
              </div>
              <div className="relative">
                  <input
                     readOnly
-                    value={createdInviteUrl || 'Generating...'}
+                    value={createdInviteUrl || t('invite.create.generating')}
                     className="w-full bg-[#1E1F22] text-white p-2.5 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none text-sm font-medium"
                  />
                  <button
@@ -57,11 +59,11 @@ export const CreateInviteModal: React.FC = () => {
                         }
                     }}
                  >
-                     {isCopied ? 'Copied' : 'Copy'}
+                     {isCopied ? t('invite.create.copied') : t('invite.create.copy')}
                  </button>
              </div>
              <div className="text-xs text-mew-textMuted mt-2">
-                 Your invite link expires in 7 days. <span className="text-mew-accent hover:underline cursor-pointer">Edit link</span>
+                 {t('invite.create.expires')} <span className="text-mew-accent hover:underline cursor-pointer">{t('invite.create.editLink')}</span>
              </div>
          </div>
     </div>

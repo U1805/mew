@@ -4,8 +4,10 @@ import clsx from 'clsx';
 import { Invite } from '../../../shared/types';
 import { inviteApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useI18n } from '../../../shared/i18n';
 
 export const JoinServerModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const queryClient = useQueryClient();
 
@@ -38,7 +40,7 @@ export const JoinServerModal: React.FC = () => {
           const res = await inviteApi.get(code);
           setInvitePreview(res.data);
       } catch {
-          setJoinError("Invalid or expired invite code.");
+          setJoinError(t('server.join.invalidInvite'));
           setInvitePreview(null);
       } finally {
           setIsLoading(false);
@@ -54,7 +56,7 @@ export const JoinServerModal: React.FC = () => {
           useUIStore.getState().setCurrentServer(invitePreview.serverId);
           closeModal();
       } catch {
-          setJoinError("Failed to join server.");
+          setJoinError(t('server.join.failed'));
       } finally {
           setIsLoading(false);
       }
@@ -72,12 +74,12 @@ export const JoinServerModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
          <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in p-6 text-center">
-             <h2 className="text-2xl font-bold text-white mb-2">Join a Server</h2>
-             <p className="text-mew-textMuted text-sm mb-6">Enter an invite below to join an existing server.</p>
+             <h2 className="text-2xl font-bold text-white mb-2">{t('server.join.title')}</h2>
+             <p className="text-mew-textMuted text-sm mb-6">{t('server.join.subtitle')}</p>
 
              {!invitePreview ? (
                 <div className="text-left">
-                    <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Invite Link</label>
+                    <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('server.join.inviteLink')}</label>
                     <input
                         type="text"
                         value={inviteInput}
@@ -89,7 +91,7 @@ export const JoinServerModal: React.FC = () => {
                             if (code.length > 5) handleFetchInvite(code);
                         }}
                         className="w-full bg-[#1E1F22] text-white p-2.5 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none text-sm font-medium mb-2"
-                        placeholder="https://mew.com/invite/..."
+                        placeholder={t('server.join.invitePlaceholder')}
                     />
                      {joinError && <div className="text-red-400 text-xs mb-2">{joinError}</div>}
                 </div>
@@ -105,13 +107,13 @@ export const JoinServerModal: React.FC = () => {
                     <div className="text-white font-bold truncate max-w-full">{invitePreview.server?.name}</div>
                     <div className="text-mew-textMuted text-xs flex items-center mt-1">
                         <span className="w-2 h-2 rounded-full bg-mew-textMuted mr-1.5"></span>
-                        {invitePreview.server?.memberCount ?? '?'} Members
+                        {invitePreview.server?.memberCount ?? '?'} {t('common.members')}
                     </div>
                 </div>
              )}
 
              <div className="flex justify-between items-center mt-2">
-                 <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">Back</button>
+                 <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">{t('server.join.back')}</button>
                  <button
                     onClick={invitePreview ? handleJoinServer : () => handleFetchInvite(inviteCode)}
                     disabled={isLoading || !inviteCode}
@@ -120,7 +122,7 @@ export const JoinServerModal: React.FC = () => {
                         (isLoading || !inviteCode) && "opacity-50 cursor-not-allowed"
                     )}
                  >
-                     {invitePreview ? 'Join Server' : 'Find Server'}
+                     {invitePreview ? t('server.join.join') : t('server.join.find')}
                  </button>
              </div>
          </div>

@@ -6,8 +6,10 @@ import { useModalStore, useUIStore } from '../../../shared/stores';
 import { User } from '../../../shared/types';
 import { serverBotApi } from '../../../shared/services/api';
 import { useServerBotSearch } from '../hooks/useServerBotSearch';
+import { useI18n } from '../../../shared/i18n';
 
 export const InviteBotModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
@@ -30,13 +32,13 @@ export const InviteBotModal: React.FC = () => {
     setLoadingBotUserId(botUser._id);
     try {
       await serverBotApi.invite(currentServerId, botUser._id);
-      toast.success('Bot added to server');
+      toast.success(t('bot.invite.success'));
       queryClient.invalidateQueries({ queryKey: ['members', currentServerId] });
       closeModal();
     } catch (error: any) {
-      const message = error?.response?.data?.message || 'Failed to add bot';
+      const message = error?.response?.data?.message || t('bot.invite.failed');
       toast.error(message);
-      console.error('Failed to add bot', error);
+      console.error(t('bot.invite.failed'), error);
     } finally {
       setLoadingBotUserId(null);
     }
@@ -46,8 +48,8 @@ export const InviteBotModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-[#313338] w-full max-w-lg rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[600px]">
         <div className="p-4 pt-5">
-          <h2 className="text-xl font-bold text-white mb-2">Add App</h2>
-          <p className="text-mew-textMuted text-sm">Search for a bot by username to add it to this server.</p>
+          <h2 className="text-xl font-bold text-white mb-2">{t('bot.invite.title')}</h2>
+          <p className="text-mew-textMuted text-sm">{t('bot.invite.subtitle')}</p>
         </div>
 
         <div className="px-4 mb-4">
@@ -56,7 +58,7 @@ export const InviteBotModal: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[#1E1F22] text-white p-3 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none font-medium placeholder-mew-textMuted"
-            placeholder="Search bots..."
+            placeholder={t('bot.invite.searchPlaceholder')}
             autoFocus
           />
         </div>
@@ -67,7 +69,7 @@ export const InviteBotModal: React.FC = () => {
               <Icon icon="mdi:loading" className="animate-spin" width="24" />
             </div>
           ) : searchResults?.length === 0 && debouncedQuery ? (
-            <div className="text-center p-4 text-mew-textMuted">No bots found.</div>
+            <div className="text-center p-4 text-mew-textMuted">{t('bot.invite.none')}</div>
           ) : (
             searchResults?.map((botUser) => (
               <div
@@ -91,13 +93,13 @@ export const InviteBotModal: React.FC = () => {
           )}
 
           {!debouncedQuery && !isSearching && (
-            <div className="text-center p-8 text-mew-textMuted text-sm">Start typing to search for bots.</div>
+            <div className="text-center p-8 text-mew-textMuted text-sm">{t('bot.invite.startTyping')}</div>
           )}
         </div>
 
         <div className="bg-[#2B2D31] p-4 flex justify-end">
           <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>

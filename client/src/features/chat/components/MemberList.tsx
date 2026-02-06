@@ -11,6 +11,7 @@ import { useServerPermissions } from '../../../shared/hooks/useServerPermissions
 import { useMembers } from '../../../shared/hooks/useMembers';
 import { useRoles } from '../../../shared/hooks/useRoles';
 import { filterMembersForChannel } from '../hooks/memberListUtils';
+import { useI18n } from '../../../shared/i18n';
 
 const getHighestRolePos = (member: ServerMember, roles: Role[]) => {
   if (member.isOwner) return Infinity;
@@ -217,6 +218,7 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
 }
 
 const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => {
+    const { t } = useI18n();
     const { currentServerId } = useUIStore();
     const { user: currentUser } = useAuthStore();
     const { openModal } = useModalStore();
@@ -261,7 +263,7 @@ const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => 
             {canManageRoles && (
                 <ContextMenu.Sub>
                     <ContextMenu.SubTrigger className="flex items-center justify-between px-2 py-1.5 hover:bg-mew-accent hover:text-white text-mew-textMuted rounded cursor-pointer text-sm font-medium outline-none">
-                        Roles
+                        {t('member.menu.roles')}
                         <Icon icon="mdi:chevron-right" width="16" />
                     </ContextMenu.SubTrigger>
                     <ContextMenu.Portal>
@@ -291,7 +293,7 @@ const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => 
                     className="flex items-center px-2 py-1.5 hover:bg-red-500 hover:text-white text-red-400 rounded cursor-pointer text-sm font-medium outline-none"
                     onSelect={() => openModal('kickUser', { user: targetMember.userId, serverId: currentServerId })}
                 >
-                    Kick {targetMember.userId?.username}
+                    {t('member.menu.kick', { name: targetMember.userId?.username || '' })}
                 </ContextMenu.Item>
             )}
         </ContextMenu.Content>

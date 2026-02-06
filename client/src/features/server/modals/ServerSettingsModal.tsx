@@ -10,6 +10,7 @@ import { Permission } from '../../../shared/constants/permissions';
 import { useRoles } from '../../../shared/hooks/useRoles';
 import { roleApi, serverApi, stickerApi } from '../../../shared/services/api';
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
+import { useI18n } from '../../../shared/i18n';
 import { PERMISSION_GROUPS, PRESET_COLORS } from '../../server-settings/model/constants';
 import { ServerSettingsSidebar, type ServerSettingsTab } from '../../server-settings/components/ServerSettingsSidebar';
 import { ServerSettingsStickersTab } from '../../server-settings/components/ServerSettingsStickersTab';
@@ -17,6 +18,7 @@ import { ServerSettingsStickersTab } from '../../server-settings/components/Serv
 export const ServerSettingsModal = () => {
   const { closeModal, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const { permissions: serverPermissions } = useServerPermissions();
   const canManageStickers = serverPermissions.has('ADMINISTRATOR') || serverPermissions.has('MANAGE_STICKERS');
@@ -127,10 +129,10 @@ export const ServerSettingsModal = () => {
         if (positions.length > 0) { await roleApi.updatePositions(currentServerId, positions); }
       },
       onSuccess: () => {
-          toast.success("Roles saved!");
+          toast.success(t('server.settings.rolesSaved'));
           queryClient.invalidateQueries({ queryKey:['roles', currentServerId] });
       },
-      onError: (err: any) => toast.error(err.response?.data?.message || "Failed to save roles.")
+      onError: (err: any) => toast.error(err.response?.data?.message || t('server.settings.rolesSaveFailed'))
   })
 
   const createStickerMutation = useMutation({
@@ -138,7 +140,7 @@ export const ServerSettingsModal = () => {
       if (!currentServerId) throw new Error('No server ID');
       if (!newStickerFile) throw new Error('No file selected');
       const name = newStickerName.trim();
-      if (!name) throw new Error('Sticker name is required');
+      if (!name) throw new Error(t('sticker.nameRequired'));
 
       const fd = new FormData();
       fd.append('file', newStickerFile);
@@ -147,7 +149,7 @@ export const ServerSettingsModal = () => {
       return res.data as Sticker;
     },
     onSuccess: (sticker) => {
-      toast.success('Sticker uploaded');
+      toast.success(t('sticker.uploaded'));
       queryClient.setQueryData(['stickers', currentServerId], (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         if (prev.some(s => s._id === sticker._id)) return prev;
@@ -158,7 +160,7 @@ export const ServerSettingsModal = () => {
       setNewStickerName('');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to upload sticker');
+      toast.error(err?.response?.data?.message || err?.message || t('sticker.uploadFailed'));
     },
   });
 
@@ -173,14 +175,14 @@ export const ServerSettingsModal = () => {
       return res.data as Sticker;
     },
     onSuccess: (sticker) => {
-      toast.success('Sticker updated');
+      toast.success(t('sticker.updated'));
       queryClient.setQueryData(['stickers', currentServerId], (old: Sticker[] | undefined) => {
         if (!old) return old;
         return old.map(s => (s._id === sticker._id ? sticker : s));
       });
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to update sticker');
+      toast.error(err?.response?.data?.message || err?.message || t('sticker.updateFailed'));
     },
   });
 
@@ -191,14 +193,14 @@ export const ServerSettingsModal = () => {
       return stickerId;
     },
     onSuccess: (stickerId) => {
-      toast.success('Sticker deleted');
+      toast.success(t('sticker.deleted'));
       queryClient.setQueryData(['stickers', currentServerId], (old: Sticker[] | undefined) => {
         if (!old) return old;
         return old.filter(s => s._id !== stickerId);
       });
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to delete sticker');
+      toast.error(err?.response?.data?.message || err?.message || t('sticker.deleteFailed'));
     },
   });
 
@@ -270,12 +272,12 @@ export const ServerSettingsModal = () => {
       if (updated) {
         await queryClient.invalidateQueries({ queryKey: ['server', currentServerId] });
         await queryClient.invalidateQueries({ queryKey: ['servers'] });
-        toast.success("Server settings updated!");
+        toast.success(t('server.settings.serverUpdated'));
         setPendingIconFile(null);
       }
     } catch (error) {
       console.error(error);
-      toast.error("Failed to update server settings");
+      toast.error(t('server.settings.serverUpdateFailed'));
     } finally {
       setIsUploading(false);
     }
@@ -283,19 +285,26 @@ export const ServerSettingsModal = () => {
 
   const handleResetOverview = () => { if (server) { setName(server.name); setPendingIconFile(null); setIconPreview(server.avatarUrl || null); } };
   const handleCreateRole = () => {
-    const newRole: Role = { _id: `new_${Date.now()}`, name: 'New Role', color: '#99AAB5', position: localRoles.length, permissions: [], isDefault: false, serverId: currentServerId! };
+    const newRole: Role = { _id: `new_${Date.now()}`, name: t('server.settings.newRole'), color: '#99AAB5', position: localRoles.length, permissions: [], isDefault: false, serverId: currentServerId! };
     setLocalRoles(prev => [...prev, newRole]); setSelectedRoleId(newRole._id); setRoleTab('display'); setMobileRoleEditOpen(true);
   };
   const handleDeleteRole = () => {
     if (!selectedRole || selectedRole.isDefault || isOwnerRole) return;
-    openModal('confirm', { title: `Delete Role '${selectedRole.name}'`, description: 'Are you sure?', onConfirm: () => { setLocalRoles(prev => prev.filter(r => r._id !== selectedRoleId)); setMobileRoleEditOpen(false); }});
+    openModal('confirm', {
+      title: t('server.settings.deleteRoleTitle', { name: selectedRole.name }),
+      description: t('server.settings.deleteRoleDesc'),
+      onConfirm: () => {
+        setLocalRoles(prev => prev.filter(r => r._id !== selectedRoleId));
+        setMobileRoleEditOpen(false);
+      },
+    });
   };
 
   const handleIconClick = () => { if (isUploading) return; fileInputRef.current?.click(); };
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
-      if (file.size > 50 * 1024 * 1024) { toast.error("Image size must be less than 50MB"); return; }
+      if (file.size > 50 * 1024 * 1024) { toast.error(t('toast.imageSizeLimit')); return; }
       setPendingIconFile(file); setIconPreview(URL.createObjectURL(file)); e.target.value = '';
   };
   const handleTabClick = (tab: typeof activeTab) => { setActiveTab(tab); setMobileMenuOpen(false); };
@@ -303,8 +312,8 @@ export const ServerSettingsModal = () => {
 
   const requestDeleteSticker = (sticker: Sticker) => {
     openModal('confirm', {
-      title: `Delete sticker '${sticker.name}'`,
-      description: 'Are you sure you want to delete this sticker? This cannot be undone.',
+      title: t('sticker.deleteTitle', { name: sticker.name }),
+      description: t('sticker.deleteDesc'),
       onConfirm: () => deleteStickerMutation.mutate(sticker._id),
     });
   };
@@ -314,7 +323,7 @@ export const ServerSettingsModal = () => {
     const f = e.target.files?.[0] || null;
     if (f) {
         if (f.size > 512 * 1024) { // 512KB limit typically for stickers
-            toast.error("Sticker max size is 512KB");
+            toast.error(t('sticker.maxSize'));
             return;
         }
         setNewStickerFile(f);
@@ -322,10 +331,17 @@ export const ServerSettingsModal = () => {
         // Auto-fill name from filename if empty
         if (!newStickerName.trim()) {
             const base = (f.name || '').replace(/\.[^/.]+$/, '').trim();
-            setNewStickerName(base || 'sticker');
+            setNewStickerName(base || t('sticker.defaultName'));
         }
     }
     e.target.value = '';
+  };
+
+  const tabLabelMap: Record<ServerSettingsTab, string> = {
+    overview: t('server.settings.overview'),
+    roles: t('server.settings.roles'),
+    emoji: t('server.settings.emoji'),
+    stickers: t('server.settings.stickers'),
   };
 
   return (
@@ -348,39 +364,39 @@ export const ServerSettingsModal = () => {
              {/* Mobile Content Header */}
              <div className="md:hidden h-14 flex items-center px-4 bg-[#313338] border-b border-[#26272D] sticky top-0 z-20 shrink-0">
                 <button onClick={() => setMobileMenuOpen(true)} className="mr-4 text-mew-textMuted hover:text-white active:scale-90 transition-transform"><Icon icon="mdi:arrow-left" width="24" /></button>
-                <span className="font-bold text-lg text-white capitalize animate-fade-in">{activeTab}</span>
+                <span className="font-bold text-lg text-white capitalize animate-fade-in">{tabLabelMap[activeTab]}</span>
             </div>
 
              {/* OVERVIEW CONTENT (unchanged for brevity, assuming existing structure) */}
              {activeTab === 'overview' && (
                // ... existing overview code ...
                <div className="animate-fade-in overflow-y-auto custom-scrollbar h-full pb-20 p-4 md:p-0">
-                 <h2 className="text-xl font-bold text-white mb-6 hidden md:block">Server Overview</h2>
+                 <h2 className="text-xl font-bold text-white mb-6 hidden md:block">{t('server.settings.overviewTitle')}</h2>
                  <div className="flex flex-col md:flex-row gap-8">
                      <div className="flex items-center justify-center">
                          <div className="relative group cursor-pointer" onClick={handleIconClick}>
                              <div className="w-[100px] h-[100px] rounded-full bg-mew-accent flex items-center justify-center overflow-hidden relative">
                                  <input type="file" ref={fileInputRef} className="hidden" accept="image/png, image/jpeg, image/gif" onChange={handleFileChange} />
-                                 {iconPreview ? <img src={iconPreview} alt="Server Icon" className="w-full h-full object-cover" /> : <div className="text-white text-3xl font-bold">{server?.name?.substring(0,2).toUpperCase()}</div>}
+                                 {iconPreview ? <img src={iconPreview} alt={t('server.settings.serverIconAlt')} className="w-full h-full object-cover" /> : <div className="text-white text-3xl font-bold">{server?.name?.substring(0,2).toUpperCase()}</div>}
                                  <div className={clsx("absolute inset-0 bg-black/40 rounded-full flex items-center justify-center transition-opacity", isUploading ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
-                                     {isUploading ? <Icon icon="mdi:loading" className="text-white animate-spin" width="32" /> : <span className="text-xs font-bold text-white uppercase text-center px-2">Change Icon</span>}
+                                     {isUploading ? <Icon icon="mdi:loading" className="text-white animate-spin" width="32" /> : <span className="text-xs font-bold text-white uppercase text-center px-2">{t('server.settings.changeIcon')}</span>}
                                  </div>
                              </div>
                          </div>
                      </div>
                      <div className="flex-1 space-y-4">
                          <div>
-                            <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Server Name</label>
+                            <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('server.settings.serverName')}</label>
                             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium" />
                          </div>
                      </div>
                  </div>
                  {hasOverviewChanges && (
                     <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up z-30">
-                        <span className="text-sm text-mew-textMuted truncate mr-2">Unsaved changes!</span>
+                        <span className="text-sm text-mew-textMuted truncate mr-2">{t('server.settings.unsavedChanges')}</span>
                         <div className="flex shrink-0">
-                            <button onClick={handleResetOverview} className="text-white hover:underline text-sm font-medium px-3 py-2">Reset</button>
-                            <button onClick={handleSaveOverview} disabled={isUploading} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">{isUploading ? '...' : 'Save'}</button>
+                            <button onClick={handleResetOverview} className="text-white hover:underline text-sm font-medium px-3 py-2">{t('server.settings.reset')}</button>
+                            <button onClick={handleSaveOverview} disabled={isUploading} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">{isUploading ? '...' : t('server.settings.save')}</button>
                         </div>
                     </div>
                 )}
@@ -392,7 +408,7 @@ export const ServerSettingsModal = () => {
                 <div className="flex flex-col md:flex-row h-full relative overflow-hidden">
                   <div className={clsx("w-full md:w-[200px] flex-shrink-0 flex flex-col md:pr-4 md:border-r border-[#3F4147] h-full p-4 md:p-0", "absolute inset-0 md:static transition-transform duration-300 ease-ios bg-[#313338]", mobileRoleEditOpen ? "-translate-x-[20%] opacity-0 pointer-events-none md:translate-x-0 md:opacity-100 md:pointer-events-auto md:flex" : "translate-x-0 flex")}>
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xs font-bold text-mew-textMuted uppercase">Roles</h3>
+                      <h3 className="text-xs font-bold text-mew-textMuted uppercase">{t('server.settings.roles')}</h3>
                       <button onClick={handleCreateRole} className="text-mew-textMuted hover:text-white"><Icon icon="mdi:plus" width="18" /></button>
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0.5">
@@ -413,19 +429,19 @@ export const ServerSettingsModal = () => {
                            <h2 className="text-lg font-bold text-white truncate max-w-[150px] md:max-w-none">{selectedRole.name}</h2>
                        </div>
                        <div className="flex bg-[#1E1F22] rounded-[3px] p-0.5 shrink-0">
-                          <button className={clsx("px-3 md:px-4 py-1 rounded-[2px] text-xs md:text-sm font-medium transition-colors", roleTab === 'display' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")} onClick={() => setRoleTab('display')}>Display</button>
-                          <button className={clsx("px-3 md:px-4 py-1 rounded-[2px] text-xs md:text-sm font-medium transition-colors", roleTab === 'permissions' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")} onClick={() => setRoleTab('permissions')}>Perms</button>
+                          <button className={clsx("px-3 md:px-4 py-1 rounded-[2px] text-xs md:text-sm font-medium transition-colors", roleTab === 'display' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")} onClick={() => setRoleTab('display')}>{t('server.settings.roleTabDisplay')}</button>
+                          <button className={clsx("px-3 md:px-4 py-1 rounded-[2px] text-xs md:text-sm font-medium transition-colors", roleTab === 'permissions' ? "bg-[#404249] text-white" : "text-mew-textMuted hover:text-mew-text")} onClick={() => setRoleTab('permissions')}>{t('server.settings.roleTabPermissions')}</button>
                        </div>
                      </div>
                      <div className="flex-1 overflow-y-auto custom-scrollbar pb-24 p-4 md:p-0">
                         {roleTab === 'display' && (
                           <div className="space-y-6 animate-fade-in">
                             <div>
-                               <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Role Name</label>
+                               <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('server.settings.roleName')}</label>
                                <input type="text" value={selectedRole.name} onChange={(e) => handleLocalRoleUpdate({ name: e.target.value })} disabled={selectedRole.isDefault} className={clsx("w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium", selectedRole.isDefault && "opacity-50 cursor-not-allowed")} />
                             </div>
                             <div>
-                               <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Role Color</label>
+                               <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('server.settings.roleColor')}</label>
                                <div className="grid grid-cols-6 gap-2 mb-3">
                                   {PRESET_COLORS.map(color => (<div key={color} className={clsx("w-full pt-[100%] rounded cursor-pointer relative", selectedRole.color === color && "ring-2 ring-white ring-offset-2 ring-offset-[#313338]")} style={{ backgroundColor: color }} onClick={() => handleLocalRoleUpdate({ color })} ></div>))}
                                </div>
@@ -457,21 +473,21 @@ export const ServerSettingsModal = () => {
                         )}
                      </div>
                     </>
-                    ) : <div className='flex-1 flex items-center justify-center text-mew-textMuted p-4 text-center'>Select a role to start editing.</div>}
+                    ) : <div className='flex-1 flex items-center justify-center text-mew-textMuted p-4 text-center'>{t('server.settings.selectRoleToEdit')}</div>}
                   </div>
                   {hasChanges && (
                     <div className="absolute bottom-4 left-4 right-4 bg-[#1E1F22] p-2 rounded-md shadow-lg flex items-center justify-between animate-fade-in-up z-30">
-                        <span className="text-sm text-mew-textMuted truncate mr-2">Unsaved changes!</span>
+                        <span className="text-sm text-mew-textMuted truncate mr-2">{t('server.settings.unsavedChanges')}</span>
                         <div className="flex shrink-0">
-                            <button onClick={handleResetChanges} className="text-white hover:underline text-sm font-medium px-3 py-2">Reset</button>
-                            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">{saveMutation.isPending ? '...' : 'Save'}</button>
+                            <button onClick={handleResetChanges} className="text-white hover:underline text-sm font-medium px-3 py-2">{t('server.settings.reset')}</button>
+                            <button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} className="bg-green-500 hover:bg-green-600 text-white rounded px-4 py-2 text-sm font-medium">{saveMutation.isPending ? '...' : t('server.settings.save')}</button>
                         </div>
                     </div>
                 )}
                 </div>
              )}
 
-              {activeTab === 'emoji' && <div className="flex flex-col items-center justify-center h-full text-mew-textMuted"><Icon icon="mdi:hammer-wrench" width="48" className="mb-2 opacity-50" /><p>This setting is coming soon.</p></div>}
+              {activeTab === 'emoji' && <div className="flex flex-col items-center justify-center h-full text-mew-textMuted"><Icon icon="mdi:hammer-wrench" width="48" className="mb-2 opacity-50" /><p>{t('server.settings.comingSoon')}</p></div>}
 
               {/* STICKERS - IMPROVED UI */}
               {activeTab === 'stickers' && (
@@ -503,7 +519,7 @@ export const ServerSettingsModal = () => {
                  <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
                      <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />
                  </div>
-                 <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
+                 <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">{t('settings.esc')}</span>
              </div>
          </div>
     </div>

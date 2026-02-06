@@ -5,8 +5,10 @@ import { useUIStore } from '../../../shared/stores';
 import { SearchResultItem } from './SearchResultItem';
 import { Channel } from '../../../shared/types';
 import { useMessageSearch } from '../hooks/useMessageSearch';
+import { useI18n } from '../../../shared/i18n';
 
 export const SearchResultsPanel = () => {
+    const { t } = useI18n();
     const { currentServerId, searchQuery, isSearchOpen, setSearchOpen, setCurrentChannel, setTargetMessageId } = useUIStore();
     const queryClient = useQueryClient();
 
@@ -34,7 +36,7 @@ export const SearchResultsPanel = () => {
             {/* Header: On mobile this sits below the main ChatHeader input, serves as status bar */}
             <div className="h-12 flex items-center px-4 border-b border-[#1E1F22] flex-shrink-0 bg-[#2B2D31]/50 md:bg-[#2B2D31] shadow-sm">
                 <span className="font-bold text-mew-textMuted uppercase text-xs flex-1">
-                    {searchQuery ? 'Results' : 'Search'}
+                    {searchQuery ? t('search.results') : t('search.title')}
                 </span>
                 {/* Close button - mostly for Desktop, as mobile closes via ChatHeader 'Cancel' */}
                 <button 
@@ -49,7 +51,7 @@ export const SearchResultsPanel = () => {
                 {isLoading && (
                     <div className="flex flex-col items-center justify-center mt-20 text-mew-textMuted">
                         <Icon icon="mdi:loading" className="animate-spin mb-3" width="32" />
-                        <span className="text-sm font-medium">Searching...</span>
+                        <span className="text-sm font-medium">{t('search.searching')}</span>
                     </div>
                 )}
 
@@ -58,7 +60,7 @@ export const SearchResultsPanel = () => {
                         <div className="w-16 h-16 bg-[#1E1F22] rounded-full flex items-center justify-center mb-4">
                             <Icon icon="mdi:text-search-variant" className="opacity-50" width="32" />
                         </div>
-                        <span className="text-sm">No results found for <span className="font-bold text-white">&quot;{searchQuery}&quot;</span></span>
+                        <span className="text-sm">{t('search.noResultsFor', { query: searchQuery })}</span>
                     </div>
                 )}
                 
@@ -67,14 +69,14 @@ export const SearchResultsPanel = () => {
                         <div className="w-16 h-16 bg-[#1E1F22] rounded-full flex items-center justify-center mb-4">
                             <Icon icon="mdi:magnify" className="opacity-50" width="32" />
                         </div>
-                        <span className="text-sm">Search for messages, files, and more in this server.</span>
+                        <span className="text-sm">{t('search.hintServer')}</span>
                     </div>
                 )}
 
                 {!isLoading && messages.length > 0 && (
                     <div className="space-y-2 pb-safe-bottom">
                          <div className="text-xs font-bold text-mew-textMuted uppercase mb-2 px-2">
-                            {messages.length} Results
+                            {t('search.resultsCount', { count: messages.length })}
                         </div>
                         {messages
                             .filter(msg => channels?.some(c => c._id === msg.channelId))

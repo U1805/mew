@@ -1,11 +1,13 @@
 import { useModalStore } from '../../../shared/stores';
+import { useI18n } from '../../../shared/i18n';
 import { PermissionTargetSelector } from './PermissionTargetSelector';
 
 export const AddPermissionOverrideModal = () => {
   const { closeModal, modalData } = useModalStore();
+  const { t } = useI18n();
 
   if (!modalData || !modalData.roles || !modalData.members || !modalData.existingTargetIds || !modalData.onSelect) {
-      return <div className="text-red-500">Required modal data is missing.</div>;
+      return <div className="text-red-500">{t('channel.permissions.modalDataMissing')}</div>;
   }
 
   return (

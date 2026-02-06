@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef, useState, type MouseEvent, type TouchEvent, type WheelEvent } from 'react';
 import { Icon } from '@iconify/react';
+import { useI18n } from '../../../shared/i18n';
 
 interface ImageViewerProps {
   src: string;
@@ -19,6 +20,7 @@ function isTypingTarget(target: EventTarget | null): boolean {
 }
 
 export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, attachmentUrl, onPrev, onNext, onClose }: ImageViewerProps) => {
+  const { t } = useI18n();
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -245,7 +247,7 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
         {onPrev && (
           <button
             type="button"
-            aria-label="Previous image"
+            aria-label={t('imageViewer.prev')}
             className="absolute left-4 top-1/2 -translate-y-1/2 z-[1] h-11 w-11 rounded-full bg-black/40 hover:bg-black/60 text-white/80 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-colors pointer-events-auto"
             onClick={(e) => {
               e.preventDefault();
@@ -260,7 +262,7 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
         {onNext && (
           <button
             type="button"
-            aria-label="Next image"
+            aria-label={t('imageViewer.next')}
             className="absolute right-4 top-1/2 -translate-y-1/2 z-[1] h-11 w-11 rounded-full bg-black/40 hover:bg-black/60 text-white/80 hover:text-white flex items-center justify-center backdrop-blur-sm border border-white/10 transition-colors pointer-events-auto"
             onClick={(e) => {
               e.preventDefault();
@@ -297,23 +299,23 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
           className="bg-[#1E1F22] rounded-full px-4 py-2 flex items-center gap-4 shadow-2xl border border-[#2B2D31] animate-fade-in-up pointer-events-auto"
           onClick={e => e.stopPropagation()}
         >
-          <button onClick={() => window.open(attachmentUrl, '_blank')} className="text-mew-textMuted hover:text-white tooltip" title="Open Original">
+          <button onClick={() => window.open(attachmentUrl, '_blank')} className="text-mew-textMuted hover:text-white tooltip" title={t('imageViewer.openOriginal')}>
             <Icon icon="mdi:open-in-new" width="20" />
           </button>
           <div className="w-[1px] h-6 bg-[#3F4147]"></div>
 
-          <button onClick={resetView} className="text-mew-textMuted hover:text-white" title="Fit to Screen">
+          <button onClick={resetView} className="text-mew-textMuted hover:text-white" title={t('imageViewer.fitToScreen')}>
             <Icon icon="mdi:fit-to-screen-outline" width="20" />
           </button>
-          <button onClick={() => { setScale(oneToOneScale); setPosition({ x: 0, y: 0 }); }} className="text-mew-textMuted hover:text-white font-bold text-xs w-6" title="1:1 Scale">
+          <button onClick={() => { setScale(oneToOneScale); setPosition({ x: 0, y: 0 }); }} className="text-mew-textMuted hover:text-white font-bold text-xs w-6" title={t('imageViewer.scaleOneToOne')}>
             1:1
           </button>
           <div className="w-[1px] h-6 bg-[#3F4147]"></div>
 
-          <button onClick={rotateCW} className="text-mew-textMuted hover:text-white" title="Rotate 90°">
+          <button onClick={rotateCW} className="text-mew-textMuted hover:text-white" title={t('imageViewer.rotate90')}>
             <Icon icon="mdi:rotate-right" width="20" />
           </button>
-          <button onClick={onEdit} className="text-mew-textMuted hover:text-white" title="Edit / Draw">
+          <button onClick={onEdit} className="text-mew-textMuted hover:text-white" title={t('imageViewer.editDraw')}>
             <Icon icon="mdi:pencil" width="20" />
           </button>
 
@@ -325,7 +327,7 @@ export const AttachmentImageViewer = ({ src, rotation, setRotation, onEdit, atta
       </div>
 
       <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/50 text-xs pointer-events-none bg-black/40 px-3 py-1 rounded-full backdrop-blur-sm animate-fade-in">
-        Hold Space to pan • Click to zoom • Alt+Click to zoom out
+        {t('imageViewer.hint')}
       </div>
     </Fragment>
   );

@@ -5,6 +5,7 @@ import { Channel, ChannelType } from '../../../shared/types';
 import { useAuthStore, useUIStore } from '../../../shared/stores';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { formatUserTag } from '../../../shared/utils/userTag';
+import { useI18n } from '../../../shared/i18n';
 
 interface ChatHeaderProps {
   channel: Channel | null;
@@ -13,6 +14,7 @@ interface ChatHeaderProps {
 }
 
 const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, toggleMemberList }) => {
+  const { t } = useI18n();
   const { user } = useAuthStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const [mobileSearchActive, setMobileSearchActive] = useState(false);
@@ -90,7 +92,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
   const isDM = channel?.type === ChannelType.DM;
   const isWeb = channel?.type === ChannelType.GUILD_WEB;
   
-  let title = channel?.name || 'channel';
+  let title = channel?.name || t('notification.channel.unnamed');
   let otherUser: any = null;
 
   if (isDM && channel?.recipients) {
@@ -124,7 +126,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
               <input 
                   type="text" 
                   autoFocus
-                  placeholder={isDM ? "Search DM" : "Search"}
+                  placeholder={isDM ? t('search.dmTitle') : t('search.title')}
                   value={isDM ? dmInputValue : inputValue}
                   onChange={(e) => isDM ? setDmInputValue(e.target.value) : setInputValue(e.target.value)}
                   className="bg-[#1E1F22] text-sm rounded-md pl-9 pr-8 py-1.5 w-full focus:outline-none text-white placeholder-mew-textMuted border-none" 
@@ -143,7 +145,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
              onClick={handleMobileCancel} 
              className="ml-3 text-white text-sm font-medium whitespace-nowrap active:opacity-70"
            >
-             Cancel
+             {t('common.cancel')}
            </button>
         </div>
       )}
@@ -174,13 +176,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
                     "w-2.5 h-2.5 rounded-full mr-2",
                     isOnline ? "bg-green-500" : "bg-gray-500"
                 )}></div>
-                {isOnline && <span className="text-xs text-mew-textMuted hidden sm:block">Online</span>}
+                {isOnline && <span className="text-xs text-mew-textMuted hidden sm:block">{t('plugin.online')}</span>}
            </div>
       )}
 
       {!isDM && !mobileSearchActive && (
         <span className="text-xs text-mew-textMuted border-l border-mew-textMuted pl-2 ml-2 hidden md:block truncate max-w-[300px]">
-          {isWeb ? (channel?.url || 'No URL set') : (channel?.topic || `Welcome to #${title}`)}
+          {isWeb ? (channel?.url || t('chat.web.noUrlSetShort')) : (channel?.topic || t('chat.welcome', { title }))}
         </span>
       )}
       
@@ -202,7 +204,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
             target="_blank"
             rel="noreferrer"
             className={clsx("p-1 hover:text-mew-text transition-colors hidden sm:block", mobileSearchActive && "hidden")}
-            title="Open in new tab"
+            title={t('chat.web.openInNewTab')}
           >
             <Icon icon="mdi:open-in-new" width="22" />
           </a>
@@ -222,7 +224,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
             <div className={clsx("relative hidden lg:block transition-all", isSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
             <input 
                 type="text" 
-                placeholder="Search" 
+                placeholder={t('search.title')} 
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onFocus={() => { if (inputValue.trim()) setSearchOpen(true); }}
@@ -236,7 +238,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
             <div className={clsx("relative hidden lg:block transition-all", isDmSearchOpen ? "w-60" : "w-36 focus-within:w-60")}>
             <input 
                 type="text" 
-                placeholder="Search" 
+                placeholder={t('search.title')} 
                 value={dmInputValue}
                 onChange={(e) => setDmInputValue(e.target.value)}
                 onFocus={() => {

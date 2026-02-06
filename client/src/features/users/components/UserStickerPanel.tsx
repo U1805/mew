@@ -6,10 +6,12 @@ import toast from 'react-hot-toast';
 import type { Bot, Sticker } from '../../../shared/types';
 import { botApi, botStickerApi, userStickerApi } from '../../../shared/services/api';
 import { useModalStore } from '../../../shared/stores';
+import { useI18n } from '../../../shared/i18n';
 
 export const UserStickerPanel = () => {
   const queryClient = useQueryClient();
   const { openModal } = useModalStore();
+  const { t } = useI18n();
 
   const [target, setTarget] = useState<{ kind: 'me' } | { kind: 'bot'; botId: string }>({ kind: 'me' });
 
@@ -74,9 +76,9 @@ export const UserStickerPanel = () => {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!newStickerFile) throw new Error('No file selected');
+      if (!newStickerFile) throw new Error(t('sticker.noFileSelected'));
       const name = newStickerName.trim();
-      if (!name) throw new Error('Sticker name is required');
+      if (!name) throw new Error(t('sticker.nameRequired'));
 
       const fd = new FormData();
       fd.append('file', newStickerFile);
@@ -86,7 +88,7 @@ export const UserStickerPanel = () => {
       return res.data as Sticker;
     },
     onSuccess: (sticker) => {
-      toast.success('Sticker uploaded');
+      toast.success(t('sticker.uploaded'));
       queryClient.setQueryData(stickerQueryKey, (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         if (prev.some(s => s._id === sticker._id)) return prev;
@@ -99,7 +101,7 @@ export const UserStickerPanel = () => {
       setNewStickerDescription('');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to upload sticker');
+      toast.error(err?.response?.data?.message || err?.message || t('sticker.uploadFailed'));
     },
   });
 
@@ -115,14 +117,14 @@ export const UserStickerPanel = () => {
       return res.data as Sticker;
     },
     onSuccess: (sticker) => {
-      toast.success('Sticker updated');
+      toast.success(t('sticker.updated'));
       queryClient.setQueryData(stickerQueryKey, (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         return prev.map(s => (s._id === sticker._id ? sticker : s));
       });
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to update sticker');
+      toast.error(err?.response?.data?.message || err?.message || t('sticker.updateFailed'));
     },
   });
 
@@ -132,24 +134,24 @@ export const UserStickerPanel = () => {
       return stickerId;
     },
     onSuccess: (stickerId) => {
-      toast.success('Sticker deleted');
+      toast.success(t('sticker.deleted'));
       queryClient.setQueryData(stickerQueryKey, (old: Sticker[] | undefined) => {
         const prev = Array.isArray(old) ? old : [];
         return prev.filter(s => s._id !== stickerId);
       });
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || err?.message || 'Failed to delete sticker');
+      toast.error(err?.response?.data?.message || err?.message || t('sticker.deleteFailed'));
     },
   });
 
   return (
     <div className="h-full flex flex-col p-4 md:p-0 overflow-hidden">
       <div className="pb-4 border-b border-[#3F4147] shrink-0">
-        <h2 className="text-xl font-bold text-white mb-2">Stickers</h2>
-        <p className="text-sm text-mew-textMuted">Upload and manage your personal stickers. You can use them in DMs and servers.</p>
+        <h2 className="text-xl font-bold text-white mb-2">{t('settings.stickers')}</h2>
+        <p className="text-sm text-mew-textMuted">{t('sticker.personalSubtitle')}</p>
         <div className="mt-4 flex flex-col sm:flex-row sm:items-center gap-2">
-          <div className="text-xs font-bold text-mew-textMuted uppercase">Manage For</div>
+          <div className="text-xs font-bold text-mew-textMuted uppercase">{t('sticker.manageFor')}</div>
           <select
             value={target.kind === 'bot' ? `bot:${target.botId}` : 'me'}
             onChange={(e) => {
@@ -160,10 +162,10 @@ export const UserStickerPanel = () => {
             }}
             className="bg-[#1E1F22] text-white px-3 py-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all w-full sm:w-auto"
           >
-            <option value="me">Me</option>
+            <option value="me">{t('sticker.manageMe')}</option>
             {bots.map((b) => (
               <option key={b._id} value={`bot:${b._id}`}>
-                Bot: {b.name}
+                {t('sticker.manageBot', { name: b.name })}
               </option>
             ))}
           </select>
@@ -194,7 +196,7 @@ export const UserStickerPanel = () => {
               ) : (
                 <>
                   <Icon icon="mdi:plus" className="text-mew-textMuted mb-1" width="24" />
-                  <span className="text-[10px] font-bold text-mew-textMuted uppercase">Upload</span>
+                  <span className="text-[10px] font-bold text-mew-textMuted uppercase">{t('server.create.upload')}</span>
                 </>
               )}
             </div>
@@ -202,22 +204,22 @@ export const UserStickerPanel = () => {
             <div className="flex-1 space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
+                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">{t('sticker.name')}</label>
                   <input
                     value={newStickerName}
                     onChange={e => setNewStickerName(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
-                    placeholder="Give it a name"
+                    placeholder={t('sticker.namePlaceholder')}
                     disabled={createMutation.isPending}
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Description</label>
+                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">{t('sticker.description')}</label>
                   <textarea
                     value={newStickerDescription}
                     onChange={e => setNewStickerDescription(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all resize-none"
-                    placeholder="Optional: when should the assistant use this sticker?"
+                    placeholder={t('sticker.descriptionHint')}
                     rows={2}
                     disabled={createMutation.isPending}
                   />
@@ -234,7 +236,7 @@ export const UserStickerPanel = () => {
                 )}
               >
                 {createMutation.isPending ? <Icon icon="mdi:loading" className="animate-spin" width="18" /> : null}
-                Upload Sticker
+                {t('sticker.upload')}
               </button>
             </div>
           </div>
@@ -243,7 +245,7 @@ export const UserStickerPanel = () => {
         {/* Existing Stickers */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-mew-textMuted uppercase">{stickers.length} Stickers</h3>
+            <h3 className="text-sm font-bold text-mew-textMuted uppercase">{t('sticker.count', { count: stickers.length })}</h3>
           </div>
 
           {isLoading ? (
@@ -251,7 +253,7 @@ export const UserStickerPanel = () => {
               <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" width="28" />
             </div>
           ) : stickers.length === 0 ? (
-            <div className="text-center py-10 text-mew-textMuted text-sm">No stickers yet.</div>
+            <div className="text-center py-10 text-mew-textMuted text-sm">{t('sticker.noneYet')}</div>
           ) : (
             <div className="space-y-2">
               {stickers.map((s) => {
@@ -271,7 +273,7 @@ export const UserStickerPanel = () => {
                           value={draft.name}
                           onChange={(e) => setDrafts(prev => ({ ...prev, [s._id]: { ...draft, name: e.target.value } }))}
                           className="bg-transparent text-white font-medium text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                          placeholder="Name"
+                          placeholder={t('sticker.name')}
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -279,7 +281,7 @@ export const UserStickerPanel = () => {
                           value={draft.description}
                           onChange={(e) => setDrafts(prev => ({ ...prev, [s._id]: { ...draft, description: e.target.value } }))}
                           className="bg-transparent text-mew-textMuted text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                          placeholder="Description (optional)"
+                          placeholder={t('sticker.descriptionOptional')}
                         />
                       </div>
                     </div>
@@ -289,21 +291,21 @@ export const UserStickerPanel = () => {
                         onClick={() => updateMutation.mutate({ stickerId: s._id, ...draft })}
                         disabled={updateMutation.isPending}
                         className="p-1.5 text-mew-textMuted hover:text-green-400 hover:bg-[#202225] rounded transition-colors"
-                        title="Save Changes"
+                        title={t('common.saveChanges')}
                       >
                         <Icon icon="mdi:check" width="20" />
                       </button>
                       <button
                         onClick={() =>
                           openModal('confirm', {
-                            title: `Delete sticker '${s.name}'`,
-                            description: 'Are you sure you want to delete this sticker? This cannot be undone.',
+                            title: t('sticker.deleteTitle', { name: s.name }),
+                            description: t('sticker.deleteDesc'),
                             onConfirm: () => deleteMutation.mutate(s._id),
                           })
                         }
                         disabled={deleteMutation.isPending}
                         className="p-1.5 text-mew-textMuted hover:text-red-400 hover:bg-[#202225] rounded transition-colors"
-                        title="Delete Sticker"
+                        title={t('sticker.delete')}
                       >
                         <Icon icon="mdi:trash-can-outline" width="20" />
                       </button>

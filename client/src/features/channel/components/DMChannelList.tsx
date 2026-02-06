@@ -5,11 +5,13 @@ import { UserStatusFooter } from '../../users/components/UserStatusFooter';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores';
 import { useDmChannels } from '../hooks/useDmChannels';
+import { useI18n } from '../../../shared/i18n';
 
 export const DMChannelList = () => {
   const { currentChannelId, setCurrentChannel } = useUIStore();
   const { openModal } = useModalStore();
   const { user } = useAuthStore();
+  const { t } = useI18n();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
   const { hiddenDmChannelIds, addHiddenChannel } = useHiddenStore();
@@ -37,17 +39,17 @@ export const DMChannelList = () => {
               className="w-full text-left px-2 py-1 rounded bg-mew-darkest text-mew-textMuted text-sm hover:bg-[#1E1F22] transition-colors"
               onClick={() => openModal('findUser')}
            >
-               Find or start a conversation
+               {t('dm.search.placeholder')}
            </button>
       </div>
       <div className="p-2 flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex items-center px-2 py-2 rounded hover:bg-mew-dark text-mew-textMuted hover:text-mew-text cursor-pointer mb-4 transition-colors">
               <Icon icon="mdi:account-multiple" className="mr-3" width="24" height="24" />
-              <span className="font-medium">Friends</span>
+              <span className="font-medium">{t('dm.friends')}</span>
           </div>
 
           <div className="flex items-center justify-between px-2 mb-2 group">
-              <div className="text-xs font-bold text-mew-textMuted uppercase hover:text-mew-text cursor-pointer">Direct Messages</div>
+              <div className="text-xs font-bold text-mew-textMuted uppercase hover:text-mew-text cursor-pointer">{t('dm.directMessages')}</div>
               <Icon
                   icon="mdi:plus"
                   className="text-mew-textMuted hover:text-mew-text cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
@@ -57,7 +59,7 @@ export const DMChannelList = () => {
 
           {visibleDmChannels?.map(dm => {
                const otherUser = dm.recipients?.find(r => typeof r === 'object' && r._id !== user?._id) as any;
-               const name = otherUser?.username || dm.name || 'Unknown User';
+               const name = otherUser?.username || dm.name || t('dm.unknownUser');
                const isOnline = otherUser?._id && onlineStatus[otherUser._id] === 'online';
                const hasUnread = unreadChannelIds.has(dm._id);
 
@@ -96,14 +98,14 @@ export const DMChannelList = () => {
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <div
                               className="cursor-pointer text-mew-textMuted hover:text-white"
-                              title="Notification Settings"
+                              title={t('dm.notificationSettings')}
                               onClick={(e) => { e.stopPropagation(); openModal('channelNotifications', { channel: dm }); }}
                           >
                               <Icon icon="mdi:bell-outline" width="16" />
                           </div>
                           <div
                              className="cursor-pointer text-mew-textMuted hover:text-white"
-                             title="Remove DM"
+                             title={t('dm.remove')}
                              onClick={(e) => handleRemoveDm(e, dm._id)}
                           >
                              <Icon icon="mdi:close" width="16" />

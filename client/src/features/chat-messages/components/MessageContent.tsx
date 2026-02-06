@@ -7,6 +7,7 @@ import { AttachmentList } from '../../chat-attachments/components/AttachmentList
 import ForwardCard from './ForwardCard';
 import { BilibiliCard, InstagramCard, JpdictCard, PornhubCard, RssCard, TwitterCard, UrlEmbed } from '../../chat-embeds';
 import { VoiceMessagePlayer } from '../../chat-voice/components/VoiceMessagePlayer';
+import { useI18n } from '../../../shared/i18n';
 
 interface MessageContentProps {
     message: Message;
@@ -17,6 +18,7 @@ interface MessageContentProps {
 }
 
 const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, channelId, showVoiceTranscript, voiceTranscriptLoading }) => {
+    const { t } = useI18n();
     const isRssCard = message.type === 'app/x-rss-card';
     const isPornhubCard = message.type === 'app/x-pornhub-card';
     const isTwitterCard = message.type === 'app/x-twitter-card';
@@ -65,7 +67,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
           return (
             <div className="flex items-center gap-2 p-2 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                 <Icon icon="mdi:alert-circle-outline" width="16" />
-                <span>Voice message unavailable</span>
+                <span>{t('message.voice.unavailable')}</span>
             </div>
           );
         }
@@ -86,7 +88,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
                    <div className="flex items-center gap-1.5 select-none">
                       <Icon icon="mdi:text-recognition" className="w-3.5 h-3.5 text-mew-textMuted" />
                       <span className="text-[10px] font-bold text-mew-textMuted uppercase tracking-wide opacity-80">
-                        Transcription
+                        {t('message.voice.transcription')}
                       </span>
                    </div>
 
@@ -106,7 +108,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
                          transcript
                       ) : (
                          <span className="text-sm italic text-mew-textMuted opacity-80">
-                           (No speech detected)
+                           {t('message.voice.noSpeechDetected')}
                          </span>
                       )}
                    </div>
@@ -124,7 +126,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
               <div className="mt-1 mb-1 block">
                 <img
                   src={message.payload.sticker.url}
-                  alt={message.payload.sticker.name || 'sticker'}
+                  alt={message.payload.sticker.name || t('sticker.defaultName')}
                   title={message.payload.sticker.name || undefined}
                   // Discord sticker size + hover effect
                   className="max-w-[160px] max-h-[160px] w-auto h-auto object-contain select-none cursor-pointer hover:scale-[1.02] transition-transform duration-200"

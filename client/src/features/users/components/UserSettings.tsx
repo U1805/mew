@@ -15,8 +15,10 @@ import { UserSettingsSidebar } from './UserSettingsSidebar';
 import { UserSettingsAccountTab } from './UserSettingsAccountTab';
 import { UserSettingsNotificationsTab } from './UserSettingsNotificationsTab';
 import type { SettingsTab } from '../../../shared/router/settingsRoute';
+import { useI18n } from '../../../shared/i18n';
 
 const UserSettings: React.FC = () => {
+    const { t } = useI18n();
     const { isSettingsOpen, closeSettings, settingsTab: activeTab, selectSettingsTab } = useUIStore();
     const { user, logout, setUser, status } = useAuthStore();
     const notif = useNotificationSettingsStore((s) => s.user);
@@ -51,7 +53,7 @@ const UserSettings: React.FC = () => {
         if (!file) return;
 
         if (file.size > 50 * 1024 * 1024) {
-            toast.error("Image size must be less than 50MB");
+            toast.error(t('toast.imageSizeLimit'));
             return;
         }
 
@@ -78,11 +80,11 @@ const UserSettings: React.FC = () => {
         try {
             const res = await userApi.updateProfile(formData);
             setUser(res.data);
-            toast.success("Avatar updated!");
+            toast.success(t('toast.avatarUpdated'));
             cancelUpload();
         } catch (error) {
             console.error(error);
-            toast.error(getApiErrorMessage(error, 'Failed to update avatar'));
+            toast.error(getApiErrorMessage(error, t('toast.updateAvatarFailed')));
         } finally {
             setIsUploading(false);
         }
@@ -96,11 +98,11 @@ const UserSettings: React.FC = () => {
         try {
             const res = await userApi.updateProfile({ username: newUsername.trim() });
             setUser(res.data);
-            toast.success("Username updated!");
+            toast.success(t('toast.usernameUpdated'));
             setIsEditUsernameModalOpen(false);
         } catch (error) {
             console.error(error);
-            toast.error(getApiErrorMessage(error, 'Failed to update username'));
+            toast.error(getApiErrorMessage(error, t('toast.updateUsernameFailed')));
         } finally {
             setIsUpdatingUsername(false);
         }
@@ -110,11 +112,11 @@ const UserSettings: React.FC = () => {
         setIsUpdatingPassword(true);
         try {
             await userApi.changePassword(passwords);
-            toast.success("Password updated successfully!");
+            toast.success(t('toast.passwordUpdated'));
             setIsChangePasswordModalOpen(false);
         } catch (error) {
             console.error(error);
-            const message = getApiErrorMessage(error, 'Failed to update password');
+            const message = getApiErrorMessage(error, t('toast.updatePasswordFailed'));
             toast.error(message);
             throw new Error(message);
         } finally {
@@ -131,7 +133,7 @@ const UserSettings: React.FC = () => {
             setNotif(settings);
             setUser({ ...user, notificationSettings: settings });
         } catch (error) {
-            toast.error(getApiErrorMessage(error, 'Failed to update notification settings'));
+            toast.error(getApiErrorMessage(error, t('toast.updateNotificationFailed')));
             throw error;
         } finally {
             setIsUpdatingNotifications(false);
@@ -170,7 +172,7 @@ const UserSettings: React.FC = () => {
                         <Icon icon="mdi:arrow-left" width="24" />
                     </button>
                     <span className="font-bold text-lg text-white capitalize">
-                        {activeTab === 'account' ? 'My Account' : activeTab}
+                        {activeTab === 'account' ? t('settings.myAccount') : t(`settings.${activeTab}`)}
                     </span>
                 </div>
 
@@ -216,23 +218,23 @@ const UserSettings: React.FC = () => {
                     <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
                         <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />
                     </div>
-                    <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
+                    <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">{t('settings.esc')}</span>
                 </div>
             </div>
 
             {pendingFile && (
                 <ConfirmModal
-                    title="Change Avatar"
-                    description="Are you sure you want to use this image as your new avatar?"
+                    title={t('confirm.changeAvatarTitle')}
+                    description={t('confirm.changeAvatarDesc')}
                     onConfirm={confirmUpload}
                     onCancel={cancelUpload}
-                    confirmText="Apply"
+                    confirmText={t('common.apply')}
                     isLoading={isUploading}
                     isDestructive={false}
                 >
                     <div className="flex justify-center my-6">
                         <div className="w-32 h-32 rounded-full overflow-hidden ring-4 ring-mew-accent/50 shadow-xl">
-                            <img src={previewUrl || ''} className="w-full h-full object-cover" alt="Preview" />
+                            <img src={previewUrl || ''} className="w-full h-full object-cover" alt={t('modal.preview')} />
                         </div>
                     </div>
                 </ConfirmModal>

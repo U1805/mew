@@ -4,6 +4,7 @@ import { Icon } from '@iconify/react';
 import { formatFileSize } from '../../../shared/utils/file';
 import { AttachmentLightbox } from '../modals/AttachmentLightbox';
 import { VideoPlayer } from './VideoPlayer';
+import { useI18n } from '../../../shared/i18n';
 
 interface AttachmentListProps {
   attachments: Attachment[];
@@ -12,6 +13,7 @@ interface AttachmentListProps {
 }
 
 export const AttachmentList = ({ attachments, serverId, channelId }: AttachmentListProps) => {
+  const { t } = useI18n();
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const imageAttachments = attachments.filter(a => a.contentType.startsWith('image/'));
@@ -72,7 +74,7 @@ export const AttachmentList = ({ attachments, serverId, channelId }: AttachmentL
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-mew-textMuted hover:text-white transition-colors"
-                  title="Download"
+                  title={t('attachment.download')}
                   onClick={(e) => e.stopPropagation()}
               >
                   <Icon icon="mdi:download" width="24" height="24" />

@@ -6,6 +6,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { useWebhooks } from '../hooks/useWebhooks';
 import toast from 'react-hot-toast';
+import { useI18n } from '../../../shared/i18n';
 
 interface WebhookManagerProps {
   serverId: string;
@@ -13,6 +14,7 @@ interface WebhookManagerProps {
 }
 
 export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
+  const { t } = useI18n();
   const [view, setView] = useState<'list' | 'create' | 'edit'>('list');
   const [selectedWebhook, setSelectedWebhook] = useState<Webhook | null>(null);
   const [copiedWebhookId, setCopiedWebhookId] = useState<string | null>(null);
@@ -70,10 +72,10 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
       queryClient.setQueryData<Webhook[]>(['webhooks', channel._id], (prev) =>
         prev ? prev.map((wh) => (wh._id === webhookId ? { ...wh, token } : wh)) : prev
       );
-      toast.success('Webhook token reset.');
+      toast.success(t('webhook.tokenReset'));
     },
     onError: (err: unknown) => {
-      const message = err instanceof Error ? err.message : 'Failed to reset webhook token.';
+      const message = err instanceof Error ? err.message : t('webhook.tokenResetFailed');
       toast.error(message);
     },
   });
@@ -128,13 +130,13 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
 
     const allowed = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
     if (!allowed.includes(file.type)) {
-      toast.error('Only common image formats are allowed.');
+      toast.error(t('webhook.imageFormatsOnly'));
       e.target.value = '';
       return;
     }
 
     if (file.size > 50 * 1024 * 1024) {
-      toast.error('Image size must be less than 50MB.');
+      toast.error(t('toast.imageSizeLimit'));
       e.target.value = '';
       return;
     }
@@ -199,7 +201,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
         );
         setSelectedWebhook((prev) => (prev && prev._id === webhook._id ? { ...prev, token } : prev));
       } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Failed to load webhook token.';
+        const message = err instanceof Error ? err.message : t('webhook.loadTokenFailed');
         toast.error(message);
         return;
       }
@@ -215,16 +217,16 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
       await navigator.clipboard.writeText(url);
       setCopiedWebhookId(webhook._id);
       setTimeout(() => setCopiedWebhookId(null), 2000);
-      toast.success('Webhook URL copied.');
+      toast.success(t('webhook.urlCopied'));
     } catch {
       const ok = fallbackCopy(url);
       if (!ok) {
-        toast.error('Failed to copy webhook URL.');
+        toast.error(t('webhook.copyUrlFailed'));
         return;
       }
       setCopiedWebhookId(webhook._id);
       setTimeout(() => setCopiedWebhookId(null), 2000);
-      toast.success('Webhook URL copied.');
+      toast.success(t('webhook.urlCopied'));
     }
   };
 
@@ -232,17 +234,17 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
     return (
       <div>
          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-base font-bold text-white uppercase">Integrations</h3>
+            <h3 className="text-base font-bold text-white uppercase">{t('channel.settings.integrations')}</h3>
             <button 
               onClick={() => { resetForm(); setView('create'); }}
               className="bg-mew-accent hover:bg-mew-accentHover text-white px-3 py-1.5 rounded text-sm font-medium transition-colors"
             >
-              Create Webhook
+              {t('webhook.create')}
             </button>
          </div>
          
          <div className="text-sm text-mew-textMuted mb-4">
-            Webhooks allow external services to send messages to this channel.
+            {t('webhook.subtitle')}
          </div>
 
          {isLoading ? (
@@ -262,7 +264,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                      <div>
                        <div className="font-bold text-white">{wh.name}</div>
                       <div className="text-xs text-mew-textMuted">
-                        {wh.token ? `****${wh.token.slice(-4)}` : 'Token hidden'}
+                        {wh.token ? `****${wh.token.slice(-4)}` : t('webhook.tokenHidden')}
                       </div>
                      </div>
                   </div>
@@ -276,7 +278,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                                 : "bg-[#1E1F22] hover:bg-[#111214]"
                         )}
                     >
-                       {copiedWebhookId === wh._id ? 'Copied' : 'Copy URL'}
+                       {copiedWebhookId === wh._id ? t('message.copy.success') : t('webhook.copyUrl')}
                     </button>
                     <button onClick={() => handleEdit(wh)} className="bg-[#1E1F22] hover:bg-[#111214] text-white p-1.5 rounded transition-colors">
                        <Icon icon="mdi:pencil" width="16" />
@@ -289,7 +291,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
              ))}
              {webhooks?.length === 0 && (
                <div className="text-center py-8 text-mew-textMuted border border-dashed border-mew-darker rounded">
-                 No webhooks yet.
+                 {t('webhook.none')}
                </div>
              )}
            </div>
@@ -304,24 +306,24 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
            <button onClick={() => setView('list')} className="mr-2 text-mew-textMuted hover:text-white">
               <Icon icon="mdi:arrow-left" width="24" />
            </button>
-           <h3 className="text-xl font-bold text-white">{view === 'create' ? 'Create Webhook' : 'Edit Webhook'}</h3>
+           <h3 className="text-xl font-bold text-white">{view === 'create' ? t('webhook.create') : t('webhook.edit')}</h3>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
            <div>
-              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Name</label>
+              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('webhook.name')}</label>
               <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none focus:ring-0 font-medium"
-                  placeholder="Captain Hook"
+                  placeholder={t('webhook.namePlaceholder')}
                   required
               />
            </div>
            
            <div>
-              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Avatar</label>
+              <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('webhook.avatar')}</label>
               <div className="flex items-center gap-4">
                 <div
                   className="w-16 h-16 rounded-full bg-[#1E1F22] border-dashed border-2 border-[#4E5058] flex items-center justify-center cursor-pointer hover:border-mew-textMuted transition-colors relative overflow-hidden"
@@ -335,20 +337,20 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                     onChange={handleFileChange}
                   />
                   {avatarPreview ? (
-                    <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                    <img src={avatarPreview} alt={t('webhook.avatarPreview')} className="w-full h-full object-cover" />
                   ) : (
                     <Icon icon="mdi:camera-plus" className="text-mew-textMuted" width="22" />
                   )}
                 </div>
                 <div className="text-sm text-mew-textMuted">
-                  JPG/PNG/GIF/WEBP/AVIF, up to 50MB.
+                  {t('webhook.avatarHint')}
                 </div>
               </div>
            </div>
 
            {view === 'edit' && selectedWebhook && (
               <div>
-                 <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Webhook URL</label>
+                 <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('webhook.url')}</label>
                  <div className="flex">
                     <input
                        type="text"
@@ -356,7 +358,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                       value={
                         selectedWebhook.token ? buildWebhookUrl(selectedWebhook) : ''
                       }
-                      placeholder={selectedWebhook.token ? undefined : 'Token hidden. Reset token to generate a new URL.'}
+                      placeholder={selectedWebhook.token ? undefined : t('webhook.urlPlaceholderNoToken')}
                       disabled={!selectedWebhook.token}
                        className="w-full bg-[#1E1F22] text-mew-textMuted p-2.5 rounded-l border-none focus:outline-none focus:ring-0 font-medium text-sm"
                     />
@@ -373,7 +375,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                               : "bg-[#4E5058] cursor-not-allowed"
                        )}
                     >
-                      {copiedWebhookId === selectedWebhook._id ? 'Copied' : 'Copy'}
+                      {copiedWebhookId === selectedWebhook._id ? t('message.copy.success') : t('invite.create.copy')}
                     </button>
                  </div>
                  {!selectedWebhook.token && (
@@ -383,7 +385,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                      disabled={resetTokenMutation.isPending}
                      className="mt-2 bg-[#1E1F22] hover:bg-[#111214] text-white px-3 py-1.5 rounded text-xs font-medium transition-colors"
                    >
-                     {resetTokenMutation.isPending ? 'Resetting…' : 'Reset Token'}
+                     {resetTokenMutation.isPending ? t('webhook.resettingToken') : t('webhook.resetToken')}
                    </button>
                  )}
               </div>
@@ -396,7 +398,7 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                     onClick={() => deleteMutation.mutate(selectedWebhook)}
                     className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
                   >
-                    Delete Webhook
+                    {t('webhook.delete')}
                   </button>
               ) : <div></div>}
 
@@ -406,14 +408,14 @@ export const WebhookManager = ({ serverId, channel }: WebhookManagerProps) => {
                      onClick={() => setView('list')}
                      className="text-white hover:underline text-sm font-medium px-2 self-center"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                   <button 
                     type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
                     className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2 rounded-[3px] font-medium text-sm transition-colors"
                   >
-                    Save
+                    {t('server.settings.save')}
                   </button>
               </div>
            </div>

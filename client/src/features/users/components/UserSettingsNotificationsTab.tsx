@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import type { UserNotificationSettings } from '../../../shared/types';
 import { playMessageSound, requestDesktopNotificationPermission, showDesktopNotification } from '../../../shared/services/notifications';
 import { Switch } from './UserSettingsSwitch';
+import { useI18n } from '../../../shared/i18n';
 
 export const UserSettingsNotificationsTab: React.FC<{
   notif: UserNotificationSettings;
@@ -12,13 +13,15 @@ export const UserSettingsNotificationsTab: React.FC<{
   setNotif: (next: Partial<UserNotificationSettings>) => void;
   persistNotificationSettings: (next: Partial<UserNotificationSettings>) => Promise<void>;
 }> = ({ notif, isUpdatingNotifications, setNotif, persistNotificationSettings }) => {
+  const { t } = useI18n();
+
   return (
     <div className="animate-in fade-in duration-300">
-      <h2 className="text-[20px] font-bold text-[#F2F3F5] mb-5 hidden md:block">Notifications</h2>
+      <h2 className="text-[20px] font-bold text-[#F2F3F5] mb-5 hidden md:block">{t('settings.notifications')}</h2>
 
       <div className="space-y-6">
         <div>
-          <h3 className="text-xs font-bold text-[#B5BAC1] uppercase mb-3 tracking-wide">Sounds</h3>
+          <h3 className="text-xs font-bold text-[#B5BAC1] uppercase mb-3 tracking-wide">{t('notifications.sounds')}</h3>
 
           <div className="space-y-1">
             <div
@@ -32,9 +35,9 @@ export const UserSettingsNotificationsTab: React.FC<{
             >
               <div className="flex-1 pr-4">
                 <div className="text-[#F2F3F5] font-medium text-base mb-0.5 group-hover:underline decoration-1 underline-offset-2 decoration-[#F2F3F5]/0 group-hover:decoration-[#F2F3F5]/100 transition-all">
-                  Message Sounds
+                  {t('notifications.messageSounds')}
                 </div>
-                <div className="text-sm text-[#B5BAC1]">Play a sound when you receive a new message.</div>
+                <div className="text-sm text-[#B5BAC1]">{t('notifications.messageSoundsDesc')}</div>
               </div>
               <Switch
                 checked={notif.soundEnabled}
@@ -52,8 +55,8 @@ export const UserSettingsNotificationsTab: React.FC<{
             <div className={clsx('py-2 transition-opacity duration-300', !notif.soundEnabled && 'opacity-50 pointer-events-none grayscale')}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-[#F2F3F5] font-medium text-base mb-0.5">Sound Volume</div>
-                  <div className="text-sm text-[#B5BAC1]">Controls the volume of message notifications.</div>
+                  <div className="text-[#F2F3F5] font-medium text-base mb-0.5">{t('notifications.soundVolume')}</div>
+                  <div className="text-sm text-[#B5BAC1]">{t('notifications.soundVolumeDesc')}</div>
                 </div>
               </div>
 
@@ -101,7 +104,7 @@ export const UserSettingsNotificationsTab: React.FC<{
         <div className="h-[1px] bg-[#3F4147] w-full" />
 
         <div>
-          <h3 className="text-xs font-bold text-[#B5BAC1] uppercase mb-3 tracking-wide">Desktop Options</h3>
+          <h3 className="text-xs font-bold text-[#B5BAC1] uppercase mb-3 tracking-wide">{t('notifications.desktopOptions')}</h3>
 
           <div className="space-y-4">
             <div
@@ -113,23 +116,23 @@ export const UserSettingsNotificationsTab: React.FC<{
                 }
                 const perm = await requestDesktopNotificationPermission();
                 if (perm !== 'granted') {
-                  toast.error('Browser notification permission is not granted.');
+                  toast.error(t('notifications.permissionDenied'));
                   await persistNotificationSettings({ desktopEnabled: false });
                   return;
                 }
                 await persistNotificationSettings({ desktopEnabled: true });
                 showDesktopNotification({
-                  title: 'Notifications Enabled',
-                  body: 'You will now receive desktop notifications!',
+                  title: t('notifications.enabledTitle'),
+                  body: t('notifications.enabledBody'),
                   tag: 'mew:enabled',
                 });
               }}
             >
               <div className="flex-1 pr-4">
                 <div className="text-[#F2F3F5] font-medium text-base mb-0.5 group-hover:underline decoration-1 underline-offset-2 decoration-[#F2F3F5]/0 group-hover:decoration-[#F2F3F5]/100 transition-all">
-                  Enable Desktop Notifications
+                  {t('notifications.enableDesktop')}
                 </div>
-                <div className="text-sm text-[#B5BAC1]">Show native browser notifications when Mew is not focused.</div>
+                <div className="text-sm text-[#B5BAC1]">{t('notifications.enableDesktopDesc')}</div>
               </div>
               <Switch
                 checked={notif.desktopEnabled}
@@ -146,8 +149,8 @@ export const UserSettingsNotificationsTab: React.FC<{
                 onClick={() => {
                   if (notif.soundEnabled) playMessageSound(notif.soundVolume);
                   showDesktopNotification({
-                    title: 'Mew Notification',
-                    body: 'This is how your notifications will look.',
+                    title: t('notifications.testTitle'),
+                    body: t('notifications.testBody'),
                     tag: 'mew:test',
                     data: { channelId: null },
                   });
@@ -160,7 +163,7 @@ export const UserSettingsNotificationsTab: React.FC<{
                 )}
               >
                 <Icon icon="mdi:bell-outline" width="16" />
-                Send Test Notification
+                {t('notifications.sendTest')}
               </button>
             </div>
           </div>

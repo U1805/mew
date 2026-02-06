@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 
 import type { Sticker } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
 
 export const ServerSettingsStickersTab: React.FC<{
   canManageStickers: boolean;
@@ -42,18 +43,19 @@ export const ServerSettingsStickersTab: React.FC<{
   onRequestDeleteSticker,
   isDeletingSticker,
 }) => {
+  const { t } = useI18n();
   return (
     <div className="h-full flex flex-col p-4 md:p-0 overflow-hidden">
       <div className="pb-4 border-b border-[#3F4147] shrink-0">
-        <h2 className="text-xl font-bold text-white mb-2">Stickers</h2>
-        <p className="text-sm text-mew-textMuted">Upload and manage server stickers. The first 30 stickers are free!</p>
+        <h2 className="text-xl font-bold text-white mb-2">{t('settings.stickers')}</h2>
+        <p className="text-sm text-mew-textMuted">{t('sticker.serverSubtitle')}</p>
       </div>
 
       <div className="flex-1 overflow-y-auto custom-scrollbar py-6 space-y-8">
         <div>
           {!canManageStickers && (
             <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 text-sm p-3 rounded mb-4">
-              You do not have permission to manage stickers.
+              {t('sticker.noPermission')}
             </div>
           )}
 
@@ -80,7 +82,7 @@ export const ServerSettingsStickersTab: React.FC<{
               ) : (
                 <>
                   <Icon icon="mdi:plus" className="text-mew-textMuted mb-1" width="24" />
-                  <span className="text-[10px] font-bold text-mew-textMuted uppercase">Upload</span>
+                  <span className="text-[10px] font-bold text-mew-textMuted uppercase">{t('server.create.upload')}</span>
                 </>
               )}
             </div>
@@ -88,12 +90,12 @@ export const ServerSettingsStickersTab: React.FC<{
             <div className="flex-1 space-y-3">
               <div className="grid grid-cols-1 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">Sticker Name</label>
+                  <label className="text-xs font-bold text-mew-textMuted uppercase mb-1 block">{t('sticker.name')}</label>
                   <input
                     value={newStickerName}
                     onChange={(e) => setNewStickerName(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2 rounded text-sm outline-none focus:ring-1 focus:ring-mew-accent transition-all"
-                    placeholder="Give it a name"
+                    placeholder={t('sticker.namePlaceholder')}
                     disabled={!canManageStickers}
                   />
                 </div>
@@ -109,7 +111,7 @@ export const ServerSettingsStickersTab: React.FC<{
                       (isUploading || !newStickerName.trim()) && 'opacity-50 cursor-not-allowed'
                     )}
                   >
-                    {isUploading ? 'Uploading...' : 'Upload Sticker'}
+                    {isUploading ? t('sticker.uploading') : t('sticker.upload')}
                   </button>
                 </div>
               )}
@@ -119,15 +121,15 @@ export const ServerSettingsStickersTab: React.FC<{
 
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-white">{stickers?.length || 0} Stickers</h3>
+            <h3 className="text-sm font-bold text-white">{t('sticker.count', { count: stickers?.length || 0 })}</h3>
           </div>
 
           {isLoadingStickers ? (
-            <div className="text-mew-textMuted text-sm">Loading stickers...</div>
+            <div className="text-mew-textMuted text-sm">{t('sticker.loading')}</div>
           ) : !stickers?.length ? (
             <div className="bg-[#1E1F22] rounded-lg p-6 text-center">
               <Icon icon="mdi:sticker-emoji" width="44" className="text-mew-textMuted opacity-40 mx-auto mb-3" />
-              <p className="text-mew-textMuted text-sm">No stickers found.</p>
+              <p className="text-mew-textMuted text-sm">{t('sticker.none')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -145,7 +147,7 @@ export const ServerSettingsStickersTab: React.FC<{
                           value={draft.name}
                           onChange={(e) => setStickerDrafts((prev) => ({ ...prev, [s._id]: { ...draft, name: e.target.value } }))}
                           className="bg-transparent text-white font-medium text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                          placeholder="Name"
+                          placeholder={t('sticker.name')}
                           disabled={!canManageStickers}
                         />
                       </div>
@@ -154,7 +156,7 @@ export const ServerSettingsStickersTab: React.FC<{
                           value={draft.description}
                           onChange={(e) => setStickerDrafts((prev) => ({ ...prev, [s._id]: { ...draft, description: e.target.value } }))}
                           className="bg-transparent text-mew-textMuted text-sm w-full outline-none border-b border-transparent focus:border-mew-accent transition-colors placeholder-mew-textMuted/50"
-                          placeholder="Description (optional)"
+                          placeholder={t('sticker.descriptionOptional')}
                           disabled={!canManageStickers}
                         />
                       </div>
@@ -165,7 +167,7 @@ export const ServerSettingsStickersTab: React.FC<{
                         onClick={() => onUpdateSticker({ stickerId: s._id, ...draft })}
                         disabled={isUpdatingSticker}
                         className="p-1.5 text-mew-textMuted hover:text-green-400 hover:bg-[#202225] rounded transition-colors"
-                        title="Save Changes"
+                        title={t('common.saveChanges')}
                       >
                         <Icon icon="mdi:check" width="20" />
                       </button>
@@ -173,7 +175,7 @@ export const ServerSettingsStickersTab: React.FC<{
                         onClick={() => onRequestDeleteSticker(s)}
                         disabled={isDeletingSticker}
                         className="p-1.5 text-mew-textMuted hover:text-red-400 hover:bg-[#202225] rounded transition-colors"
-                        title="Delete Sticker"
+                        title={t('sticker.delete')}
                       >
                         <Icon icon="mdi:trash-can-outline" width="20" />
                       </button>

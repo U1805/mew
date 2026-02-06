@@ -16,6 +16,7 @@ import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../.
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { getMessageBestEffortText } from '../../../shared/utils/messageText';
+import { useI18n } from '../../../shared/i18n';
 
 interface MessageItemProps {
   message: Message;
@@ -62,6 +63,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const { user } = useAuthStore();
   const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId, targetMessageId } = useUIStore();
   const { openModal } = useModalStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -80,7 +82,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const canManageMessages = permissions.has('MANAGE_MESSAGES');
   const canSendMessages = permissions.has('SEND_MESSAGES');
 
-  const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
+  const author = typeof message.authorId === 'object' ? message.authorId : { username: t('common.unknown'), avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
   const isRssCard = message.type === 'app/x-rss-card';
   const isPornhubCard = message.type === 'app/x-pornhub-card';
   const isTwitterCard = message.type === 'app/x-twitter-card';
@@ -166,12 +168,12 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const handleCopy = async () => {
     const text = getMessageBestEffortText(message);
     if (!text) {
-      toast.error('Nothing to copy');
+      toast.error(t('message.copy.empty'));
       return;
     }
     try {
       await navigator.clipboard.writeText(text);
-      toast.success('Copied');
+      toast.success(t('message.copy.success'));
     } catch {
       const textarea = document.createElement('textarea');
       textarea.value = text;
@@ -182,8 +184,8 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       textarea.select();
       const ok = document.execCommand('copy');
       document.body.removeChild(textarea);
-      if (ok) toast.success('Copied');
-      else toast.error('Copy failed');
+      if (ok) toast.success(t('message.copy.success'));
+      else toast.error(t('message.copy.failed'));
     }
   };
 
@@ -208,11 +210,11 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
   const handleSendToJpdict = async () => {
     if (!jpdictUserId) {
-      toast.error('jpdict-agent not found');
+      toast.error(t('message.jpdict.notFound'));
       return;
     }
     if (onlineStatus[jpdictUserId] !== 'online') {
-      toast.error('jpdict-agent is offline');
+      toast.error(t('message.jpdict.offline'));
       return;
     }
 
@@ -232,7 +234,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
     } else {
       const fallbackText = getMessageBestEffortText(message).trim();
       if (!fallbackText) {
-        toast.error('Nothing to send');
+        toast.error(t('message.jpdict.nothingToSend'));
         return;
       }
       payloadToSend.content = fallbackText;
@@ -242,7 +244,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       const dmRes = await channelApi.createDM(jpdictUserId);
       const dmChannelId = dmRes.data?._id as string | undefined;
       if (!dmChannelId) {
-        toast.error('Failed to create DM');
+        toast.error(t('message.jpdict.dmCreateFailed'));
         return;
       }
 
@@ -250,10 +252,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       await queryClient.invalidateQueries({ queryKey: ['dmChannels'] });
       setCurrentServer(null);
       setCurrentChannel(dmChannelId);
-      toast.success('Sent to jpdict');
+      toast.success(t('message.jpdict.sent'));
     } catch (err) {
       console.error('send to jpdict failed', err);
-      toast.error('Send failed');
+      toast.error(t('message.jpdict.sendFailed'));
     }
   };
 
@@ -262,11 +264,11 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
     const text = (selection || getMessageBestEffortText(message)).trim();
 
     if (!text) {
-      toast.error('Nothing to speak');
+      toast.error(t('message.tts.nothingToSpeak'));
       return;
     }
 
-    const loadingToast = toast.loading('Generating speech...');
+    const loadingToast = toast.loading(t('message.tts.generating'));
     try {
       const res = await ttsApi.synthesize(text);
       stopActiveTts();
@@ -282,10 +284,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       audio.onerror = () => stopActiveTts();
 
       await audio.play();
-      toast.success('Playing', { id: loadingToast });
+      toast.success(t('message.tts.playing'), { id: loadingToast });
     } catch (err) {
       console.error('TTS failed', err);
-      toast.error('TTS failed', { id: loadingToast });
+      toast.error(t('message.tts.failed'), { id: loadingToast });
       stopActiveTts();
     }
   };
@@ -293,7 +295,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const handleTranscribeVoice = async () => {
     if (!isVoiceMessage) return;
     if (!voiceSrc) {
-      toast.error('Voice message unavailable');
+      toast.error(t('message.voice.unavailable'));
       return;
     }
 
@@ -339,7 +341,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       });
     } catch (err) {
       console.error('STT failed', err);
-      toast.error('Transcribe failed');
+      toast.error(t('message.voice.transcribeFailed'));
     } finally {
       setVoiceTranscriptLoading(false);
     }
@@ -410,7 +412,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
         ? referencedMessage.authorId
         : null;
 
-    const label = refAuthor?.username ? `回复 ${refAuthor.username}` : '回复一条消息';
+    const label = refAuthor?.username ? t('message.reply.toUser', { name: refAuthor.username }) : t('message.reply.generic');
     const snippet = referencedMessage?.content ? referencedMessage.content.replace(/\s+/g, ' ').slice(0, 90) : '';
 
     return (
@@ -427,7 +429,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
         <Icon icon="mdi:reply" width="14" />
         <span className="truncate">
           {label}
-          {snippet ? `：${snippet}` : ''}
+          {snippet ? `: ${snippet}` : ''}
         </span>
       </button>
     );
@@ -471,7 +473,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                   <button
                     type="button"
                     className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text"
-                    title="Add Reaction"
+                    title={t('message.menu.addReaction')}
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   >
                     <Icon icon="mdi:emoticon-plus-outline" width="18" height="18" />
@@ -490,7 +492,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                   type="button"
                   onClick={() => setIsEditing(true)}
                   className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text"
-                  title="Edit"
+                  title={t('common.edit')}
                 >
                   <Icon icon="mdi:pencil" width="18" height="18" />
                 </button>
@@ -501,7 +503,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                   type="button"
                   onClick={handleDelete}
                   className="p-1 hover:bg-[#404249] rounded text-red-400 hover:text-red-500"
-                  title="Delete"
+                  title={t('message.delete.confirm')}
                 >
                   <Icon icon="mdi:trash-can-outline" width="18" height="18" />
                 </button>
@@ -517,7 +519,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
               <div className="flex-1 min-w-0 pl-4">
                 {isRetracted ? (
                   <div className="text-mew-textMuted italic text-[0.95rem] leading-[1.375rem] select-none">
-                    (message deleted)
+                    {t('message.deleted')}
                   </div>
                 ) : (
                   <>
@@ -528,7 +530,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                       channelId={message.channelId}
                     />
                     {message.editedAt && (
-                      <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>
+                      <span className="text-[10px] text-mew-textMuted ml-1 select-none">{t('message.edited')}</span>
                     )}
                     <ReactionList
                       reactions={message.reactions}
@@ -574,7 +576,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                   </div>
                   {author.isBot && (
                     <span className="bg-[#5865F2] text-white text-[10px] font-bold px-1 rounded-[3px] leading-3 shrink-0">
-                      {message.payload?.webhookName ? 'HOOK' : 'BOT'}
+                      {message.payload?.webhookName ? t('message.bot.hook') : t('message.bot.bot')}
                     </span>
                   )}
                   <span className="text-xs text-mew-textMuted ml-2">{fullDateString}</span>
@@ -582,7 +584,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
                 {isRetracted ? (
                   <div className="text-mew-textMuted italic text-[0.95rem] leading-[1.375rem] select-none mt-1">
-                    (message deleted)
+                    {t('message.deleted')}
                   </div>
                 ) : (
                   <>
@@ -596,7 +598,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                         voiceTranscriptLoading={isVoiceMessage && showVoiceTranscript && voiceTranscriptLoading}
                       />
                       {message.editedAt && (
-                        <span className="text-[10px] text-mew-textMuted ml-1 select-none">(edited)</span>
+                        <span className="text-[10px] text-mew-textMuted ml-1 select-none">{t('message.edited')}</span>
                       )}
                     </div>
                     <ReactionList

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { stickerApi, userStickerApi } from '../../../shared/services/api';
 import type { Sticker } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
 
 interface StickerPickerProps {
   serverId: string | null;
@@ -42,6 +43,7 @@ const pushRecent = (contextKey: string, stickerKey: string) => {
 };
 
 export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProps) => {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const contextKey = serverId || '@dm';
 
@@ -117,7 +119,7 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search stickers"
+              placeholder={t('sticker.search')}
               className="w-full bg-[#1E1F22] text-mew-text placeholder-mew-textMuted rounded-[4px] pl-2 pr-8 py-1.5 text-sm font-medium outline-none transition-all focus:ring-1 focus:ring-mew-accent"
               autoFocus
               disabled={isLoading}
@@ -141,7 +143,7 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
               {/* Recent Section */}
               {recent.length > 0 && !query.trim() && (
                 <div>
-                  <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">Recently Used</div>
+                  <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">{t('sticker.recent')}</div>
                   <div className="grid grid-cols-4 gap-2">
                     {recent.map((s) => (
                       <button
@@ -161,14 +163,14 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
               {query.trim() ? (
                 <div>
                   <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
-                    Search Results
+                    {t('search.results')}
                   </div>
                   {filtered.length === 0 ? (
                     <div className="text-center py-8">
                       <div className="flex justify-center mb-2">
                         <Icon icon="mdi:sticker-emoji" className="text-[#404249]" width="48" />
                       </div>
-                      <p className="text-mew-textMuted text-sm">No stickers found.</p>
+                      <p className="text-mew-textMuted text-sm">{t('sticker.none')}</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-4 gap-2">
@@ -194,11 +196,11 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
                   {/* Personal Stickers */}
                   <div>
                     <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
-                      {serverId ? 'Personal Stickers' : 'My Stickers'}
+                      {serverId ? t('sticker.personal') : t('sticker.mine')}
                     </div>
                     {userStickers.length === 0 ? (
                       <div className="text-center py-6 text-mew-textMuted text-sm">
-                        You don&apos;t have any stickers yet.
+                        {t('sticker.noneYet')}
                       </div>
                     ) : (
                       <div className="grid grid-cols-4 gap-2">
@@ -224,10 +226,10 @@ export const StickerPicker = ({ serverId, onSelect, onClose }: StickerPickerProp
                   {serverId && (
                     <div>
                       <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2 px-1">
-                        Server Stickers
+                        {t('sticker.server')}
                       </div>
                       {serverStickers.length === 0 ? (
-                        <div className="text-center py-6 text-mew-textMuted text-sm">No server stickers.</div>
+                        <div className="text-center py-6 text-mew-textMuted text-sm">{t('sticker.noServer')}</div>
                       ) : (
                         <div className="grid grid-cols-4 gap-2">
                           {serverStickers.map((s) => (

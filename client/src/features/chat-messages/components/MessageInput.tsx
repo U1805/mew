@@ -21,6 +21,7 @@ import type { Sticker } from '../../../shared/types';
 import toast from 'react-hot-toast';
 import { useVoiceRecorder } from '../../chat-voice/hooks/useVoiceRecorder';
 import { VoiceMessagePlayer } from '../../chat-voice/components/VoiceMessagePlayer';
+import { useI18n } from '../../../shared/i18n';
 
 interface MessageInputProps {
   channel: Channel | null;
@@ -29,6 +30,7 @@ interface MessageInputProps {
 }
 
 const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
+  const { t } = useI18n();
   const [attachments, setAttachments] = useState<Array<Partial<Attachment & { isUploading?: boolean; progress?: number; file?: File; localUrl?: string; error?: string; key?: string }>>>([]);
   const isUploading = attachments.some(a => a.isUploading);
   const [showStickerPicker, setShowStickerPicker] = useState(false);
@@ -60,10 +62,10 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   };
 
   const placeholderText = useMemo(() => {
-    if (isUploading) return 'Uploading files...';
-    if (!canSendMessage) return 'You do not have permission to send messages in this channel';
-    return `Message #${channel?.name || 'channel'}`;
-  }, [canSendMessage, channel?.name, isUploading]);
+    if (isUploading) return t('message.input.uploadingFiles');
+    if (!canSendMessage) return t('message.input.noPermission');
+    return t('message.input.placeholder', { name: channel?.name || t('notification.channel.unnamed') });
+  }, [canSendMessage, channel?.name, isUploading, t]);
 
   placeholderRef.current = placeholderText;
 
@@ -204,12 +206,12 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
           const newAttachments = [...prev];
           if (newAttachments[index]) {
             newAttachments[index].isUploading = false;
-            newAttachments[index].error = 'Upload Failed';
+            newAttachments[index].error = t('message.input.uploadFailed');
           }
           return newAttachments;
       });
     }
-  }, [channelId]);
+  }, [channelId, t]);
 
   const queueFilesForUpload = useCallback((files: File[]) => {
     if (!channelId || files.length === 0) return;
@@ -294,7 +296,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
         return oldData ? oldData.filter(m => m._id !== tempId) : [];
       });
-      console.error("Failed to send message:", err);
+      console.error('Failed to send message:', err);
       setAttachments(attachments);
       if (replySnapshot) setReplyTo(replySnapshot);
     }
@@ -402,7 +404,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       await queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
     } catch (err) {
       console.error('Failed to send voice message:', err);
-      toast.error('Failed to send voice message');
+      toast.error(t('message.input.sendVoiceFailed'));
       queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
         return oldData ? oldData.filter((m) => m._id !== tempId) : [];
       });
@@ -455,7 +457,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                 <div className="absolute bottom-1 left-1 right-1 bg-black/50 text-white text-xs px-1.5 py-0.5 rounded-sm truncate z-10">
                   {formatFileSize(file.size!)}
                 </div>
-                 {file.error && <div className='absolute bottom-0 left-0 right-0 bg-red-500 text-white text-xs text-center p-1'>Upload Failed</div>}
+                 {file.error && <div className='absolute bottom-0 left-0 right-0 bg-red-500 text-white text-xs text-center p-1'>{t('message.input.uploadFailed')}</div>}
               </div>
             );
           })}
@@ -466,7 +468,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         <div className="bg-[#2B2D31] border-x border-t border-[#1E1F22] rounded-t-lg px-3 py-2 flex items-center justify-between gap-3 text-sm">
           <div className="flex items-center gap-2 overflow-hidden">
             <Icon icon="mdi:reply" className="text-mew-textMuted shrink-0" />
-            <span className="text-mew-textMuted whitespace-nowrap">Replying to <span className="font-semibold text-white">{activeReplyTo.authorUsername}</span></span>
+            <span className="text-mew-textMuted whitespace-nowrap">{t('message.input.replyingTo')} <span className="font-semibold text-white">{activeReplyTo.authorUsername}</span></span>
           </div>
           <button onClick={() => clearReplyTo()} className="text-mew-textMuted hover:text-mew-text p-0.5">
             <Icon icon="mdi:close-circle" width="16" />
@@ -479,7 +481,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
           {voiceRecorder.status === 'recording' ? (
             <div className="flex items-center gap-2 min-w-0">
               <span className="inline-flex w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-mew-textMuted">Recording</span>
+              <span className="text-mew-textMuted">{t('message.input.recording')}</span>
               <span className="text-white font-semibold tabular-nums">{formatMs(voiceRecorder.elapsedMs)}</span>
             </div>
           ) : (
@@ -491,7 +493,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   durationMs={voiceRecorder.preview.durationMs}
                 />
               ) : (
-                <div className="text-mew-textMuted">Voice preview unavailable</div>
+                <div className="text-mew-textMuted">{t('message.input.voicePreviewUnavailable')}</div>
               )}
             </div>
           )}
@@ -505,7 +507,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   className="px-3 py-1.5 rounded-md bg-[#1E1F22] hover:bg-[#202225] text-white text-xs font-semibold"
                   disabled={isSendingVoice}
                 >
-                  Stop
+                  {t('message.input.stop')}
                 </button>
                 <button
                   type="button"
@@ -513,7 +515,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   className="px-3 py-1.5 rounded-md bg-transparent hover:bg-[#202225] text-mew-textMuted text-xs font-semibold"
                   disabled={isSendingVoice}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
               </>
             ) : (
@@ -524,7 +526,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   className="px-3 py-1.5 rounded-md bg-mew-accent hover:opacity-90 text-white text-xs font-semibold"
                   disabled={isSendingVoice || !canSendMessage || isUploading}
                 >
-                  {isSendingVoice ? 'Sending…' : 'Send'}
+                  {isSendingVoice ? t('message.input.sending') : t('message.input.send')}
                 </button>
                 <button
                   type="button"
@@ -532,7 +534,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   className="px-3 py-1.5 rounded-md bg-transparent hover:bg-[#202225] text-mew-textMuted text-xs font-semibold"
                   disabled={isSendingVoice}
                 >
-                  Discard
+                  {t('message.input.discard')}
                 </button>
               </>
             )}
@@ -579,8 +581,8 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   : "text-mew-textMuted hover:text-mew-text hover:bg-[#3F4147]" // Discord 风格的悬停背景
               )}
               disabled={!canSendMessage || isUploading || isSendingVoice}
-              aria-label="open message actions"
-              title="Actions"
+              aria-label={t('message.input.openActions')}
+              title={t('message.input.actions')}
           >
             <Icon icon="mdi:plus-circle" width="24" height="24" className={clsx(
                 "transition-transform duration-200",
@@ -605,7 +607,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                 role="menuitem"
               >
                 <Icon icon="mdi:file-upload-outline" width="20" height="20" className="text-[#B5BAC1] group-hover:text-white" />
-                <span className="text-[14px] font-medium">Upload file</span>
+                <span className="text-[14px] font-medium">{t('message.input.uploadFile')}</span>
               </button>
 
               <button
@@ -620,7 +622,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                 role="menuitem"
               >
                 <Icon icon="mdi:music-note-plus" width="20" height="20" className="text-[#B5BAC1] group-hover:text-white" />
-                <span className="text-[14px] font-medium">Upload audio</span>
+                <span className="text-[14px] font-medium">{t('message.input.uploadAudio')}</span>
               </button>
 
               <div className="my-1 h-[1px] bg-[#1E1F22] w-full mx-auto opacity-60" /> {/* 分割线 */}
@@ -643,7 +645,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
                   height="20" 
                   className="text-[#B5BAC1] group-hover:text-white"
                 />
-                <span className="text-[14px] font-medium">Record voice</span>
+                <span className="text-[14px] font-medium">{t('message.input.recordVoice')}</span>
               </button>
             </div>
           )}
@@ -669,8 +671,8 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
               )}
               onClick={() => setShowStickerPicker((v) => !v)}
               disabled={!canSendMessage || isUploading}
-              title="Open Sticker Picker"
-              aria-label="open sticker picker"
+              title={t('message.input.openStickerPicker')}
+              aria-label={t('message.input.openStickerPicker')}
             >
               <Icon icon="mdi:sticker-emoji" width="24" height="24" />
             </button>

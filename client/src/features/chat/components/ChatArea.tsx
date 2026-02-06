@@ -11,8 +11,10 @@ import { useSocketMessages } from '../../../shared/hooks/useSocketMessages';
 import { useMessages } from '../../../shared/hooks/useMessages';
 import { useChannel } from '../hooks/useChannel';
 import { ChannelType } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
 
 const ChatArea: React.FC = () => {
+  const { t } = useI18n();
   const { 
     currentServerId, 
     currentChannelId, 
@@ -56,7 +58,7 @@ const ChatArea: React.FC = () => {
         <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
              <Icon icon="mdi:chat-outline" width="32" height="32" />
         </div>
-        <p className="mb-6">Select a channel to start chatting</p>
+        <p className="mb-6">{t('chat.selectChannel')}</p>
       </div>
     );
   }
@@ -71,7 +73,7 @@ const ChatArea: React.FC = () => {
             <div className="flex flex-col flex-1 min-h-0">
               <div className="px-4 py-2 border-b border-mew-darkest bg-mew-dark flex items-center gap-3">
                 <div className="text-xs text-mew-textMuted truncate flex-1">
-                  {channel?.url || 'No URL set. Update this channel in settings.'}
+                  {channel?.url || t('chat.web.noUrlSet')}
                 </div>
                 {channel?.url && (
                   <a
@@ -80,13 +82,13 @@ const ChatArea: React.FC = () => {
                     rel="noreferrer"
                     className="text-xs font-medium text-mew-textMuted hover:text-white hover:underline whitespace-nowrap"
                   >
-                    Open
+                    {t('chat.web.open')}
                   </a>
                 )}
               </div>
               {channel?.url ? (
                 <iframe
-                  title={channel?.name || 'Web Channel'}
+                  title={channel?.name || t('chat.web.channelTitle')}
                   src={channel.url}
                   className="w-full h-full border-0 bg-white"
                   // Note: many sites rely on cookies/localStorage for auth; without `allow-same-origin` they often break.
@@ -95,7 +97,7 @@ const ChatArea: React.FC = () => {
                 />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-mew-textMuted">
-                  Set a URL for this channel in settings.
+                  {t('chat.web.setUrlHint')}
                 </div>
               )}
             </div>

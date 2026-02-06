@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { infraApi } from '../../../shared/services/api';
 import type { AvailableService } from '../../../shared/services/infra.api';
+import { useI18n } from '../../../shared/i18n';
 
 // --- Helpers ---
 
@@ -47,6 +48,7 @@ const ServiceDetailsModal: React.FC<{ service: AvailableService; onClose: () => 
   service,
   onClose,
 }) => {
+  const { t } = useI18n();
   const title = service.serverName?.trim() || service.serviceType;
   const description = service.description?.trim();
   const icon = service.icon?.trim();
@@ -94,7 +96,7 @@ const ServiceDetailsModal: React.FC<{ service: AvailableService; onClose: () => 
       }}
       role="dialog"
       aria-modal="true"
-      aria-label={`${title} details`}
+      aria-label={t('plugin.details.aria', { title })}
     >
       <div className="bg-[#232428] w-full max-w-2xl rounded-lg shadow-2xl overflow-hidden animate-scale-in border border-[#1E1F22]">
         <div className="px-5 py-4 flex items-start justify-between gap-4 border-b border-[#1E1F22]">
@@ -114,7 +116,7 @@ const ServiceDetailsModal: React.FC<{ service: AvailableService; onClose: () => 
             onClick={onClose}
             autoFocus
             className="w-9 h-9 rounded-full bg-[#2B2D31] hover:bg-[#404249] flex items-center justify-center text-[#949BA4] hover:text-white transition-colors flex-shrink-0"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <Icon icon="mdi:close" width="18" />
           </button>
@@ -123,18 +125,18 @@ const ServiceDetailsModal: React.FC<{ service: AvailableService; onClose: () => 
         <div className="px-5 py-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="bg-[#111214] rounded-md p-3 border border-[#1E1F22]">
-              <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide">Status</div>
+              <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide">{t('plugin.status')}</div>
               <div className="mt-1 flex items-center gap-2">
                 <div
                   className={`w-2.5 h-2.5 rounded-full ${service.online ? 'bg-[#23A559] shadow-[0_0_6px_rgba(35,165,89,0.35)]' : 'bg-[#80848E]'}`}
                 />
-                <div className="text-sm font-semibold text-white">{service.online ? 'Online' : 'Offline'}</div>
+                <div className="text-sm font-semibold text-white">{service.online ? t('plugin.online') : t('plugin.offline')}</div>
               </div>
             </div>
 
             <div className="bg-[#111214] rounded-md p-3 border border-[#1E1F22]">
               <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide">
-                Connections
+                {t('plugin.connections')}
               </div>
               <div className="mt-1 flex items-center gap-2 text-white">
                 <Icon icon="mdi:server-network" width="16" className="text-[#949BA4]" />
@@ -143,21 +145,21 @@ const ServiceDetailsModal: React.FC<{ service: AvailableService; onClose: () => 
             </div>
 
             <div className="bg-[#111214] rounded-md p-3 border border-[#1E1F22]">
-              <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide">Config</div>
+              <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide">{t('plugin.config')}</div>
               <div className="mt-1 text-sm font-semibold text-white">
-                {configTemplate ? 'Available' : 'None'}
+                {configTemplate ? t('plugin.available') : t('plugin.none')}
               </div>
             </div>
           </div>
 
           <div className="bg-[#111214] rounded-md p-4 border border-[#1E1F22]">
             <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide mb-2">
-              Description
+              {t('plugin.description')}
             </div>
             {description ? (
               <p className="text-sm text-[#B5BAC1] leading-relaxed whitespace-pre-wrap">{description}</p>
             ) : (
-              <p className="text-sm text-[#5C5E66] italic select-none">No description provided.</p>
+              <p className="text-sm text-[#5C5E66] italic select-none">{t('plugin.noDescription')}</p>
             )}
           </div>
 
@@ -165,17 +167,17 @@ const ServiceDetailsModal: React.FC<{ service: AvailableService; onClose: () => 
             <div className="bg-[#111214] rounded-md border border-[#1E1F22] overflow-hidden">
               <div className="px-4 py-3 flex items-center justify-between gap-3 border-b border-[#1E1F22]">
                 <div className="text-[11px] font-bold text-[#949BA4] uppercase tracking-wide">
-                  Config Template
+                  {t('plugin.configTemplate')}
                 </div>
                 <button
                   type="button"
                   onClick={handleCopy}
                   className="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded bg-[#2B2D31] hover:bg-[#404249] text-white transition-colors"
-                  aria-label="Copy config template"
-                  title="Copy to clipboard"
+                  aria-label={t('plugin.copyConfigTemplate')}
+                  title={t('plugin.copyToClipboard')}
                 >
                   <Icon icon={copied ? 'mdi:check' : 'mdi:content-copy'} width="14" />
-                  <span>{copied ? 'Copied' : 'Copy'}</span>
+                  <span>{copied ? t('message.copy.success') : t('invite.create.copy')}</span>
                 </button>
               </div>
               <pre className="p-4 text-xs text-[#B5BAC1] font-mono overflow-auto max-h-[260px] whitespace-pre-wrap leading-relaxed">
@@ -194,6 +196,7 @@ const ServiceCard: React.FC<{ service: AvailableService; onOpenDetails: (service
   service,
   onOpenDetails,
 }) => {
+  const { t } = useI18n();
   const title = service.serverName?.trim() || service.serviceType;
   const description = service.description?.trim();
   const icon = service.icon?.trim();
@@ -205,7 +208,7 @@ const ServiceCard: React.FC<{ service: AvailableService; onOpenDetails: (service
       onClick={() => onOpenDetails(service)}
       className="group relative flex flex-col bg-[#2B2D31] hover:bg-[#32343a] rounded-lg overflow-hidden transition-all duration-200 border border-[#1E1F22] hover:border-[#4E5058] shadow-sm hover:shadow-md hover:-translate-y-0.5 text-left focus:outline-none focus:ring-2 focus:ring-[#5865F2]/60"
       aria-haspopup="dialog"
-      aria-label={`View ${title} details`}
+      aria-label={t('plugin.viewDetails', { title })}
     >
       {/* Main Body */}
       <div className="p-4 flex-1">
@@ -232,7 +235,7 @@ const ServiceCard: React.FC<{ service: AvailableService; onOpenDetails: (service
             </p>
           ) : (
             <p className="text-sm text-[#5C5E66] italic leading-relaxed select-none">
-              No description provided.
+              {t('plugin.noDescription')}
             </p>
           )}
         </div>
@@ -242,15 +245,15 @@ const ServiceCard: React.FC<{ service: AvailableService; onOpenDetails: (service
       <div className="bg-[#232428] px-4 py-2.5 flex items-center justify-between border-t border-[#1E1F22]">
         <div className="flex items-center gap-4">
           {/* Status */}
-          <div className="flex items-center gap-1.5" title={service.online ? "Service is online" : "Service is offline"}>
+          <div className="flex items-center gap-1.5" title={service.online ? t('plugin.serviceOnline') : t('plugin.serviceOffline')}>
             <div className={`w-2.5 h-2.5 rounded-full ${service.online ? 'bg-[#23A559] shadow-[0_0_4px_rgba(35,165,89,0.4)]' : 'bg-[#80848E]'}`} />
             <span className={`text-xs font-medium ${service.online ? 'text-[#F2F3F5]' : 'text-[#949BA4]'}`}>
-              {service.online ? 'Online' : 'Offline'}
+              {service.online ? t('plugin.online') : t('plugin.offline')}
             </span>
           </div>
 
           {/* Connections */}
-          <div className="flex items-center gap-1.5 text-[#949BA4]" title="Active Connections">
+          <div className="flex items-center gap-1.5 text-[#949BA4]" title={t('plugin.activeConnections')}>
             <Icon icon="mdi:server-network" width="14" />
             <span className="text-xs font-medium">{service.connections}</span>
           </div>
@@ -258,9 +261,9 @@ const ServiceCard: React.FC<{ service: AvailableService; onOpenDetails: (service
 
         {/* Config Indicator */}
         {hasConfig && (
-          <div className="flex items-center gap-1 text-[#949BA4] bg-[#2B2D31] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-[#1E1F22]" title="Configuration Template Available">
+          <div className="flex items-center gap-1 text-[#949BA4] bg-[#2B2D31] px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border border-[#1E1F22]" title={t('plugin.configTemplateAvailable')}>
             <Icon icon="mdi:file-cog" width="12" />
-            <span>Config</span>
+            <span>{t('plugin.config')}</span>
           </div>
         )}
       </div>
@@ -268,21 +271,23 @@ const ServiceCard: React.FC<{ service: AvailableService; onOpenDetails: (service
   );
 };
 
-const EmptyState: React.FC = () => (
-  <div className="bg-[#2B2D31] rounded-lg p-12 text-center border border-[#1E1F22] flex flex-col items-center justify-center animate-fade-in">
-    <div className="w-20 h-20 bg-[#313338] rounded-full flex items-center justify-center mb-4 border border-[#1E1F22]">
-      <Icon icon="mdi:puzzle-remove" className="text-[#80848E]" width="40" />
+const EmptyState: React.FC = () => {
+  const { t } = useI18n();
+  return (
+    <div className="bg-[#2B2D31] rounded-lg p-12 text-center border border-[#1E1F22] flex flex-col items-center justify-center animate-fade-in">
+      <div className="w-20 h-20 bg-[#313338] rounded-full flex items-center justify-center mb-4 border border-[#1E1F22]">
+        <Icon icon="mdi:puzzle-remove" className="text-[#80848E]" width="40" />
+      </div>
+      <h3 className="text-[#F2F3F5] text-lg font-bold mb-2">{t('plugin.emptyTitle')}</h3>
+      <p className="text-[#949BA4] text-sm max-w-sm leading-relaxed">
+        {t('plugin.emptyDesc')}
+      </p>
     </div>
-    <h3 className="text-[#F2F3F5] text-lg font-bold mb-2">No Plugins Detected</h3>
-    <p className="text-[#949BA4] text-sm max-w-sm leading-relaxed">
-      It seems there are no Bot services running at the moment. 
-      <br />
-      Start a service to see it appear here.
-    </p>
-  </div>
-);
+  );
+};
 
 export const PluginManagementPanel: React.FC = () => {
+  const { t } = useI18n();
   const { data: services, isLoading } = useQuery({
     queryKey: ['availableServices'],
     queryFn: async () => {
@@ -311,10 +316,10 @@ export const PluginManagementPanel: React.FC = () => {
       <div className="mb-6">
         <h2 className="text-xl font-bold text-[#F2F3F5] flex items-center gap-2">
           <Icon icon="mdi:toy-brick" className="text-[#5865F2]" />
-          Plugins
+          {t('settings.plugins')}
         </h2>
         <p className="text-[#949BA4] text-sm mt-1">
-          Registered bot services available to host and manage your automation tasks.
+          {t('plugin.subtitle')}
         </p>
       </div>
 

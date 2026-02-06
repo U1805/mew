@@ -9,6 +9,7 @@ import { useCreateBot, useUpdateBot, useDeleteBot, useRegenerateBotToken } from 
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { infraApi } from '../../../shared/services/api';
 import type { AvailableService } from '../../../shared/services/infra.api';
+import { useI18n } from '../../../shared/i18n';
 import {
   ConfigTemplateForm,
   buildInitialValueFromSchema,
@@ -20,6 +21,7 @@ import {
 
 export const BotEditorModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
+  const { t } = useI18n();
 
   const [internalBot, setInternalBot] = useState<Bot | undefined>(modalData?.bot);
   const isEditing = !!internalBot;
@@ -46,7 +48,7 @@ export const BotEditorModal: React.FC = () => {
     setInternalBot(newBot);
     setCurrentToken(newBot.accessToken || '');
     setShowToken(true);
-    toast.success('Bot created! Copy your token now, you won\'t see it again.');
+    toast.success(t('bot.editor.created'));
   });
 
   const updateMutation = useUpdateBot();
@@ -152,7 +154,7 @@ export const BotEditorModal: React.FC = () => {
       JSON.parse(config);
       setConfigError('');
     } catch {
-      setConfigError('Invalid JSON format');
+      setConfigError(t('bot.editor.invalidJson'));
     }
   }, [config, configMode]);
 
@@ -165,7 +167,7 @@ export const BotEditorModal: React.FC = () => {
       const parsed = JSON.parse(config);
       setConfig(JSON.stringify(parsed, null, 2));
     } catch {
-      toast.error('Invalid JSON format');
+      toast.error(t('bot.editor.invalidJson'));
     }
   };
 
@@ -184,11 +186,11 @@ export const BotEditorModal: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      toast.error('Bot name is required');
+      toast.error(t('bot.editor.nameRequired'));
       return;
     }
     if (!serviceType) {
-      toast.error('Service type is required');
+      toast.error(t('bot.editor.serviceTypeRequired'));
       return;
     }
     if (configError) return;
@@ -204,7 +206,7 @@ export const BotEditorModal: React.FC = () => {
 
     if (isEditing && internalBot) {
       updateMutation.mutate({ botId: internalBot._id, data: formData }, {
-        onSuccess: () => toast.success('Bot updated!')
+        onSuccess: () => toast.success(t('bot.editor.updated'))
       });
     } else {
       createMutation.mutate(formData);
@@ -232,10 +234,10 @@ export const BotEditorModal: React.FC = () => {
 
   if (showDeleteConfirm) {
     return (
-      <ConfirmModal
-        title="Delete Bot"
-        description={`Are you sure you want to delete ${name}? This action cannot be undone.`}
-        confirmText="Delete Bot"
+        <ConfirmModal
+        title={t('bot.editor.deleteTitle')}
+        description={t('bot.editor.deleteDesc', { name })}
+        confirmText={t('bot.editor.deleteConfirm')}
         onConfirm={handleDelete}
         onCancel={() => setShowDeleteConfirm(false)}
         isLoading={deleteMutation.isPending}
@@ -246,10 +248,10 @@ export const BotEditorModal: React.FC = () => {
 
   if (showRegenConfirm) {
     return (
-      <ConfirmModal
-        title="Regenerate Token"
-        description="Are you sure? The old token will stop working immediately. You will need to update any applications using this bot."
-        confirmText="Regenerate"
+        <ConfirmModal
+        title={t('bot.editor.regenTitle')}
+        description={t('bot.editor.regenDesc')}
+        confirmText={t('bot.editor.regenConfirm')}
         onConfirm={handleRegenerateToken}
         onCancel={() => setShowRegenConfirm(false)}
         isLoading={regenTokenMutation.isPending}
@@ -262,8 +264,8 @@ export const BotEditorModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-[#313338] w-full max-w-2xl rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[90vh]">
         <div className="p-6 pb-0">
-          <h2 className="text-xl font-bold text-white mb-2">{isEditing ? `Edit Bot - ${name}` : 'Create a Bot'}</h2>
-          <p className="text-mew-textMuted text-sm">Configure your bot appearance and settings.</p>
+          <h2 className="text-xl font-bold text-white mb-2">{isEditing ? t('bot.editor.editTitle', { name }) : t('bot.editor.createTitle')}</h2>
+          <p className="text-mew-textMuted text-sm">{t('bot.editor.subtitle')}</p>
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
@@ -283,40 +285,40 @@ export const BotEditorModal: React.FC = () => {
                   />
                   {avatarPreview ? (
                     <>
-                      <img src={avatarPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <img src={avatarPreview} alt={t('modal.preview')} className="w-full h-full object-cover" />
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="text-[10px] font-bold text-white uppercase">Change</span>
+                        <span className="text-[10px] font-bold text-white uppercase">{t('account.change')}</span>
                       </div>
                     </>
                   ) : (
                     <>
                       <Icon icon="mdi:camera-plus" className="text-mew-textMuted group-hover:text-white mb-1" width="24" />
-                      <span className="text-[10px] font-bold text-mew-textMuted group-hover:text-white uppercase">Upload</span>
+                      <span className="text-[10px] font-bold text-mew-textMuted group-hover:text-white uppercase">{t('server.create.upload')}</span>
                     </>
                   )}
                 </div>
               </div>
               <div className="flex-1 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Bot Name</label>
+                  <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('bot.editor.botName')}</label>
                   <input
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none font-medium"
-                    placeholder="My Awesome Bot"
+                    placeholder={t('bot.editor.botNamePlaceholder')}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">Service Type</label>
+                  <label className="block text-xs font-bold text-mew-textMuted uppercase mb-2">{t('bot.editor.serviceType')}</label>
                   <select
                     value={serviceType}
                     onChange={(e) => setServiceType(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-2.5 rounded border-none focus:outline-none font-medium appearance-none"
                     disabled={!isEditing && serviceOptions.length === 0}
                   >
-                    <option value="" disabled>Select a service type</option>
+                    <option value="" disabled>{t('bot.editor.selectServiceType')}</option>
                     {serviceOptions.map((s) => (
                       <option key={s.serviceType} value={s.serviceType}>
                         {(s.serverName && s.serverName !== s.serviceType ? ` [${s.serviceType}] ` : '') + (s.serverName || s.serviceType)}
@@ -324,7 +326,7 @@ export const BotEditorModal: React.FC = () => {
                     ))}
                   </select>
                   {!isEditing && serviceOptions.length === 0 && (
-                    <p className="text-xs text-mew-textMuted mt-2">No online Bot services are running.</p>
+                    <p className="text-xs text-mew-textMuted mt-2">{t('bot.editor.noOnlineServices')}</p>
                   )}
                   {!!selectedService?.description && (
                     <p className="text-xs text-mew-textMuted mt-2 whitespace-pre-wrap">{selectedService.description}</p>
@@ -340,14 +342,14 @@ export const BotEditorModal: React.FC = () => {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Icon icon="mdi:key-variant" className="text-mew-textMuted" />
-                    <label className="text-xs font-bold text-mew-textMuted uppercase">Access Token</label>
+                    <label className="text-xs font-bold text-mew-textMuted uppercase">{t('bot.editor.accessToken')}</label>
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowRegenConfirm(true)}
                     className="text-xs text-mew-accent hover:underline font-medium"
                   >
-                    Regenerate
+                    {t('bot.editor.regenConfirm')}
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
@@ -362,7 +364,7 @@ export const BotEditorModal: React.FC = () => {
                   >
                     {currentToken
                         ? (showToken ? currentToken : '********************************')
-                        : 'Token is hidden. Regenerate to view.'
+                        : t('bot.editor.tokenHidden')
                     }
                   </div>
                   <button
@@ -370,17 +372,17 @@ export const BotEditorModal: React.FC = () => {
                     onClick={() => {
                       if (currentToken) {
                         navigator.clipboard.writeText(currentToken);
-                        toast.success('Token copied!');
+                        toast.success(t('bot.editor.tokenCopied'));
                       }
                     }}
                     disabled={!currentToken}
                     className="bg-mew-accent hover:bg-mew-accentHover text-white px-3 py-2 rounded text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Copy
+                    {t('invite.create.copy')}
                   </button>
                 </div>
                 <p className="text-xs text-mew-textMuted mt-2">
-                  Keep this token secret! Anyone with it can control your bot.
+                  {t('bot.editor.tokenWarning')}
                 </p>
               </div>
             )}
@@ -402,15 +404,15 @@ export const BotEditorModal: React.FC = () => {
                   ></div>
                 </div>
                 <div>
-                  <div className="text-sm font-medium text-white">Allow Direct Messages</div>
-                  <div className="text-xs text-mew-textMuted">Allow users to send DMs to this bot</div>
+                  <div className="text-sm font-medium text-white">{t('bot.editor.allowDmTitle')}</div>
+                  <div className="text-xs text-mew-textMuted">{t('bot.editor.allowDmDesc')}</div>
                 </div>
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-3">
                     <label className="block text-xs font-bold text-mew-textMuted uppercase">
-                      Configuration {configSchema ? '' : '(JSON)'}
+                      {t('bot.editor.configuration')} {configSchema ? '' : '(JSON)'}
                     </label>
                     {configSchema && (
                       <div className="flex items-center gap-2">
@@ -422,7 +424,7 @@ export const BotEditorModal: React.FC = () => {
                             configMode === 'visual' ? 'bg-[#1E1F22] text-white' : 'bg-transparent text-mew-textMuted hover:text-white'
                           )}
                         >
-                          Visual
+                          {t('bot.editor.visual')}
                         </button>
                         <button
                           type="button"
@@ -444,10 +446,10 @@ export const BotEditorModal: React.FC = () => {
                       onClick={handleFormatConfig}
                       disabled={!config.trim() || !!configError}
                       className="flex items-center gap-1.5 text-xs text-mew-textMuted hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title="Format JSON"
+                      title={t('bot.editor.formatJson')}
                     >
                       <Icon icon="mdi:format-indent-increase" width="16" />
-                      Format
+                      {t('bot.editor.format')}
                     </button>
                   )}
                 </div>
@@ -485,11 +487,11 @@ export const BotEditorModal: React.FC = () => {
               onClick={() => setShowDeleteConfirm(true)}
               className="text-red-400 hover:text-red-500 text-sm font-medium px-2"
             >
-              Delete Bot
+              {t('bot.editor.deleteConfirm')}
             </button>
           ) : <div></div>}
           <div className="flex gap-4">
-            <button type="button" onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">Cancel</button>
+            <button type="button" onClick={closeModal} className="text-white hover:underline text-sm font-medium px-2 self-center">{t('common.cancel')}</button>
             <button
               type="button"
               onClick={handleSubmit}
@@ -499,7 +501,7 @@ export const BotEditorModal: React.FC = () => {
                 !isEditing && createMutation.isSuccess && "hidden"
               )}
             >
-              {isSubmitting ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create')}
+              {isSubmitting ? (isEditing ? t('common.saving') : t('bot.editor.creating')) : (isEditing ? t('common.saveChanges') : t('server.create.create'))}
             </button>
           </div>
         </div>
