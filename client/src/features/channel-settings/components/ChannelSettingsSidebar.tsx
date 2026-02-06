@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { useI18n } from '../../../shared/i18n';
 
 export type ChannelSettingsTab = 'overview' | 'permissions' | 'integrations';
 
@@ -13,6 +14,8 @@ export const ChannelSettingsSidebar: React.FC<{
   onDelete: () => void;
   showIntegrations: boolean;
 }> = ({ title, activeTab, mobileMenuOpen, onClose, onTabClick, onDelete, showIntegrations }) => {
+  const { t } = useI18n();
+
   return (
     <div
       className={clsx(
@@ -22,7 +25,7 @@ export const ChannelSettingsSidebar: React.FC<{
     >
       <div className="w-full md:w-[192px] px-4 md:px-1.5">
         <div className="flex md:hidden items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Channel Settings</h2>
+          <h2 className="text-lg font-bold text-white">{t('channel.settings.title')}</h2>
           <button onClick={onClose} className="p-2 text-mew-textMuted hover:text-white">
             <Icon icon="mdi:close" width="24" />
           </button>
@@ -37,7 +40,7 @@ export const ChannelSettingsSidebar: React.FC<{
           )}
           onClick={() => onTabClick('overview')}
         >
-          Overview
+          {t('channel.settings.overview')}
         </div>
         <div
           className={clsx(
@@ -46,7 +49,7 @@ export const ChannelSettingsSidebar: React.FC<{
           )}
           onClick={() => onTabClick('permissions')}
         >
-          Permissions
+          {t('channel.settings.permissions')}
         </div>
         {showIntegrations && (
           <div
@@ -56,7 +59,7 @@ export const ChannelSettingsSidebar: React.FC<{
             )}
             onClick={() => onTabClick('integrations')}
           >
-            Integrations
+            {t('channel.settings.integrations')}
           </div>
         )}
 
@@ -66,7 +69,7 @@ export const ChannelSettingsSidebar: React.FC<{
           className="px-2.5 py-1.5 rounded-[4px] text-mew-textMuted hover:bg-[#35373C] hover:text-mew-text font-medium text-sm cursor-pointer mb-0.5 flex justify-between group"
           onClick={onDelete}
         >
-          <span className="text-red-400">Delete Channel</span>
+          <span className="text-red-400">{t('channel.settings.deleteChannel')}</span>
           <Icon icon="mdi:trash-can-outline" className="text-red-400" />
         </div>
       </div>

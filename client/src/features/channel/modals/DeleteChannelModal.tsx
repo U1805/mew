@@ -3,8 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { channelApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { useI18n } from '../../../shared/i18n';
 
 export const DeleteChannelModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
@@ -33,9 +35,9 @@ export const DeleteChannelModal: React.FC = () => {
 
   return (
     <ConfirmModal
-      title="Delete Channel"
-      description={`Are you sure you want to delete #${channel.name}? This cannot be undone.`}
-      confirmText="Delete Channel"
+      title={t('channel.delete.title')}
+      description={t('channel.delete.description', { name: channel.name })}
+      confirmText={t('channel.delete.confirm')}
       onConfirm={handleConfirm}
       onCancel={closeModal}
       isLoading={isLoading}

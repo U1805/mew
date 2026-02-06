@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
+import { useI18n } from '../../../shared/i18n';
 
 const formatTime = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -33,6 +34,7 @@ type Props = {
 };
 
 export const VoiceMessagePlayer = ({ src, contentType, durationMs, className }: Props) => {
+  const { t } = useI18n();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -196,7 +198,7 @@ export const VoiceMessagePlayer = ({ src, contentType, durationMs, className }: 
         aria-valuenow={currentTime}
         aria-valuemin={0}
         aria-valuemax={duration}
-        title="Seek"
+        title={t('voice.seek')}
       >
         {/* Layer 1: Background */}
         <div className="absolute inset-0 flex items-center opacity-60">

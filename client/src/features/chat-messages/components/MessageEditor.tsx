@@ -10,6 +10,7 @@ import Mention from '@tiptap/extension-mention';
 import Placeholder from '@tiptap/extension-placeholder';
 import { createMentionSuggestion } from '../../chat-editor/hooks/mentionSuggestion';
 import { parseContentStringToTiptapDoc, serializeTiptapDocToContentString } from '../../chat-editor/hooks/chatContent';
+import { useI18n } from '../../../shared/i18n';
 
 interface MessageEditorProps {
     message: Message;
@@ -18,10 +19,11 @@ interface MessageEditorProps {
 
 const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
     const { currentServerId } = useUIStore();
+    const { t } = useI18n();
     const queryClient = useQueryClient();
     const saveRef = useRef<() => void>(() => {});
 
-    const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
+    const author = typeof message.authorId === 'object' ? message.authorId : { username: t('common.unknown'), avatarUrl: '', _id: message.authorId as string, isBot: false, createdAt: new Date().toISOString(), email: '' };
 
     const mentionExtension = useMemo(() => {
       if (!currentServerId) return null;
@@ -46,10 +48,10 @@ const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
         }),
         ...(mentionExtension ? [mentionExtension] : []),
         Placeholder.configure({
-          placeholder: 'Edit message',
+          placeholder: t('message.editor.placeholder'),
         }),
       ];
-    }, [mentionExtension]);
+    }, [mentionExtension, t]);
 
     const editorProps = useMemo(() => {
       return {
@@ -96,7 +98,7 @@ const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
             });
             onCancel();
         } catch (error) {
-            console.error("Failed to edit message", error);
+            console.error('Failed to edit message', error);
         }
     };
 
@@ -127,9 +129,9 @@ const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
                     </div>
                 </div>
                 <div className="text-xs mt-2 space-x-2">
-                    <span className="text-mew-textMuted">escape to <span onClick={onCancel} className="text-mew-accent hover:underline cursor-pointer">cancel</span></span>
+                    <span className="text-mew-textMuted">{t('message.editor.escapeTo')} <span onClick={onCancel} className="text-mew-accent hover:underline cursor-pointer">{t('common.cancel')}</span></span>
                     <span className="text-mew-textMuted">•</span>
-                    <span className="text-mew-textMuted">enter to <span onClick={handleEdit} className="text-mew-accent hover:underline cursor-pointer">save</span></span>
+                    <span className="text-mew-textMuted">{t('message.editor.enterTo')} <span onClick={handleEdit} className="text-mew-accent hover:underline cursor-pointer">{t('server.settings.save')}</span></span>
                 </div>
             </div>
         </div>

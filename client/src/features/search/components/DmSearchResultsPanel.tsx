@@ -3,8 +3,10 @@ import clsx from 'clsx';
 import { useUIStore } from '../../../shared/stores';
 import { SearchResultItem } from './SearchResultItem';
 import { useChannelMessageSearch } from '../hooks/useChannelMessageSearch';
+import { useI18n } from '../../../shared/i18n';
 
 export const DmSearchResultsPanel = () => {
+  const { t } = useI18n();
   const { currentChannelId, dmSearchQuery, isDmSearchOpen, setDmSearchOpen, setTargetMessageId } = useUIStore();
 
   const { data: searchData, isLoading } = useChannelMessageSearch(currentChannelId, dmSearchQuery, isDmSearchOpen);
@@ -28,7 +30,7 @@ export const DmSearchResultsPanel = () => {
     )}>
       <div className="h-12 flex items-center px-4 border-b border-[#1E1F22] flex-shrink-0 bg-[#2B2D31]/50 md:bg-[#2B2D31] shadow-sm">
         <span className="font-bold text-mew-textMuted uppercase text-xs flex-1">
-            {dmSearchQuery ? 'Results' : 'Search DM'}
+            {dmSearchQuery ? t('search.results') : t('search.dmTitle')}
         </span>
         <button 
             onClick={() => setDmSearchOpen(false)} 
@@ -42,7 +44,7 @@ export const DmSearchResultsPanel = () => {
         {isLoading && (
           <div className="flex flex-col items-center justify-center mt-20 text-mew-textMuted">
             <Icon icon="mdi:loading" className="animate-spin mb-3" width="32" />
-            <span className="text-sm font-medium">Searching...</span>
+            <span className="text-sm font-medium">{t('search.searching')}</span>
           </div>
         )}
 
@@ -51,7 +53,7 @@ export const DmSearchResultsPanel = () => {
             <div className="w-16 h-16 bg-[#1E1F22] rounded-full flex items-center justify-center mb-4">
                 <Icon icon="mdi:text-search-variant" className="opacity-50" width="32" />
             </div>
-            <span className="text-sm">No results found for <span className="font-bold text-white">&quot;{dmSearchQuery}&quot;</span></span>
+            <span className="text-sm">{t('search.noResultsFor', { query: dmSearchQuery })}</span>
           </div>
         )}
 
@@ -60,13 +62,13 @@ export const DmSearchResultsPanel = () => {
             <div className="w-16 h-16 bg-[#1E1F22] rounded-full flex items-center justify-center mb-4">
                 <Icon icon="mdi:magnify" className="opacity-50" width="32" />
             </div>
-            <span className="text-sm">Search history in this conversation.</span>
+            <span className="text-sm">{t('search.hintDm')}</span>
           </div>
         )}
 
         {!isLoading && messages.length > 0 && (
           <div className="space-y-2 pb-safe-bottom">
-            <div className="text-xs font-bold text-mew-textMuted uppercase mb-2 px-2">{messages.length} Results</div>
+            <div className="text-xs font-bold text-mew-textMuted uppercase mb-2 px-2">{t('search.resultsCount', { count: messages.length })}</div>
             {messages.map((msg) => (
               <SearchResultItem
                 key={msg._id}

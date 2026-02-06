@@ -1,22 +1,24 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { useUIStore, useAuthStore, useNotificationSettingsStore } from '../../../shared/stores';
+import { useUIStore, useNotificationSettingsStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { userApi } from '../../../shared/services/api';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { EditDisplayNameModal } from '../modals/EditDisplayNameModal';
 import { ChangePasswordModal } from '../modals/ChangePasswordModal';
 import { BotManagementPanel } from './BotManagementPanel';
-import { PluginManagementPanel } from './PluginManagementPanel';
 import { UserStickerPanel } from './UserStickerPanel';
 import { UserSettingsSidebar } from './UserSettingsSidebar';
 import { UserSettingsAccountTab } from './UserSettingsAccountTab';
 import { UserSettingsNotificationsTab } from './UserSettingsNotificationsTab';
 import type { SettingsTab } from '../../../shared/router/settingsRoute';
+import { useI18n } from '../../../shared/i18n';
 
 const UserSettings: React.FC = () => {
+    const { t } = useI18n();
     const { isSettingsOpen, closeSettings, settingsTab: activeTab, selectSettingsTab } = useUIStore();
     const { user, logout, setUser, status } = useAuthStore();
     const notif = useNotificationSettingsStore((s) => s.user);
@@ -33,6 +35,42 @@ const UserSettings: React.FC = () => {
     const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
     const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+    const [displayedTab, setDisplayedTab] = useState<SettingsTab>(activeTab);
+    const [tabTransition, setTabTransition] = useState<'idle' | 'out' | 'in'>('idle');
+    const [tabDirection, setTabDirection] = useState<'forward' | 'backward'>('forward');
+
+    useEffect(() => {
+        if (!isSettingsOpen) return;
+        const tabOrder: SettingsTab[] = ['account', 'stickers', 'notifications', 'bots', 'plugins'];
+        if (activeTab === displayedTab) return;
+
+        const currentIndex = tabOrder.indexOf(displayedTab);
+        const nextIndex = tabOrder.indexOf(activeTab);
+        const isForward = nextIndex >= currentIndex;
+
+        setTabDirection(isForward ? 'forward' : 'backward');
+        setTabTransition('out');
+
+        const switchTimer = window.setTimeout(() => {
+            setDisplayedTab(activeTab);
+            setTabTransition('in');
+        }, 140);
+
+        const settleTimer = window.setTimeout(() => {
+            setTabTransition('idle');
+        }, 320);
+
+        return () => {
+            window.clearTimeout(switchTimer);
+            window.clearTimeout(settleTimer);
+        };
+    }, [activeTab, displayedTab, isSettingsOpen]);
+
+    useEffect(() => {
+        if (!isSettingsOpen) return;
+        setDisplayedTab(activeTab);
+        setTabTransition('idle');
+    }, [isSettingsOpen]);
 
     if (!isSettingsOpen) return null;
 
@@ -51,7 +89,7 @@ const UserSettings: React.FC = () => {
         if (!file) return;
 
         if (file.size > 50 * 1024 * 1024) {
-            toast.error("Image size must be less than 50MB");
+            toast.error(t('toast.imageSizeLimit'));
             return;
         }
 
@@ -78,11 +116,11 @@ const UserSettings: React.FC = () => {
         try {
             const res = await userApi.updateProfile(formData);
             setUser(res.data);
-            toast.success("Avatar updated!");
+            toast.success(t('toast.avatarUpdated'));
             cancelUpload();
         } catch (error) {
             console.error(error);
-            toast.error(getApiErrorMessage(error, 'Failed to update avatar'));
+            toast.error(getApiErrorMessage(error, t('toast.updateAvatarFailed')));
         } finally {
             setIsUploading(false);
         }
@@ -96,11 +134,11 @@ const UserSettings: React.FC = () => {
         try {
             const res = await userApi.updateProfile({ username: newUsername.trim() });
             setUser(res.data);
-            toast.success("Username updated!");
+            toast.success(t('toast.usernameUpdated'));
             setIsEditUsernameModalOpen(false);
         } catch (error) {
             console.error(error);
-            toast.error(getApiErrorMessage(error, 'Failed to update username'));
+            toast.error(getApiErrorMessage(error, t('toast.updateUsernameFailed')));
         } finally {
             setIsUpdatingUsername(false);
         }
@@ -110,11 +148,11 @@ const UserSettings: React.FC = () => {
         setIsUpdatingPassword(true);
         try {
             await userApi.changePassword(passwords);
-            toast.success("Password updated successfully!");
+            toast.success(t('toast.passwordUpdated'));
             setIsChangePasswordModalOpen(false);
         } catch (error) {
             console.error(error);
-            const message = getApiErrorMessage(error, 'Failed to update password');
+            const message = getApiErrorMessage(error, t('toast.updatePasswordFailed'));
             toast.error(message);
             throw new Error(message);
         } finally {
@@ -131,7 +169,7 @@ const UserSettings: React.FC = () => {
             setNotif(settings);
             setUser({ ...user, notificationSettings: settings });
         } catch (error) {
-            toast.error(getApiErrorMessage(error, 'Failed to update notification settings'));
+            toast.error(getApiErrorMessage(error, t('toast.updateNotificationFailed')));
             throw error;
         } finally {
             setIsUpdatingNotifications(false);
@@ -144,7 +182,7 @@ const UserSettings: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans selection:bg-mew-accent selection:text-white">
+        <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in settings-shell-enter text-mew-text font-sans selection:bg-mew-accent selection:text-white">
 
             {/* Sidebar (Left) */}
             <UserSettingsSidebar
@@ -157,7 +195,8 @@ const UserSettings: React.FC = () => {
 
             {/* Main Content (Center) */}
             <div className={clsx(
-                "flex-1 bg-[#313338] pt-0 md:pt-[60px] px-0 md:px-10 max-w-full md:max-w-[740px] overflow-y-auto custom-scrollbar flex flex-col h-full",
+                "flex-1 bg-[#313338] flex flex-col h-full min-w-0", // min-w-0 prevents flex items from overflowing
+                "settings-main-enter",
                 !mobileMenuOpen ? "flex" : "hidden md:flex"
             )}>
 
@@ -169,70 +208,74 @@ const UserSettings: React.FC = () => {
                     >
                         <Icon icon="mdi:arrow-left" width="24" />
                     </button>
-                    <span className="font-bold text-lg text-white capitalize">
-                        {activeTab === 'account' ? 'My Account' : activeTab}
+                    <span key={activeTab} className="font-bold text-lg text-white capitalize animate-fade-in">
+                        {activeTab === 'account' ? t('settings.myAccount') : t(`settings.${activeTab}`)}
                     </span>
                 </div>
 
-                <div className="p-4 md:p-0 pb-10">
-                    {activeTab === 'account' && (
-                        <UserSettingsAccountTab
-                            user={user}
-                            isUploading={isUploading}
-                            fileInputRef={fileInputRef}
-                            onAvatarClick={handleAvatarClick}
-                            onAvatarFileChange={handleFileChange}
-                            onEditDisplayName={() => setIsEditUsernameModalOpen(true)}
-                            onChangePassword={() => setIsChangePasswordModalOpen(true)}
-                        />
-                    )}
+                <div className="flex-1 overflow-y-auto discord-scrollbar px-4 md:px-10 pt-4 md:pt-[60px] pb-10">
+                    <div
+                        className={clsx(
+                            "max-w-full md:max-w-[740px]",
+                            tabTransition === 'out' && tabDirection === 'forward' && 'settings-tab-out-left',
+                            tabTransition === 'out' && tabDirection === 'backward' && 'settings-tab-out-right',
+                            tabTransition === 'in' && tabDirection === 'forward' && 'settings-tab-in-right',
+                            tabTransition === 'in' && tabDirection === 'backward' && 'settings-tab-in-left'
+                        )}
+                    >
+                        {displayedTab === 'account' && (
+                            <UserSettingsAccountTab
+                                user={user}
+                                isUploading={isUploading}
+                                fileInputRef={fileInputRef}
+                                onAvatarClick={handleAvatarClick}
+                                onAvatarFileChange={handleFileChange}
+                                onEditDisplayName={() => setIsEditUsernameModalOpen(true)}
+                                onChangePassword={() => setIsChangePasswordModalOpen(true)}
+                            />
+                        )}
 
-                    {activeTab === 'plugins' && <PluginManagementPanel />}
-                    {activeTab === 'bots' && <BotManagementPanel />}
-                    {activeTab === 'stickers' && <UserStickerPanel />}
+                        {(displayedTab === 'bots' || displayedTab === 'plugins') && <BotManagementPanel />}
+                        {displayedTab === 'stickers' && <UserStickerPanel />}
 
-                    {/* 
-                     * =========================================
-                     * NOTIFICATION TAB (Updated & Discord-styled)
-                     * =========================================
-                     */}
-                    {activeTab === 'notifications' && (
-                        <UserSettingsNotificationsTab
-                            notif={notif}
-                            isUpdatingNotifications={isUpdatingNotifications}
-                            setNotif={setNotif}
-                            persistNotificationSettings={persistNotificationSettings}
-                        />
-                    )}
+                        {displayedTab === 'notifications' && (
+                            <UserSettingsNotificationsTab
+                                notif={notif}
+                                isUpdatingNotifications={isUpdatingNotifications}
+                                setNotif={setNotif}
+                                persistNotificationSettings={persistNotificationSettings}
+                            />
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* Close Button Column (Right) - Desktop Only */}
-            <div className="hidden md:block w-[18%] min-w-[60px] pt-[60px] pl-5">
+            <div className="hidden md:block w-[18%] min-w-[60px] max-w-[200px] pt-[60px] pl-5 settings-close-enter">
                 <div
-                    className="flex flex-col items-center cursor-pointer group"
+                    className="flex flex-col items-center cursor-pointer group sticky top-[60px]"
                     onClick={closeSettings}
                 >
                     <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
                         <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />
                     </div>
-                    <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
+                    <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">{t('settings.esc')}</span>
                 </div>
             </div>
 
             {pendingFile && (
                 <ConfirmModal
-                    title="Change Avatar"
-                    description="Are you sure you want to use this image as your new avatar?"
+                    title={t('confirm.changeAvatarTitle')}
+                    description={t('confirm.changeAvatarDesc')}
                     onConfirm={confirmUpload}
                     onCancel={cancelUpload}
-                    confirmText="Apply"
+                    confirmText={t('common.apply')}
                     isLoading={isUploading}
                     isDestructive={false}
                 >
                     <div className="flex justify-center my-6">
                         <div className="w-32 h-32 rounded-full overflow-hidden ring-4 ring-mew-accent/50 shadow-xl">
-                            <img src={previewUrl || ''} className="w-full h-full object-cover" alt="Preview" />
+                            <img src={previewUrl || ''} className="w-full h-full object-cover" alt={t('modal.preview')} />
                         </div>
                     </div>
                 </ConfirmModal>
@@ -257,3 +300,4 @@ const UserSettings: React.FC = () => {
 };
 
 export default UserSettings;
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { Icon } from '@iconify/react';
 import type { Message } from '../../../shared/types';
 import MessageContent from './MessageContent';
+import { useI18n } from '../../../shared/i18n';
 
 interface ForwardCardProps {
   payload: any;
@@ -10,13 +11,14 @@ interface ForwardCardProps {
 }
 
 export const ForwardCard: React.FC<ForwardCardProps> = ({ payload, serverId, channelId }) => {
+  const { t } = useI18n();
   const forwardedFromLabel = payload?.forwardedFromLabel as string | undefined;
   const forwardedMessage = payload?.forwardedMessage as Partial<Message> | undefined;
 
   if (!forwardedMessage) return null;
 
   const author = (forwardedMessage as any).author as any;
-  const authorName = author?.username || 'Unknown';
+  const authorName = author?.username || t('common.unknown');
   const avatarUrl = author?.avatar; // 假设有 avatar 字段，如果没有可忽略
 
   return (
@@ -25,10 +27,10 @@ export const ForwardCard: React.FC<ForwardCardProps> = ({ payload, serverId, cha
       <div className="flex items-center gap-1.5 text-[0.75rem] font-medium text-[#949BA4] select-none ml-1">
         <Icon icon="mdi:forward" width="14" className="opacity-70" />
         <span>
-          Forwarded
+          {t('forward.forwarded')}
           {forwardedFromLabel && (
             <>
-              <span className="mx-1">from</span>
+              <span className="mx-1">{t('forward.from')}</span>
               <span className="text-[#DBDEE1] hover:underline cursor-pointer transition-colors">
                 {forwardedFromLabel}
               </span>

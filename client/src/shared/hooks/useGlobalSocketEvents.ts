@@ -2,7 +2,8 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { getSocket } from '../services/socket';
 import { Channel, Message } from '../types';
-import { useHiddenStore, useUnreadStore, useAuthStore, useUIStore, useNotificationSettingsStore } from '../stores';
+import { useHiddenStore, useUnreadStore, useUIStore, useNotificationSettingsStore } from '../stores';
+import { useAuthStore } from '../stores/authStore';
 import { playMessageSound, showDesktopNotification } from '../services/notifications';
 
 export const useGlobalSocketEvents = () => {
@@ -142,3 +143,4 @@ export const useGlobalSocketEvents = () => {
     };
   }, [queryClient]);
 };
+

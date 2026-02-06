@@ -1,4 +1,5 @@
-import { useAuthStore, useUIStore } from '../stores';
+import { useUIStore } from '../stores';
+import { useAuthStore } from '../stores/authStore';
 import { useMemo } from 'react';
 import { ALL_PERMISSIONS } from '../constants/permissions';
 import { useMembers } from './useMembers';
@@ -47,3 +48,4 @@ export const useServerPermissions = (): { permissions: Set<string>; isOwner: boo
 
   return serverPermissions;
 };
+

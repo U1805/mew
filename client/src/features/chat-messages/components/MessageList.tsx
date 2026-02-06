@@ -5,10 +5,12 @@ import TimestampDivider from './TimestampDivider';
 import { formatDividerTimestamp } from '../../../shared/utils/date';
 import { isSameDay } from 'date-fns';
 import { Message, Channel, ChannelType, User } from '../../../shared/types';
-import { useAuthStore, useUIStore, useUnreadStore } from '../../../shared/stores';
+import { useUIStore, useUnreadStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { channelApi } from '../../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBots } from '../../users/hooks/useBots';
+import { useI18n } from '../../../shared/i18n';
 
 interface MessageListProps {
   messages: Message[];
@@ -34,6 +36,7 @@ const MessageList: React.FC<MessageListProps> = ({
   channel,
   channelId,
 }) => {
+  const { t } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -281,15 +284,15 @@ const MessageList: React.FC<MessageListProps> = ({
                             )}
                         </div>
                         <h1 className="text-3xl font-bold text-white mb-2">{otherUser.username}</h1>
-                        <p className="text-mew-textMuted">This is the beginning of your direct message history with <span className="font-semibold text-white">@{otherUser.username}</span>.</p>
+                        <p className="text-mew-textMuted">{t('messageList.dmBeginning', { name: otherUser.username })}</p>
                       </>
                   ) : (
                       <>
                         <div className="w-16 h-16 bg-mew-darker rounded-full flex items-center justify-center mb-4">
                             <Icon icon="mdi:pound" width="40" height="40" className="text-white" />
                         </div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Welcome to #{channel?.name || 'channel'}!</h1>
-                        <p className="text-mew-textMuted">This is the start of the #{channel?.name || 'channel'} channel.</p>
+                        <h1 className="text-3xl font-bold text-white mb-2">{t('messageList.welcome', { name: channel?.name || t('notification.channel.unnamed') })}</h1>
+                        <p className="text-mew-textMuted">{t('messageList.channelBeginning', { name: channel?.name || t('notification.channel.unnamed') })}</p>
                       </>
                   )}
                 </div>
@@ -328,7 +331,7 @@ const MessageList: React.FC<MessageListProps> = ({
       {showScrollToBottom && !isLoading && (
         <button
           type="button"
-          aria-label="Scroll to bottom"
+          aria-label={t('messageList.scrollToBottom')}
           className="absolute bottom-4 right-4 z-[2] h-11 w-11 rounded-full bg-[#1E1F22]/90 hover:bg-[#1E1F22] text-white/80 hover:text-white flex items-center justify-center shadow-xl border border-white/10 backdrop-blur-sm transition-colors"
           onClick={(e) => {
             e.preventDefault();
@@ -345,3 +348,4 @@ const MessageList: React.FC<MessageListProps> = ({
 };
 
 export default MessageList;
+

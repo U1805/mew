@@ -1,5 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
+import { useI18n } from '../i18n';
 
 interface ConfirmModalProps {
   title: string;
@@ -17,8 +18,8 @@ interface ConfirmModalProps {
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   title,
   description,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText,
+  cancelText,
   onConfirm,
   onCancel,
   isLoading = false,
@@ -26,6 +27,8 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isDestructive = true,
   children
 }) => {
+  const { t } = useI18n();
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in sm:p-0">
       <div className="bg-[#313338] w-full sm:w-full sm:max-w-md rounded-t-lg sm:rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[85vh] sm:max-h-[80vh]">
@@ -46,7 +49,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             disabled={isLoading}
             className="text-white hover:underline text-sm font-medium px-4"
           >
-            {cancelText}
+            {cancelText || t('common.cancel')}
           </button>
           <button
             onClick={onConfirm}
@@ -59,7 +62,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               (isLoading || confirmDisabled) && "opacity-50 cursor-not-allowed"
             )}
           >
-            {isLoading ? 'Processing...' : confirmText}
+            {isLoading ? t('common.processing') : confirmText || t('common.confirm')}
           </button>
         </div>
       </div>

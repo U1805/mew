@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type MouseEvent, type TouchEvent } from 'react';
 import { Icon } from '@iconify/react';
 import toast from 'react-hot-toast';
+import { useI18n } from '../../../shared/i18n';
 
 interface ImageEditorProps {
   src: string;
@@ -10,6 +11,7 @@ interface ImageEditorProps {
 }
 
 export const AttachmentImageEditor = ({ src, initialRotation, onCancel, onSend }: ImageEditorProps) => {
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [context, setContext] = useState<CanvasRenderingContext2D | null>(null);
@@ -110,7 +112,7 @@ export const AttachmentImageEditor = ({ src, initialRotation, onCancel, onSend }
     if (!canvas) return;
     canvas.toBlob((blob) => {
       if (blob) onSend(blob);
-      else toast.error("Failed to generate image data.");
+      else toast.error(t('imageEditor.generateFailed'));
     }, 'image/png');
   };
 
@@ -119,12 +121,12 @@ export const AttachmentImageEditor = ({ src, initialRotation, onCancel, onSend }
       <div className="h-14 w-full bg-[#111214] flex items-center justify-between px-6 border-b border-white/5 shrink-0 animate-fade-in-up z-10 shadow-md">
         <div className="flex items-center gap-2">
           <Icon icon="mdi:pencil" className="text-mew-accent" width="20" />
-          <span className="font-bold text-white text-sm">Editor Mode</span>
+          <span className="font-bold text-white text-sm">{t('imageEditor.mode')}</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 mr-4 bg-[#1E1F22] px-3 py-1 rounded-full border border-white/5">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></div>
-            <span className="text-xs text-mew-textMuted font-medium">Freehand</span>
+            <span className="text-xs text-mew-textMuted font-medium">{t('imageEditor.freehand')}</span>
           </div>
         </div>
       </div>
@@ -150,7 +152,7 @@ export const AttachmentImageEditor = ({ src, initialRotation, onCancel, onSend }
           onClick={onCancel}
           className="text-mew-textMuted hover:text-white text-sm font-medium px-4 py-2 rounded hover:bg-white/5 transition-colors"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
 
         <div className="flex items-center gap-4">
@@ -159,14 +161,14 @@ export const AttachmentImageEditor = ({ src, initialRotation, onCancel, onSend }
             className="bg-[#2B2D31] hover:bg-[#35373C] text-white px-5 py-2.5 rounded shadow-lg border border-white/5 text-sm font-semibold transition-all flex items-center gap-2"
           >
             <Icon icon="mdi:download" />
-            Save to Device
+            {t('imageEditor.saveToDevice')}
           </button>
           <button
             onClick={handleSendAction}
             className="bg-mew-accent hover:bg-mew-accentHover text-white px-6 py-2.5 rounded shadow-lg shadow-mew-accent/20 text-sm font-semibold transition-all flex items-center gap-2 transform active:scale-95"
           >
             <Icon icon="mdi:send" />
-            Send to Channel
+            {t('imageEditor.sendToChannel')}
           </button>
         </div>
       </div>

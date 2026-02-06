@@ -5,14 +5,17 @@ import clsx from 'clsx';
 import { format } from 'date-fns';
 import { User } from '../../../shared/types';
 import { channelApi } from '../../../shared/services/api';
-import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores';
+import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUser } from '../hooks/useUser';
 import { formatUserTag } from '../../../shared/utils/userTag';
+import { useI18n } from '../../../shared/i18n';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
   const { user: currentUser } = useAuthStore();
+  const { t } = useI18n();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +41,7 @@ export const UserProfileModal: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['dmChannels'] });
         closeModal();
     } catch (error) {
-        console.error("Failed to create DM", error);
+        console.error('Failed to create DM', error);
     } finally {
         setIsLoading(false);
     }
@@ -46,7 +49,7 @@ export const UserProfileModal: React.FC = () => {
 
   const joinedDate = user.createdAt && !isNaN(new Date(user.createdAt).getTime()) 
     ? format(new Date(user.createdAt), 'MMM d, yyyy') 
-    : 'Unknown';
+    : t('common.unknown');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
@@ -74,7 +77,7 @@ export const UserProfileModal: React.FC = () => {
                           disabled={isLoading}
                           className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors"
                         >
-                            Send Message
+                            {t('user.profile.sendMessage')}
                         </button>
                       )}
                       <button
@@ -92,13 +95,13 @@ export const UserProfileModal: React.FC = () => {
                      <div className="h-[1px] bg-mew-divider mb-3"></div>
 
                      <div className="mb-3">
-                         <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Member Since</div>
+                         <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">{t('user.profile.memberSince')}</div>
                          <div className="text-sm text-mew-text">{joinedDate}</div>
                      </div>
 
                      <div>
-                         <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Note</div>
-                         <input type="text" placeholder="Click to add a note" className="w-full bg-transparent text-xs text-white placeholder-mew-textMuted focus:outline-none" />
+                         <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">{t('user.profile.note')}</div>
+                         <input type="text" placeholder={t('user.profile.notePlaceholder')} className="w-full bg-transparent text-xs text-white placeholder-mew-textMuted focus:outline-none" />
                      </div>
                  </div>
              </div>
@@ -106,3 +109,4 @@ export const UserProfileModal: React.FC = () => {
     </div>
   )
 }
+

@@ -1,20 +1,29 @@
 import { Icon } from '@iconify/react';
 import { useModalStore } from '../../../shared/stores';
 import { useBots } from '../hooks/useBots';
+import { useI18n } from '../../../shared/i18n';
+import { BotServiceStatusPanel } from './PluginManagementPanel';
 
 export const BotManagementPanel = () => {
   const { openModal } = useModalStore();
+  const { t } = useI18n();
   const { data: bots, isLoading } = useBots();
 
   return (
     <div className="animate-fade-in pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-white">My Bots</h2>
+      <BotServiceStatusPanel
+        title={t('bot.management.serviceStatusTitle')}
+        subtitle={t('plugin.subtitle')}
+        className="mb-10"
+      />
+
+      <div className="flex items-center justify-between mb-6 border-t border-[#26272D] pt-6">
+        <h2 className="text-xl font-bold text-white">{t('bot.management.title')}</h2>
         <button
           onClick={() => openModal('manageBot')}
           className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors"
         >
-          Create Bot
+          {t('bot.management.create')}
         </button>
       </div>
 
@@ -27,15 +36,15 @@ export const BotManagementPanel = () => {
           <div className="w-16 h-16 bg-[#1E1F22] rounded-full flex items-center justify-center mx-auto mb-4">
             <Icon icon="mdi:robot-outline" className="text-mew-textMuted" width="32" />
           </div>
-          <h3 className="text-white font-bold mb-2">No bots yet</h3>
+          <h3 className="text-white font-bold mb-2">{t('bot.management.emptyTitle')}</h3>
           <p className="text-mew-textMuted text-sm mb-4 max-w-sm mx-auto">
-            Create a bot to automate tasks, moderate your server, or just for fun.
+            {t('bot.management.emptyDesc')}
           </p>
           <button
             onClick={() => openModal('manageBot')}
             className="text-mew-accent hover:underline text-sm font-medium"
           >
-            Create your first bot
+            {t('bot.management.createFirst')}
           </button>
         </div>
       ) : (
@@ -56,12 +65,12 @@ export const BotManagementPanel = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-white font-bold">{bot.name}</h3>
-                    <span className="text-[10px] bg-[#5865F2] text-white px-1.5 py-0.5 rounded uppercase font-bold">BOT</span>
+                    <span className="text-[10px] bg-[#5865F2] text-white px-1.5 py-0.5 rounded uppercase font-bold">{t('message.bot.bot')}</span>
                   </div>
                   <div className="text-xs text-mew-textMuted mt-0.5 flex items-center gap-3">
                     <span>{bot.serviceType}</span>
                     <span className="w-1 h-1 bg-mew-textMuted rounded-full"></span>
-                    <span>{bot.dmEnabled ? 'DM Enabled' : 'DM Disabled'}</span>
+                    <span>{bot.dmEnabled ? t('bot.management.dmEnabled') : t('bot.management.dmDisabled')}</span>
                   </div>
                 </div>
               </div>
@@ -69,7 +78,7 @@ export const BotManagementPanel = () => {
                 onClick={() => openModal('manageBot', { bot })}
                 className="bg-[#1E1F22] hover:bg-[#111214] text-white px-4 py-2 rounded text-sm font-medium transition-colors"
               >
-                Edit
+                {t('common.edit')}
               </button>
             </div>
           ))}

@@ -17,10 +17,12 @@ import { ChannelSettingsIntegrationsTab } from '../../channel-settings/component
 import { makeEmptyOverride, type DisplayOverride, type PermissionState } from '../../channel-settings/model/constants';
 import { ChannelSettingsPermissionsTab } from '../../channel-settings/components/ChannelSettingsPermissionsTab';
 import { ChannelType } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
 
 export const ChannelSettingsModal = () => {
   const { closeModal, modalData, openModal } = useModalStore();
   const { currentServerId } = useUIStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState('');
@@ -49,11 +51,11 @@ export const ChannelSettingsModal = () => {
       mutationFn: (overrides: PermissionOverride[]) =>
           channelApi.updatePermissionOverrides(currentServerId!, channelId!, overrides),
       onSuccess: () => {
-          toast.success('Permissions updated!');
+          toast.success(t('channel.settings.permissionsUpdated'));
           queryClient.invalidateQueries({ queryKey: ['permissionOverrides', channelId] });
       },
       onError: (err: any) => {
-          toast.error(err.response?.data?.message || 'Failed to update permissions.');
+          toast.error(err.response?.data?.message || t('channel.settings.permissionsUpdateFailed'));
       }
   });
 
@@ -214,6 +216,17 @@ export const ChannelSettingsModal = () => {
       setMobilePermissionEditOpen(true);
   }
 
+  const tabLabelMap: Record<ChannelSettingsTab, string> = {
+    overview: t('channel.settings.overview'),
+    permissions: t('channel.settings.permissions'),
+    integrations: t('channel.settings.integrations'),
+  };
+
+  const channelTypeLabel =
+    modalData?.channel?.type === ChannelType.GUILD_WEB
+      ? t('channel.settings.channelTypeWeb')
+      : t('channel.settings.channelTypeText');
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[#313338] animate-fade-in text-mew-text font-sans">
          
@@ -221,8 +234,8 @@ export const ChannelSettingsModal = () => {
          <ChannelSettingsSidebar
              title={
                <>
-                 {modalData?.channel?.name || 'CHANNEL'}{' '}
-                 {modalData?.channel?.type === ChannelType.GUILD_WEB ? 'WEB' : 'TEXT'} CHANNEL
+                 {modalData?.channel?.name || t('channel.settings.channelFallback')}{' '}
+                 {channelTypeLabel} {t('channel.settings.channelSuffix')}
                </>
              }
              activeTab={activeTab}
@@ -248,7 +261,7 @@ export const ChannelSettingsModal = () => {
                     <Icon icon="mdi:arrow-left" width="24" />
                 </button>
                 <span className="font-bold text-lg text-white capitalize">
-                    {activeTab}
+                    {tabLabelMap[activeTab]}
                 </span>
             </div>
 
@@ -300,7 +313,7 @@ export const ChannelSettingsModal = () => {
                  <div className="w-9 h-9 rounded-full border-[2px] border-mew-textMuted group-hover:bg-mew-textMuted/20 flex items-center justify-center transition-colors mb-1">
                      <Icon icon="mdi:close" className="text-mew-textMuted group-hover:text-white" width="24" height="24" />
                  </div>
-                 <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">ESC</span>
+                 <span className="text-xs font-bold text-mew-textMuted group-hover:text-white transition-colors">{t('settings.esc')}</span>
              </div>
          </div>
     </div>

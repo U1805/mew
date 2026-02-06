@@ -2,6 +2,7 @@ import { Suspense, lazy, type ReactNode } from 'react';
 import { ConfirmModal } from '../../shared/components/ConfirmModal';
 import { useModalStore } from '../../shared/stores';
 import type { ModalType } from '../../shared/stores/modalStore';
+import { useI18n } from '../../shared/i18n';
 
 const modals = {
   createServer: lazy(() => import('../../features/server/modals/CreateServerModal').then(m => ({ default: m.CreateServerModal }))),
@@ -29,6 +30,7 @@ const modals = {
 } satisfies Record<Exclude<ModalType, 'confirm'>, ReturnType<typeof lazy>>;
 
 const ModalManager = () => {
+  const { t } = useI18n();
   const { activeModal, modalData, closeModal } = useModalStore();
 
   if (!activeModal) return null;
@@ -48,7 +50,7 @@ const ModalManager = () => {
 
     return (
       <ConfirmModal
-        title={data.title ?? 'Confirm'}
+        title={data.title ?? t('common.confirm')}
         description={data.description ?? ''}
         confirmText={data.confirmText}
         cancelText={data.cancelText}

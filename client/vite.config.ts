@@ -9,11 +9,28 @@ export default defineConfig(() => {
           output: {
             manualChunks(id) {
               if (!id.includes('node_modules')) return;
-              if (id.includes('@tiptap')) return 'tiptap';
+              const moduleId = id.replace(/\\/g, '/');
+
+              if (moduleId.includes('/react/') || moduleId.includes('/react-dom/') || moduleId.includes('/scheduler/')) {
+                return 'react-vendor';
+              }
+              if (moduleId.includes('@tiptap') || moduleId.includes('/prosemirror-')) return 'tiptap';
               if (id.includes('@tanstack')) return 'tanstack';
               if (id.includes('socket.io-client')) return 'socket';
+              if (moduleId.includes('engine.io-client') || moduleId.includes('engine.io-parser') || moduleId.includes('socket.io-parser')) return 'socket';
               if (id.includes('@iconify')) return 'iconify';
               if (id.includes('marked') || id.includes('dompurify')) return 'markdown';
+              if (moduleId.includes('/date-fns/')) return 'date-fns';
+              if (moduleId.includes('/axios/')) return 'axios';
+              if (
+                moduleId.includes('@radix-ui/') ||
+                moduleId.includes('@floating-ui/') ||
+                moduleId.includes('react-remove-scroll') ||
+                moduleId.includes('@popperjs/core') ||
+                moduleId.includes('/tippy.js/')
+              ) {
+                return 'ui-vendor';
+              }
               return 'vendor';
             },
           },

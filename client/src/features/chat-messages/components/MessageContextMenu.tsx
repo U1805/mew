@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { useI18n } from '../../../shared/i18n';
 
 const PRESET_EMOJIS = [
   '👍',
@@ -64,6 +65,7 @@ export const MessageContextMenu = ({
   onTranscribeVoice,
   onDelete,
 }: MessageContextMenuProps) => {
+  const { t } = useI18n();
   const disabled = isRetracted;
 
   const itemClass = useMemo(
@@ -86,7 +88,7 @@ export const MessageContextMenu = ({
             <ContextMenu.SubTrigger className={itemClass} disabled={disabled}>
               <span className="flex items-center gap-2">
                 <Icon icon="mdi:emoticon-plus-outline" width="18" />
-                Add Reaction
+                {t('message.menu.addReaction')}
               </span>
               <Icon icon="mdi:chevron-right" width="16" />
             </ContextMenu.SubTrigger>
@@ -127,7 +129,7 @@ export const MessageContextMenu = ({
         >
           <span className="flex items-center gap-2">
             <Icon icon="mdi:reply" width="18" />
-            Reply
+            {t('message.menu.reply')}
           </span>
         </ContextMenu.Item>
 
@@ -140,7 +142,7 @@ export const MessageContextMenu = ({
         >
           <span className="flex items-center gap-2">
             <Icon icon="mdi:reply" width="18" style={{ transform: 'scaleX(-1)' }} />
-            Forward
+            {t('message.menu.forward')}
           </span>
         </ContextMenu.Item>
 
@@ -155,7 +157,7 @@ export const MessageContextMenu = ({
         >
           <span className="flex items-center gap-2">
             <Icon icon="mdi:content-copy" width="18" />
-            Copy Message
+            {t('message.menu.copyMessage')}
           </span>
         </ContextMenu.Item>
 
@@ -163,7 +165,7 @@ export const MessageContextMenu = ({
           <ContextMenu.SubTrigger className={itemClass} disabled={disabled}>
             <span className="flex items-center gap-2">
               <Icon icon="mdi:puzzle-outline" width="18" />
-              APP
+              {t('message.menu.app')}
             </span>
             <Icon icon="mdi:chevron-right" width="16" />
           </ContextMenu.SubTrigger>
@@ -179,7 +181,7 @@ export const MessageContextMenu = ({
                 >
                   <span className="flex items-center gap-2">
                     <Icon icon="mdi:text-recognition" width="18" />
-                    Transcribe
+                    {t('message.menu.transcribe')}
                   </span>
                 </ContextMenu.Item>
               )}
@@ -194,7 +196,7 @@ export const MessageContextMenu = ({
                 >
                   <span className="flex items-center gap-2">
                     <Icon icon="mdi:send" width="18" />
-                    Send to jpdict
+                    {t('message.menu.sendToJpdict')}
                   </span>
                 </ContextMenu.Item>
               ): (<></>)}
@@ -208,7 +210,7 @@ export const MessageContextMenu = ({
               >
                 <span className="flex items-center gap-2">
                   <Icon icon="mdi:volume-high" width="18" />
-                  Speak the text
+                  {t('message.menu.speakText')}
                 </span>
               </ContextMenu.Item>
             </ContextMenu.SubContent>
@@ -225,7 +227,7 @@ export const MessageContextMenu = ({
           >
             <span className="flex items-center gap-2">
               <Icon icon="mdi:trash-can-outline" width="18" />
-              Delete Message
+              {t('message.delete.title')}
             </span>
           </ContextMenu.Item>
         )}

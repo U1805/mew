@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import { format } from 'date-fns';
 import type { Attachment, MessagePayload } from '../../../shared/types';
 import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
+import { useI18n } from '../../../shared/i18n';
 
 function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -81,6 +82,7 @@ interface InstagramCardProps {
 }
 
 export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
+  const { t } = useI18n();
   const id = safeString((payload as any).id);
   const username = safeString((payload as any).username);
   const fullName = safeString((payload as any).full_name);
@@ -145,7 +147,7 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="font-semibold text-mew-text truncate">
-                    {fullName || (username ? `@${username}` : 'Instagram')}
+                    {fullName || (username ? `@${username}` : t('instagram.nameFallback'))}
                   </span>
                   {isVerified && (
                     <span className="inline-flex items-center justify-center h-4 w-4 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/25 shrink-0">
@@ -165,9 +167,9 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
                   rel="noopener noreferrer"
                   className="ml-auto inline-flex items-center gap-1 text-xs text-mew-textMuted hover:text-mew-text transition-colors shrink-0"
                   onClick={(e) => e.stopPropagation()}
-                  aria-label={`Open Instagram profile: @${username}`}
+                  aria-label={t('instagram.openProfileAria', { username })}
                 >
-                  <span>Profile</span>
+                  <span>{t('instagram.profile')}</span>
                   <Icon icon="mdi:open-in-new" width="14" height="14" />
                 </a>
               )}
@@ -229,12 +231,12 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
           {isPrivate && (
             <span className="inline-flex items-center gap-1">
               <Icon icon="mdi:lock" width="14" height="14" />
-              Private
+              {t('instagram.private')}
             </span>
           )}
-          {followersCount && <span>{followersCount} followers</span>}
-          {likeCount && <span>{likeCount} likes</span>}
-          {commentCount && <span>{commentCount} comments</span>}
+          {followersCount && <span>{t('instagram.followers', { count: followersCount })}</span>}
+          {likeCount && <span>{t('instagram.likes', { count: likeCount })}</span>}
+          {commentCount && <span>{t('instagram.comments', { count: commentCount })}</span>}
         </div>
       )}
 

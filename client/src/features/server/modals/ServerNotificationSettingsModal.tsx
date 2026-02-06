@@ -7,14 +7,10 @@ import toast from 'react-hot-toast';
 import { useModalStore, useNotificationSettingsStore, useUIStore } from '../../../shared/stores';
 import { memberApi } from '../../../shared/services/api';
 import type { NotificationLevel, Server } from '../../../shared/types';
-
-const OPTIONS: Array<{ level: NotificationLevel; title: string; desc: string }> = [
-  { level: 'ALL_MESSAGES', title: 'All Messages', desc: 'Get notified for every new message.' },
-  { level: 'MENTIONS_ONLY', title: 'Only @mentions', desc: 'Only notify for @mentions and @everyone/@here.' },
-  { level: 'MUTE', title: 'Nothing', desc: 'Mute this server.' },
-];
+import { useI18n } from '../../../shared/i18n';
 
 export const ServerNotificationSettingsModal = () => {
+  const { t } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const { currentServerId } = useUIStore();
   const setServerLevel = useNotificationSettingsStore((s) => s.setServerLevel);
@@ -23,6 +19,11 @@ export const ServerNotificationSettingsModal = () => {
   const serverId: string | null = modalData?.serverId || server?._id || currentServerId || null;
 
   const [selected, setSelected] = useState<NotificationLevel>('ALL_MESSAGES');
+  const options: Array<{ level: NotificationLevel; title: string; desc: string }> = [
+    { level: 'ALL_MESSAGES', title: t('notification.option.allMessages'), desc: t('notification.option.allMessagesDesc') },
+    { level: 'MENTIONS_ONLY', title: t('notification.option.mentionsOnly'), desc: t('notification.option.mentionsOnlyDesc') },
+    { level: 'MUTE', title: t('notification.option.mute'), desc: t('notification.option.muteServerDesc') },
+  ];
 
   const { data, isLoading } = useQuery({
     queryKey: ['serverNotificationSettings', serverId],
@@ -45,20 +46,20 @@ export const ServerNotificationSettingsModal = () => {
     },
     onSuccess: (res) => {
       if (serverId) setServerLevel(serverId, res.notificationLevel);
-      toast.success('Notification settings updated');
+      toast.success(t('notification.settings.updated'));
       closeModal();
     },
-    onError: () => toast.error('Failed to update notification settings'),
+    onError: () => toast.error(t('notification.settings.updateFailed')),
   });
 
-  const title = useMemo(() => server?.name || 'Server', [server?.name]);
+  const title = useMemo(() => server?.name || t('server.fallback'), [server?.name, t]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-[#313338] w-full max-w-lg rounded-[4px] shadow-lg overflow-hidden animate-scale-in">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#1E1F22]">
           <div className="min-w-0">
-            <div className="text-xs font-bold text-mew-textMuted uppercase">Notification Settings</div>
+            <div className="text-xs font-bold text-mew-textMuted uppercase">{t('notification.settings.title')}</div>
             <div className="text-white font-semibold truncate">{title}</div>
           </div>
           <button onClick={closeModal} className="p-2 text-mew-textMuted hover:text-white">
@@ -67,10 +68,10 @@ export const ServerNotificationSettingsModal = () => {
         </div>
 
         <div className="p-4">
-          <div className="text-xs font-bold text-mew-textMuted uppercase mb-2">Server Notification Level</div>
+          <div className="text-xs font-bold text-mew-textMuted uppercase mb-2">{t('notification.level.server')}</div>
 
           <div className="space-y-2">
-            {OPTIONS.map((o) => (
+            {options.map((o) => (
               <button
                 key={o.level}
                 disabled={isLoading}
@@ -97,7 +98,7 @@ export const ServerNotificationSettingsModal = () => {
             onClick={closeModal}
             className="px-4 py-2 rounded text-white text-sm font-medium hover:underline"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={() => saveMutation.mutate(selected)}
@@ -107,7 +108,7 @@ export const ServerNotificationSettingsModal = () => {
               saveMutation.isPending || isLoading ? 'bg-[#404249] cursor-not-allowed' : 'bg-mew-accent hover:bg-mew-accentHover'
             )}
           >
-            {saveMutation.isPending ? 'Saving…' : 'Save'}
+            {saveMutation.isPending ? t('common.saving') : t('common.saveChanges')}
           </button>
         </div>
       </div>

@@ -6,9 +6,11 @@ import { User } from '../../../shared/types';
 import { channelApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { useUserSearch } from '../hooks/useUserSearch';
+import { useI18n } from '../../../shared/i18n';
 
 export const FindUserModal: React.FC = () => {
   const { closeModal } = useModalStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,7 +27,7 @@ export const FindUserModal: React.FC = () => {
   const handleCreateDM = async (user: User) => {
     if (loadingUserId) return;
     if (user.isBot && user.dmEnabled === false) {
-      toast.error('This bot does not accept DMs.');
+      toast.error(t('findUser.botDmDisabled'));
       return;
     }
     setLoadingUserId(user._id);
@@ -38,7 +40,7 @@ export const FindUserModal: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['dmChannels'] });
         closeModal();
     } catch (error) {
-        console.error("Failed to create DM", error);
+        console.error('Failed to create DM', error);
     } finally {
         setLoadingUserId(null);
     }
@@ -48,8 +50,8 @@ export const FindUserModal: React.FC = () => {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
         <div className="bg-[#313338] w-full max-w-lg rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[600px]">
             <div className="p-4 pt-5">
-                <h2 className="text-xl font-bold text-white mb-2">Find or start a conversation</h2>
-                <p className="text-mew-textMuted text-sm">Search for a user by their username to start a direct message.</p>
+                <h2 className="text-xl font-bold text-white mb-2">{t('findUser.title')}</h2>
+                <p className="text-mew-textMuted text-sm">{t('findUser.subtitle')}</p>
             </div>
 
             <div className="px-4 mb-4">
@@ -58,7 +60,7 @@ export const FindUserModal: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full bg-[#1E1F22] text-white p-3 rounded border border-[#1E1F22] focus:border-mew-accent focus:outline-none font-medium placeholder-mew-textMuted"
-                    placeholder="Where would you like to go?"
+                    placeholder={t('findUser.searchPlaceholder')}
                     autoFocus
                 />
             </div>
@@ -70,7 +72,7 @@ export const FindUserModal: React.FC = () => {
                     </div>
                 ) : searchResults?.length === 0 && debouncedQuery ? (
                     <div className="text-center p-4 text-mew-textMuted">
-                        No users found.
+                        {t('findUser.noUsers')}
                     </div>
                 ) : (
                     searchResults?.map(user => (
@@ -96,13 +98,13 @@ export const FindUserModal: React.FC = () => {
 
                 {!debouncedQuery && !isSearching && (
                     <div className="text-center p-8 text-mew-textMuted text-sm">
-                         Start typing to search for friends.
+                         {t('findUser.startTyping')}
                     </div>
                 )}
             </div>
 
             <div className="bg-[#2B2D31] p-4 flex justify-end">
-                <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">Close</button>
+                <button onClick={closeModal} className="text-white hover:underline text-sm font-medium">{t('common.close')}</button>
             </div>
         </div>
     </div>

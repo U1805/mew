@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
 import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
+import { useI18n } from '../../../shared/i18n';
 
 function safeHostname(url: string | undefined): string | null {
   if (!url) return null;
@@ -71,6 +72,7 @@ interface TwitterCardProps {
 }
 
 export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
+  const { t } = useI18n();
   const url = typeof payload.url === 'string' ? payload.url.trim() : '';
   const text = typeof payload.text === 'string' ? payload.text.trim() : '';
   const createdAt = typeof payload.created_at === 'string' ? payload.created_at.trim() : '';
@@ -133,7 +135,7 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
         target="_blank"
         rel="noopener noreferrer"
         className="block hover:bg-mew-dark/30 transition-colors"
-        aria-label={text ? `Open tweet: ${text}` : 'Open tweet'}
+        aria-label={text ? t('twitter.openTweetAria', { text }) : t('twitter.openTweet')}
       >
         <div className="p-3">
           <div className="flex items-start justify-between gap-3">
@@ -151,7 +153,7 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
               )}
               <div className="min-w-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold text-mew-text truncate">{authorName || payload.webhookName || 'X'}</span>
+                    <span className="font-semibold text-mew-text truncate">{authorName || payload.webhookName || t('twitter.x')}</span>
                   {authorHandle && <span className="text-sm text-mew-textMuted truncate">@{authorHandle}</span>}
                   {isRetweet && (
                     <span className="text-[11px] text-mew-textMuted shrink-0 border border-mew-darkest rounded px-1 py-0.5">
@@ -202,7 +204,7 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                   )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold text-mew-text truncate">{quotedAuthorName || 'X'}</span>
+                      <span className="text-sm font-semibold text-mew-text truncate">{quotedAuthorName || t('twitter.x')}</span>
                       {quotedAuthorHandle && <span className="text-xs text-mew-textMuted truncate">@{quotedAuthorHandle}</span>}
                     </div>
                     {quotedCreatedAt && (
@@ -216,7 +218,7 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                     role="button"
                     tabIndex={0}
                     className="shrink-0 text-mew-textMuted/70 hover:text-primary transition-colors mt-0.5"
-                    aria-label="Open quoted tweet"
+                    aria-label={t('twitter.openQuotedTweet')}
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -354,10 +356,10 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
 
         {showStats && (
           <div className="border-t border-mew-darkest/50 px-3 py-2 text-xs text-mew-textMuted flex flex-wrap gap-x-4 gap-y-1">
-            {replyCount && <span>Replies {replyCount}</span>}
-            {retweetCount && <span>Reposts {retweetCount}</span>}
-            {likeCount && <span>Likes {likeCount}</span>}
-            {viewCount && <span>Views {viewCount}</span>}
+            {replyCount && <span>{t('twitter.replies', { count: replyCount })}</span>}
+            {retweetCount && <span>{t('twitter.reposts', { count: retweetCount })}</span>}
+            {likeCount && <span>{t('twitter.likes', { count: likeCount })}</span>}
+            {viewCount && <span>{t('twitter.views', { count: viewCount })}</span>}
           </div>
         )}
       </a>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
+import { useI18n } from '../../../shared/i18n';
 
 interface Props {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, isLoading }) => {
+  const { t } = useI18n();
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -17,11 +19,11 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
 
   const validate = () => {
     if (newPassword && newPassword.length < 8) {
-      setError('New password must be at least 8 characters long');
+      setError(t('validation.passwordMinLength'));
       return false;
     }
     if (newPassword && confirmPassword && newPassword !== confirmPassword) {
-      setError('New passwords do not match.');
+      setError(t('validation.passwordMismatch'));
       return false;
     }
     setError('');
@@ -54,7 +56,7 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
       try {
         await onSave({ oldPassword, newPassword });
       } catch (e) {
-        setSubmitError(getApiErrorMessage(e, 'Failed to update password'));
+        setSubmitError(getApiErrorMessage(e, t('toast.updatePasswordFailed')));
       }
     }
   };
@@ -69,11 +71,11 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center animate-fade-in-fast">
       <div className="bg-[#313338] rounded-md shadow-lg w-full max-w-md p-6 m-4">
-        <h2 className="text-xl font-bold text-white mb-2">Change Your Password</h2>
+        <h2 className="text-xl font-bold text-white mb-2">{t('modal.changePasswordTitle')}</h2>
 
         <div className="space-y-4 mb-4">
             <div>
-                <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">Current Password</label>
+                <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">{t('modal.currentPassword')}</label>
                 <input
                     type="password"
                     value={oldPassword}
@@ -82,7 +84,7 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
                 />
             </div>
             <div>
-                <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">New Password</label>
+                <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">{t('modal.newPassword')}</label>
                 <input
                     type="password"
                     value={newPassword}
@@ -91,7 +93,7 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
                 />
             </div>
             <div>
-                <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">Confirm New Password</label>
+                <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">{t('modal.confirmNewPassword')}</label>
                 <input
                     type="password"
                     value={confirmPassword}
@@ -110,14 +112,14 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
             disabled={isLoading}
             className="text-white px-4 py-2 rounded text-sm font-medium transition-colors hover:bg-transparent bg-transparent hover:underline"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={!canSave}
             className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors disabled:bg-mew-accent/50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Saving...' : 'Save Changes'}
+            {isLoading ? t('common.saving') : t('common.saveChanges')}
           </button>
         </div>
       </div>

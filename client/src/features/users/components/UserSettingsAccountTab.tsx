@@ -2,6 +2,8 @@ import React, { type RefObject } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import type { User } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
+import { LanguageSelector } from '../../../shared/components/LanguageSelector';
 
 export const UserSettingsAccountTab: React.FC<{
   user: User | null;
@@ -12,9 +14,11 @@ export const UserSettingsAccountTab: React.FC<{
   onEditDisplayName: () => void;
   onChangePassword: () => void;
 }> = ({ user, isUploading, fileInputRef, onAvatarClick, onAvatarFileChange, onEditDisplayName, onChangePassword }) => {
+  const { t } = useI18n();
+
   return (
     <>
-      <h2 className="text-xl font-bold text-white mb-6 hidden md:block">My Account</h2>
+      <h2 className="text-xl font-bold text-white mb-6 hidden md:block">{t('settings.myAccount')}</h2>
       <div className="bg-[#1E1F22] rounded-lg mb-8 overflow-hidden shadow-sm">
         <div className="h-[100px] bg-mew-accent relative">
           <div className="absolute left-4 -bottom-[36px]">
@@ -43,7 +47,7 @@ export const UserSettingsAccountTab: React.FC<{
                   {isUploading ? (
                     <Icon icon="mdi:loading" className="text-white animate-spin" width="24" />
                   ) : (
-                    <span className="text-white text-[10px] font-bold uppercase tracking-wide">Change</span>
+                    <span className="text-white text-[10px] font-bold uppercase tracking-wide">{t('account.change')}</span>
                   )}
                 </div>
               </div>
@@ -63,42 +67,48 @@ export const UserSettingsAccountTab: React.FC<{
               disabled={isUploading}
               className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-1.5 rounded-[3px] text-sm font-medium transition-colors w-full sm:w-auto"
             >
-              Edit User Profile
+              {t('account.editUserProfile')}
             </button>
           </div>
 
           <div className="bg-[#2B2D31] rounded-lg p-4 space-y-5">
             <div className="flex justify-between items-center">
               <div className="min-w-0 pr-2">
-                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Display Name</div>
+                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">{t('account.displayName')}</div>
                 <div className="text-white text-sm font-medium truncate">{user?.username}</div>
               </div>
               <button
                 onClick={onEditDisplayName}
                 className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded-[3px] text-sm font-medium transition-colors shrink-0"
               >
-                Edit
+                {t('common.edit')}
               </button>
             </div>
             <div className="flex justify-between items-center">
               <div className="min-w-0 pr-2">
-                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Email</div>
+                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">{t('auth.email')}</div>
                 <div className="text-white text-sm font-medium truncate">
-                  {user?.email ? user.email.replace(/(.{2})(.*)(@.*)/, '$1*****$3') : 'No Email'}
+                  {user?.email ? user.email.replace(/(.{2})(.*)(@.*)/, '$1*****$3') : t('account.noEmail')}
                 </div>
               </div>
               <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded-[3px] text-sm font-medium transition-colors shrink-0">
-                Edit
+                {t('common.edit')}
               </button>
             </div>
             <div className="flex justify-between items-center">
               <div className="min-w-0 pr-2">
-                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">Phone Number</div>
-                <div className="text-mew-textMuted text-sm truncate">You haven&rsquo;t added a phone number yet.</div>
+                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">{t('account.phoneNumber')}</div>
+                <div className="text-mew-textMuted text-sm truncate">{t('account.noPhone')}</div>
               </div>
               <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-1.5 rounded-[3px] text-sm font-medium transition-colors shrink-0">
-                Add
+                {t('common.add')}
               </button>
+            </div>
+            <div className="flex justify-between items-center gap-3">
+              <div className="min-w-0 pr-2">
+                <div className="text-xs font-bold text-mew-textMuted uppercase mb-1">{t('account.language')}</div>
+              </div>
+              <LanguageSelector className="bg-[#1E1F22] border-none rounded p-2 text-white focus:outline-none focus:ring-2 focus:ring-mew-accent transition-all text-sm min-w-[180px]" />
             </div>
           </div>
         </div>
@@ -106,21 +116,18 @@ export const UserSettingsAccountTab: React.FC<{
 
       <div className="h-[1px] bg-mew-divider my-8" />
 
-      <h3 className="text-lg font-bold text-white mb-4">Password and Authentication</h3>
+      <h3 className="text-lg font-bold text-white mb-4">{t('account.passwordAuth')}</h3>
       <button
         onClick={onChangePassword}
         className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded-[3px] text-sm font-medium transition-colors mb-2"
       >
-        Change Password
+        {t('account.changePassword')}
       </button>
       <div className="text-xs text-mew-textMuted mt-4 mb-8">
-        <h4 className="font-bold uppercase mb-2">Two-Factor Authentication</h4>
-        <p className="mb-4 leading-5 text-[#B5BAC1]">
-          Protect your account with an extra layer of security. Once configured, you&rsquo;ll be required to enter both your password and an
-          authentication code from your mobile phone in order to sign in.
-        </p>
+        <h4 className="font-bold uppercase mb-2">{t('account.twoFactorAuth')}</h4>
+        <p className="mb-4 leading-5 text-[#B5BAC1]">{t('account.twoFactorDesc')}</p>
         <button className="bg-[#383A40] hover:bg-[#404249] text-white px-4 py-2 rounded-[3px] text-sm font-medium transition-colors">
-          Enable Two-Factor Auth
+          {t('account.enableTwoFactor')}
         </button>
       </div>
     </>

@@ -3,8 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { serverApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { useI18n } from '../../../shared/i18n';
 
 export const LeaveServerModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -31,9 +33,9 @@ export const LeaveServerModal: React.FC = () => {
 
   return (
     <ConfirmModal
-      title="Leave Server"
-      description="Are you sure you want to leave this server?"
-      confirmText="Leave Server"
+      title={t('server.leave.title')}
+      description={t('server.leave.description')}
+      confirmText={t('server.leave.confirm')}
       onConfirm={handleConfirm}
       onCancel={closeModal}
       isLoading={isLoading}

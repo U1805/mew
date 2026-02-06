@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useI18n } from '../../../shared/i18n';
 
 interface Props {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export const EditDisplayNameModal: React.FC<Props> = ({ isOpen, onClose, onSave, currentUsername, isLoading }) => {
+  const { t } = useI18n();
   const [username, setUsername] = useState(currentUsername);
 
   useEffect(() => {
@@ -28,11 +30,11 @@ export const EditDisplayNameModal: React.FC<Props> = ({ isOpen, onClose, onSave,
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center animate-fade-in-fast">
       <div className="bg-[#313338] rounded-md shadow-lg w-full max-w-md p-6 m-4">
-        <h2 className="text-xl font-bold text-white mb-2">Change your username</h2>
-        <p className="text-sm text-mew-textMuted mb-4">Enter a new username. This is how others will see you.</p>
+        <h2 className="text-xl font-bold text-white mb-2">{t('modal.changeUsernameTitle')}</h2>
+        <p className="text-sm text-mew-textMuted mb-4">{t('modal.changeUsernameDesc')}</p>
 
         <div className="mb-4">
-            <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">Username</label>
+            <label className="text-xs font-bold text-mew-textMuted uppercase mb-2 block">{t('auth.username')}</label>
             <input
                 type="text"
                 value={username}
@@ -47,14 +49,14 @@ export const EditDisplayNameModal: React.FC<Props> = ({ isOpen, onClose, onSave,
             disabled={isLoading}
             className="text-white px-4 py-2 rounded text-sm font-medium transition-colors hover:bg-transparent bg-transparent hover:underline"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={handleSave}
             disabled={isLoading || !username.trim() || username.trim() === currentUsername}
             className="bg-mew-accent hover:bg-mew-accentHover text-white px-4 py-2 rounded text-sm font-medium transition-colors disabled:bg-mew-accent/50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Saving...' : 'Save Changes'}
+            {isLoading ? t('common.saving') : t('common.saveChanges')}
           </button>
         </div>
       </div>

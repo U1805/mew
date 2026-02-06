@@ -2,12 +2,14 @@ import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
-import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores';
+import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { messageApi } from '../../../shared/services/api';
 import { Channel, ChannelType, Message } from '../../../shared/types';
 import { useDmChannels } from '../../channel/hooks/useDmChannels';
 import { useServersWithChannels } from '../../server/hooks/useServersWithChannels';
+import { useI18n } from '../../../shared/i18n';
 
 type ForwardTarget = {
   channelId: string;
@@ -19,6 +21,7 @@ export const ForwardMessageModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
   const { currentServerId, currentChannelId } = useUIStore();
   const { user } = useAuthStore();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const message: Message | undefined = modalData?.message;
@@ -34,13 +37,13 @@ export const ForwardMessageModal: React.FC = () => {
     if (currentServerId) {
       const channels = queryClient.getQueryData<Channel[]>(['channels', currentServerId]) || [];
       const channel = channels.find((c) => c._id === currentChannelId);
-      return channel?.name ? `#${channel.name}` : '频道';
+      return channel?.name ? `#${channel.name}` : t('forward.channelFallback');
     }
 
     const channel = (queryClient.getQueryData<Channel[]>(['dmChannels']) || []).find((c) => c._id === currentChannelId);
     const otherUser = channel?.recipients?.find((r) => typeof r === 'object' && r._id !== user?._id) as any;
-    return otherUser?.username ? `@${otherUser.username}` : '私聊';
-  }, [currentChannelId, currentServerId, queryClient, user?._id]);
+    return otherUser?.username ? `@${otherUser.username}` : t('forward.dmFallback');
+  }, [currentChannelId, currentServerId, queryClient, t, user?._id]);
 
   const targets = useMemo(() => {
     const results: {
@@ -59,13 +62,13 @@ export const ForwardMessageModal: React.FC = () => {
         items.push({
           channelId: channel._id,
           serverId: server._id,
-          label: `#${channel.name || 'channel'}`,
+          label: `#${channel.name || t('notification.channel.unnamed')}`,
         });
       }
 
       if (items.length) {
         items.sort((a, b) => a.label.localeCompare(b.label));
-        results.serverGroups.push({ serverId: server._id, serverName: server.name || 'Server', channels: items });
+        results.serverGroups.push({ serverId: server._id, serverName: server.name || t('server.fallback'), channels: items });
       }
     });
 
@@ -77,13 +80,13 @@ export const ForwardMessageModal: React.FC = () => {
       results.dm.push({
         channelId: dm._id,
         serverId: undefined,
-        label: otherUser?.username ? `@${otherUser.username}` : dm.name || 'DM',
+        label: otherUser?.username ? `@${otherUser.username}` : dm.name || t('notification.channel.dm'),
       });
     }
 
     results.dm.sort((a, b) => a.label.localeCompare(b.label));
     return results;
-  }, [channelQueries, currentChannelId, dmChannels, servers, user?._id]);
+  }, [channelQueries, currentChannelId, dmChannels, servers, t, user?._id]);
 
   const forwardPayload = useMemo(() => {
     if (!message) return null;
@@ -123,10 +126,10 @@ export const ForwardMessageModal: React.FC = () => {
 
   return (
     <ConfirmModal
-      title="Forward Message"
-      description="Choose a channel or DM to forward to."
-      confirmText="Forward"
-      cancelText="Cancel"
+      title={t('forward.title')}
+      description={t('forward.description')}
+      confirmText={t('message.menu.forward')}
+      cancelText={t('common.cancel')}
       onConfirm={handleConfirm}
       onCancel={closeModal}
       isLoading={isLoading}
@@ -134,11 +137,11 @@ export const ForwardMessageModal: React.FC = () => {
       isDestructive={false}
     >
       <div className="mt-4">
-        <div className="text-xs text-mew-textMuted mb-2">Target</div>
+        <div className="text-xs text-mew-textMuted mb-2">{t('forward.target')}</div>
         <div className="max-h-64 overflow-y-auto custom-scrollbar border border-mew-divider/60 rounded bg-[#2B2D31]">
           {!!targets.serverGroups.length && (
             <div className="p-2">
-              <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2">Servers</div>
+              <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-2">{t('forward.servers')}</div>
               <div className="space-y-2">
                 {targets.serverGroups.map((group) => (
                   <div key={group.serverId} className="space-y-1">
@@ -171,7 +174,7 @@ export const ForwardMessageModal: React.FC = () => {
 
           {!!targets.dm.length && (
             <div className={clsx('p-2', targets.serverGroups.length ? 'border-t border-mew-divider/60' : '')}>
-              <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-1">DMs</div>
+              <div className="text-[11px] font-bold text-mew-textMuted uppercase mb-1">{t('forward.dms')}</div>
               <div className="space-y-1">
                 {targets.dm.map((t) => (
                   <button
@@ -194,12 +197,12 @@ export const ForwardMessageModal: React.FC = () => {
           )}
 
           {!targets.serverGroups.length && !targets.dm.length && (
-            <div className="p-4 text-sm text-mew-textMuted">No available targets.</div>
+            <div className="p-4 text-sm text-mew-textMuted">{t('forward.noTargets')}</div>
           )}
         </div>
 
         <div className="mt-3 text-xs text-mew-textMuted">
-          Sends as: <span className="text-mew-text">a forwarded card</span>
+          {t('forward.sendsAs')} <span className="text-mew-text">{t('forward.forwardCard')}</span>
         </div>
       </div>
     </ConfirmModal>
@@ -207,3 +210,4 @@ export const ForwardMessageModal: React.FC = () => {
 };
 
 export default ForwardMessageModal;
+

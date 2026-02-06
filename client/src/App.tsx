@@ -1,7 +1,8 @@
 import { Suspense, lazy, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getSocket } from './shared/services/socket';
-import { useAuthStore, useModalStore, useUIStore } from './shared/stores';
+import { useModalStore, useUIStore } from './shared/stores';
+import { useAuthStore } from './shared/stores/authStore';
 import { parseChannelsPathname } from './shared/router/channelsRoute';
 import { parseAuthPathname } from './shared/router/authRoute';
 import { parseSettingsPathname } from './shared/router/settingsRoute';
@@ -148,3 +149,4 @@ const App = () => {
 };
 
 export default App;
+

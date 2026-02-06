@@ -3,8 +3,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { serverApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
+import { useI18n } from '../../../shared/i18n';
 
 export const DeleteServerModal: React.FC = () => {
+  const { t } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -31,9 +33,9 @@ export const DeleteServerModal: React.FC = () => {
 
   return (
     <ConfirmModal
-      title="Delete Server"
-      description={`Are you sure you want to delete ${server.name}? This action cannot be undone.`}
-      confirmText="Delete Server"
+      title={t('server.delete.title')}
+      description={t('server.delete.description', { name: server.name })}
+      confirmText={t('server.delete.confirm')}
       onConfirm={handleConfirm}
       onCancel={closeModal}
       isLoading={isLoading}

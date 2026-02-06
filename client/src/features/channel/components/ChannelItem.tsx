@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
 import { useUnreadStore } from '../../../shared/stores';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
+import { useI18n } from '../../../shared/i18n';
 
 interface ChannelItemProps {
     channel: Channel;
@@ -14,6 +15,7 @@ interface ChannelItemProps {
 }
 
 export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick, onNotificationClick }) => {
+    const { t } = useI18n();
     const permissions = usePermissions(channel._id);
     const canManageChannel = permissions.has('MANAGE_CHANNEL');
     const unreadChannelIds = useUnreadStore(state => state.unreadChannelIds);
@@ -51,7 +53,7 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
                 {onNotificationClick && (
                     <div
                         className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white transition-opacity"
-                        title="Notification Settings"
+                        title={t('server.menu.notificationSettings')}
                         onClick={onNotificationClick}
                     >
                         <Icon icon="mdi:bell-outline" width="16" height="16" />
@@ -62,7 +64,7 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
                 {canManageChannel && onSettingsClick && (
                     <div
                         className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white transition-opacity"
-                        title="Edit Channel"
+                        title={t('common.edit')}
                         onClick={onSettingsClick}
                     >
                         <Icon icon="mdi:cog" width="16" height="16" />

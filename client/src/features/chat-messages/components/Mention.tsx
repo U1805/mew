@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import clsx from 'clsx';
 import type { MouseEvent } from 'react';
-import { useModalStore, useAuthStore, useUIStore } from '../../../shared/stores';
+import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { ServerMember, User } from '../../../shared/types';
 
 interface MentionProps {
@@ -40,3 +41,4 @@ export const Mention = ({ userId }: MentionProps) => {
     </span>
   );
 };
+
