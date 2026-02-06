@@ -11,26 +11,21 @@ export default defineConfig(() => {
               if (!id.includes('node_modules')) return;
               const moduleId = id.replace(/\\/g, '/');
 
-              if (moduleId.includes('/react/') || moduleId.includes('/react-dom/') || moduleId.includes('/scheduler/')) {
-                return 'react-vendor';
-              }
+              // Keep React ecosystem together in vendor to avoid chunk cycles.
+              // Split only relatively isolated heavy dependencies.
               if (moduleId.includes('@tiptap') || moduleId.includes('/prosemirror-')) return 'tiptap';
-              if (id.includes('@tanstack')) return 'tanstack';
-              if (id.includes('socket.io-client')) return 'socket';
-              if (moduleId.includes('engine.io-client') || moduleId.includes('engine.io-parser') || moduleId.includes('socket.io-parser')) return 'socket';
-              if (id.includes('@iconify')) return 'iconify';
-              if (id.includes('marked') || id.includes('dompurify')) return 'markdown';
+              if (
+                moduleId.includes('socket.io-client') ||
+                moduleId.includes('engine.io-client') ||
+                moduleId.includes('engine.io-parser') ||
+                moduleId.includes('socket.io-parser')
+              ) {
+                return 'socket';
+              }
+              if (moduleId.includes('marked') || moduleId.includes('dompurify')) return 'markdown';
               if (moduleId.includes('/date-fns/')) return 'date-fns';
               if (moduleId.includes('/axios/')) return 'axios';
-              if (
-                moduleId.includes('@radix-ui/') ||
-                moduleId.includes('@floating-ui/') ||
-                moduleId.includes('react-remove-scroll') ||
-                moduleId.includes('@popperjs/core') ||
-                moduleId.includes('/tippy.js/')
-              ) {
-                return 'ui-vendor';
-              }
+
               return 'vendor';
             },
           },

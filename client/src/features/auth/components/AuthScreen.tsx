@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import clsx from 'clsx';
 import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
@@ -6,11 +6,11 @@ import { useAuthStore } from '../../../shared/stores/authStore';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
 import { parseAuthPathname, navigateAuth } from '../../../shared/router/authRoute';
 import { addNavigationListener } from '../../../shared/router/history';
-import { useI18n } from '../../../shared/i18n';
-import { LanguageSelector } from '../../../shared/components/LanguageSelector';
+import { getBrowserLocale, translateWithLocale } from '../../../shared/i18n';
 
 export const AuthScreen = () => {
-  const { t } = useI18n();
+  const browserLocale = useMemo(() => getBrowserLocale(), []);
+  const t = (key: string) => translateWithLocale(browserLocale, key);
   const [isLogin, setIsLogin] = useState(true);
   const [allowRegistration, setAllowRegistration] = useState<boolean | null>(null);
   const [email, setEmail] = useState('');
@@ -195,10 +195,6 @@ export const AuthScreen = () => {
           ) : (
             <span />
           )}
-        </div>
-
-        <div className="mt-4">
-          <LanguageSelector className="w-full bg-[#1E1F22] border-none rounded p-2.5 text-white focus:outline-none focus:ring-2 focus:ring-mew-accent transition-all text-sm" />
         </div>
       </div>
     </div>
