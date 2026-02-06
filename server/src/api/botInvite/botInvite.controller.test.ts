@@ -30,6 +30,21 @@ describe('api/botInvite/botInvite.controller', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('searchBots uses empty query when q is missing', async () => {
+    vi.mocked((botInviteService as any).searchServerBots).mockResolvedValue([]);
+
+    const req: any = { params: { serverId: 's1' }, query: {} };
+    const res: any = { status: vi.fn().mockReturnThis(), json: vi.fn() };
+    const next = vi.fn();
+
+    await botInviteController.searchBots(req, res, next);
+
+    expect((botInviteService as any).searchServerBots).toHaveBeenCalledWith('s1', '');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith([]);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('inviteBot returns 204', async () => {
     vi.mocked((botInviteService as any).inviteBotToServer).mockResolvedValue(undefined);
 
