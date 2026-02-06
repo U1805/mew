@@ -6,6 +6,8 @@ export const API_URL = '/api';
 const api = axios.create({
   baseURL: API_URL,
   withCredentials: true,
+  xsrfCookieName: 'mew_csrf_token',
+  xsrfHeaderName: 'X-Mew-Csrf-Token',
 });
 
 let refreshPromise: Promise<void> | null = null;
@@ -17,7 +19,12 @@ const shouldSkipRefresh = (url: string | undefined) => {
 
 const refreshAccessToken = async (): Promise<void> => {
   // Use a separate request to avoid interceptor recursion.
-  await axios.post(`${API_URL}/auth/refresh-cookie`, {}, { withCredentials: true });
+  await axios.get(`${API_URL}/auth/csrf`, { withCredentials: true });
+  await axios.post(
+    `${API_URL}/auth/refresh-cookie`,
+    {},
+    { withCredentials: true, xsrfCookieName: 'mew_csrf_token', xsrfHeaderName: 'X-Mew-Csrf-Token' }
+  );
 };
 
 api.interceptors.response.use(

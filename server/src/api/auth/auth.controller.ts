@@ -45,7 +45,7 @@ export const loginHandler = asyncHandler(async (req: Request, res: Response, nex
     userId: (user as any)._id,
     createdByIp: req.ip,
     userAgent: req.headers['user-agent'] || null,
-    rememberMe: req.body?.rememberMe !== false,
+    rememberMe: req.body?.rememberMe === true,
   });
 
   setAuthCookies(res, {
@@ -65,7 +65,7 @@ export const loginCookieHandler = asyncHandler(async (req: Request, res: Respons
     userId: (user as any)._id,
     createdByIp: req.ip,
     userAgent: req.headers['user-agent'] || null,
-    rememberMe: req.body?.rememberMe !== false,
+    rememberMe: req.body?.rememberMe === true,
   });
 
   setAuthCookies(res, {
@@ -92,7 +92,7 @@ export const botLoginHandler = asyncHandler(async (req: Request, res: Response) 
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
-    isPersistent: true,
+    isPersistent: issued.isPersistent,
   });
 
   res.status(200).json({ message: 'Bot login successful', user, token });
@@ -108,14 +108,14 @@ export const registerHandler = asyncHandler(async (req: Request, res: Response, 
     userId: (user as any)._id,
     createdByIp: req.ip,
     userAgent: req.headers['user-agent'] || null,
-    rememberMe: true,
+    rememberMe: req.body?.rememberMe === true,
   });
 
   setAuthCookies(res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
-    isPersistent: true,
+    isPersistent: issued.isPersistent,
   });
 
   res.status(201).json({ message: 'User registered successfully', user, token });
@@ -131,14 +131,14 @@ export const registerCookieHandler = asyncHandler(async (req: Request, res: Resp
     userId: (user as any)._id,
     createdByIp: req.ip,
     userAgent: req.headers['user-agent'] || null,
-    rememberMe: true,
+    rememberMe: req.body?.rememberMe === true,
   });
 
   setAuthCookies(res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
-    isPersistent: true,
+    isPersistent: issued.isPersistent,
   });
 
   res.status(201).json({ message: 'User registered successfully', user });

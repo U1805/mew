@@ -34,7 +34,7 @@ export const issueRefreshToken = async (params: {
   const ttlSeconds = config.refreshTokenExpiresSeconds;
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
-  const isPersistent = params.rememberMe !== false;
+  const isPersistent = params.rememberMe === true;
   const doc = await RefreshToken.create({
     userId: params.userId,
     tokenHash,

@@ -15,5 +15,9 @@ describe('utils/cookies', () => {
     const header = 'a=1; b=2';
     expect(readCookie(header, 'c')).toBeNull();
   });
-});
 
+  it('returns null for malformed percent-encoding (no throw)', () => {
+    const header = 'mew_access_token=%E0%A4%A';
+    expect(readCookie(header, 'mew_access_token')).toBeNull();
+  });
+});

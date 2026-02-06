@@ -20,6 +20,33 @@ describe('Auth Routes', () => {
       expect(res.headers['set-cookie']).toBeDefined();
     });
 
+    it('should issue a session refresh cookie by default (no rememberMe)', async () => {
+      const userData = {
+        email: 'register-session-1@example.com',
+        username: 'registersession1',
+        password: 'password123',
+      };
+      const res = await request(app).post('/api/auth/register').send(userData);
+      expect(res.statusCode).toBe(201);
+      const cookies = res.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+      expect((cookies || []).join(';')).not.toContain('Max-Age=');
+    });
+
+    it('should issue a persistent refresh cookie when rememberMe=true', async () => {
+      const userData = {
+        email: 'register-persistent-1@example.com',
+        username: 'registerpersistent1',
+        password: 'password123',
+        rememberMe: true,
+      };
+      const res = await request(app).post('/api/auth/register').send(userData);
+      expect(res.statusCode).toBe(201);
+      const cookies = res.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+      expect((cookies || []).join(';')).toContain('Max-Age=');
+    });
+
     it('should return 409 if email is already taken', async () => {
       const userData = {
         email: 'register-conflict-1@example.com',

@@ -7,7 +7,13 @@ export const readCookie = (cookieHeader: string | undefined, name: string): stri
     if (idx === -1) continue;
     const k = part.slice(0, idx).trim();
     if (k !== name) continue;
-    return decodeURIComponent(part.slice(idx + 1).trim());
+    const v = part.slice(idx + 1).trim();
+    try {
+      return decodeURIComponent(v);
+    } catch {
+      // Malformed % encoding should not crash the request handler.
+      return null;
+    }
   }
   return null;
 };
