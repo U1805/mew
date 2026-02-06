@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { memberApi, userApi } from '../services/api';
-import { useAuthStore, useNotificationSettingsStore } from '../stores';
+import { useNotificationSettingsStore } from '../stores';
+import { useAuthStore } from '../stores/authStore';
 import type { ChannelNotificationLevel, Server, UserNotificationSettings } from '../types';
 
 const sameUserNotificationSettings = (a?: UserNotificationSettings, b?: UserNotificationSettings) => {
@@ -130,4 +131,5 @@ export const useNotificationSettingsHydration = (servers: Server[] | undefined) 
     };
   }, [status, serverIdsKey, setServerLevel]);
 };
+
 

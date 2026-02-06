@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import clsx from 'clsx';
 import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
-import { useAuthStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
 import { parseAuthPathname, navigateAuth } from '../../../shared/router/authRoute';
 import { addNavigationListener } from '../../../shared/router/history';
@@ -204,3 +204,4 @@ export const AuthScreen = () => {
     </div>
   );
 };
+

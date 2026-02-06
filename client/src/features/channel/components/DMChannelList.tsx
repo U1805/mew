@@ -3,7 +3,8 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { UserStatusFooter } from '../../users/components/UserStatusFooter';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { useUIStore, useAuthStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores';
+import { useUIStore, useModalStore, useUnreadStore, useHiddenStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { useDmChannels } from '../hooks/useDmChannels';
 import { useI18n } from '../../../shared/i18n';
 
@@ -120,3 +121,4 @@ export const DMChannelList = () => {
     </div>
   );
 };
+

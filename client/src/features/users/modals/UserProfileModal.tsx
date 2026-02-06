@@ -5,7 +5,8 @@ import clsx from 'clsx';
 import { format } from 'date-fns';
 import { User } from '../../../shared/types';
 import { channelApi } from '../../../shared/services/api';
-import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores';
+import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUser } from '../hooks/useUser';
 import { formatUserTag } from '../../../shared/utils/userTag';
@@ -108,3 +109,4 @@ export const UserProfileModal: React.FC = () => {
     </div>
   )
 }
+

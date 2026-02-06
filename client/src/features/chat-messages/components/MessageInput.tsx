@@ -3,7 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import { messageApi, uploadApi } from '../../../shared/services/api';
 import { Channel, Message, Attachment } from '../../../shared/types';
-import { useAuthStore, useUIStore } from '../../../shared/stores';
+import { useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { formatFileSize } from '../../../shared/utils/file';
 import { EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -708,3 +709,4 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 };
 
 export default MessageInput;
+

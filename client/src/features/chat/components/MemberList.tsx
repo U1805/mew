@@ -6,7 +6,8 @@ import clsx from 'clsx';
 import { memberApi } from '../../../shared/services/api';
 import { ServerMember, Role } from '../../../shared/types';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
-import { useUIStore, useModalStore, useAuthStore } from '../../../shared/stores';
+import { useUIStore, useModalStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { useServerPermissions } from '../../../shared/hooks/useServerPermissions';
 import { useMembers } from '../../../shared/hooks/useMembers';
 import { useRoles } from '../../../shared/hooks/useRoles';
@@ -302,3 +303,4 @@ const MemberContextMenu = ({ targetMember }: { targetMember: ServerMember }) => 
 }
 
 export default MemberList;
+

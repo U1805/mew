@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
-import { useAuthStore, useUIStore } from '../../../shared/stores';
+import { useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { formatUserTag } from '../../../shared/utils/userTag';
 import { useI18n } from '../../../shared/i18n';
@@ -255,3 +256,4 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
 };
 
 export default ChatHeader;
+

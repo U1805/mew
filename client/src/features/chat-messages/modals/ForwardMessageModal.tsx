@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
-import { useModalStore, useUIStore, useAuthStore } from '../../../shared/stores';
+import { useModalStore, useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { messageApi } from '../../../shared/services/api';
 import { Channel, ChannelType, Message } from '../../../shared/types';
@@ -209,3 +210,4 @@ export const ForwardMessageModal: React.FC = () => {
 };
 
 export default ForwardMessageModal;
+

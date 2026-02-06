@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthScreen } from './AuthScreen';
-import { useAuthStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 
 const setUser = vi.fn();
 const hydrate = vi.fn().mockResolvedValue(undefined);
@@ -51,3 +51,4 @@ describe('AuthScreen', () => {
     });
   });
 });
+

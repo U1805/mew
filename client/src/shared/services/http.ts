@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useAuthStore } from '../stores';
+import { useAuthStore } from '../stores/authStore';
 
 export const API_URL = '/api';
 
@@ -56,3 +56,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+

@@ -12,7 +12,8 @@ import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
 import { Attachment, Message } from '../../../shared/types';
 import { channelApi, infraApi, messageApi, ttsApi } from '../../../shared/services/api';
-import { useAuthStore, useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
+import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { getMessageBestEffortText } from '../../../shared/utils/messageText';
@@ -638,3 +639,4 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 };
 
 export default MessageItem;
+

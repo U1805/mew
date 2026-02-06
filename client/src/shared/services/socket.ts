@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import { useAuthStore } from '../stores';
+import { useAuthStore } from '../stores/authStore';
 
 let socket: Socket | null = null;
 
@@ -42,3 +42,4 @@ export const disconnectSocket = () => {
     socket = null;
   }
 };
+

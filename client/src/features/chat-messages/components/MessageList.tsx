@@ -5,7 +5,8 @@ import TimestampDivider from './TimestampDivider';
 import { formatDividerTimestamp } from '../../../shared/utils/date';
 import { isSameDay } from 'date-fns';
 import { Message, Channel, ChannelType, User } from '../../../shared/types';
-import { useAuthStore, useUIStore, useUnreadStore } from '../../../shared/stores';
+import { useUIStore, useUnreadStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { channelApi } from '../../../shared/services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBots } from '../../users/hooks/useBots';
@@ -347,3 +348,4 @@ const MessageList: React.FC<MessageListProps> = ({
 };
 
 export default MessageList;
+

@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
-import { useUIStore, useAuthStore, useNotificationSettingsStore } from '../../../shared/stores';
+import { useUIStore, useNotificationSettingsStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { userApi } from '../../../shared/services/api';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
@@ -299,3 +300,4 @@ const UserSettings: React.FC = () => {
 };
 
 export default UserSettings;
+

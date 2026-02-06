@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '@iconify/react';
-import { useAuthStore, useUIStore } from '../../../shared/stores';
+import { useUIStore } from '../../../shared/stores';
+import { useAuthStore } from '../../../shared/stores/authStore';
 import { useI18n } from '../../../shared/i18n';
 
 export const UserStatusFooter: React.FC = () => {
@@ -39,3 +40,4 @@ export const UserStatusFooter: React.FC = () => {
         </div>
     );
 };
+
