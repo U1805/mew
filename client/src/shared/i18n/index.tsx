@@ -8,7 +8,7 @@ import { jaMessages } from './messages/ja';
 export const SUPPORTED_LOCALES = ['en', 'zh-CN', 'zh-TW', 'ja'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
-type TranslateParams = Record<string, string | number>;
+export type TranslateParams = Record<string, string | number>;
 
 interface I18nContextValue {
   locale: Locale;
@@ -43,12 +43,8 @@ const normalizeLocale = (raw?: string | null): Locale | null => {
   return null;
 };
 
-const getInitialLocale = (): Locale => {
+export const getBrowserLocale = (): Locale => {
   if (typeof window === 'undefined') return 'en';
-
-  const stored = normalizeLocale(window.localStorage.getItem(STORAGE_KEY));
-  if (stored) return stored;
-
   const browserLocales = window.navigator.languages?.length ? window.navigator.languages : [window.navigator.language];
   for (const lang of browserLocales) {
     const normalized = normalizeLocale(lang);
@@ -57,15 +53,29 @@ const getInitialLocale = (): Locale => {
   return 'en';
 };
 
+const getInitialLocale = (): Locale => {
+  if (typeof window === 'undefined') return 'en';
+
+  const stored = normalizeLocale(window.localStorage.getItem(STORAGE_KEY));
+  if (stored) return stored;
+
+  return getBrowserLocale();
+};
+
 const interpolate = (template: string, params?: TranslateParams): string => {
   if (!params) return template;
   return template.replace(/\{(\w+)\}/g, (_, key: string) => String(params[key] ?? `{${key}}`));
 };
 
+export const translateWithLocale = (locale: Locale, key: string, params?: TranslateParams): string => {
+  const text = messages[locale][key] ?? messages.en[key] ?? key;
+  return interpolate(text, params);
+};
+
 const fallbackContext: I18nContextValue = {
   locale: 'en',
   setLocale: () => undefined,
-  t: (key, params) => interpolate(messages.en[key] ?? key, params),
+  t: (key, params) => translateWithLocale('en', key, params),
 };
 
 const I18nContext = createContext<I18nContextValue>(fallbackContext);
@@ -87,10 +97,7 @@ export const I18nProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value = useMemo<I18nContextValue>(() => {
-    const t = (key: string, params?: TranslateParams) => {
-      const text = messages[locale][key] ?? messages.en[key] ?? key;
-      return interpolate(text, params);
-    };
+    const t = (key: string, params?: TranslateParams) => translateWithLocale(locale, key, params);
 
     return { locale, setLocale, t };
   }, [locale]);
