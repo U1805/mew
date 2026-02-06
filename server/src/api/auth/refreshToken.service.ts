@@ -34,41 +34,54 @@ export const issueRefreshToken = async (params: {
   const ttlSeconds = config.refreshTokenExpiresSeconds;
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
+  const isPersistent = params.rememberMe === true;
   const doc = await RefreshToken.create({
     userId: params.userId,
     tokenHash,
+    isPersistent,
     expiresAt,
     createdByIp: params.createdByIp ?? null,
     userAgent: params.userAgent ?? null,
   });
 
-  const maxAgeMs = params.rememberMe === false ? undefined : ttlSeconds * 1000;
+  const maxAgeMs = isPersistent ? ttlSeconds * 1000 : undefined;
 
-  return { refreshToken: raw, refreshTokenId: doc._id, expiresAt, maxAgeMs };
+  return { refreshToken: raw, refreshTokenId: doc._id, expiresAt, maxAgeMs, isPersistent };
 };
 
 export const rotateRefreshToken = async (params: {
   refreshToken: string;
   createdByIp?: string | null;
   userAgent?: string | null;
-  rememberMe?: boolean;
 }) => {
+  const now = new Date();
   const tokenHash = sha256Hex(params.refreshToken);
-  const existing = await RefreshToken.findOne({ tokenHash });
+  const existing = await RefreshToken.findOne({ tokenHash }).select('_id userId expiresAt revokedAt replacedByTokenId isPersistent');
   if (!existing) return null;
-  if (existing.revokedAt) return null;
-  if (existing.expiresAt.getTime() <= Date.now()) return null;
+  if (existing.expiresAt.getTime() <= now.getTime()) return null;
+
+  // Refresh token reuse detection: using a revoked token strongly suggests theft.
+  if (existing.revokedAt) {
+    await RefreshToken.updateMany({ userId: existing.userId, revokedAt: null }, { $set: { revokedAt: now } });
+    return null;
+  }
+
+  // Atomically "consume" the existing token to avoid multi-rotate races.
+  const consumed = await RefreshToken.findOneAndUpdate(
+    { _id: existing._id, revokedAt: null, expiresAt: { $gt: now } },
+    { $set: { revokedAt: now } },
+    { new: true }
+  ).select('_id userId isPersistent');
+  if (!consumed) return null;
 
   const issued = await issueRefreshToken({
     userId: existing.userId,
     createdByIp: params.createdByIp ?? null,
     userAgent: params.userAgent ?? null,
-    rememberMe: params.rememberMe,
+    rememberMe: existing.isPersistent,
   });
 
-  existing.revokedAt = new Date();
-  existing.replacedByTokenId = issued.refreshTokenId;
-  await existing.save();
+  await RefreshToken.updateOne({ _id: existing._id }, { $set: { replacedByTokenId: issued.refreshTokenId } });
 
   return { userId: existing.userId, ...issued };
 };
@@ -82,3 +95,8 @@ export const revokeRefreshToken = async (refreshToken: string) => {
   await existing.save();
 };
 
+export const revokeAllRefreshTokensForUserId = async (userId: string | mongoose.Types.ObjectId) => {
+  const id = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId;
+  const now = new Date();
+  await RefreshToken.updateMany({ userId: id, revokedAt: null }, { $set: { revokedAt: now } });
+};

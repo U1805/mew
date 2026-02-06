@@ -1,5 +1,6 @@
 import Bot, { IBot } from './bot.model';
 import mongoose from 'mongoose';
+import { hashBotAccessToken } from './botAccessToken.crypto';
 
 /**
  * Creates a new bot.
@@ -61,7 +62,7 @@ export const findByIdWithToken = async (
   botId: string,
   ownerId: string
 ): Promise<IBot | null> => {
-  return Bot.findOne({ _id: botId, ownerId }).select('+accessToken');
+  return Bot.findOne({ _id: botId, ownerId }).select('+accessToken +accessTokenEnc');
 };
 
 /**
@@ -69,23 +70,27 @@ export const findByIdWithToken = async (
  */
 export const findByServiceTypeWithToken = async (serviceType: string): Promise<IBot[]> => {
   if (serviceType === 'rss-fetcher') {
-    return Bot.find({ $or: [{ serviceType }, { serviceType: { $exists: false } }] }).select('+accessToken');
+    return Bot.find({ $or: [{ serviceType }, { serviceType: { $exists: false } }] }).select('+accessToken +accessTokenEnc');
   }
-  return Bot.find({ serviceType }).select('+accessToken');
+  return Bot.find({ serviceType }).select('+accessToken +accessTokenEnc');
 };
 
 /**
  * Finds a bot by ID, including access token (infra-only).
  */
 export const findByIdWithTokenUnscoped = async (botId: string): Promise<IBot | null> => {
-  return Bot.findById(botId).select('+accessToken');
+  return Bot.findById(botId).select('+accessToken +accessTokenEnc');
 };
 
 /**
  * Finds a bot by its access token (used by interactive bots to authenticate).
  */
 export const findByAccessToken = async (accessToken: string): Promise<IBot | null> => {
-  return Bot.findOne({ accessToken }).select('+accessToken');
+  const hashed = hashBotAccessToken(accessToken);
+  const v2 = await Bot.findOne({ accessToken: hashed }).select('+accessToken +accessTokenEnc');
+  if (v2) return v2;
+  // Legacy fallback: token stored in plaintext in `accessToken`.
+  return Bot.findOne({ accessToken }).select('+accessToken +accessTokenEnc');
 };
 
 /**

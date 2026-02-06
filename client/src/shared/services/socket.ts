@@ -1,21 +1,18 @@
 import { io, Socket } from 'socket.io-client';
+import { useAuthStore } from '../stores';
 
 let socket: Socket | null = null;
 
-const readTokenFromStorage = (): string | null =>
-  localStorage.getItem('mew_token') || sessionStorage.getItem('mew_token');
-
 export const getSocket = (): Socket | null => {
-  const token = readTokenFromStorage();
-
-  if (!token) return null;
+  const status = useAuthStore.getState().status;
+  if (status !== 'authenticated') return null;
 
   if (!socket) {
     // Use same-origin. In dev, Vite proxies `/socket.io` to the API server.
     const options = {
-      auth: { token },
       // Prefer WebSocket, but allow HTTP long-polling fallback for environments that block WebSockets.
       transports: ['websocket', 'polling'],
+      withCredentials: true,
     };
 
     socket = io(options);
@@ -44,12 +41,4 @@ export const disconnectSocket = () => {
     socket.disconnect();
     socket = null;
   }
-};
-
-export const updateSocketAuthToken = (token: string) => {
-  if (!socket) return;
-  socket.auth = { token };
-  // Auth is only used during handshake; reconnect to apply.
-  socket.disconnect();
-  socket.connect();
 };

@@ -68,7 +68,7 @@ app.use(
     origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Mew-Admin-Secret'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Mew-Admin-Secret', 'X-Mew-Csrf-Token'],
     exposedHeaders: ['Content-Length'],
     maxAge: 86400,
   })

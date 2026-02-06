@@ -123,10 +123,13 @@ const channelService = {
     }
 
 
-    const processedChannels = baseChannels.map(channel => {
-      const permissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
-      return { ...channel, permissions: Array.from(permissions) };
-    });
+    const processedChannels = baseChannels
+      .map((channel) => {
+        const permissions = calculateEffectivePermissions(member, roles, everyoneRole, channel);
+        return { channel, permissions };
+      })
+      .filter(({ permissions }) => permissions.has('VIEW_CHANNEL'))
+      .map(({ channel, permissions }) => ({ ...channel, permissions: Array.from(permissions) }));
 
     return processedChannels;
   },

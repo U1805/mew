@@ -40,7 +40,10 @@ describe('Message Service', () => {
         const mentionedUserIds = [new mongoose.Types.ObjectId()];
         (mentionService.processMentions as ReturnType<typeof vi.fn>).mockResolvedValue(mentionedUserIds);
 
-        await createMessage({ content, channelId: testChannel._id.toString(), authorId: testUser._id.toString() });
+        await createMessage(
+          { content, channelId: testChannel._id.toString(), authorId: testUser._id.toString() },
+          { bypassPermissions: true }
+        );
 
         expect(mentionService.processMentions).toHaveBeenCalledOnce();
         expect(mentionService.processMentions).toHaveBeenCalledWith(content, testChannel._id.toString(), testUser._id.toString());
@@ -51,7 +54,10 @@ describe('Message Service', () => {
         const mentionedUserIds = [new mongoose.Types.ObjectId(), new mongoose.Types.ObjectId()];
         (mentionService.processMentions as ReturnType<typeof vi.fn>).mockResolvedValue(mentionedUserIds);
 
-        const message = await createMessage({ content, channelId: testChannel._id.toString(), authorId: testUser._id.toString() });
+        const message = await createMessage(
+          { content, channelId: testChannel._id.toString(), authorId: testUser._id.toString() },
+          { bypassPermissions: true }
+        );
 
         const dbMessage = await Message.findById(message._id);
         expect(dbMessage.mentions.map(String)).toEqual(mentionedUserIds.map(String));

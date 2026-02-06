@@ -7,6 +7,7 @@ export const ALL_PERMISSIONS = [
   'MANAGE_STICKERS',
   'MANAGE_WEBHOOKS',
   'MANAGE_CHANNEL',
+  'VIEW_CHANNEL',
   'SEND_MESSAGES',
   'MANAGE_MESSAGES',
   'ADD_REACTIONS',
@@ -28,6 +29,7 @@ export const SERVER_PERMISSIONS: Permission[] = [
 
 export const CHANNEL_PERMISSIONS: Permission[] = [
   'MANAGE_CHANNEL',
+  'VIEW_CHANNEL',
   'SEND_MESSAGES',
   'MANAGE_MESSAGES',
   'ADD_REACTIONS',
@@ -36,6 +38,7 @@ export const CHANNEL_PERMISSIONS: Permission[] = [
 ];
 
 export const DM_PERMISSIONS: Permission[] = [
+  'VIEW_CHANNEL',
   'SEND_MESSAGES',
   'ADD_REACTIONS',
   'ATTACH_FILES',

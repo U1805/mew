@@ -334,7 +334,7 @@ describe('message.service (unit)', () => {
     vi.mocked(messageRepository.create).mockReturnValue(doc as any);
     vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
 
-    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'hi' } as any);
+    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'hi' } as any, { bypassPermissions: true });
 
     expect(socketManager.broadcast).toHaveBeenCalledWith('MESSAGE_CREATE', 'c1', expect.any(Object));
     expect(socketManager.broadcastToUser).not.toHaveBeenCalled();
@@ -343,12 +343,15 @@ describe('message.service (unit)', () => {
   it('createMessage rejects server-scope sticker messages in DMs', async () => {
     vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM' }));
     await expect(
-      createMessage({
+      createMessage(
+        {
         channelId: 'c1',
         authorId: 'u1',
         type: 'message/sticker',
         payload: { stickerId: 'st1', stickerScope: 'server' },
-      } as any)
+      } as any,
+        { bypassPermissions: true }
+      )
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
@@ -434,7 +437,7 @@ describe('message.service (unit)', () => {
       authorId: 'u1',
       type: 'message/sticker',
       payload: { stickerId: 'st1' },
-    } as any);
+    } as any, { bypassPermissions: true });
 
     expect(messageRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -480,7 +483,7 @@ describe('message.service (unit)', () => {
     vi.mocked(messageRepository.create).mockReturnValue(doc as any);
     vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
 
-    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'see https://example.com' } as any);
+    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'see https://example.com' } as any, { bypassPermissions: true });
 
     // allow the .then(async ...) chain to run
     await new Promise((r) => setTimeout(r, 0));
@@ -504,7 +507,7 @@ describe('message.service (unit)', () => {
     vi.mocked(messageRepository.create).mockReturnValue(doc as any);
     vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
 
-    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'see https://example.com' } as any);
+    await createMessage({ channelId: 'c1', authorId: 'u1', content: 'see https://example.com' } as any, { bypassPermissions: true });
     await new Promise((r) => setTimeout(r, 0));
 
     expect(consoleSpy).toHaveBeenCalled();
@@ -564,7 +567,7 @@ describe('message.service (unit)', () => {
     vi.mocked(messageRepository.save).mockResolvedValue(undefined as any);
     vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1'), mkId('u2')] }));
 
-    const text = await transcribeVoiceMessage('c1', 'm1', { originalname: 'voice.webm' } as any);
+    const text = await transcribeVoiceMessage('c1', 'm1', 'u1', { originalname: 'voice.webm' } as any);
 
     expect(text).toBe('语音转文字结果为空');
     expect(doc.plainText).toBe('语音转文字结果为空');
@@ -581,7 +584,8 @@ describe('message.service (unit)', () => {
     });
 
     vi.mocked(messageRepository.findById).mockResolvedValue(doc as any);
-    await expect(transcribeVoiceMessage('c1', 'm1', { originalname: 'x.txt' } as any)).rejects.toBeInstanceOf(BadRequestError);
+    vi.mocked((Channel as any).findById).mockReturnValue(makeFindByIdQuery({ type: 'DM', recipients: [mkId('u1')] }));
+    await expect(transcribeVoiceMessage('c1', 'm1', 'u1', { originalname: 'x.txt' } as any)).rejects.toBeInstanceOf(BadRequestError);
   });
 });
 

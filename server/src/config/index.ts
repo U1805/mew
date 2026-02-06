@@ -80,9 +80,27 @@ const parseTrustProxy = (raw: string | undefined): TrustProxySetting => {
 
 export type ConfigEnv = Record<string, string | undefined>;
 
+const emittedConfigWarnings = new Set<string>();
+
 export const createConfig = (env: ConfigEnv = process.env, deps?: { fs?: typeof fs }) => {
   const fsImpl = deps?.fs ?? fs;
   const isProduction = (env.NODE_ENV || '').toLowerCase() === 'production';
+
+  const warnOrThrowWeakSecret = (name: string, value: string, weakValues: ReadonlySet<string>) => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return;
+    if (!weakValues.has(trimmed)) return;
+
+    const msg = `${name} is set to an insecure default value (${JSON.stringify(trimmed)}). Set a strong random secret.`;
+    if (isProduction) {
+      throw new Error(`Insecure env: ${msg}`);
+    }
+    const key = `weak-secret:${name}:${trimmed}`;
+    if (emittedConfigWarnings.has(key)) return;
+    emittedConfigWarnings.add(key);
+    // eslint-disable-next-line no-console
+    console.warn(`[mew] WARNING: ${msg}`);
+  };
 
   const readS3CredentialsFile = (): S3Credentials | null => {
     const p = env.S3_CREDENTIALS_FILE;
@@ -107,12 +125,15 @@ export const createConfig = (env: ConfigEnv = process.env, deps?: { fs?: typeof 
     port: parsePort(env.PORT, 3000),
     staticUrl: (env.MEW_STATIC_URL || '').trim(),
     jwtSecret: env.JWT_SECRET || (isProduction ? '' : 'dev-jwt-secret'),
+    jwtIssuer: (env.JWT_ISSUER || '').trim(),
+    jwtAudience: (env.JWT_AUDIENCE || '').trim(),
     // Access token expiry. Default: 30 minutes.
     jwtExpiresIn: parseJwtExpiresIn(env.JWT_EXPIRES_IN, 60 * 30),
     // Refresh token expiry (in seconds). Default: 30 days.
     refreshTokenExpiresSeconds: parseDurationSeconds(env.REFRESH_TOKEN_EXPIRES_IN, 60 * 60 * 24 * 30),
     allowUserRegistration: parseBoolean(env.MEW_ALLOW_USER_REGISTRATION, true),
     adminSecret: env.MEW_ADMIN_SECRET || '',
+    botTokenEncKey: (env.MEW_BOT_TOKEN_ENC_KEY || '').trim(),
     trustProxy: parseTrustProxy(env.MEW_TRUST_PROXY || env.TRUST_PROXY),
     cors: {
       allowedOriginsRaw: env.MEW_CORS_ORIGINS || '',
@@ -142,6 +163,23 @@ export const createConfig = (env: ConfigEnv = process.env, deps?: { fs?: typeof 
   const corsOrigins = parseCsv(config.cors.allowedOriginsRaw);
   config.cors.allowAnyOrigin = corsOrigins.includes('*') || (!isProduction && corsOrigins.length === 0);
   config.cors.allowedOrigins = corsOrigins.filter((o) => o !== '*');
+
+  // H-01: Fail-fast in production (warn otherwise) on known default/weak secrets shipped by the repo.
+  warnOrThrowWeakSecret('JWT_SECRET', config.jwtSecret, new Set(['dev-jwt-secret', 'your-super-secret-jwt-key']));
+  warnOrThrowWeakSecret('MEW_ADMIN_SECRET', config.adminSecret, new Set(['dev-admin-secret', 'change-me']));
+
+  // M-02: Strong warning on permissive CORS + credentials in production.
+  if (isProduction && config.cors.allowAnyOrigin) {
+    const key = `cors:any-origin:prod`;
+    if (!emittedConfigWarnings.has(key)) {
+      emittedConfigWarnings.add(key);
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[mew] WARNING: MEW_CORS_ORIGINS allows '*' in production while the API uses cookies (credentials=true). ` +
+          `Prefer an explicit origin allowlist to avoid cross-origin risk.`
+      );
+    }
+  }
 
   const s3CorsOrigins = parseCsv(env.S3_CORS_ORIGINS);
   if (s3CorsOrigins.includes('*')) {

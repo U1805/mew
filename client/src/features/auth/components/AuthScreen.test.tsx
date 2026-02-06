@@ -4,8 +4,21 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthScreen } from './AuthScreen';
 import { useAuthStore } from '../../../shared/stores';
 
-const setAuth = vi.fn();
-useAuthStore.setState({ setAuth });
+const setUser = vi.fn();
+const hydrate = vi.fn().mockResolvedValue(undefined);
+const logout = vi.fn().mockResolvedValue(undefined);
+useAuthStore.setState({ setUser, hydrate, logout });
+
+vi.mock('../../../shared/services/api', () => ({
+  authApi: {
+    getConfig: vi.fn().mockResolvedValue({ data: { allowUserRegistration: true } }),
+    login: vi.fn().mockResolvedValue({ data: { token: 'fake-token', user: { email: 'test@example.com' } } }),
+    register: vi.fn(),
+    getMe: vi.fn(),
+    refresh: vi.fn(),
+    logout: vi.fn(),
+  },
+}));
 
 const queryClient = new QueryClient();
 
@@ -19,7 +32,9 @@ const renderComponent = () => {
 
 describe('AuthScreen', () => {
     beforeEach(() => {
-        setAuth.mockClear();
+        setUser.mockClear();
+        hydrate.mockClear();
+        logout.mockClear();
         queryClient.clear();
     });
 
@@ -32,7 +47,7 @@ describe('AuthScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => {
-        expect(setAuth).toHaveBeenCalledWith('fake-token', expect.objectContaining({ email: 'test@example.com' }), true);
+        expect(setUser).toHaveBeenCalledWith(expect.objectContaining({ email: 'test@example.com' }));
     });
   });
 });

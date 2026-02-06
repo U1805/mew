@@ -3,29 +3,35 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const on = vi.fn();
 const disconnect = vi.fn();
 const io = vi.fn(() => ({ on, disconnect }));
+let status: 'unknown' | 'authenticated' | 'unauthenticated' = 'unauthenticated';
 
 vi.mock('socket.io-client', () => ({
   io: (...args: any[]) => (io as any)(...args),
 }));
 
+vi.mock('../stores', () => ({
+  useAuthStore: {
+    getState: () => ({ status }),
+  },
+}));
+
 describe('shared/services/socket', () => {
   beforeEach(() => {
-    localStorage.removeItem('mew_token');
-    sessionStorage.removeItem('mew_token');
+    status = 'unauthenticated';
     io.mockClear();
     on.mockClear();
     disconnect.mockClear();
     vi.resetModules();
   });
 
-  it('returns null when token is missing', async () => {
+  it('returns null when unauthenticated', async () => {
     const { getSocket } = await import('./socket');
     expect(getSocket()).toBeNull();
     expect(io).not.toHaveBeenCalled();
   });
 
-  it('creates a singleton socket when token exists', async () => {
-    localStorage.setItem('mew_token', 'abc');
+  it('creates a singleton socket when authenticated', async () => {
+    status = 'authenticated';
     const { getSocket, disconnectSocket } = await import('./socket');
 
     const s1 = getSocket();
@@ -36,8 +42,8 @@ describe('shared/services/socket', () => {
     expect(io).toHaveBeenCalledTimes(1);
     expect(io).toHaveBeenCalledWith(
       expect.objectContaining({
-        auth: { token: 'abc' },
         transports: ['websocket', 'polling'],
+        withCredentials: true,
       })
     );
     expect(on).toHaveBeenCalledWith('connect', expect.any(Function));

@@ -4,6 +4,8 @@ import { Icon } from '@iconify/react';
 import { authApi } from '../../../shared/services/api';
 import { useAuthStore } from '../../../shared/stores';
 import { getApiErrorMessage } from '../../../shared/utils/apiError';
+import { parseAuthPathname, navigateAuth } from '../../../shared/router/authRoute';
+import { addNavigationListener } from '../../../shared/router/history';
 
 export const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,8 +16,20 @@ export const AuthScreen = () => {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const setAuth = useAuthStore((state) => state.setAuth);
+  const setUser = useAuthStore((state) => state.setUser);
+  const hydrate = useAuthStore((state) => state.hydrate);
   const logout = useAuthStore((state) => state.logout);
+
+  useEffect(() => {
+    const syncFromPath = () => {
+      const mode = parseAuthPathname(window.location.pathname);
+      if (mode === 'register') setIsLogin(false);
+      if (mode === 'login') setIsLogin(true);
+    };
+
+    syncFromPath();
+    return addNavigationListener(syncFromPath);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -41,6 +55,7 @@ export const AuthScreen = () => {
   useEffect(() => {
     if (allowRegistration === false && !isLogin) {
       setIsLogin(true);
+      navigateAuth('login', { replace: true });
     }
   }, [allowRegistration, isLogin]);
 
@@ -49,36 +64,24 @@ export const AuthScreen = () => {
     setError('');
     setNotice('');
 
-    const shouldRemember = isLogin ? rememberMe : true;
     try {
       if (isLogin) {
         const res = await authApi.login({ email, password, rememberMe: rememberMe });
-        const token = res.data.token as string;
         const user = res.data.user ?? null;
-        setAuth(token, user, shouldRemember);
-
-        try {
-          const userRes = await authApi.getMe();
-          setAuth(token, userRes.data, shouldRemember);
-        } catch (userErr) {
-          console.error('Failed to fetch user profile', userErr);
-        }
+        if (user) setUser(user);
+        else await hydrate();
       } else {
         if (allowRegistration === false) {
           setIsLogin(true);
+          navigateAuth('login', { replace: true });
           setError('Registration is disabled. Please contact an admin.');
           return;
         }
         const res = await authApi.register({ email, username, password });
-        const token = res.data.token as string | undefined;
         const user = res.data.user ?? null;
 
-        if (token) {
-          setAuth(token, user, shouldRemember);
-        } else {
-          setIsLogin(true);
-          setNotice('Registration successful. Please log in.');
-        }
+        if (user) setUser(user);
+        else await hydrate();
       }
     } catch (err: any) {
       const message = getApiErrorMessage(err, 'An error occurred');
@@ -91,7 +94,7 @@ export const AuthScreen = () => {
       }
 
       setError(message);
-      if (isLogin) logout();
+      if (isLogin) void logout();
     }
   };
 
@@ -173,7 +176,9 @@ export const AuthScreen = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setIsLogin(!isLogin);
+                  const nextIsLogin = !isLogin;
+                  setIsLogin(nextIsLogin);
+                  navigateAuth(nextIsLogin ? 'login' : 'register');
                   setError('');
                   setNotice('');
                 }}

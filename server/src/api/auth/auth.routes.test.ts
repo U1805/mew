@@ -5,6 +5,22 @@ import User from '../user/user.model';
 import Bot from '../bot/bot.model';
 import mongoose from 'mongoose';
 
+const extractCookieValue = (setCookie: string[] | undefined, name: string): string | null => {
+  const all = setCookie || [];
+  for (const c of all) {
+    const m = c.match(new RegExp(`^${name}=([^;]+)`));
+    if (m && m[1]) return m[1];
+  }
+  return null;
+};
+
+const getCsrfSession = async () => {
+  const csrfRes = await request(app).get('/api/auth/csrf');
+  const csrfCookies = (csrfRes.headers['set-cookie'] as string[] | undefined) || [];
+  const csrfToken = extractCookieValue(csrfCookies, 'mew_csrf_token');
+  return { csrfCookies, csrfToken };
+};
+
 describe('Auth Routes', () => {
   describe('POST /api/auth/register', () => {
     it('should register a new user successfully', async () => {
@@ -18,6 +34,33 @@ describe('Auth Routes', () => {
       expect(res.body.user.email).toBe(userData.email);
       expect(res.body.token).toBeDefined();
       expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('should issue a session refresh cookie by default (no rememberMe)', async () => {
+      const userData = {
+        email: 'register-session-1@example.com',
+        username: 'registersession1',
+        password: 'password123',
+      };
+      const res = await request(app).post('/api/auth/register').send(userData);
+      expect(res.statusCode).toBe(201);
+      const cookies = res.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+      expect((cookies || []).join(';')).not.toContain('Max-Age=');
+    });
+
+    it('should issue a persistent refresh cookie when rememberMe=true', async () => {
+      const userData = {
+        email: 'register-persistent-1@example.com',
+        username: 'registerpersistent1',
+        password: 'password123',
+        rememberMe: true,
+      };
+      const res = await request(app).post('/api/auth/register').send(userData);
+      expect(res.statusCode).toBe(201);
+      const cookies = res.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+      expect((cookies || []).join(';')).toContain('Max-Age=');
     });
 
     it('should return 409 if email is already taken', async () => {
@@ -93,6 +136,68 @@ describe('Auth Routes', () => {
     });
   });
 
+  describe('cookie-only auth endpoints', () => {
+    it('POST /api/auth/register-cookie returns user without token', async () => {
+      const userData = {
+        email: 'register-cookie-1@example.com',
+        username: 'registercookie1',
+        password: 'password123',
+      };
+      const res = await request(app).post('/api/auth/register-cookie').send(userData);
+      expect(res.statusCode).toBe(201);
+      expect(res.body.user.email).toBe(userData.email);
+      expect(res.body.token).toBeUndefined();
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('POST /api/auth/login-cookie returns user without token', async () => {
+      const userData = {
+        email: 'login-cookie-1@example.com',
+        username: 'logincookie1',
+        password: 'password123',
+      };
+      await request(app).post('/api/auth/register').send(userData);
+      const res = await request(app).post('/api/auth/login-cookie').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: true,
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.body.user.email).toBe(userData.email);
+      expect(res.body.token).toBeUndefined();
+      expect(res.headers['set-cookie']).toBeDefined();
+    });
+
+    it('POST /api/auth/refresh-cookie rotates refresh token and returns user without token', async () => {
+      const userData = {
+        email: 'refresh-cookie-1@example.com',
+        username: 'refreshcookie1',
+        password: 'password123',
+      };
+
+      await request(app).post('/api/auth/register').send(userData);
+      const loginRes = await request(app).post('/api/auth/login-cookie').send({
+        email: userData.email,
+        password: userData.password,
+        rememberMe: true,
+      });
+
+      expect(loginRes.statusCode).toBe(200);
+      const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
+      expect(cookies).toBeDefined();
+
+      const { csrfCookies, csrfToken } = await getCsrfSession();
+      const refreshRes = await request(app)
+        .post('/api/auth/refresh-cookie')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', [...(cookies || []), ...csrfCookies]);
+      expect(refreshRes.statusCode).toBe(200);
+      expect(refreshRes.body.user).toBeDefined();
+      expect(refreshRes.body.token).toBeUndefined();
+      expect(refreshRes.headers['set-cookie']).toBeDefined();
+    });
+  });
+
   describe('POST /api/auth/bot', () => {
     it('should exchange bot accessToken for a JWT', async () => {
       const botUser = await User.create({
@@ -151,7 +256,11 @@ describe('Auth Routes', () => {
       const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
       expect(cookies).toBeDefined();
 
-      const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      const { csrfCookies, csrfToken } = await getCsrfSession();
+      const refreshRes = await request(app)
+        .post('/api/auth/refresh')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', [...(cookies || []), ...csrfCookies]);
       expect(refreshRes.statusCode).toBe(200);
       expect(refreshRes.body.token).toBeDefined();
       expect(refreshRes.body.user?._id).toBe(botUser._id.toString());
@@ -177,18 +286,34 @@ describe('Auth Routes', () => {
       const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
       expect(cookies).toBeDefined();
 
-      const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      const { csrfCookies, csrfToken } = await getCsrfSession();
+      const refreshRes = await request(app)
+        .post('/api/auth/refresh')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', [...(cookies || []), ...csrfCookies]);
       expect(refreshRes.statusCode).toBe(200);
       expect(refreshRes.body.token).toBeDefined();
       expect(refreshRes.headers['set-cookie']).toBeDefined();
 
       // Old refresh token should no longer be valid after rotation.
-      const refreshAgainOld = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      const refreshAgainOld = await request(app)
+        .post('/api/auth/refresh')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', [...(cookies || []), ...csrfCookies]);
       expect(refreshAgainOld.statusCode).toBe(401);
     });
 
-    it('should return 401 when refresh cookie is missing', async () => {
+    it('should return 403 when CSRF token is missing on refresh (even without refresh cookie)', async () => {
       const res = await request(app).post('/api/auth/refresh');
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('should return 401 when refresh cookie is missing but CSRF is valid', async () => {
+      const { csrfCookies, csrfToken } = await getCsrfSession();
+      const res = await request(app)
+        .post('/api/auth/refresh')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', csrfCookies);
       expect(res.statusCode).toBe(401);
     });
   });
@@ -211,11 +336,18 @@ describe('Auth Routes', () => {
       const cookies = loginRes.headers['set-cookie'] as string[] | undefined;
       expect(cookies).toBeDefined();
 
-      const logoutRes = await request(app).post('/api/auth/logout').set('Cookie', cookies || []);
+      const { csrfCookies, csrfToken } = await getCsrfSession();
+      const logoutRes = await request(app)
+        .post('/api/auth/logout')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', [...(cookies || []), ...csrfCookies]);
       expect(logoutRes.statusCode).toBe(204);
       expect(logoutRes.headers['set-cookie']).toBeDefined();
 
-      const refreshRes = await request(app).post('/api/auth/refresh').set('Cookie', cookies || []);
+      const refreshRes = await request(app)
+        .post('/api/auth/refresh')
+        .set('X-Mew-Csrf-Token', csrfToken || '')
+        .set('Cookie', [...(cookies || []), ...csrfCookies]);
       expect(refreshRes.statusCode).toBe(401);
     });
   });

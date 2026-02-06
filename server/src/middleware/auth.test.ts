@@ -39,6 +39,18 @@ describe('middleware/auth protect', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('returns 401 when token uses a disallowed algorithm', () => {
+    const token = jwt.sign({ id: 'u1', username: 'alice' }, config.jwtSecret, { algorithm: 'HS512' as any });
+    const req: any = { headers: { authorization: `Bearer ${token}` } };
+    const res = makeRes();
+
+    protect(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ message: 'Unauthorized: Invalid token' });
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('sets req.user and calls next when token is valid', () => {
     const token = jwt.sign({ id: 'u1', username: 'alice' }, config.jwtSecret);
     const req: any = { headers: { authorization: `Bearer ${token}` } };

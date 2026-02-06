@@ -15,10 +15,17 @@ const getHandshakeValue = (socket: Socket, key: string): string | undefined => {
   return undefined;
 };
 
+const getHandshakeAuthValue = (socket: Socket, key: string): string | undefined => {
+  const authVal = (socket.handshake.auth as any)?.[key];
+  if (typeof authVal === 'string') return authVal;
+  return undefined;
+};
+
 const getAdminSecret = (socket: Socket): string | undefined => {
   const headerVal = socket.handshake.headers?.['x-mew-admin-secret'];
   if (typeof headerVal === 'string') return headerVal;
-  return getHandshakeValue(socket, 'adminSecret');
+  // Never accept secrets via query string: it is commonly logged and has a much larger leak surface.
+  return getHandshakeAuthValue(socket, 'adminSecret');
 };
 
 const safeEqual = (a: string, b: string): boolean => {

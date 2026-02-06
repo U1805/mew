@@ -25,8 +25,8 @@ router.use(protect, checkServerMembership);
 router.get('/', getChannelsHandler);
 router.post('/', authorizeServer('MANAGE_CHANNEL'), validate(createChannelSchema), createChannelHandler);
 
-// Mount message routes
-router.use('/:channelId/messages', messageRoutes);
+// Mount message routes (must be able to view channel first)
+router.use('/:channelId/messages', authorizeChannel('VIEW_CHANNEL'), messageRoutes);
 
 // Mount webhook routes
 router.use('/:channelId/webhooks', webhookRoutes);

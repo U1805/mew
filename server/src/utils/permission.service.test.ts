@@ -74,7 +74,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
       createMockRole(everyoneRoleId, [], 0, true),
       channel
     );
-    expect(permissions).toEqual(new Set(['SEND_MESSAGES', 'ADD_REACTIONS', 'ATTACH_FILES']));
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES', 'ADD_REACTIONS', 'ATTACH_FILES']));
   });
 
   it('should combine base permissions from @everyone and other roles', () => {
@@ -90,7 +90,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
       channel
     );
 
-    expect(permissions).toEqual(new Set(['SEND_MESSAGES']));
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES']));
   });
 
   it('should grant all permissions if a role has ADMINISTRATOR', () => {
@@ -123,7 +123,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
 
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
 
-    expect(permissions).toEqual(new Set());
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL']));
   });
 
   it('should apply an ALLOW override from a specific role', () => {
@@ -146,7 +146,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
       channel
     );
 
-    expect(permissions).toEqual(new Set(['SEND_MESSAGES']));
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES']));
   });
 
 
@@ -174,7 +174,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
     ]);
 
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
-    expect(permissions).toEqual(new Set());
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL']));
   });
 
   it('should correctly apply overrides based on role position hierarchy', () => {
@@ -225,7 +225,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
 
     const permissions = calculateEffectivePermissions(member, [modRole, vipRole], everyoneRole, channel);
 
-    expect(permissions).toEqual(new Set(['ADD_REACTIONS', 'SEND_MESSAGES', 'ATTACH_FILES']));
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'ADD_REACTIONS', 'SEND_MESSAGES', 'ATTACH_FILES']));
   });
 
   it('should handle users with only the @everyone role', () => {
@@ -237,7 +237,7 @@ describe('Permission Service - calculateEffectivePermissions', () => {
 
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
 
-    expect(permissions).toEqual(new Set(['ADD_REACTIONS']));
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'ADD_REACTIONS']));
   });
 
   it('should ignore invalid permission strings in data', () => {
@@ -250,6 +250,6 @@ describe('Permission Service - calculateEffectivePermissions', () => {
     const permissions = calculateEffectivePermissions(member, [], everyoneRole, channel);
 
     // Invalid permissions should be filtered out
-    expect(permissions).toEqual(new Set(['SEND_MESSAGES']));
+    expect(permissions).toEqual(new Set(['VIEW_CHANNEL', 'SEND_MESSAGES']));
   });
 });

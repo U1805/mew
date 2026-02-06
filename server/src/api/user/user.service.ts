@@ -6,6 +6,7 @@ import BotModel from '../bot/bot.model';
 import UserModel from './user.model';
 import { Types } from 'mongoose';
 import { UserChannelNotificationSetting } from '../channel/channelNotificationSetting.model';
+import { revokeAllRefreshTokensForUserId } from '../auth/refreshToken.service';
 
 const userService = {
   async getMe(userId: string) {
@@ -177,6 +178,9 @@ const userService = {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     await userRepository.updateById(userId, { password: hashedPassword });
+
+    // Invalidate all refresh tokens after password change to prevent session persistence after credential rotation.
+    await revokeAllRefreshTokensForUserId(userId);
   },
 };
 

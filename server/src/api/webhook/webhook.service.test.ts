@@ -73,6 +73,7 @@ describe('webhook.service executeWebhook', () => {
       expect.objectContaining({
         channelId: 'c1',
         authorId: 'u-bot',
+        type: 'message/default',
         content: 'hello',
         payload: expect.objectContaining({
           webhookName: 'Hook',
@@ -81,7 +82,8 @@ describe('webhook.service executeWebhook', () => {
             avatarUrl: 'override.png',
           }),
         }),
-      })
+      }),
+      { bypassPermissions: true }
     );
     expect(result).toEqual({ _id: 'm1' });
   });

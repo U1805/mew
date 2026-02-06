@@ -1,10 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { createConfig } from './index';
 
 describe('config/createConfig', () => {
+  let warnSpy: any;
+
+  beforeEach(() => {
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warnSpy?.mockRestore?.();
+  });
+
   it('parses PORT and JWT_EXPIRES_IN (defaults + numeric + duration strings)', () => {
     expect(createConfig({}).port).toBe(3000);
     expect(createConfig({ PORT: 'nope' }).port).toBe(3000);
@@ -152,5 +162,29 @@ describe('config/createConfig', () => {
         S3_SECRET_ACCESS_KEY: '',
       })
     ).toThrow('Missing required S3 credentials');
+  });
+
+  it('fails fast in production when JWT_SECRET is a known insecure default', () => {
+    expect(() =>
+      createConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'dev-jwt-secret',
+        MEW_ADMIN_SECRET: 'admin',
+        S3_ACCESS_KEY_ID: 'env-ak',
+        S3_SECRET_ACCESS_KEY: 'env-sk',
+      })
+    ).toThrow('Insecure env');
+  });
+
+  it('fails fast in production when MEW_ADMIN_SECRET is a known insecure default', () => {
+    expect(() =>
+      createConfig({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'jwt',
+        MEW_ADMIN_SECRET: 'dev-admin-secret',
+        S3_ACCESS_KEY_ID: 'env-ak',
+        S3_SECRET_ACCESS_KEY: 'env-sk',
+      })
+    ).toThrow('Insecure env');
   });
 });
