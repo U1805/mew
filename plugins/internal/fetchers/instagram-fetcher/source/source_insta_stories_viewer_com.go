@@ -169,6 +169,7 @@ func (c *Client) fetchInstaStoriesViewerSocketIO(ctx context.Context, httpClient
 
 		if user, ok := parseSearchResult(string(body)); ok {
 			stories := append([]StoryItem(nil), user.Edges...)
+			normalizeInstaStoriesViewerStoryIDs(stories)
 			user.Edges = nil
 			return stories, &user, nil
 		}
@@ -294,4 +295,12 @@ func randomAlphaNum(length int) string {
 		b.WriteByte(chars[n.Int64()])
 	}
 	return b.String()
+}
+
+func normalizeInstaStoriesViewerStoryIDs(stories []StoryItem) {
+	for i := range stories {
+		if stories[i].TakenAt > 0 {
+			stories[i].ID = fmt.Sprintf("%d_0", stories[i].TakenAt)
+		}
+	}
 }

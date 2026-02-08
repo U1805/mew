@@ -60,9 +60,9 @@ type timelineSource struct {
 
 func (c *Client) timelineSources() []timelineSource {
 	return []timelineSource{
-		{name: "twitterviewer-trpc", fetch: c.fetchTwitterViewerTRPC},
-		{name: "twitter-viewer-user-tweets", fetch: c.fetchTwitterViewerUserTweets},
-		{name: "twitterwebviewer-user-tweets", fetch: c.fetchTwitterWebViewerUserTweets},
+		{name: "twitterviewer-net", fetch: c.fetchTwitterViewerTRPC},
+		{name: "twitter-viewer-com", fetch: c.fetchTwitterViewerUserTweets},
+		{name: "twitterwebviewer-com", fetch: c.fetchTwitterWebViewerUserTweets},
 	}
 }
 
