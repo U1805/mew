@@ -6,16 +6,15 @@ import (
 	"net/http"
 	"time"
 
-	"mew/plugins/pkg"
 	"mew/plugins/internal/fetchers/test-fetcher/config"
 	"mew/plugins/internal/fetchers/test-fetcher/source"
-	"mew/plugins/internal/fetchers/test-fetcher/tracker"
+	"mew/plugins/pkg"
 )
 
 type Worker struct {
 	logPrefix  string
 	client     *source.Client
-	tracker    *tracker.Manager
+	tracker    *Manager
 	httpClient *http.Client
 	apiBase    string
 	task       config.TaskConfig
