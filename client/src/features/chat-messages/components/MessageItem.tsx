@@ -11,7 +11,7 @@ import ReactionList from './ReactionList';
 import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
 import { Attachment, Message } from '../../../shared/types';
-import { channelApi, infraApi, messageApi, ttsApi } from '../../../shared/services/api';
+import { channelApi, infraApi, messageApi, sttApi, ttsApi } from '../../../shared/services/api';
 import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
@@ -334,8 +334,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
               : 'webm';
 
       const file = new File([blob], `voice-${message._id}.${ext}`, { type: mimeType });
-      const sttRes = await messageApi.transcribeVoice(currentServerId || undefined, message.channelId, message._id, file);
-      const text = (typeof sttRes.data === 'string' ? sttRes.data : String(sttRes.data ?? '')).trim();
+      const text = await sttApi.transcribe(file, {
+        model: 'whisper-1',
+        response_format: 'json',
+      });
 
       queryClient.setQueryData(['messages', message.channelId], (old: Message[] | undefined) => {
         if (!old) return old;

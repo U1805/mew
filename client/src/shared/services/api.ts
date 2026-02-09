@@ -18,6 +18,7 @@ export { botApi } from './bot.api';
 export { serverBotApi } from './serverBot.api';
 export { infraApi } from './infra.api';
 export { ttsApi } from './tts.api';
+export { sttApi } from './stt.api';
 export type { LoginResponse } from './auth.api';
 
 export { default } from './http';
