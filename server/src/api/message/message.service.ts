@@ -699,8 +699,10 @@ export const transcribeVoiceMessage = async (channelId: string, messageId: strin
     throw new BadRequestError('Only voice messages can be transcribed');
   }
 
-  const textRaw = await transcribeVoiceFileToText(file);
-  const text = typeof textRaw === 'string' ? textRaw.trim() : '';
+  const transcription = await transcribeVoiceFileToText(file, {
+    model: 'qwen-qwen3-asr',
+  });
+  const text = typeof transcription.text === 'string' ? transcription.text.trim() : '';
 
   message.plainText = text || undefined;
   await messageRepository.save(message);

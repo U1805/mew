@@ -335,7 +335,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
       const file = new File([blob], `voice-${message._id}.${ext}`, { type: mimeType });
       const text = await sttApi.transcribe(file, {
-        model: 'whisper-1',
+        model: 'qwen3-asr',
         response_format: 'json',
       });
 
