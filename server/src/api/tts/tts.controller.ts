@@ -62,6 +62,7 @@ export const synthesizeTts = async (req: Request, res: Response, next: NextFunct
   try {
     const input = typeof req.body?.input === 'string' ? req.body.input : '';
     const text = typeof req.body?.text === 'string' ? req.body.text : '';
+    const model = typeof req.body?.model === 'string' && req.body.model.trim() ? req.body.model.trim() : 'namiai';
     const voice = typeof req.body?.voice === 'string' && req.body.voice.trim() ? req.body.voice.trim() : 'doubao';
     const stream = req.body?.stream === true;
     const streamFormat = typeof req.body?.stream_format === 'string' ? req.body.stream_format : '';
@@ -85,7 +86,7 @@ export const synthesizeTts = async (req: Request, res: Response, next: NextFunct
         await ttsService.streamMp3(part, voice, (chunk) => {
           totalBytes += chunk.length;
           writeSseEvent(res, { type: 'speech.audio.delta', audio: chunk.toString('base64') });
-        });
+        }, model);
       }
 
       writeSseEvent(res, {
@@ -105,14 +106,14 @@ export const synthesizeTts = async (req: Request, res: Response, next: NextFunct
       for (const part of parts) {
         await ttsService.streamMp3(part, voice, (chunk) => {
           res.write(chunk);
-        });
+        }, model);
       }
       return res.end();
     }
 
     const buffers: Buffer[] = [];
     for (const part of parts) {
-      buffers.push(await ttsService.synthesizeMp3(part, voice));
+      buffers.push(await ttsService.synthesizeMp3(part, voice, model));
     }
     const audio = Buffer.concat(buffers);
 

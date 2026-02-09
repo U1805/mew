@@ -199,5 +199,69 @@ describe('tts.service', () => {
     await run;
     expect(seen).toEqual([10, 20, 30]);
   });
+
+  it('supports qwen3-tts model pipeline and downloads audio', async () => {
+    mockFetch(async (url, init) => {
+      if (url.endsWith('/gradio_api/info')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => '',
+          json: async () => ({
+            named_endpoints: {
+              '/tts_interface': {
+                parameters: [
+                  {
+                    parameter_name: 'voice_display',
+                    type: { enum: ['Vivian / 十三'] },
+                  },
+                ],
+              },
+            },
+          }),
+          arrayBuffer: async () => new ArrayBuffer(0),
+        } as unknown as FetchResponse;
+      }
+
+      if (url.endsWith('/gradio_api/call/tts_interface') && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body));
+        expect(body.data[0]).toBe('hello qwen');
+        expect(body.data[1]).toBe('Vivian / 十三');
+        return {
+          ok: true,
+          status: 200,
+          text: async () => '',
+          json: async () => ({ event_id: 'evt-1' }),
+          arrayBuffer: async () => new ArrayBuffer(0),
+        } as unknown as FetchResponse;
+      }
+
+      if (url.endsWith('/gradio_api/call/tts_interface/evt-1')) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => 'event: complete\ndata: [{"url":"https://qwen-qwen3-tts-demo.ms.show/file.wav"}]\n\n',
+          arrayBuffer: async () => new ArrayBuffer(0),
+        };
+      }
+
+      if (url === 'https://qwen-qwen3-tts-demo.ms.show/file.wav') {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => '',
+          headers: {
+            get: (name: string) => (name.toLowerCase() === 'content-type' ? 'audio/wav' : null),
+          } as any,
+          arrayBuffer: async () => new Uint8Array([5, 6, 7]).buffer,
+        } as unknown as FetchResponse;
+      }
+
+      throw new Error(`unexpected fetch url: ${url}`);
+    });
+
+    const audio = await ttsService.synthesizeMp3('hello qwen', 'vivian', 'qwen3-tts');
+    expect([...audio]).toEqual([5, 6, 7]);
+  });
 });
 

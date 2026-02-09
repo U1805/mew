@@ -103,8 +103,8 @@ describe('tts.controller', () => {
     await synthesizeTts(req, res, next);
 
     expect(ttsService.synthesizeMp3).toHaveBeenCalledTimes(2);
-    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(1, `${'a'.repeat(1699)}。${'b'.repeat(50)}。`, 'doubao');
-    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(2, 'c'.repeat(100), 'doubao');
+    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(1, `${'a'.repeat(1699)}。${'b'.repeat(50)}。`, 'doubao', 'namiai');
+    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(2, 'c'.repeat(100), 'doubao', 'namiai');
     expect(res.send).toHaveBeenCalledWith(Buffer.from([1, 2]));
     expect(next).not.toHaveBeenCalled();
   });
@@ -135,7 +135,7 @@ describe('tts.controller', () => {
 
     await synthesizeTts(req, res, next);
 
-    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello', 'doubao');
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello', 'doubao', 'namiai');
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
     expect(res.status).toHaveBeenCalledWith(200);
@@ -153,7 +153,7 @@ describe('tts.controller', () => {
 
     await synthesizeTts(req, res, next);
 
-    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello openai', 'nova');
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello openai', 'nova', 'namiai');
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
     expect(res.status).toHaveBeenCalledWith(200);
     expect(res.send).toHaveBeenCalledWith(audio);
@@ -200,6 +200,21 @@ describe('tts.controller', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('passes qwen3-tts model to upstream service', async () => {
+    const req = { body: { input: 'hello qwen', voice: 'vivian', model: 'qwen3-tts' } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    const audio = Buffer.from([6, 6]);
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(audio);
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello qwen', 'vivian', 'qwen3-tts');
+    expect(res.send).toHaveBeenCalledWith(audio);
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it('passes upstream errors to next', async () => {
     const req = { body: { text: 'hello' } } as unknown as Request;
     const res = createRes();
@@ -229,3 +244,4 @@ describe('tts.controller', () => {
     expect((passed as Error).message).toContain('TTS upstream non-audio response');
   });
 });
+
