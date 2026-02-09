@@ -94,7 +94,7 @@ app.use('/api/bots', botBootstrapRoutes);
 app.use('/api/bots', botSelfRoutes);
 app.use('/api/infra', infraRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/tts', ttsRoutes);
+app.use('/api/v1/audio/speech', ttsRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

@@ -274,7 +274,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       const res = await ttsApi.synthesize(text);
       stopActiveTts();
 
-      const blob = new Blob([res.data], { type: 'audio/mpeg' });
+      const blob = new Blob([res.data], { type: res.contentType || 'audio/mpeg' });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
 
@@ -287,7 +287,8 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       await audio.play();
       toast.success(t('message.tts.playing'), { id: loadingToast });
     } catch (err) {
-      console.error('TTS failed', err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('TTS failed', message, err);
       toast.error(t('message.tts.failed'), { id: loadingToast });
       stopActiveTts();
     }

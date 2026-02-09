@@ -6,6 +6,7 @@ type FetchResponse = {
   status: number;
   text: () => Promise<string>;
   arrayBuffer: () => Promise<ArrayBuffer>;
+  body?: { getReader: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }> } };
 };
 
 const mockFetch = (impl: (url: string, init?: RequestInit) => Promise<FetchResponse>) => {
@@ -60,6 +61,22 @@ describe('tts.service', () => {
     await expect(ttsService.synthesizeMp3('hi', 'doubao')).rejects.toThrow('TTS upstream error (502): bad gateway');
   });
 
+  it('throws when upstream returns 2xx but non-audio content-type', async () => {
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null),
+      } as any,
+      text: async () => '{"code":1100,"msg":"bad token"}',
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }));
+
+    await expect(ttsService.synthesizeMp3('hi', 'doubao')).rejects.toThrow(
+      'TTS upstream non-audio response (application/json; charset=utf-8): {"code":1100,"msg":"bad token"}'
+    );
+  });
+
   it('throws when upstream returns empty audio', async () => {
     mockFetch(async () => ({
       ok: true,
@@ -69,6 +86,118 @@ describe('tts.service', () => {
     }));
 
     await expect(ttsService.synthesizeMp3('hi', 'doubao')).rejects.toThrow('TTS upstream returned empty audio');
+  });
+
+  it('streams chunked audio from upstream', async () => {
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '',
+      arrayBuffer: async () => new ArrayBuffer(0),
+      body: {
+        getReader: () => {
+          let i = 0;
+          const chunks = [new Uint8Array([1, 2]), new Uint8Array([3])];
+          return {
+            read: async () => {
+              if (i >= chunks.length) return { done: true };
+              const value = chunks[i++];
+              return { done: false, value };
+            },
+          };
+        },
+      },
+    }));
+
+    const out: number[] = [];
+    await ttsService.streamMp3('hi', 'doubao', (chunk) => {
+      out.push(...chunk);
+    });
+
+    expect(out).toEqual([1, 2, 3]);
+  });
+
+  it('throws when streaming response body is missing', async () => {
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '',
+      arrayBuffer: async () => new ArrayBuffer(0),
+    }));
+
+    await expect(ttsService.streamMp3('hi', 'doubao', () => {})).rejects.toThrow('TTS upstream returned empty audio');
+  });
+
+  it('throws when streaming response has no audio chunks', async () => {
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '',
+      arrayBuffer: async () => new ArrayBuffer(0),
+      body: {
+        getReader: () => ({
+          read: async () => ({ done: true }),
+        }),
+      },
+    }));
+
+    await expect(ttsService.streamMp3('hi', 'doubao', () => {})).rejects.toThrow('TTS upstream returned empty audio');
+  });
+
+  it('streams chunks incrementally without waiting for all data', async () => {
+    const waiters: Array<() => void> = [];
+    let index = 0;
+    const chunks = [new Uint8Array([10]), new Uint8Array([20]), new Uint8Array([30])];
+
+    mockFetch(async () => ({
+      ok: true,
+      status: 200,
+      text: async () => '',
+      arrayBuffer: async () => new ArrayBuffer(0),
+      body: {
+        getReader: () => ({
+          read: async () => {
+            if (index >= chunks.length) return { done: true };
+            await new Promise<void>((resolve) => {
+              waiters.push(resolve);
+            });
+            const value = chunks[index++];
+            return { done: false, value };
+          },
+        }),
+      },
+    }));
+
+    const seen: number[] = [];
+    const run = ttsService.streamMp3('hi', 'doubao', (chunk) => {
+      seen.push(...chunk);
+    });
+
+    const waitForPendingRead = async () => {
+      for (let i = 0; i < 20; i += 1) {
+        if (waiters.length > 0) return;
+        await Promise.resolve();
+      }
+      throw new Error('reader did not request next chunk in time');
+    };
+
+    expect(seen).toEqual([]);
+    await waitForPendingRead();
+    waiters.shift()?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(seen).toEqual([10]);
+
+    await waitForPendingRead();
+    waiters.shift()?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(seen).toEqual([10, 20]);
+
+    await waitForPendingRead();
+    waiters.shift()?.();
+    await run;
+    expect(seen).toEqual([10, 20, 30]);
   });
 });
 

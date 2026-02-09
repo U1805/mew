@@ -83,7 +83,7 @@ const getHeaders = () => {
 };
 
 export const ttsService = {
-  async synthesizeMp3(text: string, voice: string) {
+  async fetchUpstream(text: string, voice: string) {
     const url = `https://bot.n.cn/api/tts/v1?roleid=${encodeURIComponent(voice)}`;
     const headers: Record<string, string> = {
       ...getHeaders(),
@@ -104,11 +104,50 @@ export const ttsService = {
       throw new Error(`TTS upstream error (${res.status}): ${maybeText.slice(0, 200)}`);
     }
 
+    const contentType = (res.headers?.get('content-type') || '').toLowerCase();
+    const isAudioLike =
+      contentType === '' ||
+      contentType.includes('audio/') ||
+      contentType.includes('application/octet-stream');
+    if (!isAudioLike) {
+      const maybeText = await res.text().catch(() => '');
+      throw new Error(`TTS upstream non-audio response (${contentType || 'unknown'}): ${maybeText.slice(0, 200)}`);
+    }
+
+    return res;
+  },
+
+  async synthesizeMp3(text: string, voice: string) {
+    const res = await this.fetchUpstream(text, voice);
+
     const buf = Buffer.from(await res.arrayBuffer());
     if (!buf.length) {
       throw new Error('TTS upstream returned empty audio');
     }
     return buf;
+  },
+
+  async streamMp3(text: string, voice: string, onChunk: (chunk: Buffer) => void) {
+    const res = await this.fetchUpstream(text, voice);
+    const reader = res.body?.getReader();
+    if (!reader) {
+      throw new Error('TTS upstream returned empty audio');
+    }
+
+    let hasData = false;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const buf = Buffer.from(value);
+      if (!buf.length) continue;
+      hasData = true;
+      onChunk(buf);
+    }
+
+    if (!hasData) {
+      throw new Error('TTS upstream returned empty audio');
+    }
   },
 };
 

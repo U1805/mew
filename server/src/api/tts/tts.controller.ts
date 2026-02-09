@@ -5,6 +5,10 @@ import { ttsService } from './tts.service';
 const TTS_CHUNK_SIZE = 1800;
 const TTS_MAX_CHARS = 12000;
 
+const writeSseEvent = (res: Response, payload: Record<string, unknown>) => {
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+};
+
 const splitTtsText = (input: string) => {
   const text = input.trim();
   if (!text) return [];
@@ -56,17 +60,59 @@ const splitTtsText = (input: string) => {
 
 export const synthesizeTts = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const input = typeof req.body?.input === 'string' ? req.body.input : '';
     const text = typeof req.body?.text === 'string' ? req.body.text : '';
-    const trimmed = text.trim();
+    const voice = typeof req.body?.voice === 'string' && req.body.voice.trim() ? req.body.voice.trim() : 'doubao';
+    const stream = req.body?.stream === true;
+    const streamFormat = typeof req.body?.stream_format === 'string' ? req.body.stream_format : '';
+    const wantSse = stream && streamFormat === 'sse';
+    const wantAudioStream = stream && streamFormat !== 'sse';
+    const sourceText = input || text;
+    const trimmed = sourceText.trim();
     if (!trimmed) throw new BadRequestError('text is required');
     if (trimmed.length > TTS_MAX_CHARS) throw new BadRequestError(`text is too long (max ${TTS_MAX_CHARS} chars)`);
 
     const parts = trimmed.length > TTS_CHUNK_SIZE ? splitTtsText(trimmed) : [trimmed];
     if (parts.length === 0) throw new BadRequestError('text is required');
 
+    if (wantSse) {
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('Connection', 'keep-alive');
+
+      let totalBytes = 0;
+      for (const part of parts) {
+        await ttsService.streamMp3(part, voice, (chunk) => {
+          totalBytes += chunk.length;
+          writeSseEvent(res, { type: 'speech.audio.delta', audio: chunk.toString('base64') });
+        });
+      }
+
+      writeSseEvent(res, {
+        type: 'speech.audio.done',
+        usage: {
+          input_text_length: trimmed.length,
+          output_audio_bytes: totalBytes,
+        },
+      });
+      return res.end();
+    }
+
+    if (wantAudioStream) {
+      res.setHeader('Content-Type', 'audio/mpeg');
+      res.setHeader('Cache-Control', 'no-store');
+
+      for (const part of parts) {
+        await ttsService.streamMp3(part, voice, (chunk) => {
+          res.write(chunk);
+        });
+      }
+      return res.end();
+    }
+
     const buffers: Buffer[] = [];
     for (const part of parts) {
-      buffers.push(await ttsService.synthesizeMp3(part, 'doubao'));
+      buffers.push(await ttsService.synthesizeMp3(part, voice));
     }
     const audio = Buffer.concat(buffers);
 
@@ -74,6 +120,9 @@ export const synthesizeTts = async (req: Request, res: Response, next: NextFunct
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(audio);
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith('TTS upstream')) {
+      return next(new BadRequestError(err.message));
+    }
     return next(err as Error);
   }
 };
