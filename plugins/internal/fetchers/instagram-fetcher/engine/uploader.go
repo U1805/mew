@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 
 	"mew/plugins/internal/fetchers/instagram-fetcher/source"
@@ -71,6 +72,65 @@ func (u *Uploader) UploadWithCache(ctx context.Context, remoteURL, fallbackFilen
 		return ""
 	}
 	return key
+}
+
+func (u *Uploader) ProcessAndSendStory(ctx context.Context, user *source.UserProfile, story source.StoryItem) error {
+	if user == nil {
+		return nil
+	}
+
+	isVideo := sdk.BoolOrDefault(story.IsVideo, false)
+	displayURL := source.DecodeMediaURL(story.DisplayURL)
+	thumbURL := source.DecodeMediaURL(story.ThumbnailSrc)
+	videoURL := source.DecodeMediaURL(story.VideoURL)
+
+	profilePic := source.DecodeMediaURL(user.ProfilePicURL)
+	if strings.TrimSpace(profilePic) == "" {
+		profilePic = source.DecodeMediaURL(user.ProfilePicURLHD)
+	}
+
+	s3Display := ""
+	s3Thumb := ""
+	s3Video := ""
+
+	if isVideo {
+		if strings.TrimSpace(videoURL) != "" {
+			fallback := sdk.FilenameFromURL(videoURL, "video.mp4")
+			if ext := path.Ext(fallback); ext == "" {
+				fallback = fallback + ".mp4"
+			}
+			s3Video = u.UploadWithCache(ctx, videoURL, fallback)
+		}
+		if strings.TrimSpace(thumbURL) != "" {
+			fallback := sdk.FilenameFromURL(thumbURL, "thumbnail.jpg")
+			s3Thumb = u.UploadWithCache(ctx, thumbURL, fallback)
+		}
+	} else {
+		if strings.TrimSpace(displayURL) != "" {
+			fallback := strings.TrimSpace(story.DisplayURLFilename)
+			if fallback == "" {
+				fallback = sdk.FilenameFromURL(displayURL, "story.jpg")
+			}
+			if ext := path.Ext(fallback); ext == "" {
+				fallback = fallback + ".jpg"
+			}
+			s3Display = u.UploadWithCache(ctx, displayURL, fallback)
+		} else if strings.TrimSpace(thumbURL) != "" {
+			fallback := sdk.FilenameFromURL(thumbURL, "story.jpg")
+			s3Display = u.UploadWithCache(ctx, thumbURL, fallback)
+		}
+	}
+
+	return u.SendStory(ctx, user, story, UploadResult{
+		DisplayKey: s3Display,
+		ThumbKey:   s3Thumb,
+		VideoKey:   s3Video,
+		ProfilePic: profilePic,
+		DisplayURL: displayURL,
+		ThumbURL:   thumbURL,
+		VideoURL:   videoURL,
+		IsVideo:    isVideo,
+	})
 }
 
 func (u *Uploader) SendStory(ctx context.Context, user *source.UserProfile, story source.StoryItem, uploaded UploadResult) error {

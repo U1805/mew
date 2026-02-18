@@ -6,10 +6,9 @@ import (
 	"log"
 	"time"
 
-	"mew/plugins/pkg"
 	"mew/plugins/internal/fetchers/test-fetcher/config"
 	"mew/plugins/internal/fetchers/test-fetcher/source"
-	"mew/plugins/internal/fetchers/test-fetcher/tracker"
+	"mew/plugins/pkg"
 )
 
 type Runner struct {
@@ -52,7 +51,7 @@ func (r *Runner) Run(ctx context.Context) error {
 		g.Go(func(ctx context.Context) {
 			logPrefix := fmt.Sprintf("[test-bot] bot=%s name=%q task=%d", r.botID, r.botName, taskIndex)
 
-			tr, err := tracker.Load(r.serviceType, r.botID, taskIndex, taskCopy.Webhook)
+			tr, err := Load(r.serviceType, r.botID, taskIndex, taskCopy.Webhook)
 			if err != nil {
 				log.Printf("%s load state failed: %v", logPrefix, err)
 			}
