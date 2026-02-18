@@ -52,6 +52,12 @@ export const enMessages: Record<string, string> = {
     'settings.textImages': 'Text & Images',
     'settings.logOut': 'Log Out',
     'settings.esc': 'ESC',
+    'voiceVideo.ttsSection': 'Text to Speech',
+    'voiceVideo.ttsModel': 'TTS Model',
+    'voiceVideo.ttsVoice': 'TTS Voice',
+    'voiceVideo.sttSection': 'Speech to Text',
+    'voiceVideo.sttModel': 'STT Model',
+    'voiceVideo.sttModelHint': 'Select the speech recognition model that best fits your language and accuracy needs.',
 
     'account.change': 'Change',
     'account.editUserProfile': 'Edit User Profile',

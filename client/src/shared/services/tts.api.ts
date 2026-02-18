@@ -1,6 +1,7 @@
 import { API_URL } from './http';
 
 type TtsStreamOptions = {
+  model?: string;
   voice?: string;
   onChunk?: (chunk: Uint8Array) => void;
 };
@@ -47,7 +48,7 @@ export const ttsApi = {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'namiai',
+        model: options?.model || 'namiai',
         input: text,
         voice: options?.voice || 'doubao',
         response_format: 'mp3',

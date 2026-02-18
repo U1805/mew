@@ -15,6 +15,7 @@ import { channelApi, infraApi, messageApi, sttApi, ttsApi } from '../../../share
 import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
+import { useVoiceSettingsStore } from '../../../shared/stores/voiceSettingsStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { getMessageBestEffortText } from '../../../shared/utils/messageText';
 import { useI18n } from '../../../shared/i18n';
@@ -78,6 +79,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
   const itemRef = useRef<HTMLDivElement>(null);
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
+  const voiceSettings = useVoiceSettingsStore((state) => state.settings);
 
   const canAddReaction = permissions.has('ADD_REACTIONS');
   const canManageMessages = permissions.has('MANAGE_MESSAGES');
@@ -271,7 +273,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
     const loadingToast = toast.loading(t('message.tts.generating'));
     try {
-      const res = await ttsApi.synthesize(text);
+      const res = await ttsApi.synthesize(text, {
+        model: voiceSettings.ttsModel,
+        voice: voiceSettings.ttsVoice,
+      });
       stopActiveTts();
 
       const blob = new Blob([res.data], { type: res.contentType || 'audio/mpeg' });
@@ -335,7 +340,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
       const file = new File([blob], `voice-${message._id}.${ext}`, { type: mimeType });
       const text = await sttApi.transcribe(file, {
-        model: 'qwen3-asr',
+        model: voiceSettings.sttModel,
         response_format: 'json',
       });
 

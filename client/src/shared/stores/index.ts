@@ -7,4 +7,5 @@ export { useUIStore } from './uiStore';
 export { useModalStore } from './modalStore';
 export { useHiddenStore } from './hiddenStore';
 export { useNotificationSettingsStore } from './notificationSettingsStore';
+export { useVoiceSettingsStore } from './voiceSettingsStore';
 

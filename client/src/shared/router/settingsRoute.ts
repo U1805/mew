@@ -1,13 +1,14 @@
 import { safePushState, safeReplaceState } from './history';
 
-export type SettingsTab = 'account' | 'notifications' | 'plugins' | 'bots' | 'stickers';
+export type SettingsTab = 'account' | 'notifications' | 'plugins' | 'bots' | 'stickers' | 'voiceVideo';
 
 export const isSettingsTab = (value: string): value is SettingsTab =>
   value === 'account' ||
   value === 'notifications' ||
   value === 'plugins' ||
   value === 'bots' ||
-  value === 'stickers';
+  value === 'stickers' ||
+  value === 'voiceVideo';
 
 export const buildSettingsPathname = (tab?: SettingsTab): string => {
   if (!tab || tab === 'account') return '/settings';
