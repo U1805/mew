@@ -25,19 +25,6 @@ export const messageApi = {
     const prefix = serverId ? `/servers/${serverId}` : '';
     return api.post(`${prefix}/channels/${channelId}/messages`, data);
   },
-  transcribeVoice: (
-    serverId: string | undefined,
-    channelId: string,
-    messageId: string,
-    file: File
-  ) => {
-    const prefix = serverId ? `/servers/${serverId}` : '';
-    const form = new FormData();
-    form.append('file', file);
-    return api.post(`${prefix}/channels/${channelId}/messages/${messageId}/transcribe`, form, {
-      responseType: 'text',
-    });
-  },
   update: (
     serverId: string | undefined,
     channelId: string,

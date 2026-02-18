@@ -46,7 +46,11 @@ export const UserSettingsSidebar: React.FC<{
         <div className="text-xs font-bold text-mew-textMuted uppercase px-2.5 mb-1.5 mt-2">{t('settings.appSettings')}</div>
         <SidebarItem label={t('settings.appearance')} />
         <SidebarItem label={t('settings.accessibility')} />
-        <SidebarItem label={t('settings.voiceVideo')} />
+        <SidebarItem
+          label={t('settings.voiceVideo')}
+          isActive={activeTab === 'voiceVideo'}
+          onClick={() => onTabClick('voiceVideo')}
+        />
         <SidebarItem label={t('settings.textImages')} />
         <SidebarItem label={t('settings.notifications')} isActive={activeTab === 'notifications'} onClick={() => onTabClick('notifications')} />
         <SidebarItem label={t('settings.bots')} isActive={activeTab === 'bots' || activeTab === 'plugins'} onClick={() => onTabClick('bots')} />

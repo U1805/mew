@@ -19,6 +19,7 @@ import botBootstrapRoutes from './api/bot/bot.bootstrap.routes';
 import botSelfRoutes from './api/bot/bot.self.routes';
 import healthRoutes from './api/health/health.routes';
 import ttsRoutes from './api/tts/tts.routes';
+import sttRoutes from './api/stt/stt.routes';
 import { errorHandler } from './utils/errorHandler';
 
 const app = express();
@@ -94,7 +95,8 @@ app.use('/api/bots', botBootstrapRoutes);
 app.use('/api/bots', botSelfRoutes);
 app.use('/api/infra', infraRoutes);
 app.use('/api/health', healthRoutes);
-app.use('/api/tts', ttsRoutes);
+app.use('/api/v1/audio/speech', ttsRoutes);
+app.use('/api/v1/audio/transcriptions', sttRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

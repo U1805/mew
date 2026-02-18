@@ -14,8 +14,10 @@ import { UserStickerPanel } from './UserStickerPanel';
 import { UserSettingsSidebar } from './UserSettingsSidebar';
 import { UserSettingsAccountTab } from './UserSettingsAccountTab';
 import { UserSettingsNotificationsTab } from './UserSettingsNotificationsTab';
+import { UserSettingsVoiceVideoTab } from './UserSettingsVoiceVideoTab';
 import type { SettingsTab } from '../../../shared/router/settingsRoute';
 import { useI18n } from '../../../shared/i18n';
+import { useVoiceSettingsStore } from '../../../shared/stores/voiceSettingsStore';
 
 const UserSettings: React.FC = () => {
     const { t } = useI18n();
@@ -23,6 +25,8 @@ const UserSettings: React.FC = () => {
     const { user, logout, setUser, status } = useAuthStore();
     const notif = useNotificationSettingsStore((s) => s.user);
     const setNotif = useNotificationSettingsStore((s) => s.setUserSettings);
+    const voiceSettings = useVoiceSettingsStore((s) => s.settings);
+    const updateVoiceSettings = useVoiceSettingsStore((s) => s.updateSettings);
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(true);
 
@@ -41,7 +45,7 @@ const UserSettings: React.FC = () => {
 
     useEffect(() => {
         if (!isSettingsOpen) return;
-        const tabOrder: SettingsTab[] = ['account', 'stickers', 'notifications', 'bots', 'plugins'];
+        const tabOrder: SettingsTab[] = ['account', 'stickers', 'notifications', 'voiceVideo', 'bots', 'plugins'];
         if (activeTab === displayedTab) return;
 
         const currentIndex = tabOrder.indexOf(displayedTab);
@@ -245,6 +249,10 @@ const UserSettings: React.FC = () => {
                                 setNotif={setNotif}
                                 persistNotificationSettings={persistNotificationSettings}
                             />
+                        )}
+
+                        {displayedTab === 'voiceVideo' && (
+                            <UserSettingsVoiceVideoTab settings={voiceSettings} onUpdate={updateVoiceSettings} />
                         )}
                     </div>
                 </div>

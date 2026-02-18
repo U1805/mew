@@ -5,6 +5,7 @@ import { BadRequestError } from '../../utils/errors';
 vi.mock('./tts.service', () => ({
   ttsService: {
     synthesizeMp3: vi.fn(),
+    streamMp3: vi.fn(),
   },
 }));
 
@@ -16,7 +17,15 @@ const createRes = () => {
   res.setHeader = vi.fn();
   res.status = vi.fn().mockImplementation(() => res);
   res.send = vi.fn();
-  return res as Response & { setHeader: ReturnType<typeof vi.fn>; status: ReturnType<typeof vi.fn>; send: ReturnType<typeof vi.fn> };
+  res.write = vi.fn();
+  res.end = vi.fn();
+  return res as Response & {
+    setHeader: ReturnType<typeof vi.fn>;
+    status: ReturnType<typeof vi.fn>;
+    send: ReturnType<typeof vi.fn>;
+    write: ReturnType<typeof vi.fn>;
+    end: ReturnType<typeof vi.fn>;
+  };
 };
 
 afterEach(() => {
@@ -28,7 +37,7 @@ beforeEach(() => {
 });
 
 describe('tts.controller', () => {
-  it('rejects missing text', async () => {
+  it('rejects missing input/text', async () => {
     const req = { body: {} } as unknown as Request;
     const res = createRes();
     const next = vi.fn() as unknown as NextFunction;
@@ -94,8 +103,8 @@ describe('tts.controller', () => {
     await synthesizeTts(req, res, next);
 
     expect(ttsService.synthesizeMp3).toHaveBeenCalledTimes(2);
-    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(1, `${'a'.repeat(1699)}。${'b'.repeat(50)}。`, 'doubao');
-    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(2, 'c'.repeat(100), 'doubao');
+    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(1, `${'a'.repeat(1699)}。${'b'.repeat(50)}。`, 'doubao', 'namiai');
+    expect(ttsService.synthesizeMp3).toHaveBeenNthCalledWith(2, 'c'.repeat(100), 'doubao', 'namiai');
     expect(res.send).toHaveBeenCalledWith(Buffer.from([1, 2]));
     expect(next).not.toHaveBeenCalled();
   });
@@ -126,10 +135,82 @@ describe('tts.controller', () => {
 
     await synthesizeTts(req, res, next);
 
-    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello', 'doubao');
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello', 'doubao', 'namiai');
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
     expect(res.setHeader).toHaveBeenCalledWith('Cache-Control', 'no-store');
     expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(audio);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('accepts OpenAI-compatible input/voice fields', async () => {
+    const req = { body: { input: '  hello openai  ', voice: 'nova', model: 'namiai' } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    const audio = Buffer.from([7, 7, 7]);
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(audio);
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello openai', 'nova', 'namiai');
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(audio);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('supports stream=true with audio stream output', async () => {
+    const req = { body: { input: 'hello', stream: true } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    (ttsService.streamMp3 as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_text: string, _voice: string, onChunk: (chunk: Buffer) => void) => {
+        onChunk(Buffer.from([1, 2]));
+      }
+    );
+
+    await synthesizeTts(req, res, next);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'audio/mpeg');
+    expect(res.write).toHaveBeenCalledWith(Buffer.from([1, 2]));
+    expect(res.end).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('supports stream=true with stream_format=sse output', async () => {
+    const req = { body: { input: 'hello', stream: true, stream_format: 'sse' } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    (ttsService.streamMp3 as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_text: string, _voice: string, onChunk: (chunk: Buffer) => void) => {
+        onChunk(Buffer.from([9]));
+      }
+    );
+
+    await synthesizeTts(req, res, next);
+
+    expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/event-stream; charset=utf-8');
+    const writes = (res.write as ReturnType<typeof vi.fn>).mock.calls.map((args) => String(args[0]));
+    expect(writes.some((line) => line.includes('speech.audio.delta'))).toBe(true);
+    expect(writes.some((line) => line.includes('speech.audio.done'))).toBe(true);
+    expect(res.end).toHaveBeenCalledTimes(1);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('passes qwen3-tts model to upstream service', async () => {
+    const req = { body: { input: 'hello qwen', voice: 'vivian', model: 'qwen3-tts' } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    const audio = Buffer.from([6, 6]);
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(audio);
+
+    await synthesizeTts(req, res, next);
+
+    expect(ttsService.synthesizeMp3).toHaveBeenCalledWith('hello qwen', 'vivian', 'qwen3-tts');
     expect(res.send).toHaveBeenCalledWith(audio);
     expect(next).not.toHaveBeenCalled();
   });
@@ -146,4 +227,21 @@ describe('tts.controller', () => {
 
     expect(next).toHaveBeenCalledWith(err);
   });
+
+  it('maps TTS upstream errors to BadRequestError for readable client response', async () => {
+    const req = { body: { text: 'hello' } } as unknown as Request;
+    const res = createRes();
+    const next = vi.fn() as unknown as NextFunction;
+
+    const err = new Error('TTS upstream non-audio response (application/json): {"code":1100}');
+    (ttsService.synthesizeMp3 as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(err);
+
+    await synthesizeTts(req, res, next);
+
+    expect(next).toHaveBeenCalledTimes(1);
+    const passed = (next as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(passed).toBeInstanceOf(BadRequestError);
+    expect((passed as Error).message).toContain('TTS upstream non-audio response');
+  });
 });
+

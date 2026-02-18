@@ -11,10 +11,11 @@ import ReactionList from './ReactionList';
 import MessageContent from './MessageContent';
 import MessageEditor from './MessageEditor';
 import { Attachment, Message } from '../../../shared/types';
-import { channelApi, infraApi, messageApi, ttsApi } from '../../../shared/services/api';
+import { channelApi, infraApi, messageApi, sttApi, ttsApi } from '../../../shared/services/api';
 import { useUIStore, useModalStore, useUnreadStore } from '../../../shared/stores';
 import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
+import { useVoiceSettingsStore } from '../../../shared/stores/voiceSettingsStore';
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { getMessageBestEffortText } from '../../../shared/utils/messageText';
 import { useI18n } from '../../../shared/i18n';
@@ -78,6 +79,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
   const itemRef = useRef<HTMLDivElement>(null);
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
+  const voiceSettings = useVoiceSettingsStore((state) => state.settings);
 
   const canAddReaction = permissions.has('ADD_REACTIONS');
   const canManageMessages = permissions.has('MANAGE_MESSAGES');
@@ -271,10 +273,13 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
     const loadingToast = toast.loading(t('message.tts.generating'));
     try {
-      const res = await ttsApi.synthesize(text);
+      const res = await ttsApi.synthesize(text, {
+        model: voiceSettings.ttsModel,
+        voice: voiceSettings.ttsVoice,
+      });
       stopActiveTts();
 
-      const blob = new Blob([res.data], { type: 'audio/mpeg' });
+      const blob = new Blob([res.data], { type: res.contentType || 'audio/mpeg' });
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
 
@@ -287,7 +292,8 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
       await audio.play();
       toast.success(t('message.tts.playing'), { id: loadingToast });
     } catch (err) {
-      console.error('TTS failed', err);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('TTS failed', message, err);
       toast.error(t('message.tts.failed'), { id: loadingToast });
       stopActiveTts();
     }
@@ -333,8 +339,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
               : 'webm';
 
       const file = new File([blob], `voice-${message._id}.${ext}`, { type: mimeType });
-      const sttRes = await messageApi.transcribeVoice(currentServerId || undefined, message.channelId, message._id, file);
-      const text = (typeof sttRes.data === 'string' ? sttRes.data : String(sttRes.data ?? '')).trim();
+      const text = await sttApi.transcribe(file, {
+        model: voiceSettings.sttModel,
+        response_format: 'json',
+      });
 
       queryClient.setQueryData(['messages', message.channelId], (old: Message[] | undefined) => {
         if (!old) return old;
