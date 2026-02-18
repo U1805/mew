@@ -26,7 +26,7 @@ const ChatArea: React.FC = () => {
   const { data: channel } = useChannel(currentServerId, currentChannelId);
   const isDM = channel?.type === ChannelType.DM;
   const isWeb = channel?.type === ChannelType.GUILD_WEB;
-  const messageFeaturesEnabled = !!channel && !isWeb;
+  const messageFeaturesEnabled = !!currentChannelId && channel?.type !== ChannelType.GUILD_WEB;
 
   const {
     data: messages = [],

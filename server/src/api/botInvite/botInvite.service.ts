@@ -6,6 +6,7 @@ import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { getS3PublicUrl } from '../../utils/s3';
 import { Types } from 'mongoose';
 import { socketManager } from '../../gateway/events';
+import { refreshRoomsForUser } from '../../gateway/roomSync';
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -83,6 +84,7 @@ const botInviteService = {
     });
 
     socketManager.broadcast('MEMBER_JOIN', serverId, { serverId, userId: botUserId });
+    void refreshRoomsForUser(botUserId);
   },
 };
 

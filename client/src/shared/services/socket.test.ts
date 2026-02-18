@@ -2,16 +2,29 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const on = vi.fn();
 const disconnect = vi.fn();
-const io = vi.fn(() => ({ on, disconnect }));
+const connect = vi.fn();
+const io = vi.fn(() => ({ on, disconnect, connect }));
 let status: 'unknown' | 'authenticated' | 'unauthenticated' = 'unauthenticated';
+const logout = vi.fn();
 
 vi.mock('socket.io-client', () => ({
   io: (...args: any[]) => (io as any)(...args),
 }));
 
-vi.mock('../stores', () => ({
+vi.mock('axios', () => ({
+  default: {
+    get: vi.fn(),
+    post: vi.fn(),
+  },
+}));
+
+vi.mock('./http', () => ({
+  API_URL: '/api',
+}));
+
+vi.mock('../stores/authStore', () => ({
   useAuthStore: {
-    getState: () => ({ status }),
+    getState: () => ({ status, logout }),
   },
 }));
 
@@ -21,6 +34,8 @@ describe('shared/services/socket', () => {
     io.mockClear();
     on.mockClear();
     disconnect.mockClear();
+    connect.mockClear();
+    logout.mockClear();
     vi.resetModules();
   });
 

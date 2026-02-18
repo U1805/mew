@@ -7,6 +7,7 @@ import { NotFoundError, ForbiddenError } from '../../utils/errors';
 import { Types } from 'mongoose';
 import { socketManager } from '../../gateway/events';
 import { getS3PublicUrl } from '../../utils/s3';
+import { refreshRoomsForUser } from '../../gateway/roomSync';
 
 // This internal function gets and validates an invite, returning a Mongoose document.
 async function _getAndValidateInvite(inviteCode: string): Promise<IInvite & import('mongoose').Document> {
@@ -105,6 +106,7 @@ const inviteService = {
       userId,
       roleIds: [server.everyoneRoleId],
     });
+    void refreshRoomsForUser(userId);
 
     socketManager.broadcast('MEMBER_JOIN', invite.serverId.toString(), {
       serverId: invite.serverId.toString(),
