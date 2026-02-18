@@ -52,11 +52,19 @@ export const useSocketMessages = (channelId: string | null, options?: { enabled?
       }
     };
 
+    const reconcileChannelMessages = () => {
+      if (!channelId) return;
+      // Recover from possible dropped socket events during reconnect / room re-sync.
+      void queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+    };
+
     socket.on('MESSAGE_CREATE', handleNewMessage);
     socket.on('MESSAGE_UPDATE', handleUpdateMessage);
     socket.on('MESSAGE_DELETE', handleDeleteMessage);
     socket.on('MESSAGE_REACTION_ADD', handleUpdateMessage);
     socket.on('MESSAGE_REACTION_REMOVE', handleUpdateMessage);
+    socket.on('connect', reconcileChannelMessages);
+    socket.on('ready', reconcileChannelMessages);
 
     return () => {
       socket.off('MESSAGE_CREATE', handleNewMessage);
@@ -64,6 +72,8 @@ export const useSocketMessages = (channelId: string | null, options?: { enabled?
       socket.off('MESSAGE_DELETE', handleDeleteMessage);
       socket.off('MESSAGE_REACTION_ADD', handleUpdateMessage);
       socket.off('MESSAGE_REACTION_REMOVE', handleUpdateMessage);
+      socket.off('connect', reconcileChannelMessages);
+      socket.off('ready', reconcileChannelMessages);
     };
   }, [channelId, enabled, queryClient]);
 };

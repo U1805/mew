@@ -39,7 +39,11 @@ export const useMessages = (
       return initial;
     },
     enabled: !!channelId && enabled,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    // Socket events are the primary realtime path; this polling is a safety net for dropped events.
+    refetchInterval: enabled && channelId ? 15000 : false,
+    refetchIntervalInBackground: false,
   });
 
   const fetchOlder = useCallback(async () => {

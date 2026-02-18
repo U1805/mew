@@ -6,6 +6,7 @@ import { calculateEffectivePermissions, syncUsersPermissionsForChannel } from '.
 import Category from '../category/category.model';
 import { NotFoundError, ForbiddenError, BadRequestError } from '../../utils/errors';
 import { socketManager } from '../../gateway/events';
+import { refreshRoomsForServerMembers, refreshRoomsForUser } from '../../gateway/roomSync';
 import { channelRepository } from './channel.repository';
 import Message, { IMessage } from '../message/message.model';
 import { ChannelReadState } from './readState.model';
@@ -26,6 +27,9 @@ function hydrateUserAvatarUrl<T extends { avatarUrl?: string }>(user: T): T {
 const channelService = {
   async createChannel(channelData: Omit<IChannel, 'createdAt' | 'updatedAt'>): Promise<IChannel> {
     const newChannel = await channelRepository.create(channelData);
+    if (newChannel.serverId) {
+      void refreshRoomsForServerMembers(newChannel.serverId.toString());
+    }
     return newChannel;
   },
 
@@ -165,6 +169,8 @@ const channelService = {
     }
 
     socketManager.broadcastToUser(recipientId, 'DM_CHANNEL_CREATE', newDmChannel);
+    void refreshRoomsForUser(recipientId);
+    void refreshRoomsForUser(userId);
     return newDmChannel;
   },
 
@@ -260,6 +266,7 @@ const channelService = {
                   channelId,
                   userIds: members.map((m: any) => m.userId.toString()),
                 });
+                await refreshRoomsForServerMembers(serverIdStr);
             } catch (error) {
                 console.error('Error during background permission sync after override update:', error);
             }

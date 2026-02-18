@@ -27,6 +27,13 @@ export const useGlobalSocketEvents = () => {
     const handleMessageCreate = (message: Message) => {
       try {
         if (!message || typeof message !== 'object') return;
+        const mergeMessageIntoCache = () => {
+          queryClient.setQueryData(['messages', message.channelId], (old: Message[] | undefined) => {
+            if (!old) return [message];
+            if (old.some((m) => m._id === message._id)) return old;
+            return [...old, message];
+          });
+        };
 
         const { currentChannelId } = useUIStore.getState();
         const { user } = useAuthStore.getState();
@@ -37,6 +44,8 @@ export const useGlobalSocketEvents = () => {
 
         // If user is viewing the channel, do nothing, as the message will be handled by useSocketMessages
         if (isViewingChannel) {
+          // Safety net: during channel switching / reconnect windows, channel-local hook may be briefly inactive.
+          mergeMessageIntoCache();
           return;
         }
 
@@ -126,6 +135,9 @@ export const useGlobalSocketEvents = () => {
         } else if (message.serverId) {
           updateChannelCache(['channels', message.serverId], message);
         }
+
+        // Keep message cache warm even when the user is not in this channel.
+        mergeMessageIntoCache();
       } catch (err) {
         if ((import.meta as any).env?.DEV) {
           // eslint-disable-next-line no-console

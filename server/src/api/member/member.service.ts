@@ -6,6 +6,7 @@ import { checkMemberHierarchy } from '../../utils/hierarchy.utils';
 import { socketManager } from '../../gateway/events';
 import mongoose from 'mongoose';
 import { syncUserPermissionsForServerChannels } from '../../utils/permission.service';
+import { refreshRoomsForUser } from '../../gateway/roomSync';
 import webhookMemberService from './webhookMember.service';
 import { memberRepository } from './member.repository';
 
@@ -53,6 +54,7 @@ const memberService = {
     );
     socketManager.broadcast('SERVER_KICK', userIdToRemove, { serverId });
     socketManager.broadcast('MEMBER_LEAVE', serverId, { serverId, userId: userIdToRemove });
+    void refreshRoomsForUser(userIdToRemove);
   },
 
   async leaveServer(serverId: string, requesterId: string): Promise<void> {
@@ -71,6 +73,7 @@ const memberService = {
       { serverId },
       { $pull: { permissionOverrides: { targetType: 'member', targetId: requesterId } } }
     );
+    void refreshRoomsForUser(requesterId);
   },
 
   async updateMemberRoles(serverId: string, userIdToUpdate: string, requesterId: string, roleIds: string[]): Promise<IServerMember> {
@@ -96,6 +99,7 @@ const memberService = {
     (async () => {
       try {
         await syncUserPermissionsForServerChannels(userIdToUpdate, serverId);
+        await refreshRoomsForUser(userIdToUpdate);
       } catch (error) {
         console.error('Error during background permission sync after member role update:', error);
       }
