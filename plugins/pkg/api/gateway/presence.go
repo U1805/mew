@@ -20,6 +20,8 @@ type engineIOOpen struct {
 	PingTimeout  int `json:"pingTimeout"`
 }
 
+func directWebsocketProxy(*http.Request) (*url.URL, error) { return nil, nil }
+
 func socketIOWebsocketURLFromAPIBase(apiBase string) (string, error) {
 	apiBase = strings.TrimRight(strings.TrimSpace(apiBase), "/")
 	if apiBase == "" {
@@ -87,7 +89,10 @@ func RunInfraPresence(ctx context.Context, apiBase, adminSecret, serviceType, lo
 			return
 		}
 
-		dialer := websocket.Dialer{HandshakeTimeout: 10 * time.Second}
+		dialer := websocket.Dialer{
+			HandshakeTimeout: 10 * time.Second,
+			Proxy:            directWebsocketProxy,
+		}
 		conn, _, err := dialer.Dial(wsURL, http.Header{})
 		if err != nil {
 			timer := time.NewTimer(backoff)

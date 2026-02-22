@@ -9,7 +9,6 @@ import (
 	"mew/plugins/internal/fetchers/rss-fetcher/config"
 	"mew/plugins/internal/fetchers/rss-fetcher/source"
 	"mew/plugins/pkg"
-	"mew/plugins/pkg/x/httpx"
 )
 
 type Runner struct {
@@ -36,13 +35,15 @@ func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
 	rssHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:   20 * time.Second,
-		Transport: httpx.NewTransport(nil),
+		Timeout: 20 * time.Second,
 	})
 	if err != nil {
 		return err
 	}
-	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 15 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}

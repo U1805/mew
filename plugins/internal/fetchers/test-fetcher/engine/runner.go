@@ -34,7 +34,10 @@ func NewRunner(botID, botName, accessToken string, cfg sdk.RuntimeConfig, tasks 
 func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
-	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	webhookHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 15 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}

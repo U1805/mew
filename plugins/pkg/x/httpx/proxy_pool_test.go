@@ -26,7 +26,7 @@ func TestFetchProxyLists_UsesFileCache(t *testing.T) {
 	tmpBase := t.TempDir()
 	t.Setenv("LOCALAPPDATA", tmpBase)
 	t.Setenv("APPDATA", tmpBase)
-	t.Setenv("proxy_list_cache_ttl", "10m")
+	t.Setenv("PROXY_LIST_CACHE_TTL", "10m")
 
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +65,7 @@ func TestFetchProxyLists_CacheExpires(t *testing.T) {
 	tmpBase := t.TempDir()
 	t.Setenv("LOCALAPPDATA", tmpBase)
 	t.Setenv("APPDATA", tmpBase)
-	t.Setenv("proxy_list_cache_ttl", "150ms")
+	t.Setenv("PROXY_LIST_CACHE_TTL", "150ms")
 
 	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -91,5 +91,26 @@ func TestFetchProxyLists_CacheExpires(t *testing.T) {
 	}
 	if hits.Load() != 2 {
 		t.Fatalf("expected cache expired (2 server hits), got %d", hits.Load())
+	}
+}
+
+func TestConfigFromEnv_ProxyListURLs_PreferredVar(t *testing.T) {
+	t.Setenv("PROXY_LIST_URLS", "https://a.example/list.txt,https://b.example/list.txt")
+
+	cfg := ConfigFromEnv()
+	if len(cfg.ProxyListURLs) != 2 {
+		t.Fatalf("expected 2 urls from PROXY_LIST_URLS, got %v", cfg.ProxyListURLs)
+	}
+	if cfg.ProxyListURLs[0] != "https://a.example/list.txt" || cfg.ProxyListURLs[1] != "https://b.example/list.txt" {
+		t.Fatalf("unexpected urls from PROXY_LIST_URLS: %v", cfg.ProxyListURLs)
+	}
+}
+
+func TestConfigFromEnv_ProxyListURLs_ExplicitEmptyDisablesPool(t *testing.T) {
+	t.Setenv("PROXY_LIST_URLS", "")
+
+	cfg := ConfigFromEnv()
+	if cfg.ProxyListURLs != nil {
+		t.Fatalf("expected PROXY_LIST_URLS explicit empty to disable pool, got %v", cfg.ProxyListURLs)
 	}
 }

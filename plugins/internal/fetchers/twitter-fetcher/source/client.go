@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"mew/plugins/pkg"
-	"mew/plugins/pkg/x/httpx"
 )
 
 type Client struct {
@@ -72,7 +71,6 @@ func (c *Client) getHTTPClient() *http.Client {
 		tmp, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 			Timeout:   25 * time.Second,
 			CookieJar: true,
-			Transport: httpx.NewTransport(nil),
 		})
 		if err != nil {
 			client = &http.Client{Timeout: 25 * time.Second, Transport: http.DefaultTransport}

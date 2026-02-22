@@ -9,7 +9,6 @@ import (
 	"mew/plugins/internal/fetchers/instagram-fetcher/config"
 	"mew/plugins/internal/fetchers/instagram-fetcher/source"
 	"mew/plugins/pkg"
-	"mew/plugins/pkg/x/httpx"
 )
 
 type Runner struct {
@@ -35,18 +34,23 @@ func NewRunner(botID, botName, accessToken string, cfg sdk.RuntimeConfig, tasks 
 func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
-	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
-	if err != nil {
-		return err
-	}
-	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:   45 * time.Second,
-		Transport: httpx.NewTransport(nil),
+	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 15 * time.Second,
+		Mode:    "direct",
 	})
 	if err != nil {
 		return err
 	}
-	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 90 * time.Second})
+	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 45 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
+	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 90 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}

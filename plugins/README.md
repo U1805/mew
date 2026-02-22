@@ -23,7 +23,7 @@
 - `MEW_ADMIN_SECRET`：必填，对应后端 `MEW_ADMIN_SECRET`
 - `MEW_URL`：后端基址（默认 `http://localhost:3000`）
 - `MEW_API_BASE`：可选，直接指定 API 基址（如 `http://localhost:3000/api`；优先级高于 `MEW_URL`）
-- `MEW_API_PROXY`：可选，请求代理（默认不使用代理；`env` 表示使用 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`）
+- `MEW_API_PROXY`：可选，请求代理语义（支持 `env` / `proxy` / `direct`；默认 `direct`）
 - `MEW_CONFIG_SYNC_INTERVAL_SECONDS`：轮询同步间隔，默认 `60`
 - `MEW_DOTENV`：可选，设置为 `0/false/off/no` 可禁用 `.env` 加载（默认启用）
 
@@ -31,12 +31,18 @@
 
 ## Fetcher 代理池
 
-Fetcher 类插件（`plugins/internal/fetchers/*`）的外网请求默认会使用内置 SOCKS5 代理池进行轮询，以降低触发4xx的概率。
+Fetcher 类插件（`plugins/internal/fetchers/*`）的外网抓取/下载请求使用 `MEW_API_PROXY` 指定策略：
 
-- `proxy_list_urls`：代理列表来源（支持逗号/空格/换行分隔多个 URL）；默认：
+- `MEW_API_PROXY=env`：使用 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`
+- `MEW_API_PROXY=proxy`：内置 SOCKS5 代理池（`PROXY_LIST_URLS`）-> 若 `HTTP_PROXY/HTTPS_PROXY` 非空则环境代理 -> 直连
+- `MEW_API_PROXY=direct`：直连
+
+其中代理池相关环境变量：
+
+- `PROXY_LIST_URLS`：代理列表来源（支持逗号/空格/换行分隔多个 URL）；默认：
   - `https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt`
-  - 设为空字符串可禁用代理池（直接直连）。
-- `proxy_list_cache_ttl`：代理列表本地缓存 TTL（默认 `5m`；设为 `0` 可禁用缓存）。
+  - 设为空字符串可禁用代理池。
+- `PROXY_LIST_CACHE_TTL`：代理列表本地缓存 TTL（默认 `5m`；设为 `0` 可禁用缓存）。
 
 ## `.env.local` / `.env` 加载规则
 

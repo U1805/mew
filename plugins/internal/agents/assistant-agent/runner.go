@@ -303,9 +303,9 @@ func NewAssistantRunner(opts RunnerOptions) (*Runner, error) {
 	llmTransport := http.DefaultTransport.(*http.Transport).Clone()
 	llmTransport.Proxy = nil
 	llmHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:     75 * time.Second,
-		UseMEWProxy: true,
-		Transport:   llmTransport,
+		Timeout:   75 * time.Second,
+		Mode:      "direct",
+		Transport: llmTransport,
 	})
 
 	r := &Runner{
