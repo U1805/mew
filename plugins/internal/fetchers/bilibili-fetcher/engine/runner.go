@@ -34,7 +34,10 @@ func NewRunner(botID, botName, accessToken string, cfg sdk.RuntimeConfig, tasks 
 func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
-	biliHTTP, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 20 * time.Second})
+	biliHTTP, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout:   20 * time.Second,
+		CookieJar: true,
+	})
 	if err != nil {
 		return err
 	}
