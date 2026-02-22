@@ -7,11 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
-
-	"mew/plugins/pkg/x/httpx"
 )
 
 type Client struct {
@@ -23,21 +20,10 @@ type Client struct {
 // NewClient creates a client for calling MEW server APIs.
 //
 // Proxy behavior:
-// - Default: no proxy (even if HTTP_PROXY / HTTPS_PROXY is set)
-// - Set MEW_API_PROXY to enable:
-//   - "env": use Go's ProxyFromEnvironment (HTTP_PROXY/HTTPS_PROXY/NO_PROXY)
-//   - URL / host:port: use a fixed proxy URL (http/https)
+// - Always direct connection for server-side control-plane calls.
 func NewClient(apiBase, adminSecret string) (*Client, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.Proxy = nil // default: no proxy
-
-	if raw := strings.TrimSpace(os.Getenv("MEW_API_PROXY")); raw != "" {
-		proxyFunc, err := httpx.ProxyFuncFromString(raw)
-		if err != nil {
-			return nil, fmt.Errorf("invalid MEW_API_PROXY: %w", err)
-		}
-		transport.Proxy = proxyFunc
-	}
+	transport.Proxy = nil
 
 	return &Client{
 		apiBase:     strings.TrimRight(apiBase, "/"),

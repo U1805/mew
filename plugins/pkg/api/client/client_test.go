@@ -9,11 +9,11 @@ import (
 	"testing"
 )
 
-func TestNewClient_InvalidProxyEnv(t *testing.T) {
+func TestNewClient_AlwaysDirect_IgnoresProxyEnv(t *testing.T) {
 	t.Setenv("MEW_API_PROXY", "socks5://127.0.0.1:1")
 	_, err := NewClient("http://example.com/api", "secret")
-	if err == nil || !strings.Contains(err.Error(), "invalid MEW_API_PROXY") {
-		t.Fatalf("expected invalid proxy error, got: %v", err)
+	if err != nil {
+		t.Fatalf("expected no error, got: %v", err)
 	}
 }
 

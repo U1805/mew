@@ -9,7 +9,6 @@ import (
 	"mew/plugins/internal/fetchers/pornhub-fetcher/config"
 	"mew/plugins/internal/fetchers/pornhub-fetcher/source"
 	"mew/plugins/pkg"
-	"mew/plugins/pkg/x/httpx"
 )
 
 type Runner struct {
@@ -37,17 +36,22 @@ func (r *Runner) Run(ctx context.Context) error {
 	group := sdk.NewGroup(ctx)
 
 	phClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:   30 * time.Second,
-		Transport: httpx.NewTransport(nil),
+		Timeout: 30 * time.Second,
 	})
 	if err != nil {
 		return err
 	}
-	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 15 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}
-	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 90 * time.Second})
+	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 90 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}

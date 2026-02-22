@@ -85,14 +85,58 @@ func TestUploadRemote_ImageNoExtFilenameNormalizedToPng(t *testing.T) {
 	}
 }
 
-func TestUploadRemote_RetryViaWsrvOnTimeout(t *testing.T) {
+func TestUploadRemote_RetryOnlyWithProvidedClient(t *testing.T) {
 	t.Setenv("DEV_MODE", "1")
 	t.Setenv("MEW_DEV_DIR", t.TempDir())
 
-	prev := directClientFactory
-	t.Cleanup(func() { directClientFactory = prev })
-	// Keep direct fallback deterministic (no real network) for this test.
-	directClientFactory = func(c *http.Client) *http.Client { return c }
+	primary := "https://pbs.twimg.com/media/a.jpg"
+
+	var requested []string
+	downloadClient := &http.Client{
+		Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+			requested = append(requested, r.URL.String())
+			if len(requested) < 3 {
+				return nil, timeoutErr{}
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Status:     "200 OK",
+				Header:     http.Header{"Content-Type": []string{"image/jpeg"}},
+				Body:       io.NopCloser(bytes.NewReader([]byte{0xff, 0xd8, 0xff, 0xd9})),
+				Request:    r,
+			}, nil
+		}),
+	}
+
+	att, err := UploadRemote(
+		context.Background(),
+		downloadClient,
+		nil,
+		"",
+		"invalid-webhook-url",
+		primary,
+		"a.jpg",
+		"ua",
+	)
+	if err != nil {
+		t.Fatalf("UploadRemote err=%v", err)
+	}
+	if att.Filename != "a.jpg" {
+		t.Fatalf("expected filename %q, got %q", "a.jpg", att.Filename)
+	}
+	if len(requested) != 3 {
+		t.Fatalf("expected 3 download attempts, got %d: %v", len(requested), requested)
+	}
+	for i, u := range requested {
+		if u != primary {
+			t.Fatalf("expected attempt %d to be primary url, got %q", i, u)
+		}
+	}
+}
+
+func TestUploadRemote_ImageFallbackToWsrv(t *testing.T) {
+	t.Setenv("DEV_MODE", "1")
+	t.Setenv("MEW_DEV_DIR", t.TempDir())
 
 	primary := "https://pbs.twimg.com/media/a.jpg"
 
@@ -129,25 +173,17 @@ func TestUploadRemote_RetryViaWsrvOnTimeout(t *testing.T) {
 	if att.Filename != "a.jpg" {
 		t.Fatalf("expected filename %q, got %q", "a.jpg", att.Filename)
 	}
-	if len(requested) != 6 {
-		t.Fatalf("expected 6 download attempts, got %d: %v", len(requested), requested)
+	if len(requested) != 4 {
+		t.Fatalf("expected 4 download attempts, got %d: %v", len(requested), requested)
 	}
-	if requested[0] != primary {
-		t.Fatalf("expected first attempt to be primary url, got %q", requested[0])
-	}
-	if !strings.HasPrefix(requested[len(requested)-1], "https://wsrv.nl/?url=") {
-		t.Fatalf("expected final fallback attempt to wsrv.nl, got %q", requested[len(requested)-1])
+	if !strings.HasPrefix(requested[3], "https://wsrv.nl/?url=") {
+		t.Fatalf("expected last attempt to wsrv fallback, got %q", requested[3])
 	}
 }
 
-func TestUploadRemote_DoesNotRetryWsrvForNonImage(t *testing.T) {
+func TestUploadRemote_FailsAfterRetryBudget(t *testing.T) {
 	t.Setenv("DEV_MODE", "1")
 	t.Setenv("MEW_DEV_DIR", t.TempDir())
-
-	prev := directClientFactory
-	t.Cleanup(func() { directClientFactory = prev })
-	// Keep direct fallback deterministic (no real network) for this test.
-	directClientFactory = func(c *http.Client) *http.Client { return c }
 
 	primary := "https://video.twimg.com/video/a.mp4"
 
@@ -172,8 +208,8 @@ func TestUploadRemote_DoesNotRetryWsrvForNonImage(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error")
 	}
-	if len(requested) != 5 {
-		t.Fatalf("expected 5 download attempts (proxy retries + direct retries), got %d: %v", len(requested), requested)
+	if len(requested) != 3 {
+		t.Fatalf("expected 3 download attempts, got %d: %v", len(requested), requested)
 	}
 	for i, u := range requested {
 		if u != primary {

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +23,8 @@ type GatewayOptions struct {
 	ReadTimeout      time.Duration
 	WriteTimeout     time.Duration
 }
+
+func directWebsocketProxy(*http.Request) (*url.URL, error) { return nil, nil }
 
 func (o GatewayOptions) withDefaults() GatewayOptions {
 	if o.HandshakeTimeout <= 0 {
@@ -45,7 +49,10 @@ func RunGatewayOnce(ctx context.Context, wsURL, token string, handler EventHandl
 
 	opts = opts.withDefaults()
 
-	dialer := websocket.Dialer{HandshakeTimeout: opts.HandshakeTimeout}
+	dialer := websocket.Dialer{
+		HandshakeTimeout: opts.HandshakeTimeout,
+		Proxy:            directWebsocketProxy,
+	}
 	conn, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
 		return err

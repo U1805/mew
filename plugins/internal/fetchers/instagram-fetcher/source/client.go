@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"mew/plugins/pkg"
-	"mew/plugins/pkg/x/httpx"
 )
 
 type Client struct {
@@ -23,9 +22,10 @@ func NewClient(useProxy bool) (*Client, error) {
 	opts := sdk.HTTPClientOptions{
 		Timeout:   35 * time.Second,
 		CookieJar: true,
+		Mode:      "direct",
 	}
 	if useProxy {
-		opts.Transport = httpx.NewTransport(nil)
+		opts.Mode = ""
 	}
 	httpClient, err := sdk.NewHTTPClient(opts)
 	if err != nil {
@@ -85,7 +85,6 @@ func (c *Client) getHTTPClient() *http.Client {
 		tmp, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 			Timeout:   35 * time.Second,
 			CookieJar: true,
-			Transport: httpx.NewTransport(nil),
 		})
 		if err != nil {
 			client = &http.Client{Timeout: 35 * time.Second, Transport: http.DefaultTransport}

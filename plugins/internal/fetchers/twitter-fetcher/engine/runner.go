@@ -6,10 +6,9 @@ import (
 	"log"
 	"time"
 
-	"mew/plugins/pkg"
 	"mew/plugins/internal/fetchers/twitter-fetcher/config"
 	"mew/plugins/internal/fetchers/twitter-fetcher/source"
-	"mew/plugins/pkg/x/httpx"
+	"mew/plugins/pkg"
 )
 
 type Runner struct {
@@ -38,23 +37,27 @@ func (r *Runner) Run(ctx context.Context) error {
 	twitterClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 		Timeout:   25 * time.Second,
 		CookieJar: true,
-		Transport: httpx.NewTransport(nil),
 	})
 	if err != nil {
 		return err
 	}
-	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 15 * time.Second})
+	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 15 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}
 	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:   45 * time.Second,
-		Transport: httpx.NewTransport(nil),
+		Timeout: 45 * time.Second,
 	})
 	if err != nil {
 		return err
 	}
-	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{Timeout: 90 * time.Second})
+	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 90 * time.Second,
+		Mode:    "direct",
+	})
 	if err != nil {
 		return err
 	}

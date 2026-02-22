@@ -52,17 +52,24 @@ func ConfigFromEnv() Config {
 		HealthCheckSNI:          "www.cloudflare.com",
 	}
 
-	if raw := strings.TrimSpace(os.Getenv("proxy_list_urls")); raw != "" {
-		if urls := splitEnvList(raw); len(urls) > 0 {
+	// Proxy list source env: PROXY_LIST_URLS.
+	if raw, exists := lookupProxyListURLsEnv(); exists {
+		if strings.TrimSpace(raw) == "" {
+			// Explicitly allow disabling by setting env to an empty/whitespace-only string.
+			cfg.ProxyListURLs = nil
+		} else if urls := splitEnvList(raw); len(urls) > 0 {
 			cfg.ProxyListURLs = urls
 		}
 	}
-	// Explicitly allow disabling by setting proxy_list_urls to an empty/whitespace-only string.
-	if _, ok := os.LookupEnv("proxy_list_urls"); ok && strings.TrimSpace(os.Getenv("proxy_list_urls")) == "" {
-		cfg.ProxyListURLs = nil
-	}
 
 	return cfg
+}
+
+func lookupProxyListURLsEnv() (string, bool) {
+	if raw, ok := os.LookupEnv("PROXY_LIST_URLS"); ok {
+		return raw, true
+	}
+	return "", false
 }
 
 func splitEnvList(raw string) []string {
@@ -300,7 +307,7 @@ func (d timeoutDialer) Dial(network, addr string) (net.Conn, error) {
 
 func proxyListCacheTTL() time.Duration {
 	ttl := defaultProxyListCacheTTL
-	if raw := strings.TrimSpace(os.Getenv("proxy_list_cache_ttl")); raw != "" {
+	if raw := strings.TrimSpace(os.Getenv("PROXY_LIST_CACHE_TTL")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil {
 			ttl = parsed
 		}
@@ -579,7 +586,7 @@ func (m *Manager) DialContext(ctx context.Context, baseDial func(ctx context.Con
 	m.ensureStarted()
 
 	if m.pool.Len() == 0 {
-		return baseDial(ctx, network, addr)
+		return nil, errors.New("proxy pool empty")
 	}
 
 	maxAttempts := 3
@@ -609,10 +616,6 @@ func (m *Manager) DialContext(ctx context.Context, baseDial func(ctx context.Con
 
 	if lastErr == nil {
 		lastErr = errors.New("no proxy available")
-	}
-	// Fallback to direct connection.
-	if conn, err := baseDial(ctx, network, addr); err == nil {
-		return conn, nil
 	}
 	return nil, fmt.Errorf("dial via proxy failed: %w", lastErr)
 }

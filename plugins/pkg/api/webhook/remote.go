@@ -98,37 +98,6 @@ func wsrvFallbackURL(remoteURL string) string {
 	return u.String()
 }
 
-func shouldPreferDirectFallback(host string) bool {
-	h := strings.ToLower(strings.TrimSpace(host))
-	if h == "" {
-		return false
-	}
-	// Twitter media hosts.
-	if strings.HasSuffix(h, ".twimg.com") {
-		return true
-	}
-	return false
-}
-
-func directClientFrom(downloadClient *http.Client) *http.Client {
-	timeout := 30 * time.Second
-	var jar http.CookieJar
-	if downloadClient != nil {
-		if downloadClient.Timeout > 0 {
-			timeout = downloadClient.Timeout
-		}
-		jar = downloadClient.Jar
-	}
-	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.Proxy = nil // always direct, ignore env proxy
-	tr.DialContext = (&net.Dialer{}).DialContext
-	return &http.Client{Timeout: timeout, Transport: tr, Jar: jar}
-}
-
-// directClientFactory exists to make UploadRemote deterministic in unit tests
-// (tests can override it to avoid real network access).
-var directClientFactory = directClientFrom
-
 // UploadRemote downloads a remote file and uploads it to the webhook /upload endpoint.
 // It returns the uploaded Attachment (its Key can be used in later messages).
 func UploadRemote(
@@ -161,12 +130,6 @@ func UploadRemote(
 		// Force new connection per attempt to avoid getting stuck on a bad keep-alive proxy connection.
 		req.Close = true
 		return client.Do(req)
-	}
-
-	u, _ := url.Parse(src)
-	host := ""
-	if u != nil {
-		host = strings.TrimSpace(u.Host)
 	}
 
 	tryClient := func(client *http.Client, downloadURL string, attempts int) (*http.Response, error) {
@@ -211,37 +174,25 @@ func UploadRemote(
 		return nil, lastErr
 	}
 
-	// 1) Try with provided download client (usually proxy-enabled).
+	// Only use the provided download client, so transport behavior follows SDK strategy.
 	resp, err := tryClient(downloadClient, src, 3)
 	if err != nil {
-		// 2) Direct fallback (especially for static media hosts like *.twimg.com).
-		directAttempts := 1
-		if shouldPreferDirectFallback(host) {
-			directAttempts = 2
-		}
-		directClient := directClientFactory(downloadClient)
-		if r2, err2 := tryClient(directClient, src, directAttempts); err2 == nil {
-			resp = r2
-			err = nil
-		} else if isRetryableDownloadErr(err) && isLikelyImageURL(src, fallbackFilename) {
-			// 3) Last resort: image proxy fallback.
+		// Image-only last resort via wsrv.nl, still using the same download client.
+		if isRetryableDownloadErr(err) && isLikelyImageURL(src, fallbackFilename) {
 			fallbackURL := wsrvFallbackURL(src)
 			if strings.TrimSpace(fallbackURL) != "" {
-				if r3, err3 := tryClient(directClient, fallbackURL, 1); err3 == nil {
-					resp = r3
+				if r2, err2 := tryClient(downloadClient, fallbackURL, 1); err2 == nil {
+					resp = r2
 					err = nil
 				} else {
-					return Attachment{}, fmt.Errorf("download failed: primary=%v direct=%v fallback=%w", err, err2, err3)
+					return Attachment{}, fmt.Errorf("download failed: primary=%v fallback=%w", err, err2)
 				}
 			} else {
-				return Attachment{}, fmt.Errorf("download failed: primary=%v direct=%w", err, err2)
+				return Attachment{}, fmt.Errorf("download failed: %w", err)
 			}
 		} else {
-			return Attachment{}, fmt.Errorf("download failed: primary=%v direct=%w", err, err2)
+			return Attachment{}, fmt.Errorf("download failed: %w", err)
 		}
-	}
-	if err != nil {
-		return Attachment{}, err
 	}
 	defer resp.Body.Close()
 

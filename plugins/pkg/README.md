@@ -6,7 +6,7 @@
 
 - `.env.local/.env` 加载：`sdk.LoadDotEnv(logPrefix)`
 - 运行时配置解析：`sdk.LoadRuntimeConfig(serviceType)`（serviceType 推荐用 `sdk.ServiceTypeFromCaller()` 自动获取）
-- 后端 bootstrap client：`sdk.NewMewClient(apiBase, adminSecret)`（支持代理环境变量）
+- 后端 bootstrap client：`sdk.NewMewClient(apiBase, adminSecret)`（始终直连）
 - 通用 BotManager（热重载）：`sdk.NewBotManager(client, serviceType, logPrefix, factory)`
 - 标准 Service 主循环（可选）：`sdk.RunServiceWithSignals(sdk.ServiceOptions{...})`
 - goroutine 组管理（可选）：`g := sdk.NewGroup(ctx); g.Go(...); g.Stop()`
@@ -84,17 +84,21 @@ func main() {
 
 ## 请求代理（可选）
 
-SDK 默认**不使用代理**（即使系统设置了 `HTTP_PROXY/HTTPS_PROXY`），除非你通过 `UseMEWProxy`/`MEW_API_PROXY` 显式启用。
+`sdk.NewHTTPClient` 支持三种模式：
 
-如需开启，请设置：
+- `Mode: "direct"`：显式直连（默认）
+- `Mode: "env"`：使用 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`
+- `Mode: "proxy"`：优先走内置 SOCKS5 代理池，再回退到环境代理（若配置）和直连
 
-- `MEW_API_PROXY=env`：使用 Go 的 ProxyFromEnvironment（`HTTP_PROXY/HTTPS_PROXY/NO_PROXY`）
-- `MEW_API_PROXY=http://127.0.0.1:7890`：固定代理（也支持直接写 `127.0.0.1:7890`，会自动补 `http://`）
+`MEW_API_PROXY` 支持：
 
-推荐通过 `sdk.NewHTTPClient(sdk.HTTPClientOptions{ UseMEWProxy: true, ... })` 创建抓取用的 HTTP client：
+- `MEW_API_PROXY=direct`：直连
+- `MEW_API_PROXY=env`：使用 Go 的 `ProxyFromEnvironment`（`HTTP_PROXY/HTTPS_PROXY/NO_PROXY`）
+- `MEW_API_PROXY=proxy`：启用回退链，回退顺序为：
 
-- 若设置了 `MEW_API_PROXY`：按其配置生效（`env` / 固定代理 / `direct` 等）
-- 若未设置 `MEW_API_PROXY`：使用 Go 的默认行为（即 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`，若未设置则为直连）
+1. 内置代理池（`PROXY_LIST_URLS`）
+2. 若 `HTTP_PROXY/HTTPS_PROXY` 非空，则走 `ProxyFromEnvironment`
+3. 直连
 
 ## State（持久化）
 
