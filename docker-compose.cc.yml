@@ -1,8 +1,9 @@
 services:
   b4u2cc-init:
-    image: alpine/git:2.49.1
+    build:
+      context: .
+      dockerfile: docker/b4u2cc-init/Dockerfile
     restart: "no"
-    entrypoint: ["/bin/sh", "-lc"]
     command: >-
       if [ -d /src/.git ]; then
         echo "b4u2cc source already initialized";
@@ -13,13 +14,13 @@ services:
       - b4u2cc_src:/src
 
   b4u2cc:
-    image: denoland/deno:2.2.7
+    build:
+      context: .
+      dockerfile: docker/b4u2cc/Dockerfile
     restart: unless-stopped
     depends_on:
       b4u2cc-init:
         condition: service_completed_successfully
-    working_dir: /src/deno-proxy
-    entrypoint: ["deno", "run", "--allow-net", "--allow-env", "src/main.ts"]
     environment:
       HOST: 0.0.0.0
       PORT: 3456

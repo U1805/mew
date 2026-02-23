@@ -1,0 +1,15 @@
+# Override for pulling prebuilt images from GHCR.
+# Use with:
+# docker compose --env-file docker-compose.cc.env -f docker-compose.cc.yml -f docker-compose.cc.ghcr.yml up -d
+services:
+  b4u2cc-init:
+    image: "ghcr.io/u1805/mew/b4u2cc-init:latest"
+    build: null
+
+  b4u2cc:
+    image: "ghcr.io/u1805/mew/b4u2cc:latest"
+    build: null
+
+  claude-code:
+    image: "ghcr.io/u1805/mew/claude-code:latest"
+    build: null

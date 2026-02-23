@@ -31,6 +31,9 @@ vim docker-compose.env
 
 
 ```bash
+# create network
+docker network inspect mew_network >/dev/null 2>&1 || docker network create mew_network
+# setup container
 docker compose --env-file docker-compose.env up --build
 ```
 

@@ -48,6 +48,15 @@ jobs:
               - 'docker/plugins/**'
             garage-init:
               - 'docker/garage/**'
+            b4u2cc-init:
+              - 'docker/b4u2cc-init/**'
+              - 'docker-compose.cc.yml'
+            b4u2cc:
+              - 'docker/b4u2cc/**'
+              - 'docker-compose.cc.yml'
+            claude-code:
+              - 'docker/claude-code/**'
+              - 'docker-compose.cc.yml'
             workflow:
               - '.github/workflows/docker-ghcr.yml'
 
@@ -60,6 +69,9 @@ jobs:
           CLIENT: ${{ steps.filter.outputs.client }}
           PLUGINS: ${{ steps.filter.outputs.plugins }}
           GARAGE_INIT: ${{ steps.filter.outputs['garage-init'] }}
+          B4U2CC_INIT: ${{ steps.filter.outputs['b4u2cc-init'] }}
+          B4U2CC: ${{ steps.filter.outputs['b4u2cc'] }}
+          CLAUDE_CODE: ${{ steps.filter.outputs['claude-code'] }}
           WORKFLOW: ${{ steps.filter.outputs.workflow }}
         with:
           script: |
@@ -69,6 +81,9 @@ jobs:
               client: { dockerfile: 'client/Dockerfile', context: '.' },
               plugins: { dockerfile: 'docker/plugins/Dockerfile', context: '.' },
               'garage-init': { dockerfile: 'docker/garage/Dockerfile.init', context: '.' },
+              'b4u2cc-init': { dockerfile: 'docker/b4u2cc-init/Dockerfile', context: '.' },
+              b4u2cc: { dockerfile: 'docker/b4u2cc/Dockerfile', context: '.' },
+              'claude-code': { dockerfile: 'docker/claude-code/Dockerfile', context: '.' },
             };
 
             const changed = JSON.parse(process.env.CHANGES || '[]');
@@ -81,7 +96,10 @@ jobs:
                 (name === 'server' && process.env.SERVER === 'true') ||
                 (name === 'client' && process.env.CLIENT === 'true') ||
                 (name === 'plugins' && process.env.PLUGINS === 'true') ||
-                (name === 'garage-init' && process.env.GARAGE_INIT === 'true');
+                (name === 'garage-init' && process.env.GARAGE_INIT === 'true') ||
+                (name === 'b4u2cc-init' && process.env.B4U2CC_INIT === 'true') ||
+                (name === 'b4u2cc' && process.env.B4U2CC === 'true') ||
+                (name === 'claude-code' && process.env.CLAUDE_CODE === 'true');
 
               if (shouldBuild) include.push({ name, ...all[name] });
             }
