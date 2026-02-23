@@ -16,6 +16,7 @@ type UploadResult struct {
 	DisplayKey string
 	ThumbKey   string
 	VideoKey   string
+	ProfileKey string
 
 	ProfilePic string
 
@@ -88,6 +89,14 @@ func (u *Uploader) ProcessAndSendStory(ctx context.Context, user *source.UserPro
 	if strings.TrimSpace(profilePic) == "" {
 		profilePic = source.DecodeMediaURL(user.ProfilePicURLHD)
 	}
+	s3Profile := ""
+	if strings.TrimSpace(profilePic) != "" {
+		fallback := sdk.FilenameFromURL(profilePic, "avatar.jpg")
+		if ext := path.Ext(fallback); ext == "" {
+			fallback = fallback + ".jpg"
+		}
+		s3Profile = u.UploadWithCache(ctx, profilePic, fallback)
+	}
 
 	s3Display := ""
 	s3Thumb := ""
@@ -125,6 +134,7 @@ func (u *Uploader) ProcessAndSendStory(ctx context.Context, user *source.UserPro
 		DisplayKey: s3Display,
 		ThumbKey:   s3Thumb,
 		VideoKey:   s3Video,
+		ProfileKey: s3Profile,
 		ProfilePic: profilePic,
 		DisplayURL: displayURL,
 		ThumbURL:   thumbURL,
@@ -172,14 +182,21 @@ func (u *Uploader) SendStory(ctx context.Context, user *source.UserProfile, stor
 	if uploaded.VideoKey != "" {
 		payload["s3_video_url"] = uploaded.VideoKey
 	}
+	if uploaded.ProfileKey != "" {
+		payload["s3_profile_pic_url"] = uploaded.ProfileKey
+	}
 
 	content := fmt.Sprintf("@%s posted a new story", strings.TrimSpace(user.Username))
+	avatarURL := uploaded.ProfilePic
+	if uploaded.ProfileKey != "" {
+		avatarURL = uploaded.ProfileKey
+	}
 	msg := sdk.WebhookPayload{
 		Content:   content,
 		Type:      "app/x-instagram-card",
 		Payload:   payload,
 		Username:  strings.TrimSpace(user.FullName),
-		AvatarURL: uploaded.ProfilePic,
+		AvatarURL: avatarURL,
 	}
 	if strings.TrimSpace(msg.Username) == "" {
 		msg.Username = "@" + strings.TrimSpace(user.Username)

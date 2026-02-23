@@ -250,7 +250,10 @@ export const BilibiliCard: React.FC<BilibiliCardProps> = ({ payload }) => {
   ).trim();
 
   const authorName = typeof payload.author_name === 'string' ? payload.author_name.trim() : '';
-  const authorFace = typeof payload.author_face === 'string' ? normalizeUrl(payload.author_face) : '';
+  const authorFace = normalizeUrl(
+    (typeof payload.s3_author_face === 'string' ? payload.s3_author_face : '')
+    || (typeof payload.author_face === 'string' ? payload.author_face : '')
+  );
   
   const primaryUrl = pickPrimaryUrl(payload);
   const hostname = useMemo(() => safeHostname(primaryUrl), [primaryUrl]);

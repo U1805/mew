@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 
 	"mew/plugins/internal/fetchers/bilibili-fetcher/source"
@@ -238,6 +239,19 @@ func uploadCoverToWebhook(tCtx transformContext, coverURL string) string {
 	return att.Key
 }
 
+func uploadFaceToWebhook(tCtx transformContext, faceURL string) string {
+	u := normalizeBiliURL(faceURL)
+	if u == "" {
+		return ""
+	}
+	att, err := uploadRemoteToWebhook(tCtx, u, "avatar"+path.Ext(u))
+	if err != nil {
+		log.Printf("%s upload author face failed: %v", tCtx.logPrefix, err)
+		return ""
+	}
+	return att.Key
+}
+
 type localizedEmoji struct {
 	Text      string `json:"text"`
 	IconURL   string `json:"icon_url"`
@@ -358,17 +372,22 @@ func majorTitleAndURL(major *source.Major) (string, string) {
 func transformItemToWebhook(tCtx transformContext, item source.APIItem) (*sdk.WebhookPayload, error) {
 	author := item.Modules.ModuleAuthor
 	dyn := item.Modules.ModuleDynamic
+	authorFace := normalizeBiliURL(author.Face)
+	s3AuthorFace := uploadFaceToWebhook(tCtx, authorFace)
 
 	payload := map[string]any{
 		"dynamic_id":        item.IDStr,
 		"dynamic_url":       fmt.Sprintf("https://t.bilibili.com/%s", item.IDStr),
 		"author_name":       author.Name,
-		"author_face":       author.Face,
+		"author_face":       authorFace,
 		"author_mid":        author.ID,
 		"author_type":       author.Type,
 		"published_at":      int64(author.PubTS),
 		"published_loc":     author.PubLoc,
 		"bili_dynamic_type": item.Type,
+	}
+	if s3AuthorFace != "" {
+		payload["s3_author_face"] = s3AuthorFace
 	}
 	if dyn.Major != nil {
 		payload["bili_major_type"] = dyn.Major.Type
@@ -695,7 +714,10 @@ func transformItemToWebhook(tCtx transformContext, item source.APIItem) (*sdk.We
 		Type:      "app/x-bilibili-card",
 		Payload:   payload,
 		Username:  author.Name,
-		AvatarURL: author.Face, // Fallback for clients that don't use the s3 key
+		AvatarURL: authorFace, // Fallback when avatar upload/localization fails
+	}
+	if s3AuthorFace != "" {
+		msg.AvatarURL = s3AuthorFace
 	}
 
 	return msg, nil

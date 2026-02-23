@@ -42,6 +42,7 @@
 ## 去重与缓存
 
 - 用 `dynamic_id`（`id_str`）去重（避免重复推送）
+- 动态媒体（封面/图片）与作者头像会通过 webhook `/upload` 本地化到 S3/CDN 后下发（失败时回退原始 URL）
 - 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/bilibili-fetcher/<botId>/...`），避免重启后重复推送
 
 ## 运行
