@@ -45,7 +45,7 @@
 - 用 Tweet `restId` 去重（避免重复推送）
 - 抓取端会随机使用常见浏览器 `User-Agent` 以降低被拦截风险
 - 抓取端会自动请求 `/_trace` 获取 `_utid` Cookie
-- 媒体文件会通过 webhook `/upload` 本地化到 S3/CDN，并在本地 state 中缓存 `remoteURL -> key`，避免重复上传
+- 媒体文件（包括推文图片/视频/封面与头像）会通过 webhook `/upload` 本地化到 S3/CDN，并在本地 state 中缓存 `remoteURL -> key`，避免重复上传
 - 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/twitter-fetcher/<botId>/task-<idx>-<hash>.json`），避免重启后重复推送
 
 ## 运行

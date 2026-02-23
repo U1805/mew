@@ -82,6 +82,11 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 	}
 
 	text := BuildTweetText(display)
+	authorAvatar := NormalizeMediaURL(author.ProfileImageURL)
+	s3AuthorAvatar := ""
+	if authorAvatar != "" {
+		s3AuthorAvatar = u.uploadWithCache(ctx, authorAvatar, "avatar"+path.Ext(authorAvatar))
+	}
 
 	s3Images := make([]string, 0, len(display.Images))
 	images := make([]string, 0, len(display.Images))
@@ -119,7 +124,7 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 		"is_retweet":    isRetweet,
 		"author_name":   author.Name,
 		"author_handle": author.Handle,
-		"author_avatar": author.ProfileImageURL,
+		"author_avatar": authorAvatar,
 		"images":        images,
 		"video_url":     videoURL,
 		"cover_url":     coverURL,
@@ -131,6 +136,9 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 	}
 	if len(s3Images) > 0 {
 		payload["s3_images"] = s3Images
+	}
+	if s3AuthorAvatar != "" {
+		payload["s3_author_avatar"] = s3AuthorAvatar
 	}
 	if s3Cover != "" {
 		payload["s3_cover_url"] = s3Cover
@@ -151,12 +159,17 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 		content = string([]rune(content)[:180]) + "…"
 	}
 
+	avatarURL := NormalizeMediaURL(tl.MonitoredUser.ProfileImageURL)
+	if key := u.uploadWithCache(ctx, avatarURL, "avatar"+path.Ext(avatarURL)); key != "" {
+		avatarURL = key
+	}
+
 	msg := sdk.WebhookPayload{
 		Content:   content,
 		Type:      "app/x-twitter-card",
 		Payload:   payload,
 		Username:  tl.MonitoredUser.Name,
-		AvatarURL: tl.MonitoredUser.ProfileImageURL,
+		AvatarURL: avatarURL,
 	}
 
 	if err := sdk.PostWebhook(ctx, u.webhookClient, u.apiBase, u.webhookURL, msg, 3); err != nil {
@@ -171,6 +184,11 @@ func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline
 
 	tweetURL := BuildTweetURL(tl.Users, t.UserID, t.RestID)
 	text := BuildTweetText(t)
+	authorAvatar := NormalizeMediaURL(author.ProfileImageURL)
+	s3AuthorAvatar := ""
+	if authorAvatar != "" {
+		s3AuthorAvatar = u.uploadWithCache(ctx, authorAvatar, "avatar"+path.Ext(authorAvatar))
+	}
 
 	s3Images := make([]string, 0, len(t.Images))
 	images := make([]string, 0, len(t.Images))
@@ -207,7 +225,7 @@ func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline
 		"created_at":    t.CreatedAt,
 		"author_name":   author.Name,
 		"author_handle": author.Handle,
-		"author_avatar": author.ProfileImageURL,
+		"author_avatar": authorAvatar,
 		"images":        images,
 		"video_url":     videoURL,
 		"cover_url":     coverURL,
@@ -219,6 +237,9 @@ func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline
 	}
 	if len(s3Images) > 0 {
 		out["s3_images"] = s3Images
+	}
+	if s3AuthorAvatar != "" {
+		out["s3_author_avatar"] = s3AuthorAvatar
 	}
 	if s3Cover != "" {
 		out["s3_cover_url"] = s3Cover

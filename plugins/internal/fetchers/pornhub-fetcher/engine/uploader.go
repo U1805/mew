@@ -52,3 +52,16 @@ func (u *Uploader) UploadPreview(ctx context.Context, url string) string {
 	}
 	return att.Key
 }
+
+func (u *Uploader) UploadAvatar(ctx context.Context, url string) string {
+	src := strings.TrimSpace(url)
+	if src == "" {
+		return ""
+	}
+	att, err := sdk.UploadRemoteToWebhook(ctx, u.downloadClient, u.uploadClient, u.apiBase, u.webhookURL, src, "avatar.jpg")
+	if err != nil {
+		log.Printf("%s upload avatar failed: %v", u.logPrefix, err)
+		return ""
+	}
+	return att.Key
+}

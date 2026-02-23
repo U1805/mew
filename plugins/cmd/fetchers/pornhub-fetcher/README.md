@@ -39,6 +39,7 @@
 ## 去重与缓存
 
 - 解析出的视频会用 `viewkey` 做去重（避免重复推送）
+- 媒体文件（缩略图/预览）与作者头像会通过 webhook `/upload` 本地化到 S3/CDN 后下发（失败时回退原始 URL）
 - 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/pornhub-fetcher/<botId>/task-<idx>-<hash>.json`），避免重启后重复推送
 
 ## 运行

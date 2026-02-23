@@ -113,13 +113,17 @@ func (w *Worker) processAndSend(ctx context.Context, author source.Author, item 
 			payload["s3_preview_url"] = key
 		}
 	}
+	avatarURL := strings.TrimSpace(author.AvatarURL)
+	if key := w.uploader.UploadAvatar(ctx, avatarURL); key != "" {
+		avatarURL = key
+	}
 
 	msg := sdk.WebhookPayload{
 		Content:   fmt.Sprintf("@%v posted a new video - %v", author.Name, item.Title),
 		Type:      cardMessageType,
 		Payload:   payload,
 		Username:  author.Name,
-		AvatarURL: author.AvatarURL,
+		AvatarURL: avatarURL,
 	}
 
 	if err := sdk.PostWebhook(ctx, w.webhookClient, w.apiBase, w.task.Webhook, msg, 3); err != nil {

@@ -80,7 +80,9 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
 
   const authorName = typeof payload.author_name === 'string' ? payload.author_name.trim() : '';
   const authorHandle = typeof payload.author_handle === 'string' ? payload.author_handle.trim() : '';
-  const authorAvatar = typeof payload.author_avatar === 'string' ? payload.author_avatar.trim() : '';
+  const authorAvatar =
+    (typeof payload.s3_author_avatar === 'string' ? payload.s3_author_avatar.trim() : '')
+    || (typeof payload.author_avatar === 'string' ? payload.author_avatar.trim() : '');
 
   const images = toStringArray(payload.s3_images).length > 0 ? toStringArray(payload.s3_images) : toStringArray(payload.images);
   const videoUrl = (typeof payload.s3_video_url === 'string' ? payload.s3_video_url.trim() : '') || (typeof payload.video_url === 'string' ? payload.video_url.trim() : '');
@@ -116,7 +118,9 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
   const quotedCreatedAt = typeof quotedPayload?.created_at === 'string' ? quotedPayload.created_at.trim() : '';
   const quotedAuthorName = typeof quotedPayload?.author_name === 'string' ? quotedPayload.author_name.trim() : '';
   const quotedAuthorHandle = typeof quotedPayload?.author_handle === 'string' ? quotedPayload.author_handle.trim() : '';
-  const quotedAuthorAvatar = typeof quotedPayload?.author_avatar === 'string' ? quotedPayload.author_avatar.trim() : '';
+  const quotedAuthorAvatar =
+    (typeof quotedPayload?.s3_author_avatar === 'string' ? quotedPayload.s3_author_avatar.trim() : '')
+    || (typeof quotedPayload?.author_avatar === 'string' ? quotedPayload.author_avatar.trim() : '');
   const quotedImages = quotedPayload
     ? (toStringArray(quotedPayload.s3_images).length > 0 ? toStringArray(quotedPayload.s3_images) : toStringArray(quotedPayload.images))
     : [];

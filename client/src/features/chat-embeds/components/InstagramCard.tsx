@@ -87,7 +87,8 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
   const username = safeString((payload as any).username);
   const fullName = safeString((payload as any).full_name);
   const biography = safeString((payload as any).biography);
-  const profilePicUrl = safeString((payload as any).profile_pic_url);
+  const s3ProfilePicUrl = safeString((payload as any).s3_profile_pic_url);
+  const profilePicUrl = (s3ProfilePicUrl || safeString((payload as any).profile_pic_url)).trim();
 
   const isVerified = safeBoolean((payload as any).is_verified) ?? false;
   const isPrivate = safeBoolean((payload as any).is_private) ?? false;
