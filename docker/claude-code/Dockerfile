@@ -19,4 +19,8 @@ RUN npm install -g @anthropic-ai/claude-code
 
 WORKDIR /workspace
 
-CMD ["claude"]
+COPY plugins/internal/agents/claudecode-agent/claude_code_proxy/server.py /opt/mew/claudecode-agent/server.py
+
+EXPOSE 3457
+
+CMD ["python", "/opt/mew/claudecode-agent/server.py"]

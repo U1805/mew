@@ -26,6 +26,16 @@ build/
 # TypeScript
 *.tsbuildinfo
 
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.python-version
+.venv/
+venv/
+env/
+
 # Logs
 logs
 *.log

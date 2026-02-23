@@ -34,6 +34,8 @@ services:
 
   claude-code:
     container_name: mew_claude_code
+    ports:
+      - "3457:3457"
     build:
       context: .
       dockerfile: docker/claude-code/Dockerfile
@@ -45,6 +47,11 @@ services:
       ANTHROPIC_API_KEY: ${CLIENT_API_KEY}
       ANTHROPIC_AUTH_TOKEN: ${CLIENT_API_KEY}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://b4u2cc:3456}
+      CLAUDE_CODE_ATTRIBUTION_HEADER: 0
+      CLAUDE_PROXY_HOST: 0.0.0.0
+      CLAUDE_PROXY_PORT: 3457
+      CLAUDE_PROXY_WORKDIR: /workspace/.claude-sessions
+      CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-180}
     volumes:
       - claude_code_workspace:/workspace
     stdin_open: true

@@ -145,6 +145,8 @@ services:
       HTTPS_PROXY: ${HTTPS_PROXY:-http://host.docker.internal:7890}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1,server,client,mongo,garage}
       PROXY_LIST_URLS: ${PROXY_LIST_URLS:-https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt}
+      # Claude Code proxy base url for claudecode-agent plugin
+      CLAUDECODE_URL: ${CLAUDECODE_URL:-http://claude-code:3457}
     volumes:
       - plugins_cache:/root/.cache/mew
     networks:
