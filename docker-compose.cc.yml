@@ -1,26 +1,9 @@
 services:
-  b4u2cc-init:
-    build:
-      context: .
-      dockerfile: docker/b4u2cc-init/Dockerfile
-    restart: "no"
-    command: >-
-      if [ -d /src/.git ]; then
-        echo "b4u2cc source already initialized";
-      else
-        git clone --depth 1 https://github.com/CassiopeiaCode/b4u2cc.git /src;
-      fi
-    volumes:
-      - b4u2cc_src:/src
-
   b4u2cc:
     build:
       context: .
       dockerfile: docker/b4u2cc/Dockerfile
     restart: unless-stopped
-    depends_on:
-      b4u2cc-init:
-        condition: service_completed_successfully
     environment:
       HOST: 0.0.0.0
       PORT: 3456
@@ -44,8 +27,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    volumes:
-      - b4u2cc_src:/src:ro
     networks:
       - mew_network
 
@@ -62,14 +43,14 @@ services:
       ANTHROPIC_AUTH_TOKEN: ${CLIENT_API_KEY}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://b4u2cc:3456}
     volumes:
-      - ./:/workspace
+      - claude_code_workspace:/workspace
     stdin_open: true
     tty: true
     networks:
       - mew_network
 
 volumes:
-  b4u2cc_src:
+  claude_code_workspace:
 
 networks:
   mew_network:
