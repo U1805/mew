@@ -69,11 +69,12 @@ func (c *Client) getHTTPClient() *http.Client {
 	client := c.httpClient
 	if client == nil {
 		tmp, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-			Timeout:   25 * time.Second,
+			Timeout:   30 * time.Second,
 			CookieJar: true,
+			Mode:      "proxy",
 		})
 		if err != nil {
-			client = &http.Client{Timeout: 25 * time.Second, Transport: http.DefaultTransport}
+			client = &http.Client{Timeout: 30 * time.Second, Transport: http.DefaultTransport}
 		} else {
 			client = tmp
 		}

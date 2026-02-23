@@ -48,6 +48,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 45 * time.Second,
+	})
+	if err != nil {
+		return err
+	}
 	uploadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 		Timeout: 90 * time.Second,
 		Mode:    "direct",
@@ -72,7 +78,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				log.Printf("%s load state failed: %v", logPrefix, err)
 			}
 
-			uploader := NewUploader(r.apiBase, taskCopy.Webhook, logPrefix, phClient, uploadClient)
+			uploader := NewUploader(r.apiBase, taskCopy.Webhook, logPrefix, downloadClient, uploadClient)
 
 			w := &Worker{
 				logPrefix:     logPrefix,
@@ -84,7 +90,8 @@ func (r *Runner) Run(ctx context.Context) error {
 				task:          taskCopy,
 				firstRun:      true,
 				freshState:    tr.Fresh(),
-				fetchTimeout:  45 * time.Second,
+				// Max request count in one fetch cycle is 1; add download/webhook/upload timeout budgets.
+				fetchTimeout:  30*time.Second + 45*time.Second + 15*time.Second + 90*time.Second,
 			}
 
 			w.Run(ctx)

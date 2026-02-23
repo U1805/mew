@@ -35,7 +35,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
 	rssHTTPClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout: 20 * time.Second,
+		Timeout: 30 * time.Second,
 	})
 	if err != nil {
 		return err
@@ -73,7 +73,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				task:            taskCopy,
 				firstRun:        true,
 				freshState:      tr.Fresh(),
-				fetchTimeout:    25 * time.Second,
+				fetchTimeout:    30*time.Second + 15*time.Second,
 				sendHistory:     sdk.BoolOrDefault(taskCopy.SendHistoryOnStart, false),
 				interval:        time.Duration(taskCopy.Interval) * time.Second,
 				maxItemsPerPoll: taskCopy.MaxItemsPerPoll,
