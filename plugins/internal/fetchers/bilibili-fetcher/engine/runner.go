@@ -35,7 +35,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
 	biliHTTP, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:   20 * time.Second,
+		Timeout:   30 * time.Second,
 		CookieJar: true,
 	})
 	if err != nil {
@@ -44,6 +44,12 @@ func (r *Runner) Run(ctx context.Context) error {
 	webhookClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 		Timeout: 15 * time.Second,
 		Mode:    "direct",
+	})
+	if err != nil {
+		return err
+	}
+	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
+		Timeout: 45 * time.Second,
 	})
 	if err != nil {
 		return err
@@ -73,7 +79,7 @@ func (r *Runner) Run(ctx context.Context) error {
 				log.Printf("%s load state failed: %v", logPrefix, err)
 			}
 
-			uploader := NewUploader(r.apiBase, taskCopy.Webhook, logPrefix, biliHTTP, uploadClient)
+			uploader := NewUploader(r.apiBase, taskCopy.Webhook, logPrefix, downloadClient, uploadClient)
 
 			w := &Worker{
 				logPrefix:     logPrefix,
@@ -88,7 +94,9 @@ func (r *Runner) Run(ctx context.Context) error {
 				sendHistory:   sdk.BoolOrDefault(taskCopy.SendHistoryOnStart, false),
 				firstRun:      true,
 				freshState:    tr.Fresh(),
-				fetchTimeout:  25 * time.Second,
+				// Max request count in one fetch cycle is 20; add total retry backoff budget,
+				// download/upload/webhook timeout budgets (45s/90s/15s).
+				fetchTimeout:  time.Duration(30*20)*time.Second + 7088*time.Millisecond + 45*time.Second + 90*time.Second + 15*time.Second,
 			}
 
 			w.Run(ctx)

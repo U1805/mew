@@ -162,7 +162,7 @@ func ensureClient(client *http.Client) *http.Client {
 	if client == nil {
 		jar, _ := cookiejar.New(nil)
 		return &http.Client{
-			Timeout: 20 * time.Second,
+			Timeout: 30 * time.Second,
 			Jar:     jar,
 		}
 	}

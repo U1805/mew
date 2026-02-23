@@ -35,8 +35,9 @@ func (r *Runner) Run(ctx context.Context) error {
 	g := sdk.NewGroup(ctx)
 
 	twitterClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
-		Timeout:   25 * time.Second,
+		Timeout:   30 * time.Second,
 		CookieJar: true,
+		Mode:      "proxy",
 	})
 	if err != nil {
 		return err
@@ -50,6 +51,7 @@ func (r *Runner) Run(ctx context.Context) error {
 	}
 	downloadClient, err := sdk.NewHTTPClient(sdk.HTTPClientOptions{
 		Timeout: 45 * time.Second,
+		Mode:    "proxy",
 	})
 	if err != nil {
 		return err
@@ -91,7 +93,8 @@ func (r *Runner) Run(ctx context.Context) error {
 				sendHistory:  sdk.BoolOrDefault(taskCopy.SendHistoryOnStart, false),
 				firstRun:     true,
 				freshState:   tr.Fresh(),
-				fetchTimeout: 35 * time.Second,
+				// Max request count in one fetch cycle is 6; add webhook/download/upload timeout budgets.
+				fetchTimeout: time.Duration(30*6)*time.Second + 15*time.Second + 45*time.Second + 90*time.Second,
 			}
 
 			w.Run(ctx)
