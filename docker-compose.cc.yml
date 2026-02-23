@@ -1,0 +1,75 @@
+services:
+  b4u2cc-init:
+    image: alpine/git:2.49.1
+    restart: "no"
+    entrypoint: ["/bin/sh", "-lc"]
+    command: >-
+      if [ -d /src/.git ]; then
+        echo "b4u2cc source already initialized";
+      else
+        git clone --depth 1 https://github.com/CassiopeiaCode/b4u2cc.git /src;
+      fi
+    volumes:
+      - b4u2cc_src:/src
+
+  b4u2cc:
+    image: denoland/deno:2.2.7
+    restart: unless-stopped
+    depends_on:
+      b4u2cc-init:
+        condition: service_completed_successfully
+    working_dir: /src/deno-proxy
+    entrypoint: ["deno", "run", "--allow-net", "--allow-env", "src/main.ts"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3456
+      UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL}
+      UPSTREAM_API_KEY: ${UPSTREAM_API_KEY:-}
+      UPSTREAM_MODEL: ${UPSTREAM_MODEL:-}
+      CLIENT_API_KEY: ${CLIENT_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAX_REQUESTS_PER_MINUTE: ${MAX_REQUESTS_PER_MINUTE:-10}
+      TIMEOUT_MS: ${TIMEOUT_MS:-120000}
+      TOKEN_MULTIPLIER: ${TOKEN_MULTIPLIER:-1.0}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "deno",
+          "eval",
+          "const r = await fetch('http://localhost:3456/healthz'); if (!r.ok) Deno.exit(1);",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    volumes:
+      - b4u2cc_src:/src:ro
+    networks:
+      - mew_network
+
+  claude-code:
+    build:
+      context: .
+      dockerfile: docker/claude-code/Dockerfile
+    depends_on:
+      b4u2cc:
+        condition: service_healthy
+    working_dir: /workspace
+    environment:
+      ANTHROPIC_API_KEY: ${CLIENT_API_KEY}
+      ANTHROPIC_AUTH_TOKEN: ${CLIENT_API_KEY}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://b4u2cc:3456}
+    volumes:
+      - ./:/workspace
+    stdin_open: true
+    tty: true
+    networks:
+      - mew_network
+
+volumes:
+  b4u2cc_src:
+
+networks:
+  mew_network:
+    external: true
