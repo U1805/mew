@@ -1,5 +1,6 @@
 services:
   b4u2cc:
+    container_name: mew_b4u2cc
     build:
       context: .
       dockerfile: docker/b4u2cc/Dockerfile
@@ -21,16 +22,18 @@ services:
           "CMD",
           "deno",
           "eval",
-          "const r = await fetch('http://localhost:3456/healthz'); if (!r.ok) Deno.exit(1);",
+          "--no-lock",
+          "const r = await fetch('http://127.0.0.1:3456/healthz'); if (!r.ok) Deno.exit(1);",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 30s
     networks:
       - mew_network
 
   claude-code:
+    container_name: mew_claude_code
     build:
       context: .
       dockerfile: docker/claude-code/Dockerfile
