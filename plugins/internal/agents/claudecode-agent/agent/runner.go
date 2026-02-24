@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path"
 	"strings"
 	"sync"
 	"time"
 
 	"mew/plugins/pkg"
 	sdkapi "mew/plugins/pkg/api"
+	"mew/plugins/pkg/api/attachment"
 	"mew/plugins/pkg/api/gateway/socketio"
 	"mew/plugins/pkg/api/messages"
 )
@@ -43,6 +45,7 @@ type ClaudeCodeRunner struct {
 const (
 	claudeCodeLogContentPreviewLen = 160
 	claudeCodeIncomingQueueSize    = 128
+	claudeCodeMaxAttachmentBytes   = 20 * 1024 * 1024
 )
 
 type messageCreateJob struct {
@@ -153,11 +156,12 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 		// Keep gateway callback fast; long-running Claude calls must run outside read loop.
 		select {
 		case jobs <- messageCreateJob{msg: msg, emit: emit}:
-			log.Printf("%s MESSAGE_CREATE queued: channel=%s msg=%s user=%s qcap=%d content=%q",
+			log.Printf("%s MESSAGE_CREATE queued: channel=%s msg=%s user=%s atts=%d qcap=%d content=%q",
 				logPrefix,
 				msg.ChannelID,
 				msg.ID,
 				msg.AuthorID(),
+				len(msg.Attachments),
 				claudeCodeIncomingQueueSize,
 				sdk.PreviewString(msg.ContextText(), claudeCodeLogContentPreviewLen),
 			)
@@ -177,15 +181,16 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 
 func (r *ClaudeCodeRunner) handleMessageCreateJob(ctx context.Context, logPrefix string, job messageCreateJob) {
 	msg := job.msg
-	log.Printf("%s MESSAGE_CREATE handling: channel=%s msg=%s user=%s content=%q",
+	log.Printf("%s MESSAGE_CREATE handling: channel=%s msg=%s user=%s atts=%d content=%q",
 		logPrefix,
 		msg.ChannelID,
 		msg.ID,
 		msg.AuthorID(),
+		len(msg.Attachments),
 		sdk.PreviewString(msg.ContextText(), claudeCodeLogContentPreviewLen),
 	)
 
-	ok, err := r.maybeHandleMessage(ctx, msg.ChannelID, msg.ContextText(), job.emit)
+	ok, err := r.maybeHandleMessage(ctx, msg.ChannelID, msg.ContextText(), msg.Attachments, job.emit)
 	if err != nil {
 		log.Printf("%s message handle failed: channel=%s msg=%s err=%v", logPrefix, msg.ChannelID, msg.ID, err)
 		return
@@ -197,21 +202,26 @@ func (r *ClaudeCodeRunner) handleMessageCreateJob(ctx context.Context, logPrefix
 	}
 }
 
-func (r *ClaudeCodeRunner) maybeHandleMessage(ctx context.Context, channelID, content string, emit socketio.EmitFunc) (ok bool, err error) {
+func (r *ClaudeCodeRunner) maybeHandleMessage(
+	ctx context.Context,
+	channelID, content string,
+	attachments []sdkapi.AttachmentRef,
+	emit socketio.EmitFunc,
+) (ok bool, err error) {
 	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
+	if trimmed == "" && len(attachments) == 0 {
 		log.Printf("%s skip empty content: channel=%s", r.logPrefix, channelID)
 		return false, nil
 	}
 
 	if rest, mentioned := socketio.StripLeadingBotMention(trimmed, r.botUserID); mentioned {
 		log.Printf("%s route by mention: channel=%s", r.logPrefix, channelID)
-		return r.handleCommand(ctx, channelID, rest, emit)
+		return r.handleCommand(ctx, channelID, rest, attachments, emit)
 	}
 
 	if r.dmChannels.Has(channelID) {
 		log.Printf("%s route by DM cache hit: channel=%s", r.logPrefix, channelID)
-		return r.handleCommand(ctx, channelID, trimmed, emit)
+		return r.handleCommand(ctx, channelID, trimmed, attachments, emit)
 	}
 
 	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
@@ -220,15 +230,20 @@ func (r *ClaudeCodeRunner) maybeHandleMessage(ctx context.Context, channelID, co
 	}
 	if r.dmChannels.Has(channelID) {
 		log.Printf("%s route by DM cache refresh: channel=%s", r.logPrefix, channelID)
-		return r.handleCommand(ctx, channelID, trimmed, emit)
+		return r.handleCommand(ctx, channelID, trimmed, attachments, emit)
 	}
 	log.Printf("%s ignore non-DM and no leading mention: channel=%s", r.logPrefix, channelID)
 	return false, nil
 }
 
-func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw string, emit socketio.EmitFunc) (ok bool, err error) {
+func (r *ClaudeCodeRunner) handleCommand(
+	ctx context.Context,
+	channelID, raw string,
+	attachments []sdkapi.AttachmentRef,
+	emit socketio.EmitFunc,
+) (ok bool, err error) {
 	command := strings.TrimSpace(raw)
-	if command == "" {
+	if command == "" && len(attachments) == 0 {
 		log.Printf("%s skip empty command: channel=%s", r.logPrefix, channelID)
 		return false, nil
 	}
@@ -242,28 +257,65 @@ func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw str
 		return true, nil
 	}
 
+	prompt, err := r.buildPromptWithAttachments(ctx, channelID, command, attachments)
+	if err != nil {
+		log.Printf("%s attachment processing failed: channel=%s err=%v", r.logPrefix, channelID, err)
+		_ = emitChannelMessage(emit, channelID, fmt.Sprintf("附件处理失败: %v", err))
+		return true, nil
+	}
+
 	continued := r.getChannelContinued(channelID)
 	mode := "-p"
 	if continued {
 		mode = "-c -p"
 	}
 	start := time.Now()
-	log.Printf("%s proxy request start: channel=%s mode=%s prompt_len=%d prompt=%q",
+	log.Printf("%s proxy request start: channel=%s mode=%s attachments=%d prompt_len=%d prompt=%q",
 		r.logPrefix,
 		channelID,
 		mode,
-		len(command),
-		sdk.PreviewString(command, claudeCodeLogContentPreviewLen),
+		len(attachments),
+		len(prompt),
+		sdk.PreviewString(prompt, claudeCodeLogContentPreviewLen),
 	)
 	parser := NewClaudeStreamParser()
 	sentMessages := 0
+	pendingMsg := ""
+	pendingHasUsageFooter := false
 
-	chunks, err := r.proxyClient.ChatStream(ctx, channelID, command, continued, func(line string) error {
+	flushPending := func() error {
+		msg := strings.TrimSpace(pendingMsg)
+		if msg == "" {
+			pendingMsg = ""
+			pendingHasUsageFooter = false
+			return nil
+		}
+		if pendingHasUsageFooter {
+			n, err := r.emitMessageWithFileRefs(ctx, channelID, msg, emit)
+			if err != nil {
+				return err
+			}
+			sentMessages += n
+		} else {
+			if err := emitChannelMessage(emit, channelID, msg); err != nil {
+				return err
+			}
+			sentMessages++
+		}
+		pendingMsg = ""
+		pendingHasUsageFooter = false
+		return nil
+	}
+
+	chunks, err := r.proxyClient.ChatStream(ctx, channelID, prompt, continued, func(line string) error {
 		log.Printf("%s proxy chunk: channel=%s mode=%s chunk_len=%d chunk=%q",
 			r.logPrefix, channelID, mode, len(line), sdk.PreviewString(line, claudeCodeLogContentPreviewLen))
 		outMsgs, parseErr := parser.FeedLine(line)
 		if parseErr != nil {
 			log.Printf("%s proxy chunk parse failed: channel=%s mode=%s err=%v", r.logPrefix, channelID, mode, parseErr)
+			if err := flushPending(); err != nil {
+				return err
+			}
 			if err := emitChannelMessage(emit, channelID, line); err != nil {
 				return err
 			}
@@ -276,10 +328,11 @@ func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw str
 			if m == "" {
 				continue
 			}
-			if err := emitChannelMessage(emit, channelID, m); err != nil {
+			if err := flushPending(); err != nil {
 				return err
 			}
-			sentMessages++
+			pendingMsg = m
+			pendingHasUsageFooter = messageHasUsageFooter(m)
 		}
 		return nil
 	})
@@ -296,10 +349,15 @@ func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw str
 		if m == "" {
 			continue
 		}
-		if err := emitChannelMessage(emit, channelID, m); err != nil {
+		if err := flushPending(); err != nil {
 			return true, err
 		}
-		sentMessages++
+		pendingMsg = m
+		pendingHasUsageFooter = messageHasUsageFooter(m)
+	}
+
+	if err := flushPending(); err != nil {
+		return true, err
 	}
 
 	r.setChannelContinued(channelID, true)
@@ -311,6 +369,66 @@ func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw str
 		}
 	}
 	return true, nil
+}
+
+func (r *ClaudeCodeRunner) buildPromptWithAttachments(
+	ctx context.Context,
+	channelID, command string,
+	attachments []sdkapi.AttachmentRef,
+) (string, error) {
+	command = strings.TrimSpace(command)
+	if len(attachments) == 0 {
+		return command, nil
+	}
+
+	httpClient := r.session.HTTPClient()
+	fileRefs := make([]string, 0, len(attachments))
+	for i, att := range attachments {
+		name := sanitizeAttachmentName(att.Filename, i+1)
+		data, err := attachment.DownloadAttachmentBytes(
+			ctx,
+			httpClient,
+			httpClient,
+			r.apiBase,
+			"",
+			att,
+			claudeCodeMaxAttachmentBytes,
+		)
+		if err != nil {
+			return "", fmt.Errorf("download %q failed: %w", name, err)
+		}
+
+		remotePath, remoteName, err := r.proxyClient.UploadFile(ctx, channelID, name, data)
+		if err != nil {
+			return "", fmt.Errorf("upload %q failed: %w", name, err)
+		}
+		if strings.TrimSpace(remoteName) == "" {
+			remoteName = name
+		}
+		log.Printf("%s attachment uploaded: channel=%s name=%q size=%d path=%q",
+			r.logPrefix, channelID, remoteName, len(data), remotePath)
+		fileRefs = append(fileRefs, fmt.Sprintf("[%s](%s)", remoteName, remotePath))
+	}
+
+	refLine := strings.Join(fileRefs, " ")
+	if command == "" {
+		return refLine, nil
+	}
+	return command + "\n\n" + refLine, nil
+}
+
+func sanitizeAttachmentName(filename string, seq int) string {
+	name := strings.TrimSpace(filename)
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\n", "")
+	name = path.Base(name)
+	if name == "." || name == "/" || name == `\` {
+		name = ""
+	}
+	if name == "" {
+		return fmt.Sprintf("file_%d", seq)
+	}
+	return name
 }
 
 func (r *ClaudeCodeRunner) getChannelContinued(channelID string) bool {

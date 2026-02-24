@@ -24,7 +24,7 @@ RUN mkdir -p /home/node/workspace /home/node/.claude /opt/cc-proxy \
 ENV HOME=/home/node
 WORKDIR /home/node/workspace
 
-COPY --chown=node:node docker/claude-code/server.py /opt/cc-proxy/server.py
+COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/server.py /opt/cc-proxy/server.py
 COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/settings.json /home/node/.claude/settings.json
 COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/CLAUDE.md /home/node/.claude/CLAUDE.md
 COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/skills /home/node/.claude/skills

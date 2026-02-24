@@ -17,5 +17,6 @@
   },
   "sandbox": {
     "enabled": false
-  }
+  },
+  "skipWebFetchPreflight": true
 }

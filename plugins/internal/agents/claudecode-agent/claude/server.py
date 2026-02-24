@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+import base64
 import json
 import logging
+import mimetypes
 import os
 import re
 import selectors
@@ -16,6 +18,7 @@ BASE_DIR = os.getenv("CLAUDE_PROXY_WORKDIR", "/home/node/workspace/projects")
 DEFAULT_TIMEOUT = int(os.getenv("CLAUDE_PROXY_TIMEOUT_SECONDS", "600"))
 LOG_LEVEL = os.getenv("CLAUDE_PROXY_LOG_LEVEL", "INFO").upper()
 PROMPT_PREVIEW_CHARS = int(os.getenv("CLAUDE_PROXY_PROMPT_PREVIEW_CHARS", "120"))
+MAX_FILE_BYTES = int(os.getenv("CLAUDE_PROXY_MAX_FILE_BYTES", str(20 * 1024 * 1024)))
 
 
 def _setup_logger():
@@ -60,6 +63,46 @@ def parse_bool(value) -> bool:
         if s in {"0", "false", "no", "n", "off", ""}:
             return False
     return bool(value)
+
+
+def safe_filename(filename: str, fallback: str = "file") -> str:
+    raw = os.path.basename((filename or "").strip())
+    stem_raw, ext_raw = os.path.splitext(raw)
+
+    stem = re.sub(r"[^\w.-]", "_", stem_raw, flags=re.UNICODE).strip(". ")
+    ext = re.sub(r"[^\w.-]", "", ext_raw, flags=re.UNICODE)
+    if ext and not ext.startswith("."):
+        ext = "." + ext
+
+    if not stem:
+        stem = fallback
+
+    name = stem + ext
+    if len(name) > 180:
+        max_stem = max(1, 180 - len(ext))
+        name = stem[:max_stem] + ext
+    return name
+
+
+def unique_file_path(dir_path: str, filename: str) -> str:
+    stem, ext = os.path.splitext(filename)
+    candidate = os.path.join(dir_path, filename)
+    idx = 1
+    while os.path.exists(candidate):
+        candidate = os.path.join(dir_path, f"{stem}_{idx}{ext}")
+        idx += 1
+    return candidate
+
+
+def save_uploaded_file(session_id: str, filename: str, content: bytes):
+    session_dir = safe_session_dir(session_id)
+    files_dir = os.path.join(session_dir, ".files")
+    os.makedirs(files_dir, exist_ok=True)
+    safe_name = safe_filename(filename)
+    abs_path = unique_file_path(files_dir, safe_name)
+    with open(abs_path, "wb") as f:
+        f.write(content)
+    return os.path.basename(abs_path), abs_path
 
 
 def build_claude_cmd(prompt: str, use_continue: bool):
@@ -258,6 +301,14 @@ class Handler(BaseHTTPRequestHandler):
             self.path,
             self._client_ip(),
         )
+        if self.path == "/files/download":
+            self.handle_download_file(request_id, start)
+            return
+
+        if self.path == "/files/upload":
+            self.handle_upload_file(request_id, start)
+            return
+
         if self.path != "/chat":
             self._write_json(404, {"ok": False, "error": "not found"}, request_id, start)
             return
@@ -366,6 +417,150 @@ class Handler(BaseHTTPRequestHandler):
                 self._client_ip(),
                 line_count,
             )
+
+    def handle_upload_file(self, request_id: str, start: float):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0:
+                self._write_json(
+                    400,
+                    {"ok": False, "error": "empty request body"},
+                    request_id,
+                    start,
+                )
+                return
+            raw = self.rfile.read(length)
+            req = json.loads(raw.decode("utf-8"))
+        except Exception as exc:
+            self._write_json(
+                400,
+                {"ok": False, "error": f"invalid JSON: {exc}"},
+                request_id,
+                start,
+            )
+            return
+
+        session_id = str(req.get("session_id", "default")).strip()
+        filename = str(req.get("filename", "")).strip()
+        content_b64 = str(req.get("content_base64", "")).strip()
+
+        if not filename:
+            self._write_json(400, {"ok": False, "error": "filename is required"}, request_id, start)
+            return
+        if not content_b64:
+            self._write_json(400, {"ok": False, "error": "content_base64 is required"}, request_id, start)
+            return
+
+        try:
+            content = base64.b64decode(content_b64, validate=True)
+        except Exception as exc:
+            self._write_json(400, {"ok": False, "error": f"invalid base64 content: {exc}"}, request_id, start)
+            return
+
+        if len(content) == 0:
+            self._write_json(400, {"ok": False, "error": "empty file content"}, request_id, start)
+            return
+        if len(content) > MAX_FILE_BYTES:
+            self._write_json(
+                413,
+                {"ok": False, "error": f"file too large (> {MAX_FILE_BYTES} bytes)"},
+                request_id,
+                start,
+            )
+            return
+
+        saved_name, saved_path = save_uploaded_file(session_id, filename, content)
+        LOGGER.info(
+            "file.uploaded request_id=%s session_id=%s name=%r bytes=%d path=%s",
+            request_id,
+            session_id,
+            saved_name,
+            len(content),
+            saved_path,
+        )
+        self._write_json(
+            200,
+            {"ok": True, "filename": saved_name, "file_path": saved_path},
+            request_id,
+            start,
+        )
+
+    def handle_download_file(self, request_id: str, start: float):
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0:
+                self._write_json(
+                    400,
+                    {"ok": False, "error": "empty request body"},
+                    request_id,
+                    start,
+                )
+                return
+            raw = self.rfile.read(length)
+            req = json.loads(raw.decode("utf-8"))
+        except Exception as exc:
+            self._write_json(
+                400,
+                {"ok": False, "error": f"invalid JSON: {exc}"},
+                request_id,
+                start,
+            )
+            return
+
+        session_id = str(req.get("session_id", "default")).strip()
+        file_path = str(req.get("file_path", "")).strip()
+        if not file_path:
+            self._write_json(400, {"ok": False, "error": "file_path is required"}, request_id, start)
+            return
+
+        session_dir = safe_session_dir(session_id)
+        session_root = os.path.realpath(session_dir)
+        if os.path.isabs(file_path):
+            abs_path = os.path.realpath(file_path)
+        else:
+            abs_path = os.path.realpath(os.path.join(session_dir, file_path))
+
+        allow_prefix = session_root + os.sep
+        if abs_path != session_root and not abs_path.startswith(allow_prefix):
+            self._write_json(403, {"ok": False, "error": "file path out of session scope"}, request_id, start)
+            return
+        if not os.path.isfile(abs_path):
+            self._write_json(404, {"ok": False, "error": "file not found"}, request_id, start)
+            return
+
+        size = os.path.getsize(abs_path)
+        if size > MAX_FILE_BYTES:
+            self._write_json(
+                413,
+                {"ok": False, "error": f"file too large (> {MAX_FILE_BYTES} bytes)"},
+                request_id,
+                start,
+            )
+            return
+
+        with open(abs_path, "rb") as f:
+            data = f.read()
+        filename = os.path.basename(abs_path)
+        content_type, _ = mimetypes.guess_type(filename)
+        LOGGER.info(
+            "file.downloaded request_id=%s session_id=%s name=%r bytes=%d path=%s content_type=%s",
+            request_id,
+            session_id,
+            filename,
+            len(data),
+            abs_path,
+            content_type or "application/octet-stream",
+        )
+        self._write_json(
+            200,
+            {
+                "ok": True,
+                "filename": filename,
+                "content_base64": base64.b64encode(data).decode("ascii"),
+            },
+            request_id,
+            start,
+        )
 
     def log_message(self, fmt, *args):
         return
