@@ -185,69 +185,61 @@ func (r *ClaudeCodeRunner) handleMessageCreateJob(ctx context.Context, logPrefix
 		sdk.PreviewString(msg.ContextText(), claudeCodeLogContentPreviewLen),
 	)
 
-	reply, ok, err := r.maybeHandleMessage(ctx, msg.ChannelID, msg.ContextText())
+	ok, err := r.maybeHandleMessage(ctx, msg.ChannelID, msg.ContextText(), job.emit)
 	if err != nil {
 		log.Printf("%s message handle failed: channel=%s msg=%s err=%v", logPrefix, msg.ChannelID, msg.ID, err)
 		return
 	}
 	if !ok {
 		log.Printf("%s message ignored: channel=%s msg=%s", logPrefix, msg.ChannelID, msg.ID)
-		return
+	} else {
+		log.Printf("%s message handled: channel=%s msg=%s", logPrefix, msg.ChannelID, msg.ID)
 	}
-	if strings.TrimSpace(reply) == "" {
-		reply = "(empty response)"
-	}
-
-	if err := job.emit("message/create", map[string]any{
-		"channelId": msg.ChannelID,
-		"content":   reply,
-	}); err != nil {
-		log.Printf("%s send message failed: channel=%s msg=%s err=%v", logPrefix, msg.ChannelID, msg.ID, err)
-		return
-	}
-	log.Printf("%s replied: channel=%s msg=%s preview=%q", logPrefix, msg.ChannelID, msg.ID, sdk.PreviewString(reply, claudeCodeLogContentPreviewLen))
 }
 
-func (r *ClaudeCodeRunner) maybeHandleMessage(ctx context.Context, channelID, content string) (reply string, ok bool, err error) {
+func (r *ClaudeCodeRunner) maybeHandleMessage(ctx context.Context, channelID, content string, emit socketio.EmitFunc) (ok bool, err error) {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
 		log.Printf("%s skip empty content: channel=%s", r.logPrefix, channelID)
-		return "", false, nil
+		return false, nil
 	}
 
 	if rest, mentioned := socketio.StripLeadingBotMention(trimmed, r.botUserID); mentioned {
 		log.Printf("%s route by mention: channel=%s", r.logPrefix, channelID)
-		return r.handleCommand(ctx, channelID, rest)
+		return r.handleCommand(ctx, channelID, rest, emit)
 	}
 
 	if r.dmChannels.Has(channelID) {
 		log.Printf("%s route by DM cache hit: channel=%s", r.logPrefix, channelID)
-		return r.handleCommand(ctx, channelID, trimmed)
+		return r.handleCommand(ctx, channelID, trimmed, emit)
 	}
 
 	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
 		log.Printf("%s DM channel refresh failed on demand: channel=%s err=%v", r.logPrefix, channelID, err)
-		return "", false, err
+		return false, err
 	}
 	if r.dmChannels.Has(channelID) {
 		log.Printf("%s route by DM cache refresh: channel=%s", r.logPrefix, channelID)
-		return r.handleCommand(ctx, channelID, trimmed)
+		return r.handleCommand(ctx, channelID, trimmed, emit)
 	}
 	log.Printf("%s ignore non-DM and no leading mention: channel=%s", r.logPrefix, channelID)
-	return "", false, nil
+	return false, nil
 }
 
-func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw string) (reply string, ok bool, err error) {
+func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw string, emit socketio.EmitFunc) (ok bool, err error) {
 	command := strings.TrimSpace(raw)
 	if command == "" {
 		log.Printf("%s skip empty command: channel=%s", r.logPrefix, channelID)
-		return "", false, nil
+		return false, nil
 	}
 
 	if strings.EqualFold(command, "/clear") {
 		r.setChannelContinued(channelID, false)
 		log.Printf("%s command /clear: channel=%s", r.logPrefix, channelID)
-		return "会话已清空。", true, nil
+		if err := emitChannelMessage(emit, channelID, "会话已清空。"); err != nil {
+			return true, err
+		}
+		return true, nil
 	}
 
 	continued := r.getChannelContinued(channelID)
@@ -263,18 +255,62 @@ func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw str
 		len(command),
 		sdk.PreviewString(command, claudeCodeLogContentPreviewLen),
 	)
-	out, err := r.proxyClient.Chat(ctx, channelID, command, continued)
+	parser := NewClaudeStreamParser()
+	sentMessages := 0
+
+	chunks, err := r.proxyClient.ChatStream(ctx, channelID, command, continued, func(line string) error {
+		log.Printf("%s proxy chunk: channel=%s mode=%s chunk_len=%d chunk=%q",
+			r.logPrefix, channelID, mode, len(line), sdk.PreviewString(line, claudeCodeLogContentPreviewLen))
+		outMsgs, parseErr := parser.FeedLine(line)
+		if parseErr != nil {
+			log.Printf("%s proxy chunk parse failed: channel=%s mode=%s err=%v", r.logPrefix, channelID, mode, parseErr)
+			if err := emitChannelMessage(emit, channelID, line); err != nil {
+				return err
+			}
+			sentMessages++
+			return nil
+		}
+
+		for _, m := range outMsgs {
+			m = strings.TrimSpace(m)
+			if m == "" {
+				continue
+			}
+			if err := emitChannelMessage(emit, channelID, m); err != nil {
+				return err
+			}
+			sentMessages++
+		}
+		return nil
+	})
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Printf("%s proxy request failed: channel=%s mode=%s elapsed=%s err=%v",
 			r.logPrefix, channelID, mode, elapsed, err)
-		return fmt.Sprintf("claude-code 调用失败: %v", err), true, nil
+		_ = emitChannelMessage(emit, channelID, fmt.Sprintf("claude-code 调用失败: %v", err))
+		return true, nil
+	}
+
+	for _, m := range parser.Flush() {
+		m = strings.TrimSpace(m)
+		if m == "" {
+			continue
+		}
+		if err := emitChannelMessage(emit, channelID, m); err != nil {
+			return true, err
+		}
+		sentMessages++
 	}
 
 	r.setChannelContinued(channelID, true)
-	log.Printf("%s proxy request success: channel=%s mode=%s elapsed=%s output_len=%d output=%q",
-		r.logPrefix, channelID, mode, elapsed, len(out), sdk.PreviewString(out, claudeCodeLogContentPreviewLen))
-	return out, true, nil
+	log.Printf("%s proxy request success: channel=%s mode=%s elapsed=%s chunks=%d messages=%d",
+		r.logPrefix, channelID, mode, elapsed, chunks, sentMessages)
+	if chunks == 0 || sentMessages == 0 {
+		if err := emitChannelMessage(emit, channelID, "(empty response)"); err != nil {
+			return true, err
+		}
+	}
+	return true, nil
 }
 
 func (r *ClaudeCodeRunner) getChannelContinued(channelID string) bool {
@@ -287,4 +323,11 @@ func (r *ClaudeCodeRunner) setChannelContinued(channelID string, continued bool)
 	r.continuedMu.Lock()
 	defer r.continuedMu.Unlock()
 	r.channelContinued[channelID] = continued
+}
+
+func emitChannelMessage(emit socketio.EmitFunc, channelID, content string) error {
+	return emit("message/create", map[string]any{
+		"channelId": channelID,
+		"content":   content,
+	})
 }

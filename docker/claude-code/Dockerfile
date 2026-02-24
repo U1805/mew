@@ -9,6 +9,7 @@ RUN apt-get update \
         less \
         procps \
         python3 \
+        python3-venv \
         python3-pip \
         ripgrep \
         ca-certificates \

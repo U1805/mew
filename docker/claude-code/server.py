@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import selectors
 import subprocess
 import time
 import uuid
@@ -61,7 +62,22 @@ def parse_bool(value) -> bool:
     return bool(value)
 
 
-def run_claude(
+def build_claude_cmd(prompt: str, use_continue: bool):
+    cmd = [
+        "claude",
+        "--dangerously-skip-permissions",
+        "--verbose",
+        "--include-partial-messages",
+        "--output-format",
+        "stream-json",
+    ]
+    if use_continue:
+        cmd.append("-c")
+    cmd.extend(["-p", prompt])
+    return cmd
+
+
+def stream_claude_output(
     prompt: str,
     use_continue: bool,
     session_id: str,
@@ -69,10 +85,7 @@ def run_claude(
     request_id: str = "-",
 ):
     workdir = safe_session_dir(session_id)
-    cmd = ["claude", "--dangerously-skip-permissions"]
-    if use_continue:
-        cmd.append("-c")
-    cmd.extend(["-p", prompt])
+    cmd = build_claude_cmd(prompt, use_continue)
     mode = "-c -p" if use_continue else "-p"
     start = time.monotonic()
     LOGGER.info(
@@ -85,39 +98,97 @@ def run_claude(
         preview_text(prompt),
     )
 
-    proc = subprocess.run(
+    proc = subprocess.Popen(
         cmd,
         cwd=workdir,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        timeout=timeout_sec,
-        check=False,
+        bufsize=1,
     )
-    stdout = (proc.stdout or "").strip()
-    stderr = (proc.stderr or "").strip()
-    duration_ms = int((time.monotonic() - start) * 1000)
-    if proc.returncode != 0:
-        msg = stderr or stdout or f"claude exited with code {proc.returncode}"
+    sel = selectors.DefaultSelector()
+    if proc.stdout is not None:
+        sel.register(proc.stdout, selectors.EVENT_READ, data="stdout")
+    if proc.stderr is not None:
+        sel.register(proc.stderr, selectors.EVENT_READ, data="stderr")
+
+    deadline = time.monotonic() + timeout_sec
+    stderr_lines = []
+    line_count = 0
+
+    try:
+        while sel.get_map():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(cmd, timeout_sec)
+
+            events = sel.select(timeout=min(0.5, remaining))
+            if not events:
+                continue
+
+            for key, _ in events:
+                stream = key.fileobj
+                stream_type = key.data
+                line = stream.readline()
+                if line == "":
+                    try:
+                        sel.unregister(stream)
+                    except Exception:
+                        pass
+                    continue
+
+                text = line.rstrip("\r\n")
+                if text == "":
+                    continue
+                if stream_type == "stdout":
+                    line_count += 1
+                    yield text
+                else:
+                    stderr_lines.append(text)
+    except subprocess.TimeoutExpired:
+        if proc.poll() is None:
+            proc.kill()
+        try:
+            proc.wait(timeout=3)
+        except Exception:
+            pass
+        duration_ms = int((time.monotonic() - start) * 1000)
         LOGGER.error(
-            "claude.exec.fail request_id=%s session_id=%s mode=%s returncode=%d duration_ms=%d stderr_preview=%r stdout_preview=%r",
+            "claude.exec.timeout request_id=%s session_id=%s mode=%s timeout_sec=%d duration_ms=%d",
             request_id,
             session_id,
             mode,
-            proc.returncode,
+            timeout_sec,
             duration_ms,
-            preview_text(stderr),
-            preview_text(stdout),
+        )
+        raise
+    finally:
+        sel.close()
+
+    returncode = proc.wait()
+    duration_ms = int((time.monotonic() - start) * 1000)
+    stderr_text = "\n".join(stderr_lines).strip()
+    if returncode != 0:
+        msg = stderr_text or f"claude exited with code {returncode}"
+        LOGGER.error(
+            "claude.exec.fail request_id=%s session_id=%s mode=%s returncode=%d duration_ms=%d stderr_preview=%r",
+            request_id,
+            session_id,
+            mode,
+            returncode,
+            duration_ms,
+            preview_text(stderr_text),
         )
         raise RuntimeError(msg)
+
     LOGGER.info(
-        "claude.exec.ok request_id=%s session_id=%s mode=%s duration_ms=%d output_len=%d",
+        "claude.exec.ok request_id=%s session_id=%s mode=%s duration_ms=%d lines=%d",
         request_id,
         session_id,
         mode,
         duration_ms,
-        len(stdout),
+        line_count,
     )
-    return stdout
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -146,6 +217,21 @@ class Handler(BaseHTTPRequestHandler):
             duration_ms,
             self._client_ip(),
         )
+
+    def _start_ndjson_stream(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/x-ndjson; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Accel-Buffering", "no")
+        self.end_headers()
+
+    def _write_ndjson_line(self, line: str):
+        payload = (line + "\n").encode("utf-8")
+        self.wfile.write(payload)
+        self.wfile.flush()
+
+    def _write_ndjson_obj(self, obj: dict):
+        self._write_ndjson_line(json.dumps(obj, ensure_ascii=False))
 
     def do_GET(self):
         request_id = self._request_id()
@@ -242,26 +328,19 @@ class Handler(BaseHTTPRequestHandler):
         if timeout_sec <= 0:
             timeout_sec = DEFAULT_TIMEOUT
 
+        self._start_ndjson_stream()
+        line_count = 0
         try:
-            out = run_claude(prompt, use_continue, session_id, timeout_sec, request_id)
-            self._write_json(
-                200,
-                {"ok": True, "output": out, "mode": "-c -p" if use_continue else "-p"},
-                request_id,
-                start,
-            )
+            for line in stream_claude_output(prompt, use_continue, session_id, timeout_sec, request_id):
+                line_count += 1
+                self._write_ndjson_line(line)
         except subprocess.TimeoutExpired:
-            LOGGER.error(
-                "claude.exec.timeout request_id=%s session_id=%s timeout_sec=%d",
-                request_id,
-                session_id,
-                timeout_sec,
-            )
-            self._write_json(
-                504,
-                {"ok": False, "error": "claude execution timed out"},
-                request_id,
-                start,
+            self._write_ndjson_obj(
+                {
+                    "type": "proxy_error",
+                    "request_id": request_id,
+                    "error": "claude execution timed out",
+                }
             )
         except Exception as exc:
             LOGGER.exception(
@@ -269,7 +348,24 @@ class Handler(BaseHTTPRequestHandler):
                 request_id,
                 session_id,
             )
-            self._write_json(502, {"ok": False, "error": str(exc)}, request_id, start)
+            self._write_ndjson_obj(
+                {
+                    "type": "proxy_error",
+                    "request_id": request_id,
+                    "error": str(exc),
+                }
+            )
+        finally:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            LOGGER.info(
+                "http.response request_id=%s method=%s path=%s status=200 duration_ms=%d client_ip=%s lines=%d",
+                request_id,
+                self.command,
+                self.path,
+                duration_ms,
+                self._client_ip(),
+                line_count,
+            )
 
     def log_message(self, fmt, *args):
         return
