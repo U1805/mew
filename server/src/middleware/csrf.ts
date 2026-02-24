@@ -7,7 +7,8 @@ import { getRefreshTokenCookieName } from '../api/auth/refreshToken.service';
 const CSRF_COOKIE_NAME = 'mew_csrf_token';
 const CSRF_HEADER_NAME = 'x-mew-csrf-token';
 
-const isSecureCookie = () => (process.env.NODE_ENV || '').toLowerCase() === 'production';
+const isProduction = () => (process.env.NODE_ENV || '').toLowerCase() === 'production';
+const shouldUseSecureCookie = (req: Request) => isProduction() && req.secure;
 
 export const getCsrfCookieName = () => CSRF_COOKIE_NAME;
 export const getCsrfHeaderName = () => CSRF_HEADER_NAME;
@@ -35,7 +36,7 @@ const readHeaderToken = (req: Request): string | null => {
 
 export const csrfCookieHandler = (req: Request, res: Response) => {
   const token = crypto.randomBytes(32).toString('base64url');
-  res.cookie(CSRF_COOKIE_NAME, token, buildCsrfCookieOptions({ secure: isSecureCookie() }));
+  res.cookie(CSRF_COOKIE_NAME, token, buildCsrfCookieOptions({ secure: shouldUseSecureCookie(req) }));
   return res.status(204).send();
 };
 

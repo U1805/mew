@@ -1,3 +1,5 @@
+name: mew-cc
+
 services:
   b4u2cc:
     container_name: mew_b4u2cc

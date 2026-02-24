@@ -1,5 +1,7 @@
 # Override for pulling prebuilt images from GHCR.
 # Use with: docker compose -f docker-compose.yml -f docker-compose.ghcr.yml up -d
+name: mew
+
 services:
   garage-init:
     image: "ghcr.io/u1805/mew/garage-init:latest"
