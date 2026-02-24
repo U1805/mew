@@ -425,12 +425,58 @@ func formatToolAction(tu toolUse, result toolResult) string {
 			"```",
 		})
 	default:
-		if result.IsError {
-			return buildCallout("warning", fmt.Sprintf("执行工具 %s", sanitizeLine(tu.Name)), []string{
-				fmt.Sprintf("系统拦截：%s", sanitizeLine(result.ErrorText)),
-			})
+		toolName := sanitizeLine(tu.Name)
+		if toolName == "" {
+			toolName = "unknown"
 		}
-		return buildCallout("info", fmt.Sprintf("执行工具 %s", sanitizeLine(tu.Name)), []string{"调用成功"})
+		inputSummary := summarizeToolInput(tu.Input, 1200)
+		if result.IsError {
+			lines := []string{
+				fmt.Sprintf("系统拦截：%s", sanitizeLine(result.ErrorText)),
+			}
+			if inputSummary != "" {
+				lines = append(lines,
+					"",
+					"输入参数：",
+					"```json",
+					inputSummary,
+					"```",
+				)
+			}
+			return buildCallout("warning", fmt.Sprintf("执行工具 %s", toolName), lines)
+		}
+
+		lines := make([]string, 0, 8)
+		if inputSummary != "" {
+			lines = append(lines,
+				"输入参数：",
+				"```json",
+				inputSummary,
+				"```",
+			)
+		}
+		stdout := strings.TrimSpace(result.Stdout)
+		if stdout != "" {
+			if len(lines) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines,
+				"工具输出：",
+				"```",
+				truncateText(stdout, 2000),
+				"```",
+			)
+		}
+		if result.NumLines > 0 {
+			if len(lines) > 0 {
+				lines = append(lines, "")
+			}
+			lines = append(lines, fmt.Sprintf("输出行数：%d", result.NumLines))
+		}
+		if len(lines) == 0 {
+			lines = append(lines, "调用成功（无可展示输出）")
+		}
+		return buildCallout("info", fmt.Sprintf("执行工具 %s", toolName), lines)
 	}
 }
 
@@ -531,4 +577,25 @@ func extractToolUseError(text string) string {
 
 func sanitizeLine(s string) string {
 	return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, "\r", " "), "\n", " "))
+}
+
+func summarizeToolInput(input map[string]any, limit int) string {
+	if len(input) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(input)
+	if err != nil {
+		return sanitizeLine(fmt.Sprintf("%v", input))
+	}
+	return truncateText(strings.TrimSpace(string(b)), limit)
+}
+
+func truncateText(s string, limit int) string {
+	if limit <= 0 || len(s) <= limit {
+		return s
+	}
+	if limit <= 3 {
+		return s[:limit]
+	}
+	return s[:limit-3] + "..."
 }

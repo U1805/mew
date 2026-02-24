@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 )
 
@@ -25,9 +27,8 @@ type claudeChatRequest struct {
 }
 
 type claudeUploadFileRequest struct {
-	SessionID     string `json:"session_id"`
-	Filename      string `json:"filename"`
-	ContentBase64 string `json:"content_base64"`
+	SessionID string `json:"session_id"`
+	Filename  string `json:"filename"`
 }
 
 type claudeUploadFileResponse struct {
@@ -43,10 +44,9 @@ type claudeDownloadFileRequest struct {
 }
 
 type claudeDownloadFileResponse struct {
-	OK            bool   `json:"ok"`
-	Filename      string `json:"filename"`
-	ContentBase64 string `json:"content_base64"`
-	Error         string `json:"error"`
+	OK       bool   `json:"ok"`
+	Filename string `json:"filename"`
+	Error    string `json:"error"`
 }
 
 func NewClaudeCodeProxyClient(baseURL string, httpClient *http.Client) (*ClaudeCodeProxyClient, error) {
@@ -125,21 +125,13 @@ func (c *ClaudeCodeProxyClient) UploadFile(
 	sessionID, filename string,
 	content []byte,
 ) (remotePath string, remoteFilename string, err error) {
-	reqBody := claudeUploadFileRequest{
-		SessionID:     strings.TrimSpace(sessionID),
-		Filename:      strings.TrimSpace(filename),
-		ContentBase64: base64.StdEncoding.EncodeToString(content),
-	}
-	bodyBytes, err := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files/upload", bytes.NewReader(content))
 	if err != nil {
 		return "", "", err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files/upload", bytes.NewReader(bodyBytes))
-	if err != nil {
-		return "", "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("X-Session-Id", url.PathEscape(strings.TrimSpace(sessionID)))
+	req.Header.Set("X-Filename", url.PathEscape(strings.TrimSpace(filename)))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -174,20 +166,12 @@ func (c *ClaudeCodeProxyClient) DownloadFile(
 	ctx context.Context,
 	sessionID, filePath string,
 ) (filename string, content []byte, err error) {
-	reqBody := claudeDownloadFileRequest{
-		SessionID: strings.TrimSpace(sessionID),
-		FilePath:  strings.TrimSpace(filePath),
-	}
-	bodyBytes, err := json.Marshal(reqBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files/download", nil)
 	if err != nil {
 		return "", nil, err
 	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files/download", bytes.NewReader(bodyBytes))
-	if err != nil {
-		return "", nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Session-Id", url.PathEscape(strings.TrimSpace(sessionID)))
+	req.Header.Set("X-File-Path", url.PathEscape(strings.TrimSpace(filePath)))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -203,21 +187,40 @@ func (c *ClaudeCodeProxyClient) DownloadFile(
 		}
 		return "", nil, fmt.Errorf("status=%d: %s", resp.StatusCode, msg)
 	}
+	name := parseProxyDownloadFilename(resp, filePath)
+	return name, raw, nil
+}
 
-	var out claudeDownloadFileResponse
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", nil, err
+func parseProxyDownloadFilename(resp *http.Response, filePath string) string {
+	fallback := path.Base(strings.TrimSpace(filePath))
+	if fallback == "" || fallback == "." || fallback == "/" || fallback == `\` {
+		fallback = "file"
 	}
-	if !out.OK {
-		msg := strings.TrimSpace(out.Error)
-		if msg == "" {
-			msg = "claude-code proxy download failed"
+
+	headerName := strings.TrimSpace(resp.Header.Get("X-Claude-Filename"))
+	if headerName != "" {
+		if decoded, err := url.QueryUnescape(headerName); err == nil && strings.TrimSpace(decoded) != "" {
+			return strings.TrimSpace(decoded)
 		}
-		return "", nil, errors.New(msg)
 	}
-	data, err := base64.StdEncoding.DecodeString(strings.TrimSpace(out.ContentBase64))
-	if err != nil {
-		return "", nil, fmt.Errorf("decode download base64 failed: %w", err)
+
+	if cd := strings.TrimSpace(resp.Header.Get("Content-Disposition")); cd != "" {
+		if _, params, err := mime.ParseMediaType(cd); err == nil {
+			if star := strings.TrimSpace(params["filename*"]); star != "" {
+				const utf8Prefix = "UTF-8''"
+				value := star
+				if strings.HasPrefix(strings.ToUpper(value), strings.ToUpper(utf8Prefix)) {
+					value = value[len(utf8Prefix):]
+				}
+				if decoded, err := url.QueryUnescape(value); err == nil && strings.TrimSpace(decoded) != "" {
+					return strings.TrimSpace(decoded)
+				}
+			}
+			if plain := strings.TrimSpace(params["filename"]); plain != "" {
+				return plain
+			}
+		}
 	}
-	return strings.TrimSpace(out.Filename), data, nil
+
+	return fallback
 }

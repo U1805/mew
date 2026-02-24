@@ -16,7 +16,6 @@ import (
 	"regexp"
 	"strings"
 
-	"mew/plugins/pkg"
 	"mew/plugins/pkg/api/gateway/socketio"
 )
 
@@ -43,19 +42,10 @@ func (r *ClaudeCodeRunner) emitMessageWithFileRefs(
 	channelID, raw string,
 	emit socketio.EmitFunc,
 ) (int, error) {
-	return r.emitMessageWithFileRefsDepth(ctx, channelID, raw, emit, 0)
-}
-
-func (r *ClaudeCodeRunner) emitMessageWithFileRefsDepth(
-	ctx context.Context,
-	channelID, raw string,
-	emit socketio.EmitFunc,
-	depth int,
-) (int, error) {
 	beforeText, afterText, refs := extractFileRefSegments(raw)
 	sent := 0
 	if len(refs) > 0 {
-		log.Printf("%s file refs detected: channel=%s count=%d depth=%d", r.logPrefix, channelID, len(refs), depth)
+		log.Printf("%s file refs detected: channel=%s count=%d", r.logPrefix, channelID, len(refs))
 	}
 
 	if strings.TrimSpace(beforeText) != "" {
@@ -65,13 +55,16 @@ func (r *ClaudeCodeRunner) emitMessageWithFileRefsDepth(
 		sent++
 	}
 
-	downloadFailures := make([]string, 0)
 	for i, ref := range refs {
 		downloadName, data, err := r.proxyClient.DownloadFile(ctx, channelID, ref.Path)
 		if err != nil {
-			downloadFailures = append(downloadFailures, fmt.Sprintf("[%s](%s): %v", ref.Name, ref.Path, err))
 			log.Printf("%s file download failed: channel=%s ref=%q path=%q err=%v",
 				r.logPrefix, channelID, ref.Name, ref.Path, err)
+			msg := formatFileTransferErrorCallout("文件下载失败", ref.Name, ref.Path, err)
+			if emitErr := emitChannelMessage(emit, channelID, msg); emitErr != nil {
+				return sent, emitErr
+			}
+			sent++
 			continue
 		}
 
@@ -84,7 +77,7 @@ func (r *ClaudeCodeRunner) emitMessageWithFileRefsDepth(
 		}
 
 		if err := r.sendAttachmentByBytes(ctx, channelID, outName, data); err != nil {
-			msg := fmt.Sprintf("文件发送失败 [%s](%s): %v", ref.Name, ref.Path, err)
+			msg := formatFileTransferErrorCallout("文件发送失败", ref.Name, ref.Path, err)
 			if emitErr := emitChannelMessage(emit, channelID, msg); emitErr != nil {
 				return sent, emitErr
 			}
@@ -96,119 +89,12 @@ func (r *ClaudeCodeRunner) emitMessageWithFileRefsDepth(
 		sent++
 	}
 
-	if len(downloadFailures) > 0 {
-		if depth < 1 {
-			n, err := r.requestClaudeFixForDownloadFailures(ctx, channelID, downloadFailures, emit, depth+1)
-			sent += n
-			if err != nil {
-				return sent, err
-			}
-		} else {
-			log.Printf("%s file download failures remain after retry, skip user error output: channel=%s count=%d",
-				r.logPrefix, channelID, len(downloadFailures))
-		}
-	}
-
 	if strings.TrimSpace(afterText) != "" {
 		if err := emitChannelMessage(emit, channelID, afterText); err != nil {
 			return sent, err
 		}
 		sent++
 	}
-	return sent, nil
-}
-
-func (r *ClaudeCodeRunner) requestClaudeFixForDownloadFailures(
-	ctx context.Context,
-	channelID string,
-	failures []string,
-	emit socketio.EmitFunc,
-	depth int,
-) (int, error) {
-	if len(failures) == 0 {
-		return 0, nil
-	}
-
-	prompt := buildDownloadFailurePrompt(failures)
-	log.Printf("%s proxy follow-up start: channel=%s mode=-c -p failure_count=%d depth=%d prompt=%q",
-		r.logPrefix, channelID, len(failures), depth, sdk.PreviewString(prompt, claudeCodeLogContentPreviewLen))
-
-	parser := NewClaudeStreamParser()
-	sent := 0
-	pendingMsg := ""
-	pendingHasUsageFooter := false
-
-	flushPending := func() error {
-		msg := strings.TrimSpace(pendingMsg)
-		if msg == "" {
-			pendingMsg = ""
-			pendingHasUsageFooter = false
-			return nil
-		}
-		if pendingHasUsageFooter {
-			n, err := r.emitMessageWithFileRefsDepth(ctx, channelID, msg, emit, depth)
-			if err != nil {
-				return err
-			}
-			sent += n
-		} else {
-			if err := emitChannelMessage(emit, channelID, msg); err != nil {
-				return err
-			}
-			sent++
-		}
-		pendingMsg = ""
-		pendingHasUsageFooter = false
-		return nil
-	}
-
-	chunks, err := r.proxyClient.ChatStream(ctx, channelID, prompt, true, func(line string) error {
-		outMsgs, parseErr := parser.FeedLine(line)
-		if parseErr != nil {
-			log.Printf("%s proxy follow-up chunk parse failed: channel=%s err=%v", r.logPrefix, channelID, parseErr)
-			if err := flushPending(); err != nil {
-				return err
-			}
-			if err := emitChannelMessage(emit, channelID, line); err != nil {
-				return err
-			}
-			sent++
-			return nil
-		}
-		for _, m := range outMsgs {
-			m = strings.TrimSpace(m)
-			if m == "" {
-				continue
-			}
-			if err := flushPending(); err != nil {
-				return err
-			}
-			pendingMsg = m
-			pendingHasUsageFooter = messageHasUsageFooter(m)
-		}
-		return nil
-	})
-	if err != nil {
-		log.Printf("%s proxy follow-up failed: channel=%s err=%v", r.logPrefix, channelID, err)
-		return sent, err
-	}
-	for _, m := range parser.Flush() {
-		m = strings.TrimSpace(m)
-		if m == "" {
-			continue
-		}
-		if err := flushPending(); err != nil {
-			return sent, err
-		}
-		pendingMsg = m
-		pendingHasUsageFooter = messageHasUsageFooter(m)
-	}
-	if err := flushPending(); err != nil {
-		return sent, err
-	}
-
-	log.Printf("%s proxy follow-up success: channel=%s mode=-c -p chunks=%d messages=%d",
-		r.logPrefix, channelID, chunks, sent)
 	return sent, nil
 }
 
@@ -399,16 +285,31 @@ func messageHasUsageFooter(msg string) bool {
 	return false
 }
 
-func buildDownloadFailurePrompt(failures []string) string {
-	if len(failures) == 0 {
-		return ""
+func formatFileTransferErrorCallout(action, name, filePath string, err error) string {
+	action = strings.TrimSpace(action)
+	if action == "" {
+		action = "文件处理失败"
 	}
-	var b strings.Builder
-	b.WriteString("系统通知：你上一条回复中有文件引用下载失败，用户侧未显示该错误。\n")
-	b.WriteString("请基于当前会话目录检查并修正文件路径；如果仍需回传文件，请在最终回复末尾重新输出文件引用行（格式：[文件名](完整文件路径)）。\n")
-	b.WriteString("以下是失败明细：\n")
-	for i, f := range failures {
-		b.WriteString(fmt.Sprintf("%d. %s\n", i+1, f))
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "未命名文件"
 	}
-	return strings.TrimSpace(b.String())
+	filePath = strings.TrimSpace(filePath)
+	errMsg := ""
+	if err != nil {
+		errMsg = strings.TrimSpace(strings.ReplaceAll(err.Error(), "\n", " "))
+	}
+	if errMsg == "" {
+		errMsg = "未知错误"
+	}
+
+	lines := []string{
+		fmt.Sprintf("> [!warning] %s", action),
+		fmt.Sprintf("> 文件：`%s`", name),
+	}
+	if filePath != "" {
+		lines = append(lines, fmt.Sprintf("> 路径：`%s`", filePath))
+	}
+	lines = append(lines, fmt.Sprintf("> 错误：`%s`", errMsg))
+	return strings.Join(lines, "\n")
 }

@@ -85,3 +85,31 @@ func TestClaudeStreamParser_GroupsTurnsAndFinalSummary(t *testing.T) {
 		t.Fatalf("message4 missing usage footer: %s", out[3])
 	}
 }
+
+func TestFormatToolAction_GenericToolShowsInputAndOutput(t *testing.T) {
+	tu := toolUse{
+		Name: "WebFetch",
+		Input: map[string]any{
+			"url":       "https://example.com/docs",
+			"max_bytes": 4096,
+		},
+	}
+	result := toolResult{
+		IsError: false,
+		Stdout:  "{\"status\":200,\"title\":\"Example Domain\"}",
+	}
+
+	out := formatToolAction(tu, result)
+	if !strings.Contains(out, "执行工具 WebFetch") {
+		t.Fatalf("missing tool title: %s", out)
+	}
+	if !strings.Contains(out, "输入参数：") || !strings.Contains(out, "https://example.com/docs") {
+		t.Fatalf("missing input summary: %s", out)
+	}
+	if !strings.Contains(out, "工具输出：") || !strings.Contains(out, "\"status\":200") {
+		t.Fatalf("missing output summary: %s", out)
+	}
+	if strings.Contains(out, "调用成功（无可展示输出）") {
+		t.Fatalf("should not fall back to empty-success message: %s", out)
+	}
+}

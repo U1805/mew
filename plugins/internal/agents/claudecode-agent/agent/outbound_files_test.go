@@ -1,6 +1,10 @@
 package agent
 
-import "testing"
+import (
+	"errors"
+	"strings"
+	"testing"
+)
 
 func TestExtractFileRefSegments_Basic(t *testing.T) {
 	in := "处理完成。\n\n[report.md](/home/node/workspace/projects/ch1/.files/report.md)"
@@ -77,5 +81,27 @@ func TestMessageHasUsageFooter(t *testing.T) {
 	withoutFooter := "普通内容"
 	if messageHasUsageFooter(withoutFooter) {
 		t.Fatalf("expected footer detection false")
+	}
+}
+
+func TestFormatFileTransferErrorCallout(t *testing.T) {
+	msg := formatFileTransferErrorCallout(
+		"文件下载失败",
+		"545360.jpg",
+		"file:///home/node/workspace/projects/ch1/.files/545360.jpg",
+		errors.New("status=404: {\"ok\": false, \"error\": \"file not found\"}"),
+	)
+
+	if !strings.Contains(msg, "> [!warning] 文件下载失败") {
+		t.Fatalf("missing callout title: %q", msg)
+	}
+	if !strings.Contains(msg, "> 文件：`545360.jpg`") {
+		t.Fatalf("missing file line: %q", msg)
+	}
+	if !strings.Contains(msg, "> 路径：`file:///home/node/workspace/projects/ch1/.files/545360.jpg`") {
+		t.Fatalf("missing path line: %q", msg)
+	}
+	if !strings.Contains(msg, "> 错误：`status=404: {\"ok\": false, \"error\": \"file not found\"}`") {
+		t.Fatalf("missing error line: %q", msg)
 	}
 }

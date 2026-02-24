@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import base64
 import json
 import logging
 import mimetypes
@@ -8,6 +7,7 @@ import re
 import selectors
 import subprocess
 import time
+import urllib.parse
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -33,6 +33,29 @@ def _setup_logger():
 LOGGER = _setup_logger()
 
 
+def default_claude_md_content(session_dir: str) -> str:
+    abs_session_dir = os.path.realpath(session_dir)
+    return (
+        f"Current Working Directory: cwd={abs_session_dir}\n"
+        "Current terminal environment is bash in Debian(bookworm)\n"
+    )
+
+
+def ensure_session_layout(session_dir: str):
+    files_dir = os.path.join(session_dir, ".files")
+    skills_dir = os.path.join(session_dir, ".claude", "skills")
+    claude_md = os.path.join(session_dir, "CLAUDE.md")
+
+    os.makedirs(files_dir, exist_ok=True)
+    os.makedirs(skills_dir, exist_ok=True)
+
+    if os.path.isdir(claude_md):
+        raise RuntimeError(f"CLAUDE.md path is a directory: {claude_md}")
+    if not os.path.exists(claude_md):
+        with open(claude_md, "w", encoding="utf-8") as f:
+            f.write(default_claude_md_content(session_dir))
+
+
 def safe_session_dir(session_id: str) -> str:
     if not session_id:
         session_id = "default"
@@ -41,6 +64,7 @@ def safe_session_dir(session_id: str) -> str:
         safe = "default"
     path = os.path.join(BASE_DIR, safe)
     os.makedirs(path, exist_ok=True)
+    ensure_session_layout(path)
     return path
 
 
@@ -103,6 +127,103 @@ def save_uploaded_file(session_id: str, filename: str, content: bytes):
     with open(abs_path, "wb") as f:
         f.write(content)
     return os.path.basename(abs_path), abs_path
+
+
+def normalize_download_path(raw_path: str) -> str:
+    """
+    Normalize incoming download path value from `X-File-Path`.
+
+    Supported input formats:
+    - Absolute local path:
+      - /home/node/workspace/projects/<session>/.files/a.png
+    - Session-relative path:
+      - .files/a.png
+      - ./.files/a.png
+      - downloads/report.md
+    - file URI (local):
+      - file:///home/node/workspace/projects/<session>/.files/a.png
+      - file://localhost/home/node/workspace/projects/<session>/.files/a.png
+    - Malformed-but-common local file URI (accepted for compatibility):
+      - file://home/node/workspace/projects/<session>/.files/a.png
+      - file://.files/a.png
+
+    Notes:
+    - Non-local file URI hosts are not trusted as local paths.
+    - Scope enforcement is handled later by `resolve_download_abs_path`.
+    """
+    value = (raw_path or "").strip()
+    if not value:
+        return ""
+
+    if value.lower().startswith("file://"):
+        parsed = urllib.parse.urlparse(value)
+        if parsed.scheme.lower() != "file":
+            return value
+        host = (parsed.netloc or "").strip().lower()
+        if host not in {"", "localhost"}:
+            # Tolerate malformed local URIs, e.g.:
+            # - file://home/node/workspace/a.txt
+            # - file://.files/a.png
+            path = urllib.parse.unquote(parsed.path or "")
+            merged = "/" + host + path
+            return merged
+        path = urllib.parse.unquote(parsed.path or "")
+        if not path:
+            return ""
+        return path
+
+    return value
+
+
+def in_session_scope(abs_path: str, session_root: str) -> bool:
+    allow_prefix = session_root + os.sep
+    return abs_path == session_root or abs_path.startswith(allow_prefix)
+
+
+def resolve_download_abs_path(session_dir: str, file_path: str) -> tuple[str, bool]:
+    """
+    Resolve requested file path to an absolute path under the session root.
+
+    Compatibility behavior:
+    - Relative path is resolved as: {session_dir}/{relative}
+    - Absolute path is tried directly first.
+    - For absolute paths that look like "session-relative with leading slash"
+      (for example "/.files/a.png" or "/downloads/a.txt"), it also tries:
+      {session_dir}/{path_without_leading_slash}
+
+    Returns:
+    - (abs_path, True)  -> accepted and inside current session scope
+    - (best_effort_path, False) -> resolved but out of scope
+    - ("", False) -> invalid/empty input
+    """
+    session_root = os.path.realpath(session_dir)
+    raw = (file_path or "").strip().strip('"').strip("'")
+    if not raw:
+        return "", False
+
+    candidates = []
+    if os.path.isabs(raw):
+        candidates.append(os.path.realpath(raw))
+        rel = raw.lstrip("/")
+        if rel:
+            candidates.append(os.path.realpath(os.path.join(session_dir, rel)))
+    else:
+        candidates.append(os.path.realpath(os.path.join(session_dir, raw)))
+
+    seen = set()
+    uniq = []
+    for c in candidates:
+        if c in seen:
+            continue
+        seen.add(c)
+        uniq.append(c)
+
+    for c in uniq:
+        if in_session_scope(c, session_root):
+            return c, True
+    if uniq:
+        return uniq[0], False
+    return "", False
 
 
 def build_claude_cmd(prompt: str, use_continue: bool):
@@ -250,6 +371,29 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+        self._log_response(code, request_id, start_time)
+
+    def _write_bytes(
+        self,
+        code: int,
+        payload: bytes,
+        content_type: str,
+        request_id: str,
+        start_time: float,
+        extra_headers: dict = None,
+    ):
+        body = payload or b""
+        self.send_response(code)
+        self.send_header("Content-Type", content_type or "application/octet-stream")
+        self.send_header("Content-Length", str(len(body)))
+        if extra_headers:
+            for k, v in extra_headers.items():
+                self.send_header(str(k), str(v))
+        self.end_headers()
+        self.wfile.write(body)
+        self._log_response(code, request_id, start_time)
+
+    def _log_response(self, code: int, request_id: str, start_time: float):
         duration_ms = int((time.monotonic() - start_time) * 1000)
         LOGGER.info(
             "http.response request_id=%s method=%s path=%s status=%d duration_ms=%d client_ip=%s",
@@ -419,43 +563,26 @@ class Handler(BaseHTTPRequestHandler):
             )
 
     def handle_upload_file(self, request_id: str, start: float):
+        session_id = urllib.parse.unquote(str(self.headers.get("X-Session-Id", "default")).strip())
+        filename = urllib.parse.unquote(str(self.headers.get("X-Filename", "")).strip())
+
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0:
-                self._write_json(
-                    400,
-                    {"ok": False, "error": "empty request body"},
-                    request_id,
-                    start,
-                )
-                return
-            raw = self.rfile.read(length)
-            req = json.loads(raw.decode("utf-8"))
-        except Exception as exc:
+        except ValueError:
+            length = 0
+        if length <= 0:
             self._write_json(
                 400,
-                {"ok": False, "error": f"invalid JSON: {exc}"},
+                {"ok": False, "error": "empty request body"},
                 request_id,
                 start,
             )
             return
-
-        session_id = str(req.get("session_id", "default")).strip()
-        filename = str(req.get("filename", "")).strip()
-        content_b64 = str(req.get("content_base64", "")).strip()
-
         if not filename:
-            self._write_json(400, {"ok": False, "error": "filename is required"}, request_id, start)
-            return
-        if not content_b64:
-            self._write_json(400, {"ok": False, "error": "content_base64 is required"}, request_id, start)
+            self._write_json(400, {"ok": False, "error": "X-Filename header is required"}, request_id, start)
             return
 
-        try:
-            content = base64.b64decode(content_b64, validate=True)
-        except Exception as exc:
-            self._write_json(400, {"ok": False, "error": f"invalid base64 content: {exc}"}, request_id, start)
-            return
+        content = self.rfile.read(length)
 
         if len(content) == 0:
             self._write_json(400, {"ok": False, "error": "empty file content"}, request_id, start)
@@ -486,42 +613,17 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def handle_download_file(self, request_id: str, start: float):
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0:
-                self._write_json(
-                    400,
-                    {"ok": False, "error": "empty request body"},
-                    request_id,
-                    start,
-                )
-                return
-            raw = self.rfile.read(length)
-            req = json.loads(raw.decode("utf-8"))
-        except Exception as exc:
-            self._write_json(
-                400,
-                {"ok": False, "error": f"invalid JSON: {exc}"},
-                request_id,
-                start,
-            )
-            return
-
-        session_id = str(req.get("session_id", "default")).strip()
-        file_path = str(req.get("file_path", "")).strip()
+        session_id = urllib.parse.unquote(str(self.headers.get("X-Session-Id", "default")).strip())
+        file_path = normalize_download_path(
+            urllib.parse.unquote(str(self.headers.get("X-File-Path", "")).strip())
+        )
         if not file_path:
-            self._write_json(400, {"ok": False, "error": "file_path is required"}, request_id, start)
+            self._write_json(400, {"ok": False, "error": "X-File-Path header is required"}, request_id, start)
             return
 
         session_dir = safe_session_dir(session_id)
-        session_root = os.path.realpath(session_dir)
-        if os.path.isabs(file_path):
-            abs_path = os.path.realpath(file_path)
-        else:
-            abs_path = os.path.realpath(os.path.join(session_dir, file_path))
-
-        allow_prefix = session_root + os.sep
-        if abs_path != session_root and not abs_path.startswith(allow_prefix):
+        abs_path, in_scope = resolve_download_abs_path(session_dir, file_path)
+        if not in_scope:
             self._write_json(403, {"ok": False, "error": "file path out of session scope"}, request_id, start)
             return
         if not os.path.isfile(abs_path):
@@ -551,15 +653,17 @@ class Handler(BaseHTTPRequestHandler):
             abs_path,
             content_type or "application/octet-stream",
         )
-        self._write_json(
+        quoted_name = urllib.parse.quote(filename, safe="")
+        self._write_bytes(
             200,
-            {
-                "ok": True,
-                "filename": filename,
-                "content_base64": base64.b64encode(data).decode("ascii"),
-            },
+            data,
+            content_type or "application/octet-stream",
             request_id,
             start,
+            extra_headers={
+                "X-Claude-Filename": quoted_name,
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quoted_name}",
+            },
         )
 
     def log_message(self, fmt, *args):

@@ -34,8 +34,8 @@ services:
 
   claude-code:
     container_name: mew_claude_code
-    ports:
-      - "3457:3457"
+    # ports:
+    #   - "3457:3457"
     build:
       context: .
       dockerfile: docker/claude-code/Dockerfile
