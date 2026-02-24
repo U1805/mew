@@ -15,26 +15,33 @@ import {
 import { buildAccessTokenCookieOptions, getAccessTokenCookieName } from './accessTokenCookie.service';
 import { readCookie } from '../../utils/cookies';
 
-const isSecureCookie = () => (process.env.NODE_ENV || '').toLowerCase() === 'production';
+const isProduction = () => (process.env.NODE_ENV || '').toLowerCase() === 'production';
+const shouldUseSecureCookie = (req: Request) => isProduction() && req.secure;
 
-const setAuthCookies = (res: Response, params: { token: string; refreshToken: string; refreshMaxAgeMs?: number; isPersistent: boolean }) => {
+const setAuthCookies = (
+  req: Request,
+  res: Response,
+  params: { token: string; refreshToken: string; refreshMaxAgeMs?: number; isPersistent: boolean }
+) => {
+  const secure = shouldUseSecureCookie(req);
   res.cookie(
     getAccessTokenCookieName(),
     params.token,
-    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: params.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
+    buildAccessTokenCookieOptions({ secure, isPersistent: params.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
   );
   res.cookie(
     getRefreshTokenCookieName(),
     params.refreshToken,
-    buildRefreshTokenCookieOptions({ maxAgeMs: params.refreshMaxAgeMs, secure: isSecureCookie() })
+    buildRefreshTokenCookieOptions({ maxAgeMs: params.refreshMaxAgeMs, secure })
   );
 };
 
-const clearAuthCookies = (res: Response) => {
-  res.clearCookie(getRefreshTokenCookieName(), buildRefreshTokenCookieOptions({ secure: isSecureCookie() }));
+const clearAuthCookies = (req: Request, res: Response) => {
+  const secure = shouldUseSecureCookie(req);
+  res.clearCookie(getRefreshTokenCookieName(), buildRefreshTokenCookieOptions({ secure }));
   res.clearCookie(
     getAccessTokenCookieName(),
-    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: false, jwtExpiresIn: config.jwtExpiresIn })
+    buildAccessTokenCookieOptions({ secure, isPersistent: false, jwtExpiresIn: config.jwtExpiresIn })
   );
 };
 
@@ -48,7 +55,7 @@ export const loginHandler = asyncHandler(async (req: Request, res: Response, nex
     rememberMe: req.body?.rememberMe === true,
   });
 
-  setAuthCookies(res, {
+  setAuthCookies(req, res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
@@ -68,7 +75,7 @@ export const loginCookieHandler = asyncHandler(async (req: Request, res: Respons
     rememberMe: req.body?.rememberMe === true,
   });
 
-  setAuthCookies(res, {
+  setAuthCookies(req, res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
@@ -88,7 +95,7 @@ export const botLoginHandler = asyncHandler(async (req: Request, res: Response) 
     rememberMe: true,
   });
 
-  setAuthCookies(res, {
+  setAuthCookies(req, res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
@@ -111,7 +118,7 @@ export const registerHandler = asyncHandler(async (req: Request, res: Response, 
     rememberMe: req.body?.rememberMe === true,
   });
 
-  setAuthCookies(res, {
+  setAuthCookies(req, res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
@@ -134,7 +141,7 @@ export const registerCookieHandler = asyncHandler(async (req: Request, res: Resp
     rememberMe: req.body?.rememberMe === true,
   });
 
-  setAuthCookies(res, {
+  setAuthCookies(req, res, {
     token,
     refreshToken: issued.refreshToken,
     refreshMaxAgeMs: issued.maxAgeMs,
@@ -162,16 +169,17 @@ export const refreshHandler = asyncHandler(async (req: Request, res: Response) =
   });
 
   if (!rotated) {
-    clearAuthCookies(res);
+    clearAuthCookies(req, res);
     return res.status(401).json({ message: 'Unauthorized: Invalid refresh token' });
   }
 
-  res.cookie(cookieName, rotated.refreshToken, buildRefreshTokenCookieOptions({ maxAgeMs: rotated.maxAgeMs, secure: isSecureCookie() }));
+  const secure = shouldUseSecureCookie(req);
+  res.cookie(cookieName, rotated.refreshToken, buildRefreshTokenCookieOptions({ maxAgeMs: rotated.maxAgeMs, secure }));
 
   const user = await userRepository.findById(rotated.userId.toString());
   if (!user) {
     await revokeRefreshToken(rotated.refreshToken);
-    clearAuthCookies(res);
+    clearAuthCookies(req, res);
     return res.status(401).json({ message: 'Unauthorized: User not found' });
   }
 
@@ -183,7 +191,7 @@ export const refreshHandler = asyncHandler(async (req: Request, res: Response) =
   res.cookie(
     getAccessTokenCookieName(),
     token,
-    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: rotated.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
+    buildAccessTokenCookieOptions({ secure, isPersistent: rotated.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
   );
 
   return res.status(200).json({ token, user: userObj });
@@ -203,16 +211,17 @@ export const refreshCookieHandler = asyncHandler(async (req: Request, res: Respo
   });
 
   if (!rotated) {
-    clearAuthCookies(res);
+    clearAuthCookies(req, res);
     return res.status(401).json({ message: 'Unauthorized: Invalid refresh token' });
   }
 
-  res.cookie(cookieName, rotated.refreshToken, buildRefreshTokenCookieOptions({ maxAgeMs: rotated.maxAgeMs, secure: isSecureCookie() }));
+  const secure = shouldUseSecureCookie(req);
+  res.cookie(cookieName, rotated.refreshToken, buildRefreshTokenCookieOptions({ maxAgeMs: rotated.maxAgeMs, secure }));
 
   const user = await userRepository.findById(rotated.userId.toString());
   if (!user) {
     await revokeRefreshToken(rotated.refreshToken);
-    clearAuthCookies(res);
+    clearAuthCookies(req, res);
     return res.status(401).json({ message: 'Unauthorized: User not found' });
   }
 
@@ -224,7 +233,7 @@ export const refreshCookieHandler = asyncHandler(async (req: Request, res: Respo
   res.cookie(
     getAccessTokenCookieName(),
     token,
-    buildAccessTokenCookieOptions({ secure: isSecureCookie(), isPersistent: rotated.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
+    buildAccessTokenCookieOptions({ secure, isPersistent: rotated.isPersistent, jwtExpiresIn: config.jwtExpiresIn })
   );
 
   return res.status(200).json({ user: userObj });
@@ -236,6 +245,6 @@ export const logoutHandler = asyncHandler(async (req: Request, res: Response) =>
   if (refreshToken) {
     await revokeRefreshToken(refreshToken);
   }
-  clearAuthCookies(res);
+  clearAuthCookies(req, res);
   return res.status(204).send();
 });

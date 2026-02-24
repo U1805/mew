@@ -1,5 +1,8 @@
+name: mew
+
 services:
   mongo:
+    container_name: mew_mongo
     image: mongodb/mongodb-community-server:8.2.2-ubuntu2204
     restart: unless-stopped
     volumes:
@@ -13,6 +16,7 @@ services:
       - mew_network
 
   garage:
+    container_name: mew_garage
     image: dxflrs/garage:v2.1.0
     restart: unless-stopped
     volumes:
@@ -30,6 +34,7 @@ services:
       - mew_network
 
   garage-init:
+    container_name: mew_garage_init
     build:
       context: .
       dockerfile: docker/garage/Dockerfile.init
@@ -50,6 +55,7 @@ services:
       - garage_data:/var/lib/garage/data
 
   server:
+    container_name: mew_server
     build:
       context: .
       dockerfile: server/Dockerfile
@@ -100,6 +106,7 @@ services:
       - mew_network
 
   client:
+    container_name: mew_client
     build:
       context: .
       dockerfile: client/Dockerfile
@@ -117,6 +124,7 @@ services:
       - mew_network
 
   plugins:
+    container_name: mew_plugins
     build:
       context: .
       dockerfile: docker/plugins/Dockerfile
