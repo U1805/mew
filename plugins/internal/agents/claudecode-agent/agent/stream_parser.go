@@ -11,6 +11,11 @@ import (
 
 var toolUseErrorPattern = regexp.MustCompile(`(?s)<tool_use_error>(.*?)</tool_use_error>`)
 
+const (
+	usageFooterCalloutType  = "footer"
+	usageFooterCalloutTitle = "运行统计"
+)
+
 type ClaudeStreamParser struct {
 	currentAssistant *assistantBuilder
 	currentBlock     *contentBlockBuilder
@@ -365,51 +370,107 @@ func formatToolAction(tu toolUse, result toolResult) string {
 			file = "unknown"
 		}
 		if result.IsError {
-			return fmt.Sprintf("> 写入文件 %s\n> \n> 系统拦截 %s", file, sanitizeLine(result.ErrorText))
+			return buildCallout("warning", fmt.Sprintf("写入文件 %s", file), []string{
+				fmt.Sprintf("系统拦截：%s", sanitizeLine(result.ErrorText)),
+			})
 		}
-		return fmt.Sprintf("> 写入文件 %s\n> \n> 写入成功", file)
+		return buildCallout("success", fmt.Sprintf("写入文件 %s", file), []string{"写入成功"})
 	case "read":
 		file := baseNameFromInput(tu.Input, "file_path")
 		if file == "" {
 			file = "unknown"
 		}
 		if result.IsError {
-			return fmt.Sprintf("> 读取文件 %s\n> \n> 系统拦截 %s", file, sanitizeLine(result.ErrorText))
+			return buildCallout("warning", fmt.Sprintf("读取文件 %s", file), []string{
+				fmt.Sprintf("系统拦截：%s", sanitizeLine(result.ErrorText)),
+			})
 		}
 		if result.NumLines > 0 {
-			return fmt.Sprintf("> 读取文件 %s\n> \n> 读取成功 (包含 %d 行代码)", file, result.NumLines)
+			return buildCallout("success", fmt.Sprintf("读取文件 %s", file), []string{
+				fmt.Sprintf("读取成功 (包含 %d 行代码)", result.NumLines),
+			})
 		}
-		return fmt.Sprintf("> 读取文件 %s\n> \n> 读取成功", file)
+		return buildCallout("success", fmt.Sprintf("读取文件 %s", file), []string{"读取成功"})
 	case "bash":
 		cmd := sanitizeLine(stringFromInput(tu.Input, "command"))
 		if cmd == "" {
 			cmd = "(empty command)"
 		}
 		if result.IsError {
-			return fmt.Sprintf("> 执行终端命令\n%s\n>\n> 系统拦截 %s", cmd, sanitizeLine(result.ErrorText))
+			return buildCallout("warning", "执行终端命令", []string{
+				"```bash",
+				cmd,
+				"```",
+				"",
+				fmt.Sprintf("系统拦截：%s", sanitizeLine(result.ErrorText)),
+			})
 		}
 		stdout := strings.TrimSpace(result.Stdout)
 		if stdout == "" {
-			return fmt.Sprintf("> 执行终端命令\n%s\n>\n> (无输出)", cmd)
+			return buildCallout("tip", "执行终端命令", []string{
+				"```bash",
+				cmd,
+				"```",
+				"",
+				"(无输出)",
+			})
 		}
-		return fmt.Sprintf("> 执行终端命令\n%s\n>\n> ```\n%s\n> ```", cmd, toBlockQuoteLines(stdout))
+		return buildCallout("tip", "执行终端命令", []string{
+			"```bash",
+			cmd,
+			"```",
+			"",
+			"```",
+			stdout,
+			"```",
+		})
 	default:
 		if result.IsError {
-			return fmt.Sprintf("> 执行工具 %s\n> \n> 系统拦截 %s", sanitizeLine(tu.Name), sanitizeLine(result.ErrorText))
+			return buildCallout("warning", fmt.Sprintf("执行工具 %s", sanitizeLine(tu.Name)), []string{
+				fmt.Sprintf("系统拦截：%s", sanitizeLine(result.ErrorText)),
+			})
 		}
-		return fmt.Sprintf("> 执行工具 %s\n> \n> 调用成功", sanitizeLine(tu.Name))
+		return buildCallout("info", fmt.Sprintf("执行工具 %s", sanitizeLine(tu.Name)), []string{"调用成功"})
 	}
 }
 
 func formatUsageFooter(durationMS int64, cost float64, inTokens, outTokens int64) string {
 	duration := float64(durationMS) / 1000.0
-	return fmt.Sprintf(
-		"> ⏱️ %.1fs  |  🪙 预估 $%.2f  |  📊 IN: %s / OUT: %s tokens",
-		duration,
-		cost,
-		abbrevTokens(inTokens),
-		abbrevTokens(outTokens),
-	)
+	return buildCallout(usageFooterCalloutType, usageFooterCalloutTitle, []string{
+		fmt.Sprintf(
+			"⏱️ %.1fs  |  🪙 预估 $%.2f  |  📊 IN: %s / OUT: %s tokens",
+			duration,
+			cost,
+			abbrevTokens(inTokens),
+			abbrevTokens(outTokens),
+		),
+	})
+}
+
+func buildCallout(kind, title string, body []string) string {
+	k := strings.TrimSpace(kind)
+	if k == "" {
+		k = "info"
+	}
+	t := strings.TrimSpace(title)
+	if t == "" {
+		t = "提示"
+	}
+
+	lines := []string{fmt.Sprintf("> [!%s] %s", k, t)}
+	for _, part := range body {
+		part = strings.ReplaceAll(part, "\r\n", "\n")
+		part = strings.ReplaceAll(part, "\r", "\n")
+		sub := strings.Split(part, "\n")
+		for _, ln := range sub {
+			if strings.TrimSpace(ln) == "" {
+				lines = append(lines, ">")
+			} else {
+				lines = append(lines, "> "+ln)
+			}
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 func abbrevTokens(v int64) string {
@@ -470,12 +531,4 @@ func extractToolUseError(text string) string {
 
 func sanitizeLine(s string) string {
 	return strings.TrimSpace(strings.ReplaceAll(strings.ReplaceAll(s, "\r", " "), "\n", " "))
-}
-
-func toBlockQuoteLines(s string) string {
-	lines := strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
-	for i := range lines {
-		lines[i] = "> " + lines[i]
-	}
-	return strings.Join(lines, "\n")
 }

@@ -35,6 +35,7 @@ type channelUploadResponse struct {
 var (
 	trailingFileRefLinePattern = regexp.MustCompile(`^\s*(\[[^\]\r\n]+\]\(([^)\r\n]+)\)\s*)+$`)
 	trailingFileRefExtract     = regexp.MustCompile(`\[([^\]\r\n]+)\]\(([^)\r\n]+)\)`)
+	usageFooterCalloutPattern  = regexp.MustCompile(`(?i)^>\s*\[!` + usageFooterCalloutType + `[+-]?\](?:\s|$)`)
 )
 
 func (r *ClaudeCodeRunner) emitMessageWithFileRefs(
@@ -381,6 +382,10 @@ func isUsageFooterLine(line string) bool {
 	if line == "" {
 		return false
 	}
+	if usageFooterCalloutPattern.MatchString(line) {
+		return true
+	}
+	// Backward compatibility for old generated messages.
 	return strings.HasPrefix(line, "> ⏱️") || strings.HasPrefix(line, ">⏱️")
 }
 

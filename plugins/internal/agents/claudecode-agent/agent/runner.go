@@ -2,9 +2,11 @@ package agent
 
 import (
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"path"
 	"strings"
@@ -46,7 +48,21 @@ const (
 	claudeCodeLogContentPreviewLen = 160
 	claudeCodeIncomingQueueSize    = 128
 	claudeCodeMaxAttachmentBytes   = 20 * 1024 * 1024
+	claudeCodeCardMessageType      = "app/x-claudecode-card"
 )
+
+var clearReplies = []string{
+	"会话清空了，我们重新开始。",
+	"已经清空，发我你的新问题吧。",
+	"好了，历史上下文已重置。",
+	"清空完成，接下来想做什么？",
+	"当前会话已重置，可以继续了。",
+	"已清空，咱们从这条开始。",
+	"会话状态已刷新，随时可以提新需求。",
+	"刚刚已清空记录，现在可以开新话题。",
+	"上下文已经重置了，继续说。",
+	"清掉了，下一步你想让我做什么？",
+}
 
 type messageCreateJob struct {
 	msg  sdkapi.ChannelMessage
@@ -250,8 +266,9 @@ func (r *ClaudeCodeRunner) handleCommand(
 
 	if strings.EqualFold(command, "/clear") {
 		r.setChannelContinued(channelID, false)
-		log.Printf("%s command /clear: channel=%s", r.logPrefix, channelID)
-		if err := emitChannelMessage(emit, channelID, "会话已清空。"); err != nil {
+		reply := pickRandomClearReply()
+		log.Printf("%s command /clear: channel=%s reply=%q", r.logPrefix, channelID, reply)
+		if err := emitChannelMessage(emit, channelID, reply); err != nil {
 			return true, err
 		}
 		return true, nil
@@ -278,10 +295,36 @@ func (r *ClaudeCodeRunner) handleCommand(
 		len(prompt),
 		sdk.PreviewString(prompt, claudeCodeLogContentPreviewLen),
 	)
+	chunks, sentMessages, err := r.runProxyPrompt(ctx, channelID, mode, prompt, continued, emit)
+	elapsed := time.Since(start)
+	if err != nil {
+		log.Printf("%s proxy request failed: channel=%s mode=%s elapsed=%s err=%v",
+			r.logPrefix, channelID, mode, elapsed, err)
+		_ = emitChannelMessage(emit, channelID, fmt.Sprintf("claude-code 调用失败: %v", err))
+		return true, nil
+	}
+
+	r.setChannelContinued(channelID, true)
+	log.Printf("%s proxy request success: channel=%s mode=%s elapsed=%s chunks=%d messages=%d",
+		r.logPrefix, channelID, mode, elapsed, chunks, sentMessages)
+	if chunks == 0 || sentMessages == 0 {
+		if err := emitChannelMessage(emit, channelID, "(empty response)"); err != nil {
+			return true, err
+		}
+	}
+	return true, nil
+}
+
+func (r *ClaudeCodeRunner) runProxyPrompt(
+	ctx context.Context,
+	channelID, mode, prompt string,
+	useContinue bool,
+	emit socketio.EmitFunc,
+) (chunks int, sentMessages int, err error) {
 	parser := NewClaudeStreamParser()
-	sentMessages := 0
 	pendingMsg := ""
 	pendingHasUsageFooter := false
+	sentMessages = 0
 
 	flushPending := func() error {
 		msg := strings.TrimSpace(pendingMsg)
@@ -307,7 +350,7 @@ func (r *ClaudeCodeRunner) handleCommand(
 		return nil
 	}
 
-	chunks, err := r.proxyClient.ChatStream(ctx, channelID, prompt, continued, func(line string) error {
+	chunks, err = r.proxyClient.ChatStream(ctx, channelID, prompt, useContinue, func(line string) error {
 		log.Printf("%s proxy chunk: channel=%s mode=%s chunk_len=%d chunk=%q",
 			r.logPrefix, channelID, mode, len(line), sdk.PreviewString(line, claudeCodeLogContentPreviewLen))
 		outMsgs, parseErr := parser.FeedLine(line)
@@ -336,12 +379,8 @@ func (r *ClaudeCodeRunner) handleCommand(
 		}
 		return nil
 	})
-	elapsed := time.Since(start)
 	if err != nil {
-		log.Printf("%s proxy request failed: channel=%s mode=%s elapsed=%s err=%v",
-			r.logPrefix, channelID, mode, elapsed, err)
-		_ = emitChannelMessage(emit, channelID, fmt.Sprintf("claude-code 调用失败: %v", err))
-		return true, nil
+		return chunks, sentMessages, err
 	}
 
 	for _, m := range parser.Flush() {
@@ -350,25 +389,15 @@ func (r *ClaudeCodeRunner) handleCommand(
 			continue
 		}
 		if err := flushPending(); err != nil {
-			return true, err
+			return chunks, sentMessages, err
 		}
 		pendingMsg = m
 		pendingHasUsageFooter = messageHasUsageFooter(m)
 	}
-
 	if err := flushPending(); err != nil {
-		return true, err
+		return chunks, sentMessages, err
 	}
-
-	r.setChannelContinued(channelID, true)
-	log.Printf("%s proxy request success: channel=%s mode=%s elapsed=%s chunks=%d messages=%d",
-		r.logPrefix, channelID, mode, elapsed, chunks, sentMessages)
-	if chunks == 0 || sentMessages == 0 {
-		if err := emitChannelMessage(emit, channelID, "(empty response)"); err != nil {
-			return true, err
-		}
-	}
-	return true, nil
+	return chunks, sentMessages, nil
 }
 
 func (r *ClaudeCodeRunner) buildPromptWithAttachments(
@@ -446,6 +475,25 @@ func (r *ClaudeCodeRunner) setChannelContinued(channelID string, continued bool)
 func emitChannelMessage(emit socketio.EmitFunc, channelID, content string) error {
 	return emit("message/create", map[string]any{
 		"channelId": channelID,
+		"type":      claudeCodeCardMessageType,
 		"content":   content,
+		"payload": map[string]any{
+			"content": content,
+		},
 	})
+}
+
+func pickRandomClearReply() string {
+	if len(clearReplies) == 0 {
+		return "会话已清空。"
+	}
+	n, err := cryptorand.Int(cryptorand.Reader, big.NewInt(int64(len(clearReplies))))
+	if err != nil {
+		return clearReplies[0]
+	}
+	idx := int(n.Int64())
+	if idx < 0 || idx >= len(clearReplies) {
+		return clearReplies[0]
+	}
+	return clearReplies[idx]
 }
