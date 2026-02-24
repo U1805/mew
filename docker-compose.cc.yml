@@ -42,7 +42,7 @@ services:
     depends_on:
       b4u2cc:
         condition: service_healthy
-    working_dir: /workspace
+    working_dir: /home/node/workspace
     environment:
       ANTHROPIC_API_KEY: ${CLIENT_API_KEY}
       ANTHROPIC_AUTH_TOKEN: ${CLIENT_API_KEY}
@@ -50,10 +50,10 @@ services:
       CLAUDE_CODE_ATTRIBUTION_HEADER: 0
       CLAUDE_PROXY_HOST: 0.0.0.0
       CLAUDE_PROXY_PORT: 3457
-      CLAUDE_PROXY_WORKDIR: /workspace/.claude-sessions
-      CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-180}
+      CLAUDE_PROXY_WORKDIR: /home/node/workspace/projects
+      CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-600}
     volumes:
-      - claude_code_workspace:/workspace
+      - claude_code_workspace:/home/node/workspace
     stdin_open: true
     tty: true
     networks:

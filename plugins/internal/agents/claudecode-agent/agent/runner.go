@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"mew/plugins/pkg"
+	sdkapi "mew/plugins/pkg/api"
 	"mew/plugins/pkg/api/gateway/socketio"
 	"mew/plugins/pkg/api/messages"
 )
@@ -18,6 +19,7 @@ import (
 type ClaudeCodeRunner struct {
 	botID       string
 	botName     string
+	logPrefix   string
 	accessToken string
 	session     *sdk.BotSession
 
@@ -27,6 +29,8 @@ type ClaudeCodeRunner struct {
 
 	mewHTTPClient *http.Client
 	proxyClient   *ClaudeCodeProxyClient
+	proxyBaseURL  string
+	proxyTimeout  int
 
 	botUserID string
 
@@ -34,6 +38,16 @@ type ClaudeCodeRunner struct {
 
 	continuedMu      sync.RWMutex
 	channelContinued map[string]bool
+}
+
+const (
+	claudeCodeLogContentPreviewLen = 160
+	claudeCodeIncomingQueueSize    = 128
+)
+
+type messageCreateJob struct {
+	msg  sdkapi.ChannelMessage
+	emit socketio.EmitFunc
 }
 
 func NewClaudeCodeRunner(botID, botName, accessToken, rawConfig string, cfg sdk.RuntimeConfig) (*ClaudeCodeRunner, error) {
@@ -68,6 +82,7 @@ func NewClaudeCodeRunner(botID, botName, accessToken, rawConfig string, cfg sdk.
 	return &ClaudeCodeRunner{
 		botID:            botID,
 		botName:          botName,
+		logPrefix:        fmt.Sprintf("[claudecode-agent] bot=%s name=%q", botID, botName),
 		accessToken:      accessToken,
 		session:          nil,
 		apiBase:          strings.TrimRight(cfg.APIBase, "/"),
@@ -75,6 +90,8 @@ func NewClaudeCodeRunner(botID, botName, accessToken, rawConfig string, cfg sdk.
 		wsURL:            wsURL,
 		mewHTTPClient:    mewHTTPClient,
 		proxyClient:      proxyClient,
+		proxyBaseURL:     strings.TrimRight(agentCfg.ProxyBaseURL, "/"),
+		proxyTimeout:     agentCfg.TimeoutSecond,
 		botUserID:        "",
 		dmChannels:       sdk.NewDMChannelCache(),
 		channelContinued: make(map[string]bool),
@@ -82,7 +99,7 @@ func NewClaudeCodeRunner(botID, botName, accessToken, rawConfig string, cfg sdk.
 }
 
 func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
-	logPrefix := fmt.Sprintf("[claudecode-agent] bot=%s name=%q", r.botID, r.botName)
+	logPrefix := r.logPrefix
 
 	r.session = sdk.NewBotSession(r.apiBase, r.accessToken, r.mewHTTPClient)
 	me, err := r.session.User(ctx)
@@ -90,10 +107,35 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 		return fmt.Errorf("%s bot auth failed: %w", logPrefix, err)
 	}
 	r.botUserID = me.ID
+	log.Printf("%s authenticated: botUserID=%s apiBase=%s wsURL=%s proxy=%s timeout=%ds",
+		logPrefix, r.botUserID, r.apiBase, r.wsURL, r.proxyBaseURL, r.proxyTimeout)
 
 	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
 		log.Printf("%s refresh DM channels failed (will retry later): %v", logPrefix, err)
+	} else {
+		log.Printf("%s DM channels cache initialized", logPrefix)
 	}
+
+	jobs := make(chan messageCreateJob, claudeCodeIncomingQueueSize)
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case job, ok := <-jobs:
+				if !ok {
+					return
+				}
+				r.handleMessageCreateJob(ctx, logPrefix, job)
+			}
+		}
+	}()
+	defer func() {
+		close(jobs)
+		<-workerDone
+	}()
 
 	return socketio.RunGatewayWithReconnectSession(ctx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
 		if eventName != "MESSAGE_CREATE" {
@@ -108,24 +150,21 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 			return nil
 		}
 
-		reply, ok, err := r.maybeHandleMessage(ctx, msg.ChannelID, msg.ContextText())
-		if err != nil {
-			return err
+		// Keep gateway callback fast; long-running Claude calls must run outside read loop.
+		select {
+		case jobs <- messageCreateJob{msg: msg, emit: emit}:
+			log.Printf("%s MESSAGE_CREATE queued: channel=%s msg=%s user=%s qcap=%d content=%q",
+				logPrefix,
+				msg.ChannelID,
+				msg.ID,
+				msg.AuthorID(),
+				claudeCodeIncomingQueueSize,
+				sdk.PreviewString(msg.ContextText(), claudeCodeLogContentPreviewLen),
+			)
+		default:
+			log.Printf("%s incoming queue full, drop MESSAGE_CREATE: channel=%s msg=%s size=%d",
+				logPrefix, msg.ChannelID, msg.ID, claudeCodeIncomingQueueSize)
 		}
-		if !ok {
-			return nil
-		}
-		if strings.TrimSpace(reply) == "" {
-			reply = "(empty response)"
-		}
-
-		if err := emit("message/create", map[string]any{
-			"channelId": msg.ChannelID,
-			"content":   reply,
-		}); err != nil {
-			return fmt.Errorf("send message failed: %w", err)
-		}
-		log.Printf("%s replied: channel=%s", logPrefix, msg.ChannelID)
 		return nil
 	}, socketio.GatewayOptions{}, socketio.ReconnectOptions{
 		InitialBackoff: 500 * time.Millisecond,
@@ -136,47 +175,105 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 	})
 }
 
+func (r *ClaudeCodeRunner) handleMessageCreateJob(ctx context.Context, logPrefix string, job messageCreateJob) {
+	msg := job.msg
+	log.Printf("%s MESSAGE_CREATE handling: channel=%s msg=%s user=%s content=%q",
+		logPrefix,
+		msg.ChannelID,
+		msg.ID,
+		msg.AuthorID(),
+		sdk.PreviewString(msg.ContextText(), claudeCodeLogContentPreviewLen),
+	)
+
+	reply, ok, err := r.maybeHandleMessage(ctx, msg.ChannelID, msg.ContextText())
+	if err != nil {
+		log.Printf("%s message handle failed: channel=%s msg=%s err=%v", logPrefix, msg.ChannelID, msg.ID, err)
+		return
+	}
+	if !ok {
+		log.Printf("%s message ignored: channel=%s msg=%s", logPrefix, msg.ChannelID, msg.ID)
+		return
+	}
+	if strings.TrimSpace(reply) == "" {
+		reply = "(empty response)"
+	}
+
+	if err := job.emit("message/create", map[string]any{
+		"channelId": msg.ChannelID,
+		"content":   reply,
+	}); err != nil {
+		log.Printf("%s send message failed: channel=%s msg=%s err=%v", logPrefix, msg.ChannelID, msg.ID, err)
+		return
+	}
+	log.Printf("%s replied: channel=%s msg=%s preview=%q", logPrefix, msg.ChannelID, msg.ID, sdk.PreviewString(reply, claudeCodeLogContentPreviewLen))
+}
+
 func (r *ClaudeCodeRunner) maybeHandleMessage(ctx context.Context, channelID, content string) (reply string, ok bool, err error) {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
+		log.Printf("%s skip empty content: channel=%s", r.logPrefix, channelID)
 		return "", false, nil
 	}
 
 	if rest, mentioned := socketio.StripLeadingBotMention(trimmed, r.botUserID); mentioned {
+		log.Printf("%s route by mention: channel=%s", r.logPrefix, channelID)
 		return r.handleCommand(ctx, channelID, rest)
 	}
 
 	if r.dmChannels.Has(channelID) {
+		log.Printf("%s route by DM cache hit: channel=%s", r.logPrefix, channelID)
 		return r.handleCommand(ctx, channelID, trimmed)
 	}
 
 	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
+		log.Printf("%s DM channel refresh failed on demand: channel=%s err=%v", r.logPrefix, channelID, err)
 		return "", false, err
 	}
 	if r.dmChannels.Has(channelID) {
+		log.Printf("%s route by DM cache refresh: channel=%s", r.logPrefix, channelID)
 		return r.handleCommand(ctx, channelID, trimmed)
 	}
+	log.Printf("%s ignore non-DM and no leading mention: channel=%s", r.logPrefix, channelID)
 	return "", false, nil
 }
 
 func (r *ClaudeCodeRunner) handleCommand(ctx context.Context, channelID, raw string) (reply string, ok bool, err error) {
 	command := strings.TrimSpace(raw)
 	if command == "" {
+		log.Printf("%s skip empty command: channel=%s", r.logPrefix, channelID)
 		return "", false, nil
 	}
 
 	if strings.EqualFold(command, "/clear") {
 		r.setChannelContinued(channelID, false)
+		log.Printf("%s command /clear: channel=%s", r.logPrefix, channelID)
 		return "会话已清空。", true, nil
 	}
 
 	continued := r.getChannelContinued(channelID)
+	mode := "-p"
+	if continued {
+		mode = "-c -p"
+	}
+	start := time.Now()
+	log.Printf("%s proxy request start: channel=%s mode=%s prompt_len=%d prompt=%q",
+		r.logPrefix,
+		channelID,
+		mode,
+		len(command),
+		sdk.PreviewString(command, claudeCodeLogContentPreviewLen),
+	)
 	out, err := r.proxyClient.Chat(ctx, channelID, command, continued)
+	elapsed := time.Since(start)
 	if err != nil {
+		log.Printf("%s proxy request failed: channel=%s mode=%s elapsed=%s err=%v",
+			r.logPrefix, channelID, mode, elapsed, err)
 		return fmt.Sprintf("claude-code 调用失败: %v", err), true, nil
 	}
 
 	r.setChannelContinued(channelID, true)
+	log.Printf("%s proxy request success: channel=%s mode=%s elapsed=%s output_len=%d output=%q",
+		r.logPrefix, channelID, mode, elapsed, len(out), sdk.PreviewString(out, claudeCodeLogContentPreviewLen))
 	return out, true, nil
 }
 

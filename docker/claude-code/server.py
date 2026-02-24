@@ -11,8 +11,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 HOST = os.getenv("CLAUDE_PROXY_HOST", "0.0.0.0")
 PORT = int(os.getenv("CLAUDE_PROXY_PORT", "3457"))
-BASE_DIR = os.getenv("CLAUDE_PROXY_WORKDIR", "/workspace/projects")
-DEFAULT_TIMEOUT = int(os.getenv("CLAUDE_PROXY_TIMEOUT_SECONDS", "180"))
+BASE_DIR = os.getenv("CLAUDE_PROXY_WORKDIR", "/home/node/workspace/projects")
+DEFAULT_TIMEOUT = int(os.getenv("CLAUDE_PROXY_TIMEOUT_SECONDS", "600"))
 LOG_LEVEL = os.getenv("CLAUDE_PROXY_LOG_LEVEL", "INFO").upper()
 PROMPT_PREVIEW_CHARS = int(os.getenv("CLAUDE_PROXY_PROMPT_PREVIEW_CHARS", "120"))
 
@@ -69,7 +69,7 @@ def run_claude(
     request_id: str = "-",
 ):
     workdir = safe_session_dir(session_id)
-    cmd = ["claude"]
+    cmd = ["claude", "--dangerously-skip-permissions"]
     if use_continue:
         cmd.append("-c")
     cmd.extend(["-p", prompt])

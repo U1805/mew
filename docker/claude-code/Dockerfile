@@ -17,10 +17,19 @@ RUN apt-get update \
 
 RUN npm install -g @anthropic-ai/claude-code
 
-WORKDIR /workspace
+RUN mkdir -p /home/node/workspace /home/node/.claude /opt/cc-proxy \
+    && chown -R node:node /home/node/workspace /home/node/.claude /opt/cc-proxy
 
-COPY plugins/internal/agents/claudecode-agent/claude_code_proxy/server.py /opt/mew/claudecode-agent/server.py
+ENV HOME=/home/node
+WORKDIR /home/node/workspace
+
+COPY --chown=node:node docker/claude-code/server.py /opt/cc-proxy/server.py
+COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/settings.json /home/node/.claude/settings.json
+COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/CLAUDE.md /home/node/.claude/CLAUDE.md
+COPY --chown=node:node plugins/internal/agents/claudecode-agent/claude/skills /home/node/.claude/skills
 
 EXPOSE 3457
 
-CMD ["python", "/opt/mew/claudecode-agent/server.py"]
+USER node
+
+CMD ["python", "/opt/cc-proxy/server.py"]

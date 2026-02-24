@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -73,7 +74,7 @@ func (c *ClaudeCodeProxyClient) Chat(ctx context.Context, channelID, prompt stri
 		if msg == "" {
 			msg = "claude-code proxy request failed"
 		}
-		return "", errors.New(msg)
+		return "", fmt.Errorf("status=%d: %s", resp.StatusCode, msg)
 	}
 	return strings.TrimSpace(parsed.Output), nil
 }
