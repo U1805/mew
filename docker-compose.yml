@@ -9,6 +9,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+    networks:
+      - mew_network
 
   garage:
     image: dxflrs/garage:v2.1.0
@@ -24,6 +26,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
+    networks:
+      - mew_network
 
   garage-init:
     build:
@@ -92,6 +96,8 @@ services:
       start_period: 20s
     volumes:
       - garage_secrets:/var/run/mew:ro
+    networks:
+      - mew_network
 
   client:
     build:
@@ -107,6 +113,8 @@ services:
       S3_WEB_ENDPOINT: ${S3_WEB_ENDPOINT:-web.garage.localhost}
     ports:
       - "151:80"
+    networks:
+      - mew_network
 
   plugins:
     build:
@@ -137,8 +145,12 @@ services:
       HTTPS_PROXY: ${HTTPS_PROXY:-http://host.docker.internal:7890}
       NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1,::1,server,client,mongo,garage}
       PROXY_LIST_URLS: ${PROXY_LIST_URLS:-https://raw.githubusercontent.com/ClearProxy/checked-proxy-list/main/socks5/raw/all.txt}
+      # Claude Code proxy base url for claudecode-agent plugin
+      CLAUDECODE_URL: ${CLAUDECODE_URL:-http://claude-code:3457}
     volumes:
       - plugins_cache:/root/.cache/mew
+    networks:
+      - mew_network
 
 volumes:
   mongo_data:
@@ -146,3 +158,7 @@ volumes:
   garage_data:
   garage_secrets:
   plugins_cache:
+
+networks:
+  mew_network:
+    external: true

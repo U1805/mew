@@ -13,6 +13,11 @@ import (
 )
 
 func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken string) (me sdkapi.User, token string, err error) {
+	csrfToken, err := ensureCsrfToken(ctx, httpClient, apiBase)
+	if err != nil {
+		return sdkapi.User{}, "", err
+	}
+
 	reqBody, err := json.Marshal(map[string]any{"accessToken": accessToken})
 	if err != nil {
 		return sdkapi.User{}, "", err
@@ -23,6 +28,7 @@ func LoginBot(ctx context.Context, httpClient *http.Client, apiBase, accessToken
 		return sdkapi.User{}, "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(csrfHeaderName, csrfToken)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

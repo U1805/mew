@@ -93,6 +93,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const isInstagramCard = message.type === 'app/x-instagram-card';
   const isForwardCard = message.type === 'app/x-forward-card';
   const isJpdictCard = message.type === 'app/x-jpdict-card';
+  const isClaudeCodeCard = message.type === 'app/x-claudecode-card';
   const isVoiceMessage = message.type === 'message/voice';
   const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isForwardCard || isJpdictCard;
   const isAuthor = user?._id?.toString() === author._id?.toString();

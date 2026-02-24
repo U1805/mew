@@ -1,0 +1,67 @@
+services:
+  b4u2cc:
+    container_name: mew_b4u2cc
+    build:
+      context: .
+      dockerfile: docker/b4u2cc/Dockerfile
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3456
+      UPSTREAM_BASE_URL: ${UPSTREAM_BASE_URL}
+      UPSTREAM_API_KEY: ${UPSTREAM_API_KEY:-}
+      UPSTREAM_MODEL: ${UPSTREAM_MODEL:-}
+      CLIENT_API_KEY: ${CLIENT_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MAX_REQUESTS_PER_MINUTE: ${MAX_REQUESTS_PER_MINUTE:-10}
+      TIMEOUT_MS: ${TIMEOUT_MS:-120000}
+      TOKEN_MULTIPLIER: ${TOKEN_MULTIPLIER:-1.0}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "deno",
+          "eval",
+          "--no-lock",
+          "const r = await fetch('http://127.0.0.1:3456/healthz'); if (!r.ok) Deno.exit(1);",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - mew_network
+
+  claude-code:
+    container_name: mew_claude_code
+    # ports:
+    #   - "3457:3457"
+    build:
+      context: .
+      dockerfile: docker/claude-code/Dockerfile
+    depends_on:
+      b4u2cc:
+        condition: service_healthy
+    working_dir: /home/node/workspace
+    environment:
+      ANTHROPIC_API_KEY: ${CLIENT_API_KEY}
+      ANTHROPIC_AUTH_TOKEN: ${CLIENT_API_KEY}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-http://b4u2cc:3456}
+      CLAUDE_CODE_ATTRIBUTION_HEADER: 0
+      CLAUDE_PROXY_HOST: 0.0.0.0
+      CLAUDE_PROXY_PORT: 3457
+      CLAUDE_PROXY_WORKDIR: /home/node/workspace/projects
+      CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-600}
+    volumes:
+      - claude_code_workspace:/home/node/workspace
+    stdin_open: true
+    tty: true
+    networks:
+      - mew_network
+
+volumes:
+  claude_code_workspace:
+
+networks:
+  mew_network:
+    external: true
