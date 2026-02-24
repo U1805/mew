@@ -53,6 +53,7 @@ jobs:
               - 'docker-compose.cc.yml'
             claude-code:
               - 'docker/claude-code/**'
+              - 'plugins/internal/agents/claudecode-agent/claude/**'
               - 'docker-compose.cc.yml'
             workflow:
               - '.github/workflows/docker-ghcr.yml'
