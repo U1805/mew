@@ -14,6 +14,8 @@ export const jaMessages: Record<string, string> = {
     'common.apply': '適用',
     'common.close': '閉じる',
     'common.unknown': '不明',
+    'datetime.today': '今日',
+    'datetime.yesterday': '昨日',
     'auth.welcomeBack': 'おかえりなさい！',
     'auth.welcomeSubtitle': 'また会えてうれしいです！',
     'auth.username': 'ユーザー名',

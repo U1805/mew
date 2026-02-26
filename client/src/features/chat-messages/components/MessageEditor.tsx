@@ -1,6 +1,5 @@
 import { useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { Message } from '../../../shared/types';
 import { messageApi } from '../../../shared/services/api';
 import { useUIStore } from '../../../shared/stores';
@@ -11,6 +10,7 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { createMentionSuggestion } from '../../chat-editor/hooks/mentionSuggestion';
 import { parseContentStringToTiptapDoc, serializeTiptapDocToContentString } from '../../chat-editor/hooks/chatContent';
 import { useI18n } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 interface MessageEditorProps {
     message: Message;
@@ -19,7 +19,7 @@ interface MessageEditorProps {
 
 const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
     const { currentServerId } = useUIStore();
-    const { t } = useI18n();
+    const { t, locale } = useI18n();
     const queryClient = useQueryClient();
     const saveRef = useRef<() => void>(() => {});
 
@@ -107,7 +107,7 @@ const MessageEditor = ({ message, onCancel }: MessageEditorProps) => {
     };
 
     const dateString = message.createdAt && !isNaN(new Date(message.createdAt).getTime()) 
-        ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a') 
+        ? formatDateTime(new Date(message.createdAt), locale, { dateStyle: 'medium', timeStyle: 'short' }) 
         : '';
 
     return (

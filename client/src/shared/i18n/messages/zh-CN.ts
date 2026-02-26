@@ -14,6 +14,8 @@ export const zhCNMessages: Record<string, string> = {
     'common.apply': '应用',
     'common.close': '关闭',
     'common.unknown': '未知',
+    'datetime.today': '今天',
+    'datetime.yesterday': '昨天',
     'auth.welcomeBack': '欢迎回来！',
     'auth.welcomeSubtitle': '很高兴再次见到你！',
     'auth.username': '用户名',

@@ -109,11 +109,11 @@ const MemberList = () => {
           // Desktop: Relative flex item, width animates from 0 to 240px.
           "absolute right-0 top-0 bottom-0 z-40 md:relative md:z-0",
           isMemberListOpen 
-            ? "w-[240px] translate-x-0" 
-            : "w-[240px] translate-x-[100%] md:w-0 md:translate-x-0 md:border-none"
+            ? "w-[260px] translate-x-0" 
+            : "w-[260px] translate-x-[100%] md:w-0 md:translate-x-0 md:border-none"
         )}
       >
-        <div className={clsx("p-3 pb-20 md:pb-3 w-[240px]")}> {/* Fixed width content container to prevent squishing during width transition */}
+        <div className={clsx("p-3 pb-20 md:pb-3 w-[260px]")}> {/* Fixed width content container to prevent squishing during width transition */}
             {!currentServerId ? null : isLoading ? (
             <div className="flex justify-center mt-10">
                 <Icon icon="mdi:loading" className="animate-spin text-mew-textMuted" />
@@ -175,7 +175,7 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
 
     const content = (
       <div
-        className="flex items-center px-2 py-1.5 rounded hover:bg-[#35373C] cursor-pointer group"
+        className="flex items-center px-2 py-1 rounded hover:bg-[#35373C] cursor-pointer group"
         onClick={onClick}
       >
         <div className="relative mr-3">
@@ -186,12 +186,17 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
               <span className="text-white text-xs font-bold">{u.username.substring(0, 1).toUpperCase()}</span>
             )}
           </div>
-          {isOnline && !u.isBot && (
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-[3px] border-[#2B2D31] rounded-full bg-green-500"></div>
+          {!u.isBot && (
+            <div
+              className={clsx(
+                "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-[#2B2D31]",
+                isOnline ? "bg-green-500" : "bg-gray-500"
+              )}
+            />
           )}
         </div>
         <div className="flex items-center flex-1 min-w-0">
-          <div className="font-medium text-sm truncate text-white">
+          <div className="font-medium text-base truncate text-white">
             {u.username}
           </div>
           {u.isBot && (

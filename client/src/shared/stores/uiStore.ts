@@ -44,7 +44,7 @@ interface UIState {
 export const useUIStore = create<UIState>((set, get) => ({
   currentServerId: null,
   currentChannelId: null,
-  isMemberListOpen: false, // Default closed, Layout will open for Desktop
+  isMemberListOpen: false, // Default closed
   isSettingsOpen: false,
   settingsTab: 'account',
   settingsReturnToPath: null,

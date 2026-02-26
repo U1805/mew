@@ -15,6 +15,8 @@ export const enMessages: Record<string, string> = {
     'common.apply': 'Apply',
     'common.close': 'Close',
     'common.unknown': 'Unknown',
+    'datetime.today': 'Today',
+    'datetime.yesterday': 'Yesterday',
 
     'auth.welcomeBack': 'Welcome back!',
     'auth.welcomeSubtitle': "We're so excited to see you again!",

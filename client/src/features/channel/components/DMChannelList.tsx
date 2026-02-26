@@ -37,7 +37,7 @@ export const DMChannelList = () => {
     <div className="w-full h-full bg-mew-darker flex flex-col border-r border-mew-darkest flex-shrink-0">
       <div className="h-12 shadow-sm flex items-center px-2 border-b border-mew-darkest shrink-0">
            <button
-              className="w-full text-left px-2 py-1 rounded bg-mew-darkest text-mew-textMuted text-sm hover:bg-[#1E1F22] transition-colors"
+              className="w-full text-left px-2 py-1 rounded bg-mew-darkest text-mew-textMuted text-base hover:bg-[#1E1F22] transition-colors"
               onClick={() => openModal('findUser')}
            >
                {t('dm.search.placeholder')}
@@ -45,12 +45,12 @@ export const DMChannelList = () => {
       </div>
       <div className="p-2 flex-1 overflow-y-auto custom-scrollbar">
           <div className="flex items-center px-2 py-2 rounded hover:bg-mew-dark text-mew-textMuted hover:text-mew-text cursor-pointer mb-4 transition-colors">
-              <Icon icon="mdi:account-multiple" className="mr-3" width="24" height="24" />
-              <span className="font-medium">{t('dm.friends')}</span>
+              <Icon icon="mdi:account-multiple" className="mr-3" width="26" height="26" />
+              <span className="font-medium text-base">{t('dm.friends')}</span>
           </div>
 
           <div className="flex items-center justify-between px-2 mb-2 group">
-              <div className="text-xs font-bold text-mew-textMuted uppercase hover:text-mew-text cursor-pointer">{t('dm.directMessages')}</div>
+              <div className="text-[15px] font-bold text-mew-textMuted uppercase hover:text-mew-text cursor-pointer">{t('dm.directMessages')}</div>
               <Icon
                   icon="mdi:plus"
                   className="text-mew-textMuted hover:text-mew-text cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
@@ -90,7 +90,7 @@ export const DMChannelList = () => {
                       </div>
                       
                       <div className="flex-1 min-w-0 flex items-center">
-                          <span className={clsx("truncate flex-1", hasUnread ? "font-bold" : "font-medium")}>{name}</span>
+                          <span className="truncate flex-1 text-base font-normal">{name}</span>
                           {hasUnread && currentChannelId !== dm._id && (
                              <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 ml-2"></div>
                           )}

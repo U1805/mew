@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react';
-import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import clsx from 'clsx';
@@ -19,11 +18,13 @@ import { useVoiceSettingsStore } from '../../../shared/stores/voiceSettingsStore
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { getMessageBestEffortText } from '../../../shared/utils/messageText';
 import { useI18n } from '../../../shared/i18n';
+import { formatDateTime, getRelativeDay } from '../../../shared/utils/dateTime';
 
 interface MessageItemProps {
   message: Message;
   isSequential?: boolean;
   ownedBotUserIds?: Set<string>;
+  className?: string;
 }
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -61,11 +62,11 @@ const getSelectionTextWithin = (container: HTMLElement | null) => {
 
 const looksLikeIdPlaceholder = (text: string) => /^@?[0-9a-fA-F]{24}$/.test(text.trim());
 
-const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProps) => {
+const MessageItem = ({ message, isSequential, ownedBotUserIds, className }: MessageItemProps) => {
   const { user } = useAuthStore();
   const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId, targetMessageId } = useUIStore();
   const { openModal } = useModalStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
@@ -407,8 +408,18 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   };
 
   const isValidDate = message.createdAt && !isNaN(new Date(message.createdAt).getTime());
-  const timeString = isValidDate ? format(new Date(message.createdAt), 'h:mm a') : '';
-  const fullDateString = isValidDate ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a') : '';
+  const timeString = isValidDate
+    ? formatDateTime(new Date(message.createdAt), locale, { hour: 'numeric', minute: '2-digit' })
+    : '';
+  const fullDateString = isValidDate
+    ? (() => {
+        const date = new Date(message.createdAt);
+        const relativeDay = getRelativeDay(date);
+        if (relativeDay === 'today') return timeString;
+        if (relativeDay === 'yesterday') return `${t('datetime.yesterday')} ${timeString}`;
+        return formatDateTime(date, locale, { dateStyle: 'medium', timeStyle: 'short' });
+      })()
+    : '';
 
   if (isEditing) {
       return <MessageEditor message={message} onCancel={() => setIsEditing(false)} />;
@@ -462,6 +473,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
           className={clsx(
             'group flex pr-4 relative transition-colors duration-200',
             isSequential ? 'py-0.5' : 'mt-[17px] py-0.5 mb-1',
+            className,
             {
               'animate-mention-flash-anim': applyFlash,
               'bg-[#fde047]/25': jumpBlinkOn,
@@ -523,10 +535,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
           {isSequential ? (
             <>
-              <div className="w-[50px] text-[10px] text-mew-textMuted opacity-0 group-hover:opacity-100 text-right pr-3 select-none mt-1.5 flex-shrink-0">
+              <div className="w-[72px] text-[10px] leading-[1.375rem] text-mew-textMuted opacity-0 group-hover:opacity-100 text-right pr-4 select-none flex-shrink-0">
                 {timeString}
               </div>
-              <div className="flex-1 min-w-0 pl-4">
+              <div className="flex-1 min-w-0">
                 {isRetracted ? (
                   <div className="text-mew-textMuted italic text-[0.95rem] leading-[1.375rem] select-none">
                     {t('message.deleted')}

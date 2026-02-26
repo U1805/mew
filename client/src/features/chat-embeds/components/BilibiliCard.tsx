@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import clsx from 'clsx';
-import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
 import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
+import { useI18n, type Locale } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 // --- Utility Functions (无变化) ---
 
@@ -33,11 +34,11 @@ function normalizeUrl(url: string): string {
   return trimmed;
 }
 
-function safeDateLabel(value: unknown): string | null {
+function safeDateLabel(value: unknown, locale: Locale): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     const ms = value > 1e12 ? value : value * 1000;
     const d = new Date(ms);
-    return Number.isNaN(d.getTime()) ? null : format(d, 'yyyy-MM-dd HH:mm');
+    return Number.isNaN(d.getTime()) ? null : formatDateTime(d, locale, { dateStyle: 'medium', timeStyle: 'short' });
   }
   return null;
 }
@@ -242,6 +243,7 @@ interface BilibiliCardProps {
 }
 
 export const BilibiliCard: React.FC<BilibiliCardProps> = ({ payload }) => {
+  const { locale } = useI18n();
   const type = typeof payload.type === 'string' ? payload.type : '';
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
   const text = ((typeof payload.text === 'string' ? payload.text : '') ||
@@ -257,7 +259,7 @@ export const BilibiliCard: React.FC<BilibiliCardProps> = ({ payload }) => {
   
   const primaryUrl = pickPrimaryUrl(payload);
   const hostname = useMemo(() => safeHostname(primaryUrl), [primaryUrl]);
-  const publishedAt = safeDateLabel(payload.published_at);
+  const publishedAt = safeDateLabel(payload.published_at, locale);
   const typeLabel = getTypeLabel(type);
   const borderClass = getEmbedColorClass(type);
 

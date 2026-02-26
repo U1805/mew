@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { format } from 'date-fns';
 import { User } from '../../../shared/types';
 import { channelApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore } from '../../../shared/stores';
@@ -11,11 +10,12 @@ import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUser } from '../hooks/useUser';
 import { formatUserTag } from '../../../shared/utils/userTag';
 import { useI18n } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
   const { user: currentUser } = useAuthStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -48,7 +48,7 @@ export const UserProfileModal: React.FC = () => {
   };
 
   const joinedDate = user.createdAt && !isNaN(new Date(user.createdAt).getTime()) 
-    ? format(new Date(user.createdAt), 'MMM d, yyyy') 
+    ? formatDateTime(new Date(user.createdAt), locale, { year: 'numeric', month: 'short', day: 'numeric' }) 
     : t('common.unknown');
 
   return (

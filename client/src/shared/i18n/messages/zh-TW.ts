@@ -14,6 +14,8 @@ export const zhTWMessages: Record<string, string> = {
     'common.apply': '套用',
     'common.close': '關閉',
     'common.unknown': '未知',
+    'datetime.today': '今天',
+    'datetime.yesterday': '昨天',
     'auth.welcomeBack': '歡迎回來！',
     'auth.welcomeSubtitle': '很高興再次見到你！',
     'auth.username': '使用者名稱',

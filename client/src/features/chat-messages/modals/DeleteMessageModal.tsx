@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { useModalStore, useUIStore } from '../../../shared/stores';
 import { messageApi } from '../../../shared/services/api';
 import { ConfirmModal } from '../../../shared/components/ConfirmModal';
 import { useI18n } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 export const DeleteMessageModal: React.FC = () => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { closeModal, modalData } = useModalStore();
   const { currentServerId } = useUIStore();
   const queryClient = useQueryClient();
@@ -74,7 +74,7 @@ export const DeleteMessageModal: React.FC = () => {
               <span className="font-bold text-white mr-1.5">{author?.username || t('common.unknown')}</span>
               <span className="text-xs text-mew-textMuted">
                 {message.createdAt && !isNaN(new Date(message.createdAt).getTime())
-                  ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a')
+                  ? formatDateTime(new Date(message.createdAt), locale, { dateStyle: 'medium', timeStyle: 'short' })
                   : ''}
               </span>
             </div>
