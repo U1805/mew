@@ -44,8 +44,6 @@ export const useGlobalSocketEvents = () => {
 
         // If user is viewing the channel, do nothing, as the message will be handled by useSocketMessages
         if (isViewingChannel) {
-          // Safety net: during channel switching / reconnect windows, channel-local hook may be briefly inactive.
-          mergeMessageIntoCache();
           return;
         }
 

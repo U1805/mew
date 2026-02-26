@@ -30,6 +30,42 @@ interface MessageInputProps {
   channelId: string | null;
 }
 
+const createClientNonce = () => `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+const dedupeMessagesById = (messages: Message[]) => {
+  const seen = new Set<string>();
+  const result: Message[] = [];
+  for (const message of messages) {
+    if (seen.has(message._id)) continue;
+    seen.add(message._id);
+    result.push(message);
+  }
+  return result;
+};
+
+const upsertConfirmedMessage = (
+  oldData: Message[] | undefined,
+  tempId: string,
+  confirmedMessage: Message
+) => {
+  if (!oldData || oldData.length === 0) return [confirmedMessage];
+
+  let replaced = false;
+  const replacedByTemp = oldData.map((m) => {
+    if (m._id !== tempId) return m;
+    replaced = true;
+    return confirmedMessage;
+  });
+
+  const withConfirmed = replaced
+    ? replacedByTemp
+    : replacedByTemp.some((m) => m._id === confirmedMessage._id)
+      ? replacedByTemp.map((m) => (m._id === confirmedMessage._id ? confirmedMessage : m))
+      : [...replacedByTemp, confirmedMessage];
+
+  return dedupeMessagesById(withConfirmed);
+};
+
 const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
   const { t } = useI18n();
   const [attachments, setAttachments] = useState<Array<Partial<Attachment & { isUploading?: boolean; progress?: number; file?: File; localUrl?: string; error?: string; key?: string }>>>([]);
@@ -254,6 +290,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     const currentServerId = serverId ? serverId : undefined;
     const replySnapshot = activeReplyTo;
     const tempId = new Date().toISOString();
+    const clientNonce = createClientNonce();
     const user = useAuthStore.getState().user;
     if (!user) return;
 
@@ -266,6 +303,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       updatedAt: new Date().toISOString(),
       type: 'DEFAULT',
       mentions: mentionsToSend,
+      payload: { clientNonce },
       ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
       attachments: attachments.map(a => ({
           filename: a.filename || '',
@@ -287,12 +325,16 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       const finalAttachments = attachments
         .filter(a => !a.isUploading && a.key)
         .map(({ filename, contentType, key, size }) => ({ filename, contentType, key, size } as unknown as Attachment));
-      await messageApi.send(currentServerId, channelId, {
+      const response = await messageApi.send(currentServerId, channelId, {
         content: contentToSend,
         attachments: finalAttachments,
+        payload: { clientNonce },
         ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
       });
-      await queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
+      const confirmedMessage = response.data as Message;
+      queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) =>
+        upsertConfirmedMessage(oldData, tempId, confirmedMessage)
+      );
     } catch (err) {
       queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) => {
         return oldData ? oldData.filter(m => m._id !== tempId) : [];
@@ -352,6 +394,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
     setIsSendingVoice(true);
 
     const tempId = new Date().toISOString();
+    const clientNonce = createClientNonce();
     const optimistic: Message = {
       _id: tempId,
       channelId: channelId,
@@ -362,6 +405,7 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
       type: 'message/voice',
       attachments: [],
       payload: {
+        clientNonce,
         voice: {
           key: '',
           url: blobUrl,
@@ -387,9 +431,10 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
 
       const uploaded: any = await uploadApi.uploadFileSmart(channelId, file);
 
-      await messageApi.send(currentServerId, channelId, {
+      const response = await messageApi.send(currentServerId, channelId, {
         type: 'message/voice',
         payload: {
+          clientNonce,
           voice: {
             key: uploaded.key,
             contentType: uploaded.contentType || mimeType || 'audio/webm',
@@ -400,9 +445,13 @@ const MessageInput = ({ channel, serverId, channelId }: MessageInputProps) => {
         ...(replySnapshot ? { referencedMessageId: replySnapshot.messageId } : {}),
       });
 
+      const confirmedMessage = response.data as Message;
+      queryClient.setQueryData(['messages', channelId], (oldData: Message[] | undefined) =>
+        upsertConfirmedMessage(oldData, tempId, confirmedMessage)
+      );
+
       voiceRecorder.cancel();
       if (replySnapshot) clearReplyTo();
-      await queryClient.invalidateQueries({ queryKey: ['messages', channelId] });
     } catch (err) {
       console.error('Failed to send voice message:', err);
       toast.error(t('message.input.sendVoiceFailed'));

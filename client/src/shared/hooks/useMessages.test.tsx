@@ -75,4 +75,42 @@ describe('useMessages', () => {
     renderHook(() => useMessages('server-1', 'channel-1', { enabled: false }), { wrapper: createWrapper() });
     expect(messageApi.list).not.toHaveBeenCalled();
   });
+
+  it('preserves already-loaded older messages when latest page refetches', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: false,
+          refetchInterval: false,
+        },
+      },
+    });
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    queryClient.setQueryData(['messages', 'channel-1'], [
+      { _id: 'older-1', content: 'older', createdAt: new Date('2023-01-01T08:00:00Z').toISOString() },
+      { _id: 'newer-1', content: 'newer', createdAt: new Date('2023-01-01T09:00:00Z').toISOString() },
+    ]);
+
+    (messageApi.list as Mock).mockResolvedValue({
+      data: [
+        { _id: 'newer-1', content: 'newer-updated', createdAt: new Date('2023-01-01T09:00:00Z').toISOString() },
+        { _id: 'latest-1', content: 'latest', createdAt: new Date('2023-01-01T10:00:00Z').toISOString() },
+      ],
+    });
+
+    const { result } = renderHook(() => useMessages('server-1', 'channel-1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toEqual([
+      { _id: 'older-1', content: 'older', createdAt: new Date('2023-01-01T08:00:00Z').toISOString() },
+      { _id: 'newer-1', content: 'newer-updated', createdAt: new Date('2023-01-01T09:00:00Z').toISOString() },
+      { _id: 'latest-1', content: 'latest', createdAt: new Date('2023-01-01T10:00:00Z').toISOString() },
+    ]);
+  });
 });
