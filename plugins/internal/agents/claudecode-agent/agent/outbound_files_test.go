@@ -105,3 +105,31 @@ func TestFormatFileTransferErrorCallout(t *testing.T) {
 		t.Fatalf("missing error line: %q", msg)
 	}
 }
+
+func TestStripCrawlerSiteLines_RemovesOnlyCrawlerLines(t *testing.T) {
+	in := strings.Join([]string{
+		"🌐 Crawling site https://claude.com/claude-code",
+		"🌐 Crawling site https://example.com/1",
+		"好的!我已经为您创建了提醒。",
+		"",
+		"> [!footer] 运行统计",
+	}, "\n")
+
+	got := stripCrawlerSiteLines(in)
+	want := strings.Join([]string{
+		"好的!我已经为您创建了提醒。",
+		"",
+		"> [!footer] 运行统计",
+	}, "\n")
+	if got != want {
+		t.Fatalf("stripCrawlerSiteLines mismatch\nwant:\n%q\ngot:\n%q", want, got)
+	}
+}
+
+func TestStripCrawlerSiteLines_AllCrawlerLinesBecomeEmpty(t *testing.T) {
+	in := "🌐 Crawling site https://a\n🌐 Crawling site https://b\n"
+	got := stripCrawlerSiteLines(in)
+	if got != "" {
+		t.Fatalf("expected empty output, got %q", got)
+	}
+}

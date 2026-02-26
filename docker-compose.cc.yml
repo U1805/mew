@@ -1,6 +1,10 @@
 name: mew
 
 services:
+  plugins:
+    volumes:
+      - claude_code_workspace:/root/.cache/mew/plugins/claudecode-agent/workspace:ro
+
   b4u2cc:
     container_name: mew_b4u2cc
     build:
@@ -55,6 +59,8 @@ services:
       CLAUDE_PROXY_WORKDIR: /home/node/workspace/projects
       CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-3600}
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - claude_code_workspace:/home/node/workspace
     stdin_open: true
     tty: true

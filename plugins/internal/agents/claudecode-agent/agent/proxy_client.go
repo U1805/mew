@@ -22,6 +22,7 @@ type ClaudeCodeProxyClient struct {
 
 type claudeChatRequest struct {
 	SessionID string `json:"session_id"`
+	BotID     string `json:"bot_id,omitempty"`
 	Prompt    string `json:"prompt"`
 	Continue  bool   `json:"continue"`
 }
@@ -62,12 +63,13 @@ func NewClaudeCodeProxyClient(baseURL string, httpClient *http.Client) (*ClaudeC
 
 func (c *ClaudeCodeProxyClient) ChatStream(
 	ctx context.Context,
-	channelID, prompt string,
+	sessionID, botID, prompt string,
 	useContinue bool,
 	onChunk func(line string) error,
 ) (int, error) {
 	reqBody := claudeChatRequest{
-		SessionID: strings.TrimSpace(channelID),
+		SessionID: strings.TrimSpace(sessionID),
+		BotID:     strings.TrimSpace(botID),
 		Prompt:    strings.TrimSpace(prompt),
 		Continue:  useContinue,
 	}
@@ -122,7 +124,7 @@ func (c *ClaudeCodeProxyClient) ChatStream(
 
 func (c *ClaudeCodeProxyClient) UploadFile(
 	ctx context.Context,
-	sessionID, filename string,
+	sessionID, botID, filename string,
 	content []byte,
 ) (remotePath string, remoteFilename string, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files/upload", bytes.NewReader(content))
@@ -131,6 +133,7 @@ func (c *ClaudeCodeProxyClient) UploadFile(
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.Header.Set("X-Session-Id", url.PathEscape(strings.TrimSpace(sessionID)))
+	req.Header.Set("X-Bot-Id", url.PathEscape(strings.TrimSpace(botID)))
 	req.Header.Set("X-Filename", url.PathEscape(strings.TrimSpace(filename)))
 
 	resp, err := c.httpClient.Do(req)
@@ -164,13 +167,14 @@ func (c *ClaudeCodeProxyClient) UploadFile(
 
 func (c *ClaudeCodeProxyClient) DownloadFile(
 	ctx context.Context,
-	sessionID, filePath string,
+	sessionID, botID, filePath string,
 ) (filename string, content []byte, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/files/download", nil)
 	if err != nil {
 		return "", nil, err
 	}
 	req.Header.Set("X-Session-Id", url.PathEscape(strings.TrimSpace(sessionID)))
+	req.Header.Set("X-Bot-Id", url.PathEscape(strings.TrimSpace(botID)))
 	req.Header.Set("X-File-Path", url.PathEscape(strings.TrimSpace(filePath)))
 
 	resp, err := c.httpClient.Do(req)

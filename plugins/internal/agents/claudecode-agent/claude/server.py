@@ -56,13 +56,20 @@ def ensure_session_layout(session_dir: str):
             f.write(default_claude_md_content(session_dir))
 
 
-def safe_session_dir(session_id: str) -> str:
-    if not session_id:
-        session_id = "default"
-    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", session_id)
+def safe_id(raw_value: str, fallback: str = "default") -> str:
+    value = (raw_value or "").strip()
+    if not value:
+        value = fallback
+    safe = re.sub(r"[^a-zA-Z0-9._-]", "_", value)
     if not safe:
-        safe = "default"
-    path = os.path.join(BASE_DIR, safe)
+        safe = fallback
+    return safe
+
+
+def safe_session_dir(bot_id: str, session_id: str) -> str:
+    safe_bot = safe_id(bot_id, "default")
+    safe_session = safe_id(session_id, "default")
+    path = os.path.join(BASE_DIR, safe_bot, safe_session)
     os.makedirs(path, exist_ok=True)
     ensure_session_layout(path)
     return path
@@ -118,8 +125,8 @@ def unique_file_path(dir_path: str, filename: str) -> str:
     return candidate
 
 
-def save_uploaded_file(session_id: str, filename: str, content: bytes):
-    session_dir = safe_session_dir(session_id)
+def save_uploaded_file(bot_id: str, session_id: str, filename: str, content: bytes):
+    session_dir = safe_session_dir(bot_id, session_id)
     files_dir = os.path.join(session_dir, ".files")
     os.makedirs(files_dir, exist_ok=True)
     safe_name = safe_filename(filename)
@@ -244,17 +251,19 @@ def build_claude_cmd(prompt: str, use_continue: bool):
 def stream_claude_output(
     prompt: str,
     use_continue: bool,
+    bot_id: str,
     session_id: str,
     timeout_sec: int,
     request_id: str = "-",
 ):
-    workdir = safe_session_dir(session_id)
+    workdir = safe_session_dir(bot_id, session_id)
     cmd = build_claude_cmd(prompt, use_continue)
     mode = "-c -p" if use_continue else "-p"
     start = time.monotonic()
     LOGGER.info(
-        "claude.exec.start request_id=%s session_id=%s mode=%s timeout_sec=%d prompt_len=%d prompt_preview=%r",
+        "claude.exec.start request_id=%s bot_id=%s session_id=%s mode=%s timeout_sec=%d prompt_len=%d prompt_preview=%r",
         request_id,
+        bot_id,
         session_id,
         mode,
         timeout_sec,
@@ -318,8 +327,9 @@ def stream_claude_output(
             pass
         duration_ms = int((time.monotonic() - start) * 1000)
         LOGGER.error(
-            "claude.exec.timeout request_id=%s session_id=%s mode=%s timeout_sec=%d duration_ms=%d",
+            "claude.exec.timeout request_id=%s bot_id=%s session_id=%s mode=%s timeout_sec=%d duration_ms=%d",
             request_id,
+            bot_id,
             session_id,
             mode,
             timeout_sec,
@@ -335,8 +345,9 @@ def stream_claude_output(
     if returncode != 0:
         msg = stderr_text or f"claude exited with code {returncode}"
         LOGGER.error(
-            "claude.exec.fail request_id=%s session_id=%s mode=%s returncode=%d duration_ms=%d stderr_preview=%r",
+            "claude.exec.fail request_id=%s bot_id=%s session_id=%s mode=%s returncode=%d duration_ms=%d stderr_preview=%r",
             request_id,
+            bot_id,
             session_id,
             mode,
             returncode,
@@ -346,8 +357,9 @@ def stream_claude_output(
         raise RuntimeError(msg)
 
     LOGGER.info(
-        "claude.exec.ok request_id=%s session_id=%s mode=%s duration_ms=%d lines=%d",
+        "claude.exec.ok request_id=%s bot_id=%s session_id=%s mode=%s duration_ms=%d lines=%d",
         request_id,
+        bot_id,
         session_id,
         mode,
         duration_ms,
@@ -503,6 +515,7 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
         use_continue = parse_bool(req.get("continue", False))
+        bot_id = str(req.get("bot_id", "default"))
         session_id = str(req.get("session_id", "default"))
         try:
             timeout_sec = int(req.get("timeout_seconds", DEFAULT_TIMEOUT))
@@ -526,7 +539,7 @@ class Handler(BaseHTTPRequestHandler):
         self._start_ndjson_stream()
         line_count = 0
         try:
-            for line in stream_claude_output(prompt, use_continue, session_id, timeout_sec, request_id):
+            for line in stream_claude_output(prompt, use_continue, bot_id, session_id, timeout_sec, request_id):
                 line_count += 1
                 self._write_ndjson_line(line)
         except subprocess.TimeoutExpired:
@@ -539,8 +552,9 @@ class Handler(BaseHTTPRequestHandler):
             )
         except Exception as exc:
             LOGGER.exception(
-                "claude.exec.exception request_id=%s session_id=%s",
+                "claude.exec.exception request_id=%s bot_id=%s session_id=%s",
                 request_id,
+                bot_id,
                 session_id,
             )
             self._write_ndjson_obj(
@@ -563,6 +577,7 @@ class Handler(BaseHTTPRequestHandler):
             )
 
     def handle_upload_file(self, request_id: str, start: float):
+        bot_id = urllib.parse.unquote(str(self.headers.get("X-Bot-Id", "default")).strip())
         session_id = urllib.parse.unquote(str(self.headers.get("X-Session-Id", "default")).strip())
         filename = urllib.parse.unquote(str(self.headers.get("X-Filename", "")).strip())
 
@@ -596,10 +611,11 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
 
-        saved_name, saved_path = save_uploaded_file(session_id, filename, content)
+        saved_name, saved_path = save_uploaded_file(bot_id, session_id, filename, content)
         LOGGER.info(
-            "file.uploaded request_id=%s session_id=%s name=%r bytes=%d path=%s",
+            "file.uploaded request_id=%s bot_id=%s session_id=%s name=%r bytes=%d path=%s",
             request_id,
+            bot_id,
             session_id,
             saved_name,
             len(content),
@@ -613,6 +629,7 @@ class Handler(BaseHTTPRequestHandler):
         )
 
     def handle_download_file(self, request_id: str, start: float):
+        bot_id = urllib.parse.unquote(str(self.headers.get("X-Bot-Id", "default")).strip())
         session_id = urllib.parse.unquote(str(self.headers.get("X-Session-Id", "default")).strip())
         file_path = normalize_download_path(
             urllib.parse.unquote(str(self.headers.get("X-File-Path", "")).strip())
@@ -621,7 +638,7 @@ class Handler(BaseHTTPRequestHandler):
             self._write_json(400, {"ok": False, "error": "X-File-Path header is required"}, request_id, start)
             return
 
-        session_dir = safe_session_dir(session_id)
+        session_dir = safe_session_dir(bot_id, session_id)
         abs_path, in_scope = resolve_download_abs_path(session_dir, file_path)
         if not in_scope:
             self._write_json(403, {"ok": False, "error": "file path out of session scope"}, request_id, start)
@@ -645,8 +662,9 @@ class Handler(BaseHTTPRequestHandler):
         filename = os.path.basename(abs_path)
         content_type, _ = mimetypes.guess_type(filename)
         LOGGER.info(
-            "file.downloaded request_id=%s session_id=%s name=%r bytes=%d path=%s content_type=%s",
+            "file.downloaded request_id=%s bot_id=%s session_id=%s name=%r bytes=%d path=%s content_type=%s",
             request_id,
+            bot_id,
             session_id,
             filename,
             len(data),
