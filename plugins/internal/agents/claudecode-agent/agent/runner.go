@@ -4,6 +4,7 @@ import (
 	"context"
 	cryptorand "crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -119,17 +120,19 @@ func NewClaudeCodeRunner(botID, botName, accessToken, rawConfig string, cfg sdk.
 
 func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 	logPrefix := r.logPrefix
+	runCtx, cancel := context.WithCancel(ctx)
 
 	r.session = sdk.NewBotSession(r.apiBase, r.accessToken, r.mewHTTPClient)
-	me, err := r.session.User(ctx)
+	me, err := r.session.User(runCtx)
 	if err != nil {
+		cancel()
 		return fmt.Errorf("%s bot auth failed: %w", logPrefix, err)
 	}
 	r.botUserID = me.ID
 	log.Printf("%s authenticated: botUserID=%s apiBase=%s wsURL=%s proxy=%s timeout=%ds",
 		logPrefix, r.botUserID, r.apiBase, r.wsURL, r.proxyBaseURL, r.proxyTimeout)
 
-	if err := r.dmChannels.RefreshWithBotSession(ctx, r.session); err != nil {
+	if err := r.dmChannels.RefreshWithBotSession(runCtx, r.session); err != nil {
 		log.Printf("%s refresh DM channels failed (will retry later): %v", logPrefix, err)
 	} else {
 		log.Printf("%s DM channels cache initialized", logPrefix)
@@ -141,22 +144,34 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 		defer close(workerDone)
 		for {
 			select {
-			case <-ctx.Done():
+			case <-runCtx.Done():
 				return
 			case job, ok := <-jobs:
 				if !ok {
 					return
 				}
-				r.handleMessageCreateJob(ctx, logPrefix, job)
+				r.handleMessageCreateJob(runCtx, logPrefix, job)
 			}
 		}
 	}()
-	defer func() {
-		close(jobs)
-		<-workerDone
+
+	scheduler := newClaudeScheduler(r)
+	schedulerDone := make(chan struct{})
+	go func() {
+		defer close(schedulerDone)
+		if err := scheduler.Run(runCtx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("%s scheduler stopped with error: %v", logPrefix, err)
+		}
 	}()
 
-	return socketio.RunGatewayWithReconnectSession(ctx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
+	defer func() {
+		cancel()
+		close(jobs)
+		<-workerDone
+		<-schedulerDone
+	}()
+
+	return socketio.RunGatewayWithReconnectSession(runCtx, r.wsURL, r.session, func(ctx context.Context, eventName string, payload json.RawMessage, emit socketio.EmitFunc) error {
 		if eventName != "MESSAGE_CREATE" {
 			return nil
 		}
@@ -193,6 +208,47 @@ func (r *ClaudeCodeRunner) Run(ctx context.Context) error {
 			log.Printf("%s gateway disconnected: %v (reconnecting in %s)", logPrefix, err, nextBackoff)
 		},
 	})
+}
+
+func (r *ClaudeCodeRunner) runScheduledPrompt(ctx context.Context, channelID, prompt string) error {
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return fmt.Errorf("scheduler prompt is empty")
+	}
+
+	chunks, sentMessages, err := r.runProxyPrompt(ctx, channelID, "scheduler -p", prompt, false, r.makeCardEmitFunc(ctx))
+	if err != nil {
+		_ = r.sendCardMessageByAPI(ctx, channelID, fmt.Sprintf("定时任务执行失败: %v", err))
+		return err
+	}
+	if chunks == 0 || sentMessages == 0 {
+		if err := r.sendCardMessageByAPI(ctx, channelID, "(empty response)"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *ClaudeCodeRunner) makeCardEmitFunc(ctx context.Context) socketio.EmitFunc {
+	return func(event string, payload any) error {
+		if strings.TrimSpace(event) != "message/create" {
+			return nil
+		}
+		body, ok := payload.(map[string]any)
+		if !ok {
+			return fmt.Errorf("invalid emit payload type %T", payload)
+		}
+
+		channelID := strings.TrimSpace(fmt.Sprintf("%v", body["channelId"]))
+		if channelID == "" {
+			return fmt.Errorf("missing channelId in emit payload")
+		}
+		content := strings.TrimSpace(fmt.Sprintf("%v", body["content"]))
+		if content == "" {
+			return nil
+		}
+		return r.sendCardMessageByAPI(ctx, channelID, content)
+	}
 }
 
 func (r *ClaudeCodeRunner) handleMessageCreateJob(ctx context.Context, logPrefix string, job messageCreateJob) {
@@ -325,6 +381,7 @@ func (r *ClaudeCodeRunner) runProxyPrompt(
 	sentMessages = 0
 
 	emitParsedMessage := func(msg string) error {
+		msg = stripCrawlerSiteLines(msg)
 		msg = strings.TrimSpace(msg)
 		if msg == "" {
 			return nil
@@ -344,7 +401,7 @@ func (r *ClaudeCodeRunner) runProxyPrompt(
 		return nil
 	}
 
-	chunks, err = r.proxyClient.ChatStream(ctx, channelID, prompt, useContinue, func(line string) error {
+	chunks, err = r.proxyClient.ChatStream(ctx, channelID, r.botID, prompt, useContinue, func(line string) error {
 		log.Printf("%s proxy chunk: channel=%s mode=%s chunk_len=%d chunk=%q",
 			r.logPrefix, channelID, mode, len(line), sdk.PreviewString(line, claudeCodeLogContentPreviewLen))
 		outMsgs, parseErr := parser.FeedLine(line)
@@ -422,7 +479,7 @@ func (r *ClaudeCodeRunner) buildPromptWithAttachments(
 			return "", fmt.Errorf("download %q failed: %w", name, err)
 		}
 
-		remotePath, remoteName, err := r.proxyClient.UploadFile(ctx, channelID, name, data)
+		remotePath, remoteName, err := r.proxyClient.UploadFile(ctx, channelID, r.botID, name, data)
 		if err != nil {
 			return "", fmt.Errorf("upload %q failed: %w", name, err)
 		}

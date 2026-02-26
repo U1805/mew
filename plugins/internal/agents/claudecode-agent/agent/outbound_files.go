@@ -35,6 +35,7 @@ var (
 	trailingFileRefLinePattern = regexp.MustCompile(`^\s*(\[[^\]\r\n]+\]\(([^)\r\n]+)\)\s*)+$`)
 	trailingFileRefExtract     = regexp.MustCompile(`\[([^\]\r\n]+)\]\(([^)\r\n]+)\)`)
 	usageFooterCalloutPattern  = regexp.MustCompile(`(?i)^>\s*\[!` + usageFooterCalloutType + `[+-]?\](?:\s|$)`)
+	crawlerSiteLinePattern     = regexp.MustCompile(`(?m)^[ \t]*🌐 Crawling site .*(?:\r?\n|$)`)
 )
 
 func (r *ClaudeCodeRunner) emitMessageWithFileRefs(
@@ -56,7 +57,7 @@ func (r *ClaudeCodeRunner) emitMessageWithFileRefs(
 	}
 
 	for i, ref := range refs {
-		downloadName, data, err := r.proxyClient.DownloadFile(ctx, channelID, ref.Path)
+		downloadName, data, err := r.proxyClient.DownloadFile(ctx, channelID, r.botID, ref.Path)
 		if err != nil {
 			log.Printf("%s file download failed: channel=%s ref=%q path=%q err=%v",
 				r.logPrefix, channelID, ref.Name, ref.Path, err)
@@ -143,6 +144,49 @@ func (r *ClaudeCodeRunner) sendAttachmentByBytes(ctx context.Context, channelID,
 		msg := strings.TrimSpace(string(raw))
 		if msg == "" {
 			msg = "create attachment message failed"
+		}
+		return fmt.Errorf("status=%d: %s", resp.StatusCode, msg)
+	}
+	return nil
+}
+
+func (r *ClaudeCodeRunner) sendCardMessageByAPI(ctx context.Context, channelID, content string) error {
+	httpClient := r.session.HTTPClient()
+	if httpClient == nil {
+		return fmt.Errorf("missing session http client")
+	}
+
+	reqBody := map[string]any{
+		"type":    claudeCodeCardMessageType,
+		"content": content,
+		"payload": map[string]any{
+			"content": content,
+		},
+	}
+	bodyBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return err
+	}
+
+	target := strings.TrimRight(r.apiBase, "/") + "/channels/" + url.PathEscape(channelID) + "/messages"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		msg := strings.TrimSpace(string(raw))
+		if msg == "" {
+			msg = "create card message failed"
 		}
 		return fmt.Errorf("status=%d: %s", resp.StatusCode, msg)
 	}
@@ -312,4 +356,17 @@ func formatFileTransferErrorCallout(action, name, filePath string, err error) st
 	}
 	lines = append(lines, fmt.Sprintf("> 错误：`%s`", errMsg))
 	return strings.Join(lines, "\n")
+}
+
+func stripCrawlerSiteLines(message string) string {
+	if strings.TrimSpace(message) == "" {
+		return ""
+	}
+
+	normalized := strings.ReplaceAll(message, "\r\n", "\n")
+	cleaned := crawlerSiteLinePattern.ReplaceAllString(normalized, "")
+	for strings.Contains(cleaned, "\n\n\n") {
+		cleaned = strings.ReplaceAll(cleaned, "\n\n\n", "\n\n")
+	}
+	return strings.TrimSpace(cleaned)
 }
