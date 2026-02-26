@@ -1,7 +1,7 @@
 # Override for pulling prebuilt images from GHCR.
 # Use with:
-# docker compose --env-file docker-compose.env -f docker-compose.cc.yml -f docker-compose.cc.ghcr.yml up -d
-name: mew-cc
+# docker compose --env-file docker-compose.env -f docker-compose.yml -f docker-compose.ghcr.yml -f docker-compose.cc.yml -f docker-compose.cc.ghcr.yml up -d
+name: mew
 
 services:
 

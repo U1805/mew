@@ -4,7 +4,7 @@
   "link": {
     "type": "generated-index",
     "title": "🔌 核心 API",
-    "description": "REST API（资源 CRUD）与 WebSocket（实时事件）的参考文档入口。",
+    "description": "API 数据模型、REST API、WebSocket 实时事件与 Plugins SDK 的参考文档入口。",
     "slug": "/core-api"
   }
 }

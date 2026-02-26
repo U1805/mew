@@ -20,7 +20,7 @@ slug: /guide/client-guide
 -   **状态管理**: Zustand (客户端 UI 状态) + TanStack Query (服务端数据缓存)
 -   **样式**: TailwindCSS（通过 `cdn.tailwindcss.com` 注入，配置位于 `client/index.html`）
 -   **富文本编辑**: Tiptap
--   **测试**: Vitest + MSW（`happy-dom` 环境）
+-   **测试**: Vitest + Testing Library + MSW（`happy-dom` 环境）
 :::
 
 在开始之前，建议先熟悉项目所依赖的核心接口：
@@ -59,7 +59,7 @@ slug: /guide/client-guide
 项目采用“功能优先 (Feature-First)”的目录组织方式。对于新加入的开发者，以下是几个关键的入口文件，可以帮助你快速定位代码：
 
 -   `client/src/layout/Layout.tsx`：**主布局组件**。这里是应用的顶层结构，也是挂载全局 Socket 事件监听的最佳位置。
--   `client/src/shared/http.ts`：**HTTP 客户端**（axios 实例与拦截器等）。
+-   `client/src/shared/services/http.ts`：**HTTP 客户端**（axios 实例与拦截器等）。
 -   `client/src/shared/services/socket.ts`：**Socket 客户端单例**（Socket.IO client）。
 -   `client/src/shared/*.api.ts`：**API 模块**。按资源拆分的请求封装（user/server/channel/message/...）。
 -   `client/src/shared/hooks/*`：**自定义 Hooks**。这里封装了对 TanStack Query 数据获取和 Socket 事件订阅的通用逻辑，是业务组件获取数据的主要方式。
@@ -83,7 +83,7 @@ slug: /guide/client-guide
 
 ## Socket 事件处理模式
 
-所有 Socket.IO 的事件处理都遵循一套推荐模式：**在顶层组件通过自定义 Hooks 进行订阅**。
+Socket.IO 事件处理遵循“按作用域挂载 Hook”的模式：全局事件挂在顶层，服务器级与频道级事件挂在对应功能组件。
 
 Socket 客户端单例位于 `client/src/shared/services/socket.ts`。
 
@@ -96,16 +96,17 @@ Socket 客户端单例位于 `client/src/shared/services/socket.ts`。
 
 #### `useServerEvents(serverId)`
 负责监听当前所在服务器内的事件。
--   `CATEGORY_*`: 分组的创建/更新/删除。
--   `MEMBER_*`: 成员的加入/离开/信息更新。
+-   `CATEGORY_UPDATE` / `CATEGORY_DELETE`: 频道分组更新与删除。
+-   `MEMBER_JOIN` / `MEMBER_LEAVE`: 成员加入与离开。
 -   `PERMISSIONS_UPDATE`: 权限变更。
--   `STICKER_*`: 服务器贴纸的创建/更新/删除。
+-   `STICKER_CREATE` / `STICKER_UPDATE` / `STICKER_DELETE`: 服务器贴纸变更。
 
 #### `useSocketMessages(channelId)`
 负责监听当前所在频道内的消息相关事件。
 -   `MESSAGE_CREATE`: 接收新消息。
 -   `MESSAGE_UPDATE`: 消息更新与消息撤回。
 -   `MESSAGE_REACTION_*`: 消息回应 (Reaction) 的添加与移除。
+-   `MESSAGE_DELETE`: 兼容性监听（当前服务端主要通过 `MESSAGE_UPDATE` 表示撤回）。
 
 #### `usePresenceEvents`
 负责监听用户在线状态事件。
@@ -113,7 +114,10 @@ Socket 客户端单例位于 `client/src/shared/services/socket.ts`。
 -   `PRESENCE_UPDATE`: 接收在线状态的变更。
 
 :::info 订阅机制
-这些 Hooks 都在主布局组件 `Layout.tsx` 中被调用。这样做可以确保用户登录后，应用能持续订阅所有必要的事件，无论用户导航到哪个页面。
+当前挂载位置如下：
+- `usePresenceEvents`、`useGlobalSocketEvents`：`Layout.tsx`
+- `useServerEvents(serverId)`：`features/channel/components/ServerChannelList.tsx`
+- `useSocketMessages(channelId)`：`features/chat/components/ChatArea.tsx`
 :::
 
 ---
@@ -132,6 +136,8 @@ Socket 客户端单例位于 `client/src/shared/services/socket.ts`。
 -   `app/x-instagram-card`
 -   `app/x-forward-card`
 -   `app/x-jpdict-card`
+-   `app/x-claudecode-card`
+-   `message/voice`（语音消息）
 
 如果你希望新增一种自定义消息卡片，请遵循以下流程：
 

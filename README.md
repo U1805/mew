@@ -6,8 +6,6 @@ This project is a monorepo containing the client, server, and plugin services.
 
 ## Getting Started
 
-### Docker (recommended)
-
 From the repo root:
 
 ```bash
@@ -29,12 +27,25 @@ vim docker-compose.env
 
 > Generate secrets with `openssl rand -base64 32`
 
-
 ```bash
 # create network
 docker network inspect mew_network >/dev/null 2>&1 || docker network create mew_network
-# setup container
-docker compose --env-file docker-compose.env up --build
+```
+
+### Docker
+
+```bash
+# basic app
+docker compose \
+  --env-file docker-compose.env \
+  up -d --build
+
+# full app with claudecode-agent
+docker compose \
+  --env-file docker-compose.env \
+  -f docker-compose.yml \
+  -f docker-compose.cc.yml \
+  up -d --build
 ```
 
 Endpoints (default `docker-compose.yml`):
@@ -50,5 +61,13 @@ docker compose \
   --env-file docker-compose.env \
   -f docker-compose.yml \
   -f docker-compose.ghcr.yml \
+  up -d
+
+docker compose \
+  --env-file docker-compose.env \
+  -f docker-compose.yml \
+  -f docker-compose.ghcr.yml \
+  -f docker-compose.cc.yml \
+  -f docker-compose.cc.ghcr.yml \
   up -d
 ```

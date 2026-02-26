@@ -9,7 +9,7 @@ sidebar_label: 'Agent Bot'
 本篇文档将引导你构建一个最小可用的会话型 Bot。它的核心任务是：**监听消息事件，在频道内被 `@` 或在私聊中收到特定指令时，自动进行回复。**
 
 :::info 参考实现
-本文所有内容均可参考官方示例 `plugins/internal/agents/test-agent`，该示例完整实现了一个 `echo` 指令机器人。
+本文所有内容均可参考官方示例：入口 `plugins/cmd/agents/test-agent/main.go`，核心逻辑 `plugins/internal/agents/test-agent/*`。该示例完整实现了一个 `echo` 指令机器人。
 :::
 
 ## 工作原理
@@ -17,7 +17,7 @@ sidebar_label: 'Agent Bot'
 在深入编码之前，我们先来了解一个 `Agent Bot` 的核心工作流程。以 `test-agent` 为例，其完整的生命周期包括以下几个步骤：
 
 1.  **拉取实例配置**
-    Bot Service 启动后，会通过 `POST /api/bots/bootstrap` 接口，拉取所有类型为 `test-agent` 的 Bot 实例配置。（该步骤已在 SDK 中封装）
+    Bot Service 启动后，会通过 `POST /api/bots/bootstrap` 接口拉取所有类型为 `test-agent` 的 Bot 实例配置（需携带 `X-Mew-Admin-Secret`，且来源 IP 需命中 `MEW_INFRA_ALLOWED_IPS`）。该步骤已在 SDK 中封装。
 
 2.  **获取授权**
     对每一个 Bot 实例，使用其 `accessToken` 调用 `POST /api/auth/bot` 接口，换取用于后续通信的 `JWT`。
@@ -72,5 +72,5 @@ go run ./plugins/cmd/agents/test-agent
     无需 `@`，用户直接发送以 `echo` 为前缀的消息即可触发。Bot 会在私聊会话中回复后续文本。
 
 :::info 关于 Mention 的序列化
-在前端输入 `@YourBotName` 后，客户端会将其序列化为 `<@botUserId>` 的格式并包含在消息体中。服务端通过解析这种 `<@id>` 格式来识别 mention（提及）操作。
+在前端输入 `@YourBotName` 后，客户端会将其序列化为 `<@botUserId>` 的格式并包含在消息体中。`test-agent` 示例会在收到消息后由 Agent 侧解析这种 `<@id>` 前缀来判断是否触发回复。
 :::

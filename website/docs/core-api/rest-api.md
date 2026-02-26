@@ -26,19 +26,23 @@ REST API 负责应用中核心资源的“状态”同步与管理（CRUD），�
 
 ## 认证 (Authentication)
 
-大部分接口都需要通过 JWT (JSON Web Token) 进行认证。请在 HTTP 请求头中携带认证信息：
+大部分接口都需要 Access Token 认证。可以通过 HTTP 请求头携带 Bearer Token，也可以使用后端下发的 HttpOnly Cookie（`mew_access_token`）：
 
 ```bash
 Authorization: Bearer <your-jwt-token>
 ```
 
-除了 `/auth/*` 用于登录注册、`/health` 用于健康检查，以及 `/webhooks/:webhookId/:token` 用于公开执行 Webhook 的接口外，其他所有接口都需要认证。
+默认不需要 Access Token 的接口包括：
+- `/auth/*`（登录注册、刷新、注销、CSRF）
+- `/health`（健康检查）
+- `/webhooks/:webhookId/:token*`（公开执行 Webhook）
+- `/bots/bootstrap`、`/bots/:botId/bootstrap`、`/infra/service-types/register`（基础设施接口，使用 IP 白名单 + `X-Mew-Admin-Secret`）
 
 #### Token 类型
 
-- **用户 Token (User Token)**
-  - **获取方式**: 通过 `POST /auth/login` 接口，使用邮箱和密码换取。
-  - **特点**: 具有可配置的过期时间 (由环境变量 `JWT_EXPIRES_IN` 控制)。
+- **访问令牌 (Access Token)**
+  - **获取方式**: `POST /auth/login`、`POST /auth/register`、`POST /auth/bot`、`POST /auth/refresh`（或对应 `*-cookie` 版本）。
+  - **特点**: 可通过 `Authorization: Bearer <token>` 或 Cookie `mew_access_token` 使用；过期时间由 `JWT_EXPIRES_IN` 控制。
 
 - **Webhook Token**
   - **获取方式**: 在服务器频道的 Webhook 管理中生成。
@@ -95,22 +99,31 @@ Authorization: Bearer <your-jwt-token>
 | 接口 (Endpoint) | 描述 |
 |---|---|
 | `GET /auth/config` | 获取认证配置，如是否允许新用户注册。 |
+| `GET /auth/csrf` | 下发 CSRF Cookie（`mew_csrf_token`），供浏览器后续写请求使用。 |
 | `POST /auth/register` | 用户注册。 |
+| `POST /auth/register-cookie` | 用户注册（仅依赖 Cookie 会话，不在响应体返回 `token`）。 |
 | `POST /auth/login` | 用户登录，换取 JWT。 |
+| `POST /auth/login-cookie` | 用户登录（仅依赖 Cookie 会话，不在响应体返回 `token`）。 |
 | `POST /auth/bot` | Bot 登录，用 `accessToken` 换取 JWT。 |
 | `POST /auth/refresh` | 使用 Refresh Token 刷新 Access Token。 |
+| `POST /auth/refresh-cookie` | 刷新会话（仅依赖 Cookie 会话，不在响应体返回 `token`）。 |
 | `POST /auth/logout` | 注销并清理 Refresh Token。 |
 
 :::info 注册限制
 当环境变量 `MEW_ALLOW_USER_REGISTRATION` 设置为 `false` 时，`POST /auth/register` 接口将返回 `403 Forbidden`。
 :::
 
+:::info CSRF（浏览器）
+除 `GET /auth/config`、`GET /auth/csrf` 外，`/auth` 下的写操作都经过 CSRF 校验。  
+浏览器调用时通常先请求 `GET /auth/csrf`，再把同值写入请求头 `X-Mew-Csrf-Token`。
+:::
+
 :::info Refresh Token (Cookie)
-后端会在登录/注册时通过 **HttpOnly Cookie** 下发 Refresh Token：
-- Cookie 名：`mew_refresh_token`
-- Path：`/api/auth`
-- 刷新：`POST /auth/refresh` 会轮换 Refresh Token 并返回新的 Access Token
-- 注销：`POST /auth/logout` 会撤销当前 Refresh Token 并清理 Cookie
+后端会在登录/注册时通过 **HttpOnly Cookie** 下发会话 Cookie：
+- Access Token Cookie：`mew_access_token`（Path: `/`）
+- Refresh Token Cookie：`mew_refresh_token`（Path: `/api/auth`）
+- 刷新：`POST /auth/refresh` 或 `POST /auth/refresh-cookie` 会轮换 Refresh Token，并更新 Access Token Cookie
+- 注销：`POST /auth/logout` 会撤销当前 Refresh Token 并清理两类 Cookie
 :::
 
 ---
@@ -244,6 +257,8 @@ Authorization: Bearer <your-jwt-token>
 |---|---|---|
 | `GET /servers/:serverId/categories` | 获取服务器的分组列表。 | 服务器成员 |
 | `POST /servers/:serverId/categories` | 创建一个新分组。 | `MANAGE_CHANNEL` |
+| `PATCH /categories/:categoryId` | 更新分组信息。 | `MANAGE_CHANNEL` |
+| `DELETE /categories/:categoryId` | 删除分组。 | `MANAGE_CHANNEL` |
 | `GET /servers/:serverId/channels` | 获取服务器内对当前用户可见的频道列表。 | 服务器成员 |
 | `POST /servers/:serverId/channels` | 创建一个新频道。 | `MANAGE_CHANNEL` |
 | `PATCH /channels/:channelId` | 更新频道信息（如名称、主题）。 | `MANAGE_CHANNEL` |
@@ -342,15 +357,15 @@ Authorization: Bearer <your-jwt-token>
 - 来源 IP 符合基础设施 IP 白名单（见后端 `MEW_INFRA_ALLOWED_IPS`）
 :::
 
-| 接口 (Endpoint) | 描述 |
-|---|---|
-| `GET /health` | 健康检查接口，用于 Docker 等环境。 |
-| `POST /bots/bootstrap` | Bot Service 用于拉取指定类型的所有 Bot 配置。 |
-| `GET /bots/:botId/bootstrap` | Bot Service 用于按 Bot ID 拉取单个 Bot 配置（可选 query: `serviceType`）。 |
-| `PATCH /bots/:botId/config` | Bot 自身更新其配置（需要 Bot 的 JWT）。 |
-| `POST /infra/service-types/register` | 注册一个新的 Bot 服务类型。 |
-| `GET /infra/available-services` | 获取所有可用的 Bot 服务类型列表。 |
-| `GET /infra/service-bot-user?serviceType=` | 获取某个服务类型可用于 DM 的 botUserId（仅返回 `dmEnabled` 的 Bot）。 |
+| 接口 (Endpoint) | 描述 | 鉴权要求 |
+|---|---|---|
+| `GET /health` | 健康检查接口，用于 Docker 等环境。 | 无 |
+| `POST /bots/bootstrap` | Bot Service 拉取指定类型的所有 Bot 配置。 | `infraIpOnly` + `X-Mew-Admin-Secret` |
+| `GET /bots/:botId/bootstrap` | Bot Service 按 Bot ID 拉取单个 Bot 配置（可选 query: `serviceType`）。 | `infraIpOnly` + `X-Mew-Admin-Secret` |
+| `PATCH /bots/:botId/config` | Bot 自身更新其配置。 | Bot JWT（`Authorization` 或 `mew_access_token`） |
+| `POST /infra/service-types/register` | 注册新的 Bot 服务类型。 | `infraIpOnly` + `X-Mew-Admin-Secret` |
+| `GET /infra/available-services` | 获取可用 Bot 服务类型列表。 | 用户/Bot JWT |
+| `GET /infra/service-bot-user?serviceType=` | 获取某服务类型可用于 DM 的 botUserId（仅返回 `dmEnabled` 的 Bot）。 | 用户/Bot JWT |
 
 ---
 
@@ -358,4 +373,12 @@ Authorization: Bearer <your-jwt-token>
 
 | 接口 (Endpoint) | 描述 |
 |---|---|
-| `POST /tts` | 合成语音，Body: `{ "text": string }`，返回 `audio/mpeg`。 |
+| `POST /v1/audio/speech` | 合成语音，Body 至少提供 `text` 或 `input`，返回 `audio/mpeg`（也支持流式输出）。 |
+
+---
+
+### 语音转文字 (OpenAI 兼容 STT)
+
+| 接口 (Endpoint) | 描述 |
+|---|---|
+| `POST /v1/audio/transcriptions` | 上传语音文件转写。`multipart/form-data`，必填 `file`、`model`，可选 `language`、`prompt`、`response_format`、`temperature`。 |

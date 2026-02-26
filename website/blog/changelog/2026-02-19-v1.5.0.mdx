@@ -1,0 +1,133 @@
+---
+slug: changelog/v1.5.0
+title: v1.5.0 ~ v1.5.8 更新日志
+date: 2026-02-19
+tags: [changelog]
+---
+
+本文汇总 `v1.5.0` 到 `v1.5.8` 的版本更新。
+
+<!-- truncate -->
+
+## v1.5.8 (2026-02-19)
+
+### ✨ 新功能
+
+- 重构 TTS/STT 服务，增强对 OpenAI 兼容接口的支持。
+- 新增国际化（i18n）支持。
+
+### 🔒 安全
+
+- 强化认证与鉴权安全策略。
+
+### 🐛 Bug Fixes
+
+- 修复消息间歇性投递失败问题。
+- 修复 client 构建问题。
+
+### 🛠️ 工程调整
+
+- 重构 fetchers，支持多数据源架构。
+- 为 server API 模块补齐更全面的单元测试。
+
+## v1.5.7 (2026-02-04)
+
+### ✨ 新功能
+
+- 新增可视化配置编辑器，支持 field schema 配置。
+- 新增 Web Channel（iframe embedding）支持。
+- assistant-agent 新增对话队列机制，优化连续消息处理体验。
+
+### 🐛 Bug Fixes
+
+- 修复 Twitter fetcher 上传链路中的媒体 URL 处理问题。
+- 修复 TTS 语音消息处理失败问题。
+
+### 🛠️ 工程调整
+
+- 增强 control directives 解析能力。
+- 优化 assistant-agent 稳定性与记忆整理提示词。
+- 更新项目文档。
+
+## v1.5.6 (2026-01-20)
+
+### ✨ 新功能
+
+- 完成语音消息生态（录制、发送、播放等）实现。
+- assistant-agent 引入更拟人的记忆系统。
+
+### 🛠️ 工程调整
+
+- 重构 plugins 目录结构与 assistant-agent 架构。
+- 重构 plugins SDK 与 assistant-agent 相关模块。
+
+## v1.5.5 (2026-01-11)
+
+### ✨ 新功能
+
+- 新增 refresh-token + silent renewal 认证机制。
+- fetchers 新增 proxy pool 支持。
+
+### 🐛 Bug Fixes
+
+- 修复前端部署错误并优化代理缓存行为。
+- 修复图片查看器缩放异常问题。
+- 修复 assistant-agent 主动消息处理问题。
+- 修复通知设置 hydration 请求循环问题。
+
+### 🛠️ 工程调整
+
+- 重构前端组件架构并优化构建流程。
+- 优化 Docker 镜像构建缓存策略。
+
+## v1.5.4 (2026-01-05)
+
+### ✨ 新功能
+
+- 新增 WebSearch 工具。
+
+### 🛠️ 改进
+
+- 优化消息与系统交互相关的整体使用体验。
+
+## v1.5.3 (2026-01-03)
+
+### ✨ 新功能
+
+- 新增完整贴纸系统，并支持 assistant-agent 发送贴纸。
+- 新增完整消息通知系统。
+
+### 🐛 Bug Fixes
+
+- 修复 S3 直传流程中 presigned PUT URL 问题。
+- 为文件下载失败场景增加 fallback proxy。
+
+## v1.5.2 (2025-12-31)
+
+### ✨ 新功能
+
+- 实现移动端响应式布局升级。
+
+## v1.5.1 (2025-12-31)
+
+### 🐛 Bug Fixes
+
+- 修复 Instagram Stories 去重逻辑问题。
+- 修复 assistant-agent 时区处理问题并提升稳定性。
+
+### 🛠️ 工程调整
+
+- 为 Docker 部署增加基于路径的 S3 静态 URL 路由配置。
+- 完成一次项目文档体系整理与重写。
+
+## v1.5.0 (2025-12-30)
+
+### ✨ 新功能
+
+- 新增 assistant-agent。
+- 对 plugins 架构与 SDK 做了增强与重构。
+- 新增类似 Discord 的 username discriminator 机制。
+
+### 🔒 安全
+
+- 完成一次全项目 security review，并修复审计问题。

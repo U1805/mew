@@ -22,6 +22,7 @@ import TabItem from '@theme/TabItem';
 
 -   **MongoDB**: 主数据库。
 -   **Garage**: S3 兼容对象存储服务。
+-   **Garage Init**: 一次性初始化容器，自动完成单节点 layout、bucket、access key 与 website 模式配置。
 -   **Server**: 后端 API 与 Socket.IO 服务。
 -   **Client**: 基于 Nginx 托管的前端应用，并反向代理后端 API。
 -   **Plugins**: Bot Service 运行器，默认启动 `test-fetcher,test-agent` (可通过 `MEW_PLUGINS` 环境变量控制)。
@@ -31,6 +32,9 @@ import TabItem from '@theme/TabItem';
 确保项目根目录下存在 `.env` 或 `docker-compose.env` 配置文件，然后执行：
 
 ```bash
+# docker-compose.yml 使用外部网络 mew_network，首次运行前请先创建
+docker network create mew_network
+
 # --env-file 指定环境变量文件
 # --build 会在首次启动或代码更新时构建镜像
 docker compose --env-file docker-compose.env up --build
@@ -39,20 +43,19 @@ docker compose --env-file docker-compose.env up --build
 ### 访问地址
 
 启动成功后，默认服务地址如下：
--   **前端 (UI)**: `http://localhost/`
--   **后端 (API)**: `http://localhost/api` (由 Nginx 代理)
--   **Garage Web**: `http://<bucket>.web.garage.localhost/<key>` (由 Nginx 代理)
+-   **前端 (UI)**: `http://localhost:151/`
+-   **后端 (API)**: `http://localhost:151/api` (由 Nginx 代理)
+-   **Garage Web (Bucket 域名)**: `http://<bucket>.web.garage.localhost:151/<key>` (由 Nginx 代理)
+-   **Garage Web (路径访问)**: `http://localhost:151/static/<key>`
 
-如果您将 `client` 的端口映射为非 `80`（例如 `151:80`），建议在 `docker-compose.env` 中设置：
-- `MEW_STATIC_URL=http://localhost:151`（API 返回的文件 URL 会使用该前缀：`/static/`；预签名上传 URL 会使用 `/presign/`，避免浏览器混合内容拦截）
-- 并通过 `http://localhost:151/static/<key>` 访问文件
+`docker-compose.yml` 默认已将 `MEW_STATIC_URL` 设为 `http://localhost:151`，因此 API 返回的文件 URL 会优先采用 `.../static/<key>` 形式，预签名上传 URL 使用 `.../presign/...`。
 
 :::info 关于 `*.localhost` 域名
 大多数现代操作系统会自动将任何 `*.localhost` 的子域名解析到 `127.0.0.1`。如果您的环境不支持，请手动修改 `hosts` 文件，或调整 `S3_WEB_ENDPOINT` 等相关环境变量。
 :::
 
 :::tip 端口暴露策略
-`docker-compose.yml` 默认只将 Nginx 的 `80` 端口映射到宿主机。MongoDB、Garage、Server 的内部端口（如 `27017`, `3900`, `3000`）均**不会直接暴露**，以增强安全性。
+`docker-compose.yml` 默认仅暴露 `client` 的 `151:80` 映射。MongoDB、Garage、Server 的内部端口（如 `27017`, `3900`, `3000`）均**不会直接暴露**，以增强安全性。
 
 如果您需要从宿主机直接访问这些服务（例如使用 `mongosh` 调试数据库），请在 `docker-compose.yml` 中为对应服务手动添加 `ports` 映射。
 :::
@@ -189,7 +192,7 @@ sudo docker run \
 在配置集群前，必须确保节点服务已就绪。
 
 ```bash
-sudo docker exec garaged ./garage status
+sudo docker exec garaged /garage --config /etc/garage.toml status
 ```
 
 **✅ 预期结果：**
@@ -209,7 +212,7 @@ Garage 采用“拓扑声明”机制。我们需要显式地告诉节点：“�
 
 ```bash
 # 1. 自动提取当前节点的 ID (技巧：通过 grep 和 awk 精准捕获)
-NODE_ID=$(sudo docker exec garaged ./garage status | grep "NO ROLE" | awk '{print $1}')
+NODE_ID=$(sudo docker exec garaged /garage --config /etc/garage.toml status | grep "NO ROLE" | awk '{print $1}')
 
 if [ -z "$NODE_ID" ]; then
   echo "❌ 错误：未找到待配置的节点，请检查 'garage status' 的输出。"
@@ -217,10 +220,10 @@ else
   echo "🔧 正在为节点 $NODE_ID 分配角色..."
 
   # 2. 分配角色：区域=dc1, 容量=1G
-  sudo docker exec garaged ./garage layout assign -z dc1 -c 1G "$NODE_ID"
+  sudo docker exec garaged /garage --config /etc/garage.toml layout assign -z dc1 -c 1G "$NODE_ID"
 
   # 3. 应用变更 (Version 1)
-  sudo docker exec garaged ./garage layout apply --version 1
+  sudo docker exec garaged /garage --config /etc/garage.toml layout apply --version 1
 fi
 ```
 **✅ 成功标志：**
@@ -236,10 +239,10 @@ fi
 
 ```bash
 # 1. 创建名为 'mew-bucket' 的存储桶
-sudo docker exec garaged ./garage bucket create mew-bucket
+sudo docker exec garaged /garage --config /etc/garage.toml bucket create mew-bucket
 
 # 2. 创建名为 'mew-app-key' 的访问密钥
-sudo docker exec garaged ./garage key create mew-app-key
+sudo docker exec garaged /garage --config /etc/garage.toml key create mew-app-key
 ```
 
 :::danger **立即保存 Secret Key**
@@ -259,13 +262,13 @@ Secret key:   8122334f0f2d5f5cd7...        <-- 对应环境变量 S3_SECRET_ACCE
 
 ```bash
 # 赋予 mew-app-key 对 mew-bucket 的读(Read)、写(Write)、所有者(Owner)权限
-sudo docker exec garaged ./garage bucket allow \
+sudo docker exec garaged /garage --config /etc/garage.toml bucket allow \
   --read --write --owner \
   mew-bucket \
   --key mew-app-key
 
 # 验证权限是否生效
-sudo docker exec garaged ./garage bucket info mew-bucket
+sudo docker exec garaged /garage --config /etc/garage.toml bucket info mew-bucket
 ```
 
 **✅ 最终验证：**
@@ -283,10 +286,10 @@ RWO          GK121b3f65ee8...            mew-app-key
 
 ```bash
 # 将存储桶 'mew-bucket' 设置为网站模式，以允许公共读取
-sudo docker exec garaged ./garage bucket website --allow mew-bucket
+sudo docker exec garaged /garage --config /etc/garage.toml bucket website --allow mew-bucket
 ```
 **✅ 验证：**
-再次执行 `sudo docker exec garaged ./garage bucket info mew-bucket`，您将看到 `Website access: true`。
+再次执行 `sudo docker exec garaged /garage --config /etc/garage.toml bucket info mew-bucket`，您将看到 `Website access: true`。
 
 </TabItem>
 </Tabs>

@@ -1,4 +1,4 @@
-name: mew-cc
+name: mew
 
 services:
   b4u2cc:
@@ -53,7 +53,7 @@ services:
       CLAUDE_PROXY_HOST: 0.0.0.0
       CLAUDE_PROXY_PORT: 3457
       CLAUDE_PROXY_WORKDIR: /home/node/workspace/projects
-      CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-600}
+      CLAUDE_PROXY_TIMEOUT_SECONDS: ${CLAUDE_PROXY_TIMEOUT_SECONDS:-3600}
     volumes:
       - claude_code_workspace:/home/node/workspace
     stdin_open: true

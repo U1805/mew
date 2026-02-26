@@ -24,12 +24,15 @@ API 设计遵循**职责分离**的原则：
 
 ## 认证方式
 
-客户端在发起连接时，需要通过 `auth.token` 字段传入用户的 `JWT`。
+客户端在发起连接时，可以通过以下任一方式提供 Access Token：
+- `auth.token`
+- Cookie `mew_access_token`（同源场景常见）
 
 服务端认证逻辑参见: `server/src/gateway/middleware.ts`。
 
 :::info CORS
-当前 Socket.IO 服务端配置为 `origin: '*'`（允许任意 Origin 发起握手），但仍然必须提供有效的 JWT 才能建立已认证的连接。
+Socket.IO 与 REST API 共享同一套 CORS 配置（`MEW_CORS_ORIGINS`）。  
+仅当配置允许时才接受跨域握手；无论是否跨域，都必须提供有效 Access Token 才能建立连接。
 :::
 
 ## 连接示例
@@ -66,7 +69,7 @@ socket.on('disconnect', (reason) => {
 
 核心逻辑参见: `server/src/gateway/handlers.ts`
 
-- **频道房间 (`channelId`)**: 用户所在的所有服务器频道和私信（DM）频道。
+- **频道房间 (`channelId`)**: 用户可见的频道（DM + 具备 `VIEW_CHANNEL` 的服务器频道）。
 - **服务器房间 (`serverId`)**: 用户加入的所有服务器。
 - **个人房间 (`userId`)**: 每个用户独有的房间，用于接收定向推送的事件。
 
@@ -82,7 +85,7 @@ socket.on('disconnect', (reason) => {
 ## 客户端上行事件
 
 :::caution 建议优先使用 REST
-上行事件目前仅提供最小能力，用于简化部分客户端实现。由于其校验链路与 REST API 不完全一致，推荐优先使用 `POST /channels/:channelId/messages` 或 `POST /servers/:serverId/channels/:channelId/messages` 来创建消息。
+上行事件目前仅提供最小能力，用于简化部分客户端实现。虽然会复用核心消息服务（权限与业务规则一致），但不像 REST 路由那样有完整的请求体验证与统一错误格式，推荐优先使用 `POST /channels/:channelId/messages` 或 `POST /servers/:serverId/channels/:channelId/messages`。
 :::
 
 ### `message/create`
@@ -90,11 +93,13 @@ socket.on('disconnect', (reason) => {
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | `channelId` | `string` | 目标频道 ID（DM/服务器频道均可）。 |
-| `content` | `string` | 文本内容（可选，但需与 `attachments` 至少提供一个）。 |
+| `content` | `string` | 文本内容（可选）。 |
 | `attachments` | `any[]` | 附件元数据数组（可选）。 |
 | `referencedMessageId` | `string` | 被引用的消息 ID（可选）。 |
 | `type` / `payload` | `string` / `object` | 自定义消息类型与载荷（可选）。 |
 | `plainText` | `string` | 用于搜索/展示的纯文本（可选）。 |
+
+- 对于 `message/default`，建议仍按 REST 语义提供 `content` 或 `attachments` 之一；WebSocket 路径不会做同等级别的 body schema 校验。
 
 - **成功后的反馈**：服务端不会直接 `ack` 返回对象；客户端会通过常规下行事件（如 `MESSAGE_CREATE`）收到结果。
 - **失败时**：服务端会向当前 socket 发送 `error` 事件，Payload: `{ "message": "Failed to create message" }`。
@@ -177,8 +182,10 @@ socket.on('disconnect', (reason) => {
 ### 认证方式
 
 连接时需要同时提供：
-- **Admin Secret**：`X-Mew-Admin-Secret` 请求头，或握手参数 `adminSecret`
-- **serviceType**：握手参数 `serviceType`（会作为房间名使用）
+- **Admin Secret**：`X-Mew-Admin-Secret` 请求头，或握手 `auth.adminSecret`（不接受 query 传递 secret）
+- **serviceType**：握手参数 `serviceType`（`auth` 或 query，作为房间名使用）
+
+此外，`serviceType = sdk` 在服务端被保留，握手会被拒绝。
 
 ### 服务端下行事件
 
