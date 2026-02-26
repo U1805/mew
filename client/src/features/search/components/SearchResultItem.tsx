@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
-import { format } from 'date-fns';
 import { Message } from '../../../shared/types';
+import { useI18n } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 interface SearchResultItemProps {
     message: Message;
@@ -11,6 +12,7 @@ interface SearchResultItemProps {
 }
 
 export const SearchResultItem = ({ message, channelName, searchQuery, onClick }: SearchResultItemProps) => {
+    const { locale } = useI18n();
     const author = typeof message.authorId === 'object' ? message.authorId : { username: 'Unknown', avatarUrl: '' };
     const createdAt = message.createdAt ? new Date(message.createdAt) : new Date();
 
@@ -58,7 +60,7 @@ export const SearchResultItem = ({ message, channelName, searchQuery, onClick }:
                    ) : 'Jump to message'}
                 </span>
                 <span className="text-[10px] text-mew-textMuted">
-                    {format(createdAt, 'MMM d, yyyy')}
+                    {formatDateTime(createdAt, locale, { year: 'numeric', month: 'short', day: 'numeric' })}
                 </span>
             </div>
             

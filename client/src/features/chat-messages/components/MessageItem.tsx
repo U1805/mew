@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react';
-import { format } from 'date-fns';
+import { useState, useEffect, useRef, type MouseEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import { Icon } from '@iconify/react';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import clsx from 'clsx';
@@ -19,11 +18,13 @@ import { useVoiceSettingsStore } from '../../../shared/stores/voiceSettingsStore
 import { usePermissions } from '../../../shared/hooks/usePermissions';
 import { getMessageBestEffortText } from '../../../shared/utils/messageText';
 import { useI18n } from '../../../shared/i18n';
+import { formatDateTime, getRelativeDay } from '../../../shared/utils/dateTime';
 
 interface MessageItemProps {
   message: Message;
   isSequential?: boolean;
   ownedBotUserIds?: Set<string>;
+  className?: string;
 }
 
 let activeTtsAudio: HTMLAudioElement | null = null;
@@ -61,15 +62,25 @@ const getSelectionTextWithin = (container: HTMLElement | null) => {
 
 const looksLikeIdPlaceholder = (text: string) => /^@?[0-9a-fA-F]{24}$/.test(text.trim());
 
-const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProps) => {
+const ActionTooltip = ({ label }: { label: string }) => (
+  <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-0.5 flex -translate-x-1/2 translate-y-0.5 flex-col items-center opacity-0 transition-[opacity,transform] duration-150 ease-in-out group-hover/action:translate-y-0 group-hover/action:opacity-100 group-focus-visible/action:translate-y-0 group-focus-visible/action:opacity-100">
+    <span className="whitespace-nowrap rounded-[4px] bg-[#3f4147] px-3 py-1.5 text-sm font-normal leading-none text-white shadow-xl">
+      {label}
+    </span>
+    <span className="-mt-[1px] h-0 w-0 border-x-[4px] border-t-[5px] border-x-transparent border-t-[#3f4147]"></span>
+  </div>
+);
+
+const MessageItem = ({ message, isSequential, ownedBotUserIds, className }: MessageItemProps) => {
   const { user } = useAuthStore();
   const { currentServerId, setCurrentServer, setCurrentChannel, setReplyTo, setTargetMessageId, targetMessageId } = useUIStore();
   const { openModal } = useModalStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const queryClient = useQueryClient();
 
   const [isEditing, setIsEditing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const [applyFlash, setApplyFlash] = useState(false);
   const [jumpBlinkOn, setJumpBlinkOn] = useState(false);
   const [menuSelection, setMenuSelection] = useState('');
@@ -78,6 +89,8 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   const permissions = usePermissions(message.channelId);
   const { unreadMentionMessageIds, removeUnreadMention } = useUnreadStore();
   const itemRef = useRef<HTMLDivElement>(null);
+  const morePointerDownRef = useRef(false);
+  const suppressNextMoreClickOpenRef = useRef(false);
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const voiceSettings = useVoiceSettingsStore((state) => state.settings);
 
@@ -167,6 +180,42 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
   const handleForward = () => {
     openModal('forwardMessage', { message });
+  };
+
+  const handleMoreActions = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (suppressNextMoreClickOpenRef.current) {
+      suppressNextMoreClickOpenRef.current = false;
+      return;
+    }
+
+    if (isContextMenuOpen) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      return;
+    }
+
+    setShowEmojiPicker(false);
+
+    const trigger = itemRef.current;
+    if (!trigger) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const contextEvent = new window.MouseEvent('contextmenu', {
+      bubbles: true,
+      cancelable: true,
+      view: window,
+      clientX: rect.left + rect.width / 2,
+      clientY: rect.bottom,
+    });
+    trigger.dispatchEvent(contextEvent);
+  };
+
+  const handleMorePointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
+    if (isContextMenuOpen && e.button === 0) {
+      morePointerDownRef.current = true;
+    }
   };
 
   const handleCopy = async () => {
@@ -407,8 +456,24 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   };
 
   const isValidDate = message.createdAt && !isNaN(new Date(message.createdAt).getTime());
-  const timeString = isValidDate ? format(new Date(message.createdAt), 'h:mm a') : '';
-  const fullDateString = isValidDate ? format(new Date(message.createdAt), 'MM/dd/yyyy h:mm a') : '';
+  const timeString = isValidDate
+    ? formatDateTime(new Date(message.createdAt), locale, { hour: 'numeric', minute: '2-digit' })
+    : '';
+  const fullDateString = isValidDate
+    ? (() => {
+        const date = new Date(message.createdAt);
+        const relativeDay = getRelativeDay(date);
+        if (relativeDay === 'today') return timeString;
+        if (relativeDay === 'yesterday') return `${t('datetime.yesterday')} ${timeString}`;
+        return formatDateTime(date, locale, { dateStyle: 'medium', timeStyle: 'short' });
+      })()
+    : '';
+  const hoverActionButtonBaseClass =
+    'group/action relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-[6px] text-[#b5bac1] transition-colors duration-100 hover:bg-[#3f4147] hover:text-[#dbdee1] focus-visible:outline-none active:translate-y-[0.5px]';
+  const hoverActionIconClass =
+    'transition-transform duration-100 ease-out group-hover/action:scale-110 group-focus-visible/action:scale-110';
+  const hoverActionDangerClass =
+    'group/action relative flex h-8 w-8 cursor-pointer items-center justify-center rounded-[6px] text-[#b5bac1] transition-colors duration-100 hover:bg-[#da373c] hover:text-white focus-visible:outline-none active:translate-y-[0.5px]';
 
   if (isEditing) {
       return <MessageEditor message={message} onCancel={() => setIsEditing(false)} />;
@@ -448,8 +513,15 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
   return (
     <ContextMenu.Root
       onOpenChange={(open) => {
+        setIsContextMenuOpen(open);
         if (open) setMenuSelection(getSelectionTextWithin(itemRef.current));
-        else setMenuSelection('');
+        else {
+          if (morePointerDownRef.current) {
+            suppressNextMoreClickOpenRef.current = true;
+          }
+          morePointerDownRef.current = false;
+          setMenuSelection('');
+        }
       }}
     >
       <ContextMenu.Trigger asChild>
@@ -462,6 +534,7 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
           className={clsx(
             'group flex pr-4 relative transition-colors duration-200',
             isSequential ? 'py-0.5' : 'mt-[17px] py-0.5 mb-1',
+            className,
             {
               'animate-mention-flash-anim': applyFlash,
               'bg-[#fde047]/25': jumpBlinkOn,
@@ -477,16 +550,27 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
           {/* Hover Actions - Only show if NOT retracted */}
           {!isRetracted && (
-            <div className="absolute right-4 -top-2 bg-[#313338] border border-[#26272D] rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center p-1 z-10">
+            <div
+              className={clsx(
+                'absolute right-3 -top-3.5 z-10 flex select-none items-center rounded-[8px] border border-[#26272d] bg-[#2b2d31] p-[1px] shadow-sm transition-opacity',
+                showEmojiPicker
+                  ? 'opacity-100 pointer-events-auto'
+                  : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+              )}
+            >
               {canAddReaction && (
                 <div className="relative">
                   <button
                     type="button"
-                    className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text"
-                    title={t('message.menu.addReaction')}
+                    aria-label={t('message.menu.addReaction')}
+                    className={clsx(
+                      hoverActionButtonBaseClass,
+                      'text-mew-textMuted hover:text-mew-text hover:bg-[#404249]'
+                    )}
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   >
-                    <Icon icon="mdi:emoticon-plus-outline" width="18" height="18" />
+                    <Icon icon="mdi:emoticon-plus-outline" width="20" height="20" className={hoverActionIconClass} />
+                    <ActionTooltip label={t('message.menu.addReaction')} />
                   </button>
                   {showEmojiPicker && (
                     <EmojiPicker
@@ -497,14 +581,58 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                 </div>
               )}
 
+              {canSendMessages && (
+                <button
+                  type="button"
+                  onClick={handleReply}
+                  aria-label={t('message.menu.reply')}
+                  className={clsx(
+                    hoverActionButtonBaseClass
+                  )}
+                >
+                  <Icon icon="mdi:reply" width="20" height="20" className={hoverActionIconClass} />
+                  <ActionTooltip label={t('message.menu.reply')} />
+                </button>
+              )}
+
+              {canSendMessages && (
+                <button
+                  type="button"
+                  onClick={handleForward}
+                  aria-label={t('message.menu.forward')}
+                  className={clsx(
+                    hoverActionButtonBaseClass
+                  )}
+                >
+                  <span className={clsx(hoverActionIconClass, 'flex items-center justify-center')}>
+                    <Icon icon="mdi:reply" width="20" height="20" style={{ transform: 'scaleX(-1)' }} />
+                  </span>
+                  <ActionTooltip label={t('message.menu.forward')} />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onPointerDown={handleMorePointerDown}
+                onClick={handleMoreActions}
+                aria-label={t('common.more')}
+                className={hoverActionButtonBaseClass}
+              >
+                <Icon icon="mdi:dots-horizontal" width="20" height="20" className={hoverActionIconClass} />
+                <ActionTooltip label={t('common.more')} />
+              </button>
+
               {isAuthor && (
                 <button
                   type="button"
                   onClick={() => setIsEditing(true)}
-                  className="p-1 hover:bg-[#404249] rounded text-mew-textMuted hover:text-mew-text"
-                  title={t('common.edit')}
+                  aria-label={t('common.edit')}
+                  className={clsx(
+                    hoverActionButtonBaseClass
+                  )}
                 >
-                  <Icon icon="mdi:pencil" width="18" height="18" />
+                  <Icon icon="mdi:pencil" width="20" height="20" className={hoverActionIconClass} />
+                  <ActionTooltip label={t('common.edit')} />
                 </button>
               )}
 
@@ -512,10 +640,11 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
                 <button
                   type="button"
                   onClick={handleDelete}
-                  className="p-1 hover:bg-[#404249] rounded text-red-400 hover:text-red-500"
-                  title={t('message.delete.confirm')}
+                  aria-label={t('message.delete.title')}
+                  className={hoverActionDangerClass}
                 >
-                  <Icon icon="mdi:trash-can-outline" width="18" height="18" />
+                  <Icon icon="mdi:trash-can-outline" width="20" height="20" className={hoverActionIconClass} />
+                  <ActionTooltip label={t('message.delete.title')} />
                 </button>
               )}
             </div>
@@ -523,10 +652,10 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds }: MessageItemProp
 
           {isSequential ? (
             <>
-              <div className="w-[50px] text-[10px] text-mew-textMuted opacity-0 group-hover:opacity-100 text-right pr-3 select-none mt-1.5 flex-shrink-0">
+              <div className="w-[72px] text-[10px] leading-[1.375rem] text-mew-textMuted opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-right pr-4 select-none flex-shrink-0">
                 {timeString}
               </div>
-              <div className="flex-1 min-w-0 pl-4">
+              <div className="flex-1 min-w-0">
                 {isRetracted ? (
                   <div className="text-mew-textMuted italic text-[0.95rem] leading-[1.375rem] select-none">
                     {t('message.deleted')}

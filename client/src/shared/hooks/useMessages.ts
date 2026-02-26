@@ -12,6 +12,13 @@ const sortAsc = (messages: Message[]) =>
     (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
   );
 
+const mergeByIdAsc = (base: Message[], incoming: Message[]) => {
+  const mergedById = new Map<string, Message>();
+  base.forEach((m) => mergedById.set(m._id, m));
+  incoming.forEach((m) => mergedById.set(m._id, m));
+  return sortAsc(Array.from(mergedById.values()));
+};
+
 export const useMessages = (
   serverId: string | null,
   channelId: string | null,
@@ -34,9 +41,13 @@ export const useMessages = (
       const res = await messageApi.list(serverId ?? undefined, channelId, {
         limit: DEFAULT_PAGE_SIZE,
       });
-      const initial = sortAsc(res.data as Message[]);
-      setHasMoreOlder((res.data as Message[]).length === DEFAULT_PAGE_SIZE);
-      return initial;
+      const latestPage = sortAsc(res.data as Message[]);
+      const current = (queryClient.getQueryData(['messages', channelId]) as Message[] | undefined) ?? [];
+
+      // Keep already loaded history; refresh only updates/extends the latest window.
+      const merged = mergeByIdAsc(current, latestPage);
+      setHasMoreOlder((prev) => prev && (res.data as Message[]).length === DEFAULT_PAGE_SIZE);
+      return merged;
     },
     enabled: !!channelId && enabled,
     refetchOnWindowFocus: true,

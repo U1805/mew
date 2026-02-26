@@ -61,7 +61,12 @@ export const CreateServerModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
       <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in">
         <div className="p-4 pt-5 pb-3 text-center">
           <h2 className="text-2xl font-bold text-white mb-2">{t('server.create.title')}</h2>

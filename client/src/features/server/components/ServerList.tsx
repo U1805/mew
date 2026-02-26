@@ -30,23 +30,23 @@ const ServerList = () => {
   };
 
   return (
-    <div className="w-[72px] bg-mew-darkest flex flex-col items-center py-3 space-y-2 overflow-y-auto no-scrollbar flex-shrink-0 z-20">
+    <div className="w-[70px] bg-mew-darkest flex flex-col items-center py-1.5 space-y-2 overflow-y-auto no-scrollbar flex-shrink-0 z-20">
       <div className="relative flex items-center justify-center w-full">
         {currentServerId === null && (
-           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[40px] bg-white rounded-r-full" />
+           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[36px] bg-white rounded-r-full" />
         )}
         <button
             onClick={() => setCurrentServer(null)}
             className={clsx(
-            "relative group flex items-center justify-center w-12 h-12 rounded-[24px] hover:rounded-[16px] transition-all duration-200",
-            currentServerId === null ? "bg-mew-accent rounded-[16px] text-white" : "bg-mew-dark text-mew-text hover:bg-mew-accent hover:text-white"
+            "relative group flex items-center justify-center w-11 h-11 rounded-[22px] hover:rounded-[14px] transition-all duration-200",
+            currentServerId === null ? "bg-mew-accent rounded-[14px] text-white" : "bg-mew-dark text-mew-text hover:bg-mew-accent hover:text-white"
             )}
         >
-            <MewLogo width={28} height={28} />
+            <MewLogo width={24} height={24} />
         </button>
       </div>
 
-      <div className="w-8 h-[2px] bg-mew-darker rounded-full my-2" />
+      <div className="w-8 h-[2px] bg-mew-darker rounded-full my-0.5" />
 
       {servers?.map((server, index) => {
         const isUnread = hasUnread(server._id, index);
@@ -55,15 +55,15 @@ const ServerList = () => {
         return (
             <div key={server._id} className="relative flex items-center justify-center w-full">
                 {isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[4px] h-[40px] bg-white rounded-r-full" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[36px] bg-white rounded-r-full" />
                 )}
                 
                 <div className="relative">
                     <button
                         onClick={() => setCurrentServer(server._id)}
                         className={clsx(
-                        "group relative flex items-center justify-center w-12 h-12 rounded-[24px] hover:rounded-[16px] transition-all duration-200 overflow-hidden",
-                        isActive ? "rounded-[16px] ring-2 ring-offset-2 ring-offset-mew-darkest ring-mew-accent" : "bg-mew-dark hover:bg-mew-accent"
+                        "group relative flex items-center justify-center w-11 h-11 rounded-[22px] hover:rounded-[14px] transition-all duration-200 overflow-hidden",
+                        isActive ? "rounded-[14px] ring-2 ring-offset-2 ring-offset-mew-darkest ring-mew-accent" : "bg-mew-dark hover:bg-mew-accent"
                         )}
                     >
                         {server.avatarUrl ? (
@@ -75,7 +75,7 @@ const ServerList = () => {
                         )}
                     </button>
                     {isUnread && !isActive && (
-                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full border-[3px] border-mew-darkest pointer-events-none flex items-center justify-center">
+                         <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full border-[2px] border-mew-darkest pointer-events-none flex items-center justify-center">
                          </div>
                     )}
                 </div>
@@ -85,17 +85,17 @@ const ServerList = () => {
 
       <button 
         onClick={() => openModal('createServer')}
-        className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-green-500 hover:bg-green-600 hover:text-white transition-all duration-200 hover:rounded-[16px]"
+        className="group flex items-center justify-center w-11 h-11 rounded-[22px] bg-mew-dark text-green-500 hover:bg-green-600 hover:text-white transition-all duration-200 hover:rounded-[14px]"
       >
-        <Icon icon="mdi:plus" width="24" height="24" className="transition-transform group-hover:rotate-90" />
+        <Icon icon="mdi:plus" width="20" height="20" className="transition-transform group-hover:rotate-90" />
       </button>
 
       <button 
         onClick={() => openModal('joinServer')}
-        className="group flex items-center justify-center w-12 h-12 rounded-[24px] bg-mew-dark text-mew-text hover:bg-[#35373C] hover:text-white transition-all duration-200 hover:rounded-[16px]"
+        className="group flex items-center justify-center w-11 h-11 rounded-[22px] bg-mew-dark text-mew-text hover:bg-[#35373C] hover:text-white transition-all duration-200 hover:rounded-[14px]"
         title={t('server.join.title')}
       >
-        <Icon icon="mdi:compass-outline" width="24" height="24" />
+        <Icon icon="mdi:compass-outline" width="20" height="20" />
       </button>
     </div>
   );

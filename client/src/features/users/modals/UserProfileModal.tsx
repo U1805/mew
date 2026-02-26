@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from '@iconify/react';
 import clsx from 'clsx';
-import { format } from 'date-fns';
 import { User } from '../../../shared/types';
 import { channelApi } from '../../../shared/services/api';
 import { useModalStore, useUIStore } from '../../../shared/stores';
@@ -11,11 +10,12 @@ import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { useUser } from '../hooks/useUser';
 import { formatUserTag } from '../../../shared/utils/userTag';
 import { useI18n } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 export const UserProfileModal: React.FC = () => {
   const { closeModal, modalData } = useModalStore();
   const { user: currentUser } = useAuthStore();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -48,11 +48,16 @@ export const UserProfileModal: React.FC = () => {
   };
 
   const joinedDate = user.createdAt && !isNaN(new Date(user.createdAt).getTime()) 
-    ? format(new Date(user.createdAt), 'MMM d, yyyy') 
+    ? formatDateTime(new Date(user.createdAt), locale, { year: 'numeric', month: 'short', day: 'numeric' }) 
     : t('common.unknown');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
          <div className="bg-[#232428] w-[600px] rounded-lg shadow-2xl overflow-hidden animate-scale-in relative">
              <div className="h-[120px] bg-mew-accent"></div>
              <div className="px-4 pb-4 relative">

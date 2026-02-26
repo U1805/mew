@@ -261,7 +261,12 @@ export const BotEditorModal: React.FC = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
       <div className="bg-[#313338] w-full max-w-2xl rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in max-h-[90vh]">
         <div className="p-6 pb-0">
           <h2 className="text-xl font-bold text-white mb-2">{isEditing ? t('bot.editor.editTitle', { name }) : t('bot.editor.createTitle')}</h2>

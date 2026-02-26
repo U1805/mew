@@ -71,18 +71,18 @@ export const ServerChannelList: React.FC = () => {
         )}
         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
       >
-        <h1 className="font-bold text-white truncate max-w-[160px]">{server?.name || t('server.fallback')}</h1>
+        <h1 className="font-bold text-base text-white truncate max-w-[220px]">{server?.name || t('server.fallback')}</h1>
         <Icon icon={isDropdownOpen ? "mdi:close" : "mdi:chevron-down"} className="text-mew-text" />
 
         {/* Dropdown Menu */}
         {isDropdownOpen && (
-            <div className="absolute top-[52px] left-2.5 w-[220px] bg-[#111214] p-1.5 rounded-[4px] shadow-2xl z-50 animate-fade-in-up origin-top-left">
+            <div className="absolute top-[52px] left-2.5 w-[240px] bg-[#25272b] border border-white/5 p-1.5 rounded-[4px] shadow-2xl z-50 animate-fade-in-up origin-top-left">
                 {canCreateInvite && (
                     <div
                         className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-mew-accent hover:text-white group mb-1"
                         onClick={() => openModal('createInvite')}
                     >
-                        <span className="text-sm font-medium">{t('server.menu.invitePeople')}</span>
+                        <span className="text-[15px] font-medium">{t('server.menu.invitePeople')}</span>
                         <Icon icon="mdi:account-plus" />
                     </div>
                 )}
@@ -91,7 +91,7 @@ export const ServerChannelList: React.FC = () => {
                     className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group mb-1"
                     onClick={() => openModal('serverNotifications', { server, serverId: currentServerId })}
                 >
-                    <span className="text-sm font-medium">{t('server.menu.notificationSettings')}</span>
+                    <span className="text-[15px] font-medium">{t('server.menu.notificationSettings')}</span>
                     <Icon icon="mdi:bell-outline" />
                 </div>
 
@@ -100,12 +100,12 @@ export const ServerChannelList: React.FC = () => {
                         className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group mb-1"
                         onClick={() => openModal('inviteBot')}
                     >
-                        <span className="text-sm font-medium">{t('server.menu.addApp')}</span>
+                        <span className="text-[15px] font-medium">{t('server.menu.addApp')}</span>
                         <Icon icon="mdi:robot" />
                     </div>
                 )}
 
-                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
+                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-white/5 my-1 mx-1"></div>}
 
                 {canManageChannels && (
                     <>
@@ -113,14 +113,14 @@ export const ServerChannelList: React.FC = () => {
                             className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
                             onClick={() => openModal('createCategory')}
                         >
-                            <span className="text-sm font-medium">{t('server.menu.createCategory')}</span>
+                            <span className="text-[15px] font-medium">{t('server.menu.createCategory')}</span>
                             <Icon icon="mdi:folder-plus-outline" />
                         </div>
                         <div
                             className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
                             onClick={() => openModal('createChannel')}
                         >
-                            <span className="text-sm font-medium">{t('server.menu.createChannel')}</span>
+                            <span className="text-[15px] font-medium">{t('server.menu.createChannel')}</span>
                             <Icon icon="mdi:plus-circle-outline" />
                         </div>
                     </>
@@ -131,19 +131,19 @@ export const ServerChannelList: React.FC = () => {
                         className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-[#949BA4] hover:text-white group"
                         onClick={() => openModal('serverSettings', { server })}
                     >
-                        <span className="text-sm font-medium">{t('server.menu.serverSettings')}</span>
+                        <span className="text-[15px] font-medium">{t('server.menu.serverSettings')}</span>
                         <Icon icon="mdi:cog-outline" />
                     </div>
                 )}
 
-                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
+                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-white/5 my-1 mx-1"></div>}
 
                 {!isOwner && (
                     <div
                         className="flex items-center justify-between px-2 py-2 hover:bg-red-500 rounded-[2px] cursor-pointer text-red-400 hover:text-white group"
                         onClick={() => openModal('leaveServer', { serverId: currentServerId })}
                     >
-                        <span className="text-sm font-medium">{t('server.menu.leaveServer')}</span>
+                        <span className="text-[15px] font-medium">{t('server.menu.leaveServer')}</span>
                         <Icon icon="mdi:exit-to-app" />
                     </div>
                 )}
@@ -162,7 +162,6 @@ export const ServerChannelList: React.FC = () => {
                 isActive={currentChannelId === channel._id}
                 onClick={() => setCurrentChannel(channel._id)}
                 onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
-                onNotificationClick={(e) => { e.stopPropagation(); openModal('channelNotifications', { channel }); }}
             />
         ))}
 
@@ -173,7 +172,7 @@ export const ServerChannelList: React.FC = () => {
                     className="flex items-center justify-between px-0.5 mb-1 cursor-pointer hover:text-mew-text text-mew-textMuted group select-none"
                     onClick={() => toggleCategory(category._id)}
                 >
-                    <div className="flex items-center text-xs font-bold uppercase tracking-wide transition-colors group-hover:text-mew-text">
+                    <div className="flex items-center text-[15px] font-bold uppercase tracking-wide transition-colors group-hover:text-mew-text">
                         <Icon
                             icon="mdi:chevron-down"
                             width="12"
@@ -220,7 +219,6 @@ export const ServerChannelList: React.FC = () => {
                         isActive={currentChannelId === channel._id}
                         onClick={() => setCurrentChannel(channel._id)}
                         onSettingsClick={(e) => { e.stopPropagation(); openModal('channelSettings', { channel }); }}
-                        onNotificationClick={(e) => { e.stopPropagation(); openModal('channelNotifications', { channel }); }}
                     />
                 ))}
             </div>
@@ -231,10 +229,10 @@ export const ServerChannelList: React.FC = () => {
                 <div className="border border-dashed border-mew-textMuted rounded-full p-3 mb-2">
                     <Icon icon="mdi:chat-plus-outline" className="text-mew-textMuted" width="24" />
                 </div>
-                <p className="text-mew-textMuted text-xs px-4">{t('channel.empty.nothing')}</p>
+                <p className="text-mew-textMuted text-base px-4">{t('channel.empty.nothing')}</p>
                 {canManageChannels && (
                     <button
-                        className="mt-2 text-mew-accent hover:underline text-xs font-medium"
+                        className="mt-2 text-mew-accent hover:underline text-base font-medium"
                         onClick={() => openModal('createChannel')}
                     >
                         {t('channel.empty.create')}

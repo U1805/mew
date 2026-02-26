@@ -55,7 +55,12 @@ export const ServerNotificationSettingsModal = () => {
   const title = useMemo(() => server?.name || t('server.fallback'), [server?.name, t]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
       <div className="bg-[#313338] w-full max-w-lg rounded-[4px] shadow-lg overflow-hidden animate-scale-in">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#1E1F22]">
           <div className="min-w-0">

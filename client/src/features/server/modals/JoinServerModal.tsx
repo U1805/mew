@@ -72,7 +72,12 @@ export const JoinServerModal: React.FC = () => {
   }, [modalData]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
          <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in p-6 text-center">
              <h2 className="text-2xl font-bold text-white mb-2">{t('server.join.title')}</h2>
              <p className="text-mew-textMuted text-sm mb-6">{t('server.join.subtitle')}</p>

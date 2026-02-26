@@ -11,10 +11,9 @@ interface ChannelItemProps {
     isActive: boolean;
     onClick: () => void;
     onSettingsClick?: (e: React.MouseEvent) => void;
-    onNotificationClick?: (e: React.MouseEvent) => void;
 }
 
-export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick, onNotificationClick }) => {
+export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick }) => {
     const { t } = useI18n();
     const permissions = usePermissions(channel._id);
     const canManageChannel = permissions.has('MANAGE_CHANNEL');
@@ -32,7 +31,7 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
         <div
             onClick={onClick}
             className={clsx(
-                "group flex items-center justify-between px-2 py-[6px] rounded mx-1 cursor-pointer transition-colors relative",
+                "group flex items-center justify-between px-2 py-[5px] rounded mx-1 cursor-pointer transition-colors relative",
                 isActive 
                     ? "bg-mew-dark text-white" 
                     : hasUnread 
@@ -41,8 +40,8 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
             )}
         >
             <div className="flex items-center min-w-0 overflow-hidden flex-1 mr-1">
-                <Icon icon={channelIcon} width="20" height="20" className={clsx("mr-1.5 flex-shrink-0", hasUnread ? "text-white" : "text-[#80848E]")} />
-                <span className={clsx("text-sm truncate", hasUnread ? "font-bold" : "font-medium")}>{channel.name}</span>
+                <Icon icon={channelIcon} width="24" height="24" className={clsx("mr-1.5 flex-shrink-0", hasUnread ? "text-white" : "text-[#80848E]")} />
+                <span className="text-base truncate font-normal">{channel.name}</span>
                 {/* Unread Indicator - Right side of name */}
                 {hasUnread && !isActive && (
                     <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 ml-2"></div>
@@ -50,16 +49,6 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
-                {onNotificationClick && (
-                    <div
-                        className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white transition-opacity"
-                        title={t('server.menu.notificationSettings')}
-                        onClick={onNotificationClick}
-                    >
-                        <Icon icon="mdi:bell-outline" width="16" height="16" />
-                    </div>
-                )}
-
                 {/* Settings Icon - Shows on hover or if active */}
                 {canManageChannel && onSettingsClick && (
                     <div
@@ -67,7 +56,7 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
                         title={t('common.edit')}
                         onClick={onSettingsClick}
                     >
-                        <Icon icon="mdi:cog" width="16" height="16" />
+                        <Icon icon="mdi:cog" width="18" height="18" />
                     </div>
                 )}
             </div>

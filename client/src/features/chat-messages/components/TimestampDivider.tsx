@@ -6,7 +6,7 @@ interface TimestampDividerProps {
 
 const TimestampDivider: React.FC<TimestampDividerProps> = ({ timestamp }) => {
   return (
-    <div className="relative my-4">
+    <div className="relative mt-3 mb-1">
       <div
         className="absolute inset-0 flex items-center"
         aria-hidden="true"

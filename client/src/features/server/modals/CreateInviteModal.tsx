@@ -30,7 +30,12 @@ export const CreateInviteModal: React.FC = () => {
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
          <div className="bg-[#313338] w-full max-w-md rounded-[4px] shadow-lg flex flex-col overflow-hidden animate-scale-in p-4">
              <div className="flex justify-between items-center mb-2">
                  <h2 className="text-sm font-bold text-white uppercase">{t('invite.create.title')}</h2>

@@ -26,6 +26,12 @@ const SCROLL_TOP_THRESHOLD_PX = 80;
 const SCROLL_BOTTOM_THRESHOLD_PX = 200;
 const JUMP_FETCH_MAX_ATTEMPTS = 12;
 const JUMP_FETCH_MAX_MS = 12_000;
+const SEQUENTIAL_MESSAGE_WINDOW_MS = 5 * 60 * 1000;
+
+const getMessageAuthorKey = (message: Message): string => {
+  if (typeof message.authorId === 'string') return message.authorId;
+  return message.authorId?._id || '';
+};
 
 const MessageList: React.FC<MessageListProps> = ({
   messages,
@@ -36,7 +42,7 @@ const MessageList: React.FC<MessageListProps> = ({
   channel,
   channelId,
 }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -299,22 +305,60 @@ const MessageList: React.FC<MessageListProps> = ({
               )}
               {messages.map((msg, index) => {
                 const prevMsg = messages[index - 1];
+                const prevPrevMsg = messages[index - 2]; // 1. 获取上上条消息，用于判断前一条的状态
 
                 const currentTimestamp = new Date(msg.createdAt);
                 const prevTimestamp = prevMsg ? new Date(prevMsg.createdAt) : null;
+                const currentAuthorKey = getMessageAuthorKey(msg);
+                const prevAuthorKey = prevMsg ? getMessageAuthorKey(prevMsg) : '';
+                
+                // 判断当前消息是否在连续窗口内
+                const isWithinSequentialWindow =
+                  !!prevTimestamp && currentTimestamp.getTime() - prevTimestamp.getTime() < SEQUENTIAL_MESSAGE_WINDOW_MS;
 
                 const showDivider = !!prevTimestamp &&
                   (!isSameDay(currentTimestamp, prevTimestamp) ||
-                    currentTimestamp.getTime() - prevTimestamp.getTime() > 5 * 60 * 1000);
+                    currentTimestamp.getTime() - prevTimestamp.getTime() > SEQUENTIAL_MESSAGE_WINDOW_MS);
 
+                // 当前消息是否是连续消息
                 const isSequential = !!prevMsg && !showDivider &&
-                  prevMsg.authorId === msg.authorId &&
-                  currentTimestamp.getTime() - prevTimestamp.getTime() < 5 * 60 * 1000;
+                  !!currentAuthorKey &&
+                  currentAuthorKey === prevAuthorKey &&
+                  isWithinSequentialWindow;
+
+                // 2. 计算上一条消息是否也是连续消息 (为了找出"连续组"中的第一条紧跟消息)
+                let isPrevSequential = false;
+                if (isSequential && prevPrevMsg) {
+                  const prevPrevTimestamp = new Date(prevPrevMsg.createdAt);
+                  const prevPrevAuthorKey = getMessageAuthorKey(prevPrevMsg);
+                  const prevGap = prevTimestamp!.getTime() - prevPrevTimestamp.getTime();
+                  // 上一条的分割线逻辑
+                  const prevShowDivider = !isSameDay(prevTimestamp!, prevPrevTimestamp) || prevGap > SEQUENTIAL_MESSAGE_WINDOW_MS;
+                  
+                  isPrevSequential = !prevShowDivider && 
+                     prevAuthorKey === prevPrevAuthorKey && 
+                     prevGap < SEQUENTIAL_MESSAGE_WINDOW_MS;
+                }
+
+                // 3. 锁定目标：当前是连续消息，但上一条是"头"消息（非连续），这就是你要调整间距的那条
+                const isFirstSequential = isSequential && !isPrevSequential;
 
                 return (
                   <Fragment key={msg._id}>
-                    {showDivider && <TimestampDivider timestamp={formatDividerTimestamp(currentTimestamp)} />}
-                    <MessageItem message={msg} isSequential={!!isSequential} ownedBotUserIds={ownedBotUserIds} />
+                    {showDivider && (
+                      <TimestampDivider
+                        timestamp={formatDividerTimestamp(currentTimestamp, {
+                          locale,
+                          yesterdayLabel: t('datetime.yesterday'),
+                        })}
+                      />
+                    )}
+                    <MessageItem 
+                      message={msg} 
+                      isSequential={!!isSequential} 
+                      ownedBotUserIds={ownedBotUserIds} 
+                      className={isFirstSequential ? "-mt-1" : undefined}
+                    />
                   </Fragment>
                 );
               })}

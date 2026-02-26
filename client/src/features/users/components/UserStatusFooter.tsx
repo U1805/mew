@@ -10,7 +10,7 @@ export const UserStatusFooter: React.FC = () => {
     const { t } = useI18n();
 
     return (
-        <div className="h-[52px] bg-[#232428] flex items-center px-2 flex-shrink-0 z-10">
+        <div className="h-[60px] bg-[#232428] flex items-center px-2 flex-shrink-0 z-10">
             <div className="w-8 h-8 rounded-full bg-mew-accent flex items-center justify-center mr-2 overflow-hidden hover:opacity-80 cursor-pointer group">
                 {user?.avatarUrl ? (
                      <img src={user.avatarUrl} alt={t('sticker.manageMe')} className="w-full h-full object-cover" />

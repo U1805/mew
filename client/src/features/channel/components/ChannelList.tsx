@@ -7,9 +7,9 @@ const ChannelList: React.FC = () => {
   const { currentServerId } = useUIStore();
 
   return (
-    // Mobile: fills remaining width of the fixed sidebar (320px - 72px server list)
-    // Desktop: fixed width w-60
-    <div className="flex-1 md:w-60 h-full flex flex-col bg-mew-darker border-r border-mew-darkest flex-shrink-0">
+    // Mobile: fills remaining width of the fixed sidebar (320px - 70px server list)
+    // Desktop: fixed width 17rem
+    <div className="flex-1 md:w-[17rem] h-full flex flex-col bg-mew-darker border-r border-mew-darkest flex-shrink-0">
       {currentServerId ? <ServerChannelList /> : <DMChannelList />}
     </div>
   );

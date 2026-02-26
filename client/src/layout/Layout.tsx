@@ -25,23 +25,8 @@ const Layout = () => {
 
   const { data: servers } = useServers();
   useNotificationSettingsHydration(servers);
-  const { currentServerId, mobileSidebarOpen, toggleMobileSidebar, setMemberListOpen } = useUIStore(); // Destructure setMemberListOpen
+  const { currentServerId, mobileSidebarOpen, toggleMobileSidebar } = useUIStore();
   useMembers(currentServerId);
-
-  // Initialize Member List state based on screen size
-  useEffect(() => {
-    const checkScreenSize = () => {
-      if (window.innerWidth >= 768) { // 768px is tailwind 'md' breakpoint
-        setMemberListOpen(true);
-      } else {
-        setMemberListOpen(false);
-      }
-    };
-
-    checkScreenSize();
-    // Optional: Add resize listener if you want dynamic updates, 
-    // but usually initial load is sufficient for this logic.
-  }, [setMemberListOpen]);
 
   useEffect(() => {
     if (!servers) return;

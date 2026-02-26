@@ -69,7 +69,12 @@ export const ChangePasswordModal: React.FC<Props> = ({ isOpen, onClose, onSave, 
   const canSave = oldPassword && newPassword && !error && !isLoading;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center animate-fade-in-fast">
+    <div
+      className="fixed inset-0 z-[100] bg-black/70 flex items-center justify-center animate-fade-in-fast"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
+    >
       <div className="bg-[#313338] rounded-md shadow-lg w-full max-w-md p-6 m-4">
         <h2 className="text-xl font-bold text-white mb-2">{t('modal.changePasswordTitle')}</h2>
 

@@ -12,9 +12,12 @@ export const enMessages: Record<string, string> = {
     'common.saveChanges': 'Save Changes',
     'common.edit': 'Edit',
     'common.add': 'Add',
+    'common.more': 'More',
     'common.apply': 'Apply',
     'common.close': 'Close',
     'common.unknown': 'Unknown',
+    'datetime.today': 'Today',
+    'datetime.yesterday': 'Yesterday',
 
     'auth.welcomeBack': 'Welcome back!',
     'auth.welcomeSubtitle': "We're so excited to see you again!",

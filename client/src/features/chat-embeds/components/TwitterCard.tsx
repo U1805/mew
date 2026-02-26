@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
 import type { Attachment, MessagePayload } from '../../../shared/types';
 import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
-import { useI18n } from '../../../shared/i18n';
+import { useI18n, type Locale } from '../../../shared/i18n';
+import { formatDateTime, formatNumber } from '../../../shared/utils/dateTime';
 
 function safeHostname(url: string | undefined): string | null {
   if (!url) return null;
@@ -18,24 +19,24 @@ function toStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === 'string').map((v) => v.trim()).filter(Boolean);
 }
 
-function formatCount(value: unknown): string | null {
+function formatCount(value: unknown, locale: Locale): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return value.toLocaleString();
+    return formatNumber(value, locale);
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
     if (!trimmed) return null;
     const n = Number(trimmed);
-    if (Number.isFinite(n)) return n.toLocaleString();
+    if (Number.isFinite(n)) return formatNumber(n, locale);
     return trimmed;
   }
   return null;
 }
 
-function stripTimezoneOffset(createdAt: string): string {
-  // Example from Twitter API: "Mon Dec 01 12:54:46 +0000 2025"
-  // Desired:               "Mon Dec 01 12:54:46 2025"
-  return createdAt.replace(/\s[+-]\d{4}\s(?=\d{4}$)/, ' ');
+function formatTweetDate(createdAt: string, locale: Locale): string {
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return createdAt;
+  return formatDateTime(d, locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 function guessImageContentTypeFromUrl(url: string): string {
@@ -72,7 +73,7 @@ interface TwitterCardProps {
 }
 
 export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const url = typeof payload.url === 'string' ? payload.url.trim() : '';
   const text = typeof payload.text === 'string' ? payload.text.trim() : '';
   const createdAt = typeof payload.created_at === 'string' ? payload.created_at.trim() : '';
@@ -89,13 +90,16 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
   const videoContentType = typeof payload.video_content_type === 'string' ? payload.video_content_type.trim() : 'video/mp4';
   const coverUrl = (typeof payload.s3_cover_url === 'string' ? payload.s3_cover_url.trim() : '') || (typeof payload.cover_url === 'string' ? payload.cover_url.trim() : '');
 
-  const likeCount = formatCount(payload.like_count);
-  const retweetCount = formatCount(payload.retweet_count);
-  const replyCount = formatCount(payload.reply_count);
-  const viewCount = formatCount(payload.view_count);
+  const likeCount = formatCount(payload.like_count, locale);
+  const retweetCount = formatCount(payload.retweet_count, locale);
+  const replyCount = formatCount(payload.reply_count, locale);
+  const viewCount = formatCount(payload.view_count, locale);
 
   const hostname = useMemo(() => safeHostname(url), [url]);
-  const formattedCreatedAt = useMemo(() => (createdAt ? stripTimezoneOffset(createdAt) : ''), [createdAt]);
+  const formattedCreatedAt = useMemo(
+    () => (createdAt ? formatTweetDate(createdAt, locale) : ''),
+    [createdAt, locale],
+  );
 
   const makeImageAttachment = (imgUrl: string): Attachment => ({
     url: imgUrl,
@@ -212,7 +216,9 @@ export const TwitterCard: React.FC<TwitterCardProps> = ({ payload }) => {
                       {quotedAuthorHandle && <span className="text-xs text-mew-textMuted truncate">@{quotedAuthorHandle}</span>}
                     </div>
                     {quotedCreatedAt && (
-                      <div className="mt-0.5 text-[11px] text-mew-textMuted truncate">{stripTimezoneOffset(quotedCreatedAt)}</div>
+                      <div className="mt-0.5 text-[11px] text-mew-textMuted truncate">
+                        {formatTweetDate(quotedCreatedAt, locale)}
+                      </div>
                     )}
                   </div>
                 </div>

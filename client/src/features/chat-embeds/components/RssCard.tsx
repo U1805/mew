@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { format } from 'date-fns';
 import { Icon } from '@iconify/react';
 import type { MessagePayload } from '../../../shared/types';
+import { useI18n, type Locale } from '../../../shared/i18n';
+import { formatDateTime } from '../../../shared/utils/dateTime';
 
 function safeHostname(url: string | undefined): string | null {
   if (!url) return null;
@@ -12,11 +13,11 @@ function safeHostname(url: string | undefined): string | null {
   }
 }
 
-function safeDateLabel(value: unknown): string | null {
+function safeDateLabel(value: unknown, locale: Locale): string | null {
   if (typeof value !== 'string') return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  return format(d, 'yyyy-MM-dd HH:mm');
+  return formatDateTime(d, locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 interface RssCardProps {
@@ -25,12 +26,13 @@ interface RssCardProps {
 }
 
 export const RssCard: React.FC<RssCardProps> = ({ payload, fallbackTimestamp }) => {
+  const { locale } = useI18n();
   const title = typeof payload.title === 'string' ? payload.title.trim() : '';
   const url = typeof payload.url === 'string' ? payload.url.trim() : '';
   const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
   const thumbnailUrl = typeof payload.thumbnail_url === 'string' ? payload.thumbnail_url.trim() : '';
   const feedTitle = typeof payload.feed_title === 'string' ? payload.feed_title.trim() : '';
-  const publishedAt = safeDateLabel(payload.published_at) ?? safeDateLabel(fallbackTimestamp);
+  const publishedAt = safeDateLabel(payload.published_at, locale) ?? safeDateLabel(fallbackTimestamp, locale);
 
   const hostname = useMemo(() => safeHostname(url), [url]);
   const sourceLabel = feedTitle || payload.webhookName || hostname || 'RSS';

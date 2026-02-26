@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { Icon } from '@iconify/react';
-import { format } from 'date-fns';
 import type { Attachment, MessagePayload } from '../../../shared/types';
 import { AttachmentLightbox } from '../../chat-attachments/modals/AttachmentLightbox';
-import { useI18n } from '../../../shared/i18n';
+import { useI18n, type Locale } from '../../../shared/i18n';
+import { formatDateTime, formatNumber } from '../../../shared/utils/dateTime';
 
 function safeString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -14,22 +14,22 @@ function safeBoolean(value: unknown): boolean | null {
   return null;
 }
 
-function safeDateLabel(value: unknown): string | null {
+function safeDateLabel(value: unknown, locale: Locale): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     const ms = value > 1e12 ? value : value * 1000;
     const d = new Date(ms);
     if (Number.isNaN(d.getTime())) return null;
-    return format(d, 'yyyy-MM-dd HH:mm');
+    return formatDateTime(d, locale, { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   if (typeof value === 'string') {
     const s = value.trim();
     if (!s) return null;
     const asNum = Number(s);
-    if (Number.isFinite(asNum)) return safeDateLabel(asNum);
+    if (Number.isFinite(asNum)) return safeDateLabel(asNum, locale);
     const d = new Date(s);
     if (Number.isNaN(d.getTime())) return null;
-    return format(d, 'yyyy-MM-dd HH:mm');
+    return formatDateTime(d, locale, { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   return null;
@@ -59,10 +59,10 @@ function filenameFromUrl(url: string, fallback: string): string {
   }
 }
 
-function formatPositiveCount(value: unknown): string | null {
+function formatPositiveCount(value: unknown, locale: Locale): string | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     if (value <= 0) return null;
-    return value.toLocaleString();
+    return formatNumber(value, locale);
   }
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -70,7 +70,7 @@ function formatPositiveCount(value: unknown): string | null {
     const n = Number(trimmed);
     if (Number.isFinite(n)) {
       if (n <= 0) return null;
-      return n.toLocaleString();
+      return formatNumber(n, locale);
     }
     return trimmed;
   }
@@ -82,7 +82,7 @@ interface InstagramCardProps {
 }
 
 export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const id = safeString((payload as any).id);
   const username = safeString((payload as any).username);
   const fullName = safeString((payload as any).full_name);
@@ -93,9 +93,9 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
   const isVerified = safeBoolean((payload as any).is_verified) ?? false;
   const isPrivate = safeBoolean((payload as any).is_private) ?? false;
 
-  const likeCount = formatPositiveCount((payload as any).like_count);
-  const commentCount = formatPositiveCount((payload as any).comment_count);
-  const followersCount = formatPositiveCount((payload as any).followers_count);
+  const likeCount = formatPositiveCount((payload as any).like_count, locale);
+  const commentCount = formatPositiveCount((payload as any).comment_count, locale);
+  const followersCount = formatPositiveCount((payload as any).followers_count, locale);
 
   const s3DisplayUrl = safeString((payload as any).s3_display_url);
   const s3ThumbnailUrl = safeString((payload as any).s3_thumbnail_url);
@@ -109,7 +109,7 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
   const thumbnailUrl = (s3ThumbnailUrl || rawThumbnailUrl || displayUrl).trim();
   const videoUrl = (s3VideoUrl || rawVideoUrl).trim();
 
-  const takenAtLabel = useMemo(() => safeDateLabel((payload as any).taken_at), [payload]);
+  const takenAtLabel = useMemo(() => safeDateLabel((payload as any).taken_at, locale), [locale, payload]);
   const profileUrl = useMemo(() => (username ? `https://www.instagram.com/${username}/` : ''), [username]);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
 
