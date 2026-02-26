@@ -53,7 +53,6 @@ type toolResult struct {
 }
 
 type pendingTurn struct {
-	Text    string
 	ToolUse toolUse
 }
 
@@ -181,40 +180,43 @@ func (p *ClaudeStreamParser) handleStreamEvent(line string) ([]string, error) {
 		}
 		p.currentBlock = nil
 	case "message_stop":
-		p.finalizeAssistantTurn()
+		return p.finalizeAssistantTurn(), nil
 	}
 
 	return nil, nil
 }
 
-func (p *ClaudeStreamParser) finalizeAssistantTurn() {
+func (p *ClaudeStreamParser) finalizeAssistantTurn() []string {
 	if p.currentAssistant == nil {
-		return
+		return nil
 	}
 
+	out := make([]string, 0, 1)
 	text := strings.TrimSpace(p.currentAssistant.Text.String())
 	if len(p.currentAssistant.ToolUses) == 0 {
 		if text != "" {
 			p.pendingFinalText = text
 		}
 		p.currentAssistant = nil
-		return
+		return nil
 	}
 
-	for i, tu := range p.currentAssistant.ToolUses {
-		turnText := text
-		if i > 0 {
-			turnText = ""
-		}
+	// Tool turns now emit pre-tool narrative as an independent message.
+	// Tool execution result will be emitted later when corresponding user/tool_result arrives.
+	if text != "" {
+		out = append(out, text)
+	}
+
+	for _, tu := range p.currentAssistant.ToolUses {
 		if strings.TrimSpace(tu.ID) == "" {
 			continue
 		}
 		p.pendingByToolUseID[tu.ID] = &pendingTurn{
-			Text:    turnText,
 			ToolUse: tu,
 		}
 	}
 	p.currentAssistant = nil
+	return out
 }
 
 func (p *ClaudeStreamParser) handleUserToolResult(line string) ([]string, error) {
@@ -263,7 +265,7 @@ func (p *ClaudeStreamParser) handleUserToolResult(line string) ([]string, error)
 	}
 	delete(p.pendingByToolUseID, result.ToolUseID)
 
-	msg := formatTurnMessage(turn.Text, turn.ToolUse, result)
+	msg := strings.TrimSpace(formatToolAction(turn.ToolUse, result))
 	if strings.TrimSpace(msg) == "" {
 		return nil, nil
 	}

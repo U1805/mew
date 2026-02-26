@@ -322,31 +322,25 @@ func (r *ClaudeCodeRunner) runProxyPrompt(
 	emit socketio.EmitFunc,
 ) (chunks int, sentMessages int, err error) {
 	parser := NewClaudeStreamParser()
-	pendingMsg := ""
-	pendingHasUsageFooter := false
 	sentMessages = 0
 
-	flushPending := func() error {
-		msg := strings.TrimSpace(pendingMsg)
+	emitParsedMessage := func(msg string) error {
+		msg = strings.TrimSpace(msg)
 		if msg == "" {
-			pendingMsg = ""
-			pendingHasUsageFooter = false
 			return nil
 		}
-		if pendingHasUsageFooter {
+		if messageHasUsageFooter(msg) {
 			n, err := r.emitMessageWithFileRefs(ctx, channelID, msg, emit)
 			if err != nil {
 				return err
 			}
 			sentMessages += n
-		} else {
-			if err := emitChannelMessage(emit, channelID, msg); err != nil {
-				return err
-			}
-			sentMessages++
+			return nil
 		}
-		pendingMsg = ""
-		pendingHasUsageFooter = false
+		if err := emitChannelMessage(emit, channelID, msg); err != nil {
+			return err
+		}
+		sentMessages++
 		return nil
 	}
 
@@ -356,10 +350,7 @@ func (r *ClaudeCodeRunner) runProxyPrompt(
 		outMsgs, parseErr := parser.FeedLine(line)
 		if parseErr != nil {
 			log.Printf("%s proxy chunk parse failed: channel=%s mode=%s err=%v", r.logPrefix, channelID, mode, parseErr)
-			if err := flushPending(); err != nil {
-				return err
-			}
-			if err := emitChannelMessage(emit, channelID, line); err != nil {
+			if err := emitChannelMessage(emit, channelID, formatStreamParseErrorCallout(parseErr, line)); err != nil {
 				return err
 			}
 			sentMessages++
@@ -367,15 +358,9 @@ func (r *ClaudeCodeRunner) runProxyPrompt(
 		}
 
 		for _, m := range outMsgs {
-			m = strings.TrimSpace(m)
-			if m == "" {
-				continue
-			}
-			if err := flushPending(); err != nil {
+			if err := emitParsedMessage(m); err != nil {
 				return err
 			}
-			pendingMsg = m
-			pendingHasUsageFooter = messageHasUsageFooter(m)
 		}
 		return nil
 	})
@@ -384,20 +369,30 @@ func (r *ClaudeCodeRunner) runProxyPrompt(
 	}
 
 	for _, m := range parser.Flush() {
-		m = strings.TrimSpace(m)
-		if m == "" {
-			continue
-		}
-		if err := flushPending(); err != nil {
+		if err := emitParsedMessage(m); err != nil {
 			return chunks, sentMessages, err
 		}
-		pendingMsg = m
-		pendingHasUsageFooter = messageHasUsageFooter(m)
-	}
-	if err := flushPending(); err != nil {
-		return chunks, sentMessages, err
 	}
 	return chunks, sentMessages, nil
+}
+
+func formatStreamParseErrorCallout(parseErr error, line string) string {
+	errMsg := "unknown parse error"
+	if parseErr != nil {
+		parsed := strings.TrimSpace(parseErr.Error())
+		if parsed != "" {
+			errMsg = sanitizeLine(parsed)
+		}
+	}
+	chunkPreview := truncateText(strings.TrimSpace(line), 1200)
+	return buildCallout("warning", "流解析失败", []string{
+		"本条流数据解析失败，已跳过并继续处理后续内容。",
+		fmt.Sprintf("错误：`%s`", errMsg),
+		"原始片段：",
+		"```json",
+		chunkPreview,
+		"```",
+	})
 }
 
 func (r *ClaudeCodeRunner) buildPromptWithAttachments(
