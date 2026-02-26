@@ -1,0 +1,32 @@
+---
+slug: changelog/v1.6.0
+title: v1.6.0 ~ v1.6.1 更新日志
+date: 2026-02-25
+tags: [changelog]
+---
+
+本文记录 `v1.6.0` 到 `v1.6.1` 的主要变更。
+
+<!-- truncate -->
+
+## v1.6.1 (2026-02-25)
+
+### 🐛 Bug Fixes
+
+- 修复反向代理与 TLS 终止场景下的 cookie 认证问题，确保鉴权行为稳定。
+- 统一并整理 Docker Compose 配置与环境变量，提升容器部署一致性。
+
+## v1.6.0 (2026-02-25)
+
+### ✨ 新功能
+
+- 新增 `claudecode-agent`，将 Claude Code Agent 能力接入 Mew 插件生态。
+- 前端新增 Claude Code 相关卡片渲染能力，支持在消息流中展示结构化结果。
+- 增加 Claude Code 相关 Docker 部署配置，便于独立部署与联调。
+
+### 🛠️ 工程调整
+
+- 重构 fetchers HTTP 客户端与超时策略，统一网络请求行为。
+- 重构 plugin HTTP 代理策略，并优化 proxy pool 相关实现。
+- 重构 fetchers 上传链路，将头像资源统一落地到 S3。
+- 重构 Bilibili fetcher 的数据抓取流程，提升稳定性。

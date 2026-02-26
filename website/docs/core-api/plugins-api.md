@@ -77,21 +77,25 @@ func main() {
 | **`NewRunner`** | **(必填)** Bot 实例工厂函数。 |
 | `LogPrefix` | 日志前缀（默认 `[bot]`）。 |
 | `ServiceType` | 服务类型标识（留空则自动推导）。 |
-| `ServerName/Icon` | 注册到后端用于前端展示的名称与图标。 |
+| `ServerName/Icon/Description` | 注册到后端用于前端展示的名称、图标与描述。 |
 | `ConfigTemplate` | 用于前端创建 Bot 时的配置模板提示。 |
 | `DisableDotEnv` | 是否禁用 `.env` 自动加载。 |
+| `DisableInitialSync` | 是否禁用启动时的首次同步。 |
 | `SyncInterval` | 配置同步周期（覆盖环境变量）。 |
 
 ### ServiceType 推导规则
 
 若未显式指定 `ServiceOptions.ServiceType`，SDK 会根据入口文件位置自动推导：
 1. **默认**：取调用方源文件所在的目录名。
-2. **特殊路径**：若入口在 `plugins/cmd/(fetchers|agents)/<name>.go`，则使用文件名 `<name>`。
+2. **新布局**：若入口在 `plugins/cmd/(fetchers|agents)/<serviceType>/main.go`，则使用目录名 `<serviceType>`。
+3. **兼容旧布局**：若入口在 `plugins/cmd/(fetchers|agents)/<name>.go`，则使用文件名 `<name>`。
+
+`sdk.LoadRuntimeConfig(serviceType)` 会校验 `serviceType` 非空，且不能是保留值 `pkg`。
 
 ### BotManager（热重载管理）
 
 SDK 内部通过 `BotManager` 管理多 Bot 实例。其核心逻辑 `SyncOnce(ctx)` 流程如下：
-1. **注册**：向后端注册 `service-type` 信息。
+1. **注册**：向后端注册 `serviceType` 信息（含 `serverName/icon/description/configTemplate`）。
 2. **拉取**：获取当前分配给该服务的 Bot 列表（`BootstrapBots`）。
 3. **比对**：基于 `bot.Config` 的 SHA-256 哈希判断配置变更。
 4. **重载**：
@@ -141,7 +145,9 @@ _ = sdk.PostWebhook(ctx, nil, cfg.APIBase, webhookURL, payload, 3)
 
 ### 文件上传
 
-SDK 会智能选择上传策略：优先尝试 **预签名 PUT 直传**（`/presign`），失败则回退到 Multipart Upload。
+SDK 会按条件选择上传策略：
+- 当文件大小可确定且 `<= 8MB` 时，优先尝试 **预签名 PUT 直传**（`/presign`）。
+- 预签名不可用/失败时，自动回退到 Multipart Upload（`/upload`）。
 
 - **`sdk.UploadWebhookBytes`** / **`sdk.UploadWebhookReader`**：直接上传内存数据或流。
 - **`sdk.UploadRemoteToWebhook`**：下载远程 URL 并转存。
@@ -155,7 +161,7 @@ SDK 会智能选择上传策略：优先尝试 **预签名 PUT 直传**（`/pres
 
 开启方式：环境变量 `DEV_MODE` 设为 `1`, `true`, `on` 等。
 
-- **Webhook**：请求不发送，仅记录日志。
+- **Webhook**：请求不发送，改为落盘记录请求内容。
 - **Upload**：文件保存到本地目录（默认 `StateBaseDir()/dev`），返回假的本地 Key。
 
 ---
@@ -195,9 +201,16 @@ client := sess.HTTPClient()
 使用 `sdk.NewHTTPClient(opts)` 创建客户端：
 
 - **User-Agent**：默认剥离 UA 以避免被拦截；可用 `sdk.RandomBrowserUserAgent()` 生成伪造 UA。
-- **代理策略**：默认**禁用**系统代理。需设置 `UseMEWProxy=true` 并配合环境变量 `MEW_API_PROXY` 启用：
-  - `MEW_API_PROXY=env`：读取系统 `HTTP_PROXY`。
-  - `MEW_API_PROXY=http://127.0.0.1:7890`：强制指定代理。
+- **代理策略**：由 `opts.Mode` 或环境变量 `MEW_API_PROXY` 控制（默认 `direct`）：
+  - `direct`：直连（不走系统代理）
+  - `env`：使用 `HTTP_PROXY/HTTPS_PROXY/NO_PROXY`
+  - `proxy`：优先走内置代理池，再回退到环境代理（若存在）和直连
+
+可用环境变量：
+- `MEW_API_PROXY=direct|env|proxy`
+- `PROXY_LIST_URLS`：在 `proxy` 模式下提供代理列表源
+
+如需显式指定单个代理 URL，可通过 `sdk.NewHTTPClient(sdk.HTTPClientOptions{Mode: "proxy", Proxy: "<proxy-url>"})` 提供。
 
 ### State：本地持久化
 

@@ -16,7 +16,7 @@ Mew 中的 Bot 主要分为两种类型，它们的设计目标和工作模式�
 | **通信模式** | **单向**: 外部源 -> Bot -> Webhook | **双向**: Bot \<-> WebSocket \<-> User |
 | **触发机制** | 定时器 (Cron / Ticker) | 事件 (Event) |
 | **典型场景** | RSS/Atom 订阅、定时抓取新闻并投递 | 指令机器人、词典/翻译、对话式助手 |
-| **参考实现** | **Go** (`plugins/internal/fetchers/*`) | **Go** (`plugins/internal/agents/*`) |
+| **参考实现** | **Go**（入口 `plugins/cmd/fetchers/*/main.go`，逻辑 `plugins/internal/fetchers/*`） | **Go**（入口 `plugins/cmd/agents/*/main.go`，逻辑 `plugins/internal/agents/*`） |
 
 ---
 
@@ -35,6 +35,7 @@ Mew 中的 Bot 主要分为两种类型，它们的设计目标和工作模式�
 #### Bot Service
 
 这是您在服务器上 **独立运行的 Go 程序**，例如一个 `rss-fetcher` 服务。一个 Bot Service 通常会处理某一特定类型的所有 Bot 实例，其主要职责包括：
+-   **服务注册**：在同步前通过 `POST /api/infra/service-types/register` 注册/刷新 `serviceType` 元信息（`serverName/icon/description/configTemplate`）。
 -   **引导启动**：在启动时，通过 `POST /api/bots/bootstrap` 接口拉取该 `serviceType` 下所有 Bot 实例的配置及 `accessToken`。
 -   **任务管理**：为每个 Bot 实例启动一个独立的运行器 (Runner)，并根据配置变化进行热重载。`plugins/pkg` 中的 `BotManager` 提供了此功能的封装。
 
@@ -44,7 +45,9 @@ Mew 中的 Bot 主要分为两种类型，它们的设计目标和工作模式�
 
 #### serviceType
 
-这是一个关键的 **字符串标识符**，它的作用是 **将用户创建的 Bot（实例配置）与您运行的 Bot Service（Go 进程）绑定在一起**。您在界面上为 Bot 配置的 `serviceType`，必须与 Bot Service 程序中定义的类型完全一致，系统才能正确地将配置下发给对应的服务。
+这是一个关键的 **字符串标识符**，它的作用是 **将用户创建的 Bot（实例配置）与您运行的 Bot Service（Go 进程）绑定在一起**。您在界面上为 Bot 配置的 `serviceType`，必须与 Bot Service 程序中定义的类型完全一致，系统才能正确地下发配置。
+
+当前后端会校验 `serviceType` 是否已注册；未注册时创建/更新 Bot 会返回 `Unknown serviceType`。通常由对应 Bot Service 启动后自动完成注册。
 
 #### Webhook
 

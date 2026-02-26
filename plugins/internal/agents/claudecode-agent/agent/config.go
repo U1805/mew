@@ -10,7 +10,7 @@ import (
 
 const (
 	defaultProxyBaseURL = "http://claude-code:3457"
-	defaultTimeoutSec   = 600
+	defaultTimeoutSec   = 3600
 )
 
 type ClaudeCodeConfig struct {

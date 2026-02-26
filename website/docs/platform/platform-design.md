@@ -24,7 +24,7 @@ Mew 的核心平台是一个集成了身份认证、消息持久化与实时通�
 
 ## 🧩 系统组成
 
-Mew 采用前后端分离的经典架构，并通过 WebSocket 与 REST API 协同工作，同时为机器人服务提供了专用的通信通道。
+Mew 采用前后端分离架构，服务端在同一进程内同时提供 REST API 与 Socket.IO，并为插件运行时提供专用基础设施通道。
 
 ```mermaid
 flowchart LR
@@ -43,18 +43,22 @@ flowchart LR
 
   FE -->|"REST /api"| BE
   FE <-->|"Socket.IO /"| GW
+  BS -->|"REST /api/bots/bootstrap"| BE
+  BS -->|"REST /api/infra/service-types/register"| BE
+  BS <-->|"Socket.IO / (bot token)"| GW
   BS <-->|"Socket.IO /infra"| GW
   BE --> DB
   BE --> S3
   GW --> DB
 ```
 
--   **客户端 (Client)**：通过REST API拉取初始状态（如服务器列表、历史消息），同时通过WebSocket订阅状态变更（如新消息、权限更新），实现高效的实时通信。
--   **服务端 (Server)**：在同一进程内提供 REST API 和 WebSocket 实时事件。用户的写入操作（如发送消息）主要通过 REST API 完成。
--   **机器人服务 (Bot Services)**：一个独立的后端服务，它通过以下方式与主平台交互：
-    1.  通过受保护的REST API(`/api/bots/bootstrap`) 拉取自身的配置和 `accessToken`。
-    2.  使用WebSocket的 `/infra` 命名空间上报在线状态。
-    3.  使用获取到的 `accessToken` 以一个“机器人用户”的身份连接默认的 WebSocket 命名空间，收发消息和事件。
+-   **客户端 (Client)**：通过 REST API 拉取初始状态（服务器、频道、历史消息等），并通过 WebSocket 订阅增量事件（如 `MESSAGE_CREATE`、`PERMISSIONS_UPDATE`）。
+-   **服务端 (Server)**：`server/src/server.ts` 在同一个 HTTP Server 上挂载 Express 与 Socket.IO。消息写入以 REST 为主，落库后再通过网关广播。
+-   **机器人服务 (Bot Services)**：以 `plugins` 运行时接入主平台，典型链路为：
+    1.  通过受保护接口 `/api/infra/service-types/register` 注册或刷新 `serviceType` 元信息。
+    2.  通过 `/api/bots/bootstrap` 拉取该 `serviceType` 下的 Bot 配置与 `accessToken`。
+    3.  通过 Socket.IO `/infra` 命名空间（`adminSecret + serviceType`）上报服务在线状态。
+    4.  使用 Bot `accessToken` 调用 `/api/auth/bot` 登录，并以 Bot 用户身份连接默认 Socket.IO 命名空间收发事件。
 -   **MongoDB**：作为主数据库，存储所有核心数据。
 -   **对象存储 (S3)**：用于存储用户头像、聊天附件等文件。服务端只存储文件的 `key`，在返回给客户端时会动态拼接成可访问的 `url`。
 
@@ -72,25 +76,32 @@ erDiagram
     Bot {
         string serviceType
     }
+    Webhook {
+        string token
+    }
+    ChannelReadState {
+        ObjectId lastReadMessageId
+    }
     User ||--o{ ServerMember : "加入"
-    Bot ||--|{ User : "表现为"
+    Bot ||--|| User : "botUserId"
+    Webhook ||--|| User : "botUserId"
+    User ||--o{ ChannelReadState : "读取状态"
     Server ||--o{ ServerMember : "拥有"
     Server ||--o{ Role : "定义"
     Server ||--o{ Category : "分组"
     Server ||--o{ Channel : "包含"
     Channel ||--o{ Message : "存储"
     Channel ||--o{ Webhook : "指向"
-    Channel {
-        string lastReadMessageId "为当前用户聚合"
-    }
+    Channel ||--o{ ChannelReadState : "被读取"
 ```
 
 :::info 实现细节
--   **用户 (User)**：平台内存在三种类型的用户，均通过 `isBot` 字段进行区分。
+-   **用户 (User)**：平台存在三类“身份来源”。
     -   **人类用户**：通过邮箱密码注册登录。
-    -   **Bot 用户**：由一个 `Bot` 实体自动创建并关联，代表一个可编程的应用。
-    -   **Webhook 用户**：由一个 `Webhook` 实体自动创建，仅用于代表该 Webhook 在频道内发送消息。
--   **机器人 (Bot)**：这是一个管理实体，拥有独立的 `accessToken`、`serviceType` 和自定义配置 `config`。每个 `Bot` 都会对应一个 `isBot: true` 的 `User` 实体。
+    -   **Bot 用户**：由 `Bot.botUserId` 关联，代表可编程 Bot 实例。
+    -   **Webhook 用户**：由 `Webhook.botUserId` 关联，代表 Webhook 发送者身份。
+-   **isBot 字段语义**：`isBot` 只区分“人类用户 vs 机器用户”；Bot 用户与 Webhook 用户都属于 `isBot: true`。
+-   **机器人 (Bot)**：管理实体，包含 `serviceType`、`config`、`dmEnabled` 与访问令牌（存储为哈希/加密形式）。每个 `Bot` 至多关联一个 Bot 用户。
 -   **频道 (Channel)**：服务器频道和私信共用同一套数据模型。
 -   **已读状态**：用户的频道已读状态（`lastReadMessageId`）并非直接存储在频道对象上，而是由后端在请求时，根据 `ChannelReadState` 表动态聚合而来。
 :::
@@ -110,6 +121,7 @@ erDiagram
 :::info 实现细节
 -   **管理员特权**：服务器所有者或拥有 `ADMINISTRATOR` 权限角色的成员，将绕过所有权限检查，始终获得所有权限。
 -   **默认角色**：每个服务器在创建时都会自动生成一个 `@everyone` 角色作为所有成员的基础权限，以及一个拥有 `ADMINISTRATOR` 权限的 “Owner” 角色。
+-   **DM 权限**：私信频道不走服务器角色体系，而是使用固定权限集合（`VIEW_CHANNEL`、`SEND_MESSAGES`、`ADD_REACTIONS`、`ATTACH_FILES`）。
 -   **自我锁定保护**：当普通管理员修改频道权限时，系统会阻止其提交会导致自己失去 `MANAGE_CHANNEL` 权限的配置，防止误操作。
 -   **权限变更事件**：任何可能影响用户权限的操作（如角色更新、成员角色变更、频道覆盖更新），都会广播 `PERMISSIONS_UPDATE` 事件，通知客户端刷新权限相关的缓存。
 :::
@@ -131,7 +143,7 @@ erDiagram
 -   **用户定向事件** (如 `SERVER_KICK`) → 发送到对应的 `userId` 房间。
 
 :::info 服务专用通信
-除了用户通信，平台还为后端机器人服务提供了一个专用的 `/infra` WebSocket 命名空间。机器人服务通过 `adminSecret` 认证后，可以在此通道上报自己的健康状态，并触发关联的机器人用户状态同步。
+除了用户通信，平台还为机器人运行时提供 `/infra` WebSocket 命名空间。运行时通过 `adminSecret + serviceType` 认证后，可在此通道上报在线状态，并触发对应 `serviceType` 下 Bot 用户在线状态同步。
 :::
 
 ---
@@ -147,6 +159,6 @@ erDiagram
 
 :::info 已支持的卡片类型
 目前仓库内已实现的前端卡片渲染器包括：
-`app/x-rss-card`、`app/x-twitter-card`、`app/x-bilibili-card` 等。
-具体实现可参考 `client/src/features/chat-messages/components/MessageContent.tsx`。
+`app/x-rss-card`、`app/x-twitter-card`、`app/x-bilibili-card`、`app/x-instagram-card`、`app/x-pornhub-card`、`app/x-jpdict-card`、`app/x-claudecode-card`、`app/x-forward-card`，以及 `message/voice` 语音消息。
+具体实现可参考 `client/src/features/chat-messages/components/MessageContent.tsx` 与 `client/src/features/chat-embeds/components/*`。
 :::

@@ -13,7 +13,7 @@ import Link from '@docusaurus/Link';
 
 我们提供了两种路径以满足不同需求：
 *   **本地开发**：适合贡献代码、功能调试或进行二次开发。
-*   **Docker 部署**：推荐用于生产环境或快速体验完整功能。
+*   **Docker 部署**：适合快速体验或自托管部署完整功能。
 
 ---
 
@@ -31,12 +31,13 @@ import Link from '@docusaurus/Link';
 :::
 
 :::caution S3 路径风格
-请注意，Mew 对外暴露文件 URL 时采用 **Virtual-Hosted** 风格，形如 `http(s)://<bucket>.<S3_WEB_ENDPOINT>/<key>`。请确保你的 S3 服务支持并正确配置了此模式。
+默认情况下，Mew 对外文件 URL 采用 **Virtual-Hosted** 风格，形如 `http(s)://<bucket>.<S3_WEB_ENDPOINT>/<key>`。  
+如果设置了 `MEW_STATIC_URL`，服务端会返回路径式地址（`${MEW_STATIC_URL}/static/<key>`）。
 :::
 
 ### 开发环境额外依赖
 如果你计划从源码运行，请额外安装以下工具：
-*   **Node.js**: `v18` 或更高版本 (推荐使用 LTS 版本)。
+*   **Node.js**: `v20` 或更高版本。
 *   **pnpm**: 推荐使用项目根目录 `package.json` 中 `packageManager` 字段指定的版本。
     *   *若未安装, 可执行 `npm install -g pnpm`*
 *   **Go**: Go 语言编译器，用于运行插件和 Bot 服务。
@@ -102,7 +103,8 @@ PORT=3000
 
 # 🔐 JWT 签名密钥 (必须修改)
 JWT_SECRET=replace-this-with-a-super-secret-key
-JWT_EXPIRES_IN=1d
+JWT_EXPIRES_IN=30m
+REFRESH_TOKEN_EXPIRES_IN=30d
 
 # 🔑 内部服务共享密钥 (必须修改, 用于 Bot Service 和 /infra 接口鉴权)
 MEW_ADMIN_SECRET=replace-this-with-another-super-secret-key
@@ -121,6 +123,10 @@ MEW_TRUST_PROXY=loopback
 # 🔒 Infra 接口 IP 白名单 (可选, 逗号分隔)
 # 留空则默认允许内网 + loopback 地址
 MEW_INFRA_ALLOWED_IPS=
+
+# 可选：对外文件访问基址。设置后会返回 ${MEW_STATIC_URL}/static/<key> 形式的 URL
+# 例如：http://localhost:151
+MEW_STATIC_URL=
 
 # --- S3 兼容对象存储配置 ---
 S3_REGION=garage
@@ -199,10 +205,6 @@ MEW_URL=http://localhost:3000
 
 #### B. 运行测试 Bot
 ```bash
-# 进入测试 Bot 源码目录
-cd fetchers/test-fetcher
-
-# 运行服务
 go run ./plugins/cmd/fetchers/test-fetcher
 ```
 :::info
@@ -240,7 +242,7 @@ Bot 的 `serviceType` 会根据其入口文件 (`main.go`) 所在的目录名自
 
 ## Docker 部署
 
-此方式适合一键部署包含所有依赖（Mew, MongoDB, Garage）的完整环境。
+此方式适合一键部署包含所有依赖（`server`、`client`、`plugins`、`mongo`、`garage`）的完整环境。
 
 ### 步骤 1: 配置环境变量
 在项目根目录下，直接编辑 `docker-compose.env` 文件。**请务必修改以下默认值**：
@@ -255,13 +257,16 @@ Bot 的 `serviceType` 会根据其入口文件 (`main.go`) 所在的目录名自
 ### 步骤 2: 启动所有服务
 在项目根目录下执行：
 ```bash
+# docker-compose.yml 使用外部网络 mew_network，首次运行前请先创建
+docker network create mew_network
+
 docker compose --env-file docker-compose.env up --build
 ```
 该命令会构建 Mew 镜像，并拉取 `mongo` 和 `garage` 镜像，然后一并启动。
 
 ### 步骤 3: 访问服务
 服务启动后，你可以通过以下地址访问：
-*   **前端页面**: `http://localhost/`
-*   **后端 API**: `http://localhost/api` (已通过 Nginx 反向代理)
+*   **前端页面**: `http://localhost:151/`
+*   **后端 API**: `http://localhost:151/api`（由 client 容器内 Nginx 反向代理）
 
 Bot 服务的使用方式与本地开发完全相同，请参考 [本地开发 - C. 在前端配置并激活 Bot](#c-在前端配置并激活-bot) 章节进行操作。

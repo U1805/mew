@@ -89,7 +89,7 @@ interface Bot {
   botUserId?: ObjectId;   // 关联的 Bot User (isBot: true)
   name: string;           // 显示名称
   avatarUrl?: string;     // 头像 URL
-  serviceType: string;    // 服务类型, 如 'rss-fetcher', 'claude-agent'
+  serviceType: string;    // 服务类型, 如 'rss-fetcher', 'assistant-agent'
   dmEnabled: boolean;     // 是否允许用户私聊
   config: string;         // 业务配置 (JSON 字符串)
   accessToken?: string;   // 用于 Bot 认证，获取 JWT
@@ -108,7 +108,7 @@ interface Bot {
 
 ## 实践：开发消息推送 Bot (Fetcher)
 
-> **参考实现**：`plugins/internal/fetchers/test-fetcher`
+> **参考实现**：入口 `plugins/cmd/fetchers/test-fetcher/main.go`，核心逻辑 `plugins/internal/fetchers/test-fetcher/*`
 
 Fetcher Bot 是一个后台守护进程，根据 `config` 中的任务列表执行数据拉取和推送。
 
@@ -147,7 +147,7 @@ Fetcher Bot 是一个后台守护进程，根据 `config` 中的任务列表执�
 
 ## 实践：开发会话机器人 (Agent)
 
-> **参考实现**：`plugins/internal/agents/test-agent`
+> **参考实现**：入口 `plugins/cmd/agents/test-agent/main.go`，核心逻辑 `plugins/internal/agents/test-agent/*`
 
 Agent Bot 是一个长连接客户端，通过 WebSocket 实时监听和响应用户消息。
 
@@ -156,7 +156,7 @@ Agent Bot 是一个长连接客户端，通过 WebSocket 实时监听和响应�
 
 ### 开发流程
 标准的 Agent Bot 开发遵循以下步骤：
-1.  **连接**：使用 Bot 的 `accessToken` 认证并建立 WebSocket 连接。
+1.  **连接**：先使用 Bot 的 `accessToken` 调用 `POST /api/auth/bot` 换取 JWT，再用该 JWT 建立 WebSocket 连接。
 2.  **监听**：订阅 `MESSAGE_CREATE` 网关事件。
 3.  **过滤**：判断消息是否满足触发条件（例如，是否为 `@自己` 的消息、是否来自特定频道、是否为私聊）。同时，必须忽略由 Bot 自己发送的消息，避免无限循环。
 4.  **处理**：执行核心业务逻辑（如调用 LLM API、查询数据库、执行指令等）。
@@ -168,10 +168,11 @@ Agent Bot 是一个长连接客户端，通过 WebSocket 实时监听和响应�
 
 当前版本的配置同步是通过 **定时轮询** 实现的，具体流程如下：
 
-*   Bot Service 启动后，会定期调用内部接口 `POST /api/bots/bootstrap`（需携带管理员密钥 `X-Mew-Admin-Secret`），拉取所有与其 `serviceType` 匹配的 Bot 实例及其配置。
+*   Bot Service 启动后，会定期调用内部接口 `POST /api/bots/bootstrap`（需携带管理员密钥 `X-Mew-Admin-Secret`，且来源 IP 需命中 `MEW_INFRA_ALLOWED_IPS`），拉取所有与其 `serviceType` 匹配的 Bot 实例及其配置。
 *   `plugins/pkg` 中的 `BotManager` 模块会负责管理所有 Bot 实例的生命周期。
 *   当检测到某个 Bot 的 `config` 发生变化、或者有新增/删除的 Bot 时，`BotManager` 会自动触发对应 Runner 的热重载。
 
 :::info
-`/infra` Socket.IO 命名空间当前主要用于 Bot 的在线状态统计与同步，并不负责推送“配置更新”事件。
+服务端会向 `/infra` 命名空间按 `serviceType` 广播 `SYSTEM_BOT_CONFIG_UPDATE` 事件。  
+目前 `plugins/pkg` 的默认运行时仍以定时轮询（`BotManager.SyncOnce`）作为配置同步主机制，未直接消费该事件。
 :::

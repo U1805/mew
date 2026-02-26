@@ -15,7 +15,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 HOST = os.getenv("CLAUDE_PROXY_HOST", "0.0.0.0")
 PORT = int(os.getenv("CLAUDE_PROXY_PORT", "3457"))
 BASE_DIR = os.getenv("CLAUDE_PROXY_WORKDIR", "/home/node/workspace/projects")
-DEFAULT_TIMEOUT = int(os.getenv("CLAUDE_PROXY_TIMEOUT_SECONDS", "600"))
+DEFAULT_TIMEOUT = int(os.getenv("CLAUDE_PROXY_TIMEOUT_SECONDS", "3600"))
 LOG_LEVEL = os.getenv("CLAUDE_PROXY_LOG_LEVEL", "INFO").upper()
 PROMPT_PREVIEW_CHARS = int(os.getenv("CLAUDE_PROXY_PROMPT_PREVIEW_CHARS", "120"))
 MAX_FILE_BYTES = int(os.getenv("CLAUDE_PROXY_MAX_FILE_BYTES", str(20 * 1024 * 1024)))

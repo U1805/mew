@@ -55,6 +55,7 @@ pnpm --filter server dev
 | :--- | :--- |
 | `JWT_EXPIRES_IN` | Access Token 有效期（支持 `30m` / `2h` / 秒数），默认 `30m`。 |
 | `REFRESH_TOKEN_EXPIRES_IN` | Refresh Token 有效期（支持 `30d` / `12h` / 秒数），默认 `30d`。 |
+| `MEW_BOT_TOKEN_ENC_KEY` | Bot access token 的静态加密密钥。 |
 | `MEW_ALLOW_USER_REGISTRATION` | 是否允许开放注册（`/api/auth/register`），默认 `true`。 |
 | `MEW_CORS_ORIGINS` | API 允许跨域请求的来源列表，用逗号分隔。支持 `*`。开发环境下留空会默认放行任意 Origin；生产环境强烈建议显式配置。 |
 | `MEW_TRUST_PROXY` | Express 的 `trust proxy` 设置。默认 `loopback`。当你将后端部署在 Nginx 等反向代理之后时，此项至关重要，用于正确获取客户端 IP。 |
@@ -98,7 +99,8 @@ pnpm --filter server dev
 - `/api/webhooks`：Webhook 执行与文件上传（含 presign/upload）
 - `/api/bots`：Bot bootstrap（infra-only）与 Bot 自身配置更新
 - `/api/infra`：基础设施接口（服务类型注册、可用服务查询等）
-- `/api/tts`：文本转语音（TTS）
+- `/api/v1/audio/speech`：文本转语音（TTS）
+- `/api/v1/audio/transcriptions`：语音转文本（STT）
 
 #### 模块组织
 
@@ -117,7 +119,8 @@ pnpm --filter server dev
 
 1.  **认证 (Authentication)**
     - 所有需要登录的接口都会经过 `server/src/middleware/auth.ts` 中间件。
-    - 它会验证请求头中的 JWT，并将解码后的用户信息挂载到 `req.user` 上，供后续流程使用。
+    - 它会优先读取 `Authorization: Bearer <token>`，并支持从 Access Token Cookie 读取 JWT。
+    - 验证通过后会将用户信息挂载到 `req.user`，供后续权限流程使用。
 
 2.  **权限校验 (Authorization)**
     - 路由通过 `authorizeServer(...)` 或 `authorizeChannel(...)` 中间件进行权限检查。
@@ -137,6 +140,7 @@ pnpm --filter server dev
 WebSocket 网关是实现实时体验的核心，入口位于 `server/src/server.ts` 和 `server/src/gateway/*`。
 
 - **连接鉴权**：客户端发起 WebSocket 连接时，会通过 `server/src/gateway/middleware.ts` 进行 JWT 鉴权。
+- **鉴权来源**：WebSocket 支持从握手 `auth.token` 或 Access Token Cookie 中读取 JWT。
 - **房间管理**：用户成功连接后，会根据其所在服务器、频道和自身 ID 加入不同的 Socket.IO 房间 (Room)，便于精准推送事件。
 - **事件广播**：`Service` 层在完成数据操作后，会调用 `socketManager.broadcast(...)` 等封装好的函数，向特定房间广播事件（如 `MESSAGE_CREATE`），通知所有相关的客户端更新视图。
 - **基础设施命名空间 (`/infra`)**：用于 Bot Service 等内部服务的在线状态与能力同步，使用 `X-Mew-Admin-Secret`（或握手参数 `adminSecret`）+ `serviceType` 进行鉴权。

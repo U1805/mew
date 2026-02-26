@@ -180,6 +180,7 @@ export type Permission =
   | 'MANAGE_STICKERS'
   | 'MANAGE_WEBHOOKS'
   | 'MANAGE_CHANNEL'
+  | 'VIEW_CHANNEL'
   | 'SEND_MESSAGES'
   | 'MANAGE_MESSAGES'
   | 'ADD_REACTIONS'
@@ -249,7 +250,7 @@ export interface Category {
 - **来源**: `server/src/api/channel/channel.model.ts`, `server/src/api/channel/channel.repository.ts`
 
 ```ts title="TypeScript 定义"
-export type ChannelType = 'GUILD_TEXT' | 'DM';
+export type ChannelType = 'GUILD_TEXT' | 'GUILD_WEB' | 'DM';
 
 export interface PermissionOverride {
   targetType: 'role' | 'member';
@@ -265,6 +266,7 @@ export interface Channel {
   // GUILD_TEXT (服务器文本频道)
   name?: string;
   topic?: string;
+  url?: string; // GUILD_WEB 频道地址
   serverId?: string;
   categoryId?: string | null;
   position?: number;
@@ -285,6 +287,7 @@ export interface Channel {
 
 **关键点说明**:
 - 调用频道列表接口时（无论是服务器频道还是私信列表），响应中的每个频道对象都会被动态附加 `lastMessage`、`lastReadMessageId` 和 `permissions` 字段。
+- `Channel.type` 实际支持 `GUILD_TEXT`、`GUILD_WEB`、`DM` 三种类型；其中 `GUILD_WEB` 主要用于承载外部 URL（`url` 字段）。
 - 私信频道的 `recipients` 字段通常会被填充为 `UserRef` 对象数组。
 
 ---
@@ -427,7 +430,7 @@ export interface AvailableServicesResponse {
 `ChannelReadState` 是一个内部模型，不作为独立资源对外暴露。它的作用是记录每个用户对每个频道的已读位置。
 
 - **影响**: 该模型的数据会直接决定频道列表接口返回的 `lastReadMessageId` 字段值。
-- **更新**: 客户端通过调用消息 `ack` 接口来更新此状态，从而标记消息为已读。
+- **更新**: 客户端通过调用频道 `ack` 接口来更新此状态，从而标记消息为已读。
 :::
 
 ```ts title="TypeScript 定义"
