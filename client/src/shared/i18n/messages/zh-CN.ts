@@ -11,6 +11,7 @@ export const zhCNMessages: Record<string, string> = {
     'common.saveChanges': '保存更改',
     'common.edit': '编辑',
     'common.add': '添加',
+    'common.more': '更多',
     'common.apply': '应用',
     'common.close': '关闭',
     'common.unknown': '未知',

@@ -76,7 +76,7 @@ export const ServerChannelList: React.FC = () => {
 
         {/* Dropdown Menu */}
         {isDropdownOpen && (
-            <div className="absolute top-[52px] left-2.5 w-[240px] bg-[#111214] p-1.5 rounded-[4px] shadow-2xl z-50 animate-fade-in-up origin-top-left">
+            <div className="absolute top-[52px] left-2.5 w-[240px] bg-[#25272b] border border-white/5 p-1.5 rounded-[4px] shadow-2xl z-50 animate-fade-in-up origin-top-left">
                 {canCreateInvite && (
                     <div
                         className="flex items-center justify-between px-2 py-2 hover:bg-mew-accent rounded-[2px] cursor-pointer text-mew-accent hover:text-white group mb-1"
@@ -105,7 +105,7 @@ export const ServerChannelList: React.FC = () => {
                     </div>
                 )}
 
-                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
+                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-white/5 my-1 mx-1"></div>}
 
                 {canManageChannels && (
                     <>
@@ -136,7 +136,7 @@ export const ServerChannelList: React.FC = () => {
                     </div>
                 )}
 
-                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-mew-divider my-1 mx-1"></div>}
+                {(canManageChannels || canManageServer) && <div className="h-[1px] bg-white/5 my-1 mx-1"></div>}
 
                 {!isOwner && (
                     <div

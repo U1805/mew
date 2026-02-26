@@ -11,6 +11,7 @@ export const zhTWMessages: Record<string, string> = {
     'common.saveChanges': '儲存變更',
     'common.edit': '編輯',
     'common.add': '新增',
+    'common.more': '更多',
     'common.apply': '套用',
     'common.close': '關閉',
     'common.unknown': '未知',

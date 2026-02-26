@@ -11,6 +11,7 @@ export const jaMessages: Record<string, string> = {
     'common.saveChanges': '変更を保存',
     'common.edit': '編集',
     'common.add': '追加',
+    'common.more': 'その他',
     'common.apply': '適用',
     'common.close': '閉じる',
     'common.unknown': '不明',

@@ -82,7 +82,7 @@ export const MessageContextMenu = ({
 
   return (
     <ContextMenu.Portal>
-      <ContextMenu.Content className="min-w-[210px] bg-[#111214] rounded p-1.5 shadow-xl z-[9999] animate-fade-in border border-[#1E1F22]">
+      <ContextMenu.Content className="min-w-[210px] bg-[#2b2d31] rounded p-1.5 shadow-xl z-[9999] animate-fade-in border border-white/5">
         {canAddReaction && (
           <ContextMenu.Sub>
             <ContextMenu.SubTrigger className={itemClass} disabled={disabled}>
@@ -93,7 +93,7 @@ export const MessageContextMenu = ({
               <Icon icon="mdi:chevron-right" width="16" />
             </ContextMenu.SubTrigger>
             <ContextMenu.Portal>
-              <ContextMenu.SubContent className="min-w-[190px] bg-[#111214] rounded p-2 shadow-xl z-[9999] border border-[#1E1F22] ml-1">
+              <ContextMenu.SubContent className="min-w-[190px] bg-[#2b2d31] rounded p-2 shadow-xl z-[9999] border border-white/5 ml-1">
                 <div className="grid grid-cols-5 gap-1">
                   {PRESET_EMOJIS.map((emoji) => (
                     <ContextMenu.Item
@@ -118,7 +118,7 @@ export const MessageContextMenu = ({
           </ContextMenu.Sub>
         )}
 
-        <ContextMenu.Separator className="h-[1px] bg-mew-divider my-1" />
+        <ContextMenu.Separator className="h-[1px] bg-white/5 my-1" />
 
         <ContextMenu.Item
           className={itemClass}
@@ -146,7 +146,7 @@ export const MessageContextMenu = ({
           </span>
         </ContextMenu.Item>
 
-        <ContextMenu.Separator className="h-[1px] bg-mew-divider my-1" />
+        <ContextMenu.Separator className="h-[1px] bg-white/5 my-1" />
 
         <ContextMenu.Item
           className={itemClass}
@@ -170,7 +170,7 @@ export const MessageContextMenu = ({
             <Icon icon="mdi:chevron-right" width="16" />
           </ContextMenu.SubTrigger>
           <ContextMenu.Portal>
-            <ContextMenu.SubContent className="min-w-[210px] bg-[#111214] rounded p-1.5 shadow-xl z-[9999] border border-[#1E1F22] ml-1">
+            <ContextMenu.SubContent className="min-w-[210px] bg-[#2b2d31] rounded p-1.5 shadow-xl z-[9999] border border-white/5 ml-1">
               {canTranscribeVoice && (
                 <ContextMenu.Item
                   className={itemClass}
