@@ -11,10 +11,9 @@ interface ChannelItemProps {
     isActive: boolean;
     onClick: () => void;
     onSettingsClick?: (e: React.MouseEvent) => void;
-    onNotificationClick?: (e: React.MouseEvent) => void;
 }
 
-export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick, onNotificationClick }) => {
+export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onClick, onSettingsClick }) => {
     const { t } = useI18n();
     const permissions = usePermissions(channel._id);
     const canManageChannel = permissions.has('MANAGE_CHANNEL');
@@ -50,16 +49,6 @@ export const ChannelItem: React.FC<ChannelItemProps> = ({ channel, isActive, onC
             </div>
 
             <div className="flex items-center gap-1 flex-shrink-0">
-                {onNotificationClick && (
-                    <div
-                        className="opacity-0 group-hover:opacity-100 cursor-pointer text-mew-textMuted hover:text-white transition-opacity"
-                        title={t('server.menu.notificationSettings')}
-                        onClick={onNotificationClick}
-                    >
-                        <Icon icon="mdi:bell-outline" width="18" height="18" />
-                    </div>
-                )}
-
                 {/* Settings Icon - Shows on hover or if active */}
                 {canManageChannel && onSettingsClick && (
                     <div

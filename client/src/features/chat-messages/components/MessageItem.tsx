@@ -489,7 +489,14 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds, className }: Mess
 
           {/* Hover Actions - Only show if NOT retracted */}
           {!isRetracted && (
-            <div className="absolute right-4 -top-2 bg-[#313338] border border-[#26272D] rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center p-1 z-10">
+            <div
+              className={clsx(
+                'absolute right-4 -top-2 bg-[#313338] border border-[#26272D] rounded shadow-sm transition-opacity flex items-center p-1 z-10',
+                showEmojiPicker
+                  ? 'opacity-100 pointer-events-auto'
+                  : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto'
+              )}
+            >
               {canAddReaction && (
                 <div className="relative">
                   <button

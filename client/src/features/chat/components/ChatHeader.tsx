@@ -3,6 +3,7 @@ import { Icon } from '@iconify/react';
 import clsx from 'clsx';
 import { Channel, ChannelType } from '../../../shared/types';
 import { useUIStore } from '../../../shared/stores';
+import { useModalStore } from '../../../shared/stores';
 import { useAuthStore } from '../../../shared/stores/authStore';
 import { usePresenceStore } from '../../../shared/stores/presenceStore';
 import { formatUserTag } from '../../../shared/utils/userTag';
@@ -17,6 +18,7 @@ interface ChatHeaderProps {
 const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, toggleMemberList }) => {
   const { t } = useI18n();
   const { user } = useAuthStore();
+  const { openModal } = useModalStore();
   const onlineStatus = usePresenceStore((state) => state.onlineStatus);
   const [mobileSearchActive, setMobileSearchActive] = useState(false);
   const {
@@ -196,7 +198,16 @@ const ChatHeader: React.FC<ChatHeaderProps> = ({ channel, isMemberListOpen, togg
            <Icon icon="mdi:magnify" width="22" />
         </button>
 
-        <Icon icon="mdi:bell" className="hover:text-mew-text cursor-pointer hidden sm:block" width="22" />
+        {!isDM && !isWeb && currentServerId && channel && (
+            <button
+              className="hidden lg:block hover:text-mew-text p-1 rounded transition-colors"
+              title={t('server.menu.notificationSettings')}
+              onClick={() => openModal('channelNotifications', { channel })}
+            >
+              <Icon icon="mdi:bell" width="22" />
+            </button>
+        )}
+
         <Icon icon="mdi:pin" className="hover:text-mew-text cursor-pointer hidden sm:block" width="22" />
 
         {isWeb && channel?.url && (

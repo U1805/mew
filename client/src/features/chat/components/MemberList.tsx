@@ -154,7 +154,7 @@ const MemberGroup = ({ title, members, onlineStatus }: MemberGroupProps) => {
                 <MemberItem
                     key={member._id}
                     member={member}
-                    isOnline={onlineStatus[member.userId._id] === 'online'}
+                    status={onlineStatus[member.userId._id]}
                     onClick={() => openModal('userProfile', { user: member.userId })}
                 />
             ))}
@@ -164,11 +164,11 @@ const MemberGroup = ({ title, members, onlineStatus }: MemberGroupProps) => {
 
 interface MemberItemProps {
     member: ServerMember;
-    isOnline: boolean;
+    status?: 'online' | 'offline';
     onClick: () => void;
 }
 
-const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
+const MemberItem = ({ member, status, onClick }: MemberItemProps) => {
     const u = member.userId;
     if (!u) return null;
     const isWebhookMember = !!member.channelId;
@@ -186,11 +186,11 @@ const MemberItem = ({ member, isOnline, onClick }: MemberItemProps) => {
               <span className="text-white text-xs font-bold">{u.username.substring(0, 1).toUpperCase()}</span>
             )}
           </div>
-          {!u.isBot && (
+          {!u.isBot && status && (
             <div
               className={clsx(
                 "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-[2.5px] border-[#2B2D31]",
-                isOnline ? "bg-green-500" : "bg-gray-500"
+                status === 'online' ? "bg-green-500" : "bg-gray-500"
               )}
             />
           )}

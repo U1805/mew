@@ -52,7 +52,12 @@ export const UserProfileModal: React.FC = () => {
     : t('common.unknown');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-fade-in"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) closeModal();
+      }}
+    >
          <div className="bg-[#232428] w-[600px] rounded-lg shadow-2xl overflow-hidden animate-scale-in relative">
              <div className="h-[120px] bg-mew-accent"></div>
              <div className="px-4 pb-4 relative">

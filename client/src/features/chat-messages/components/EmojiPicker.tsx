@@ -26,7 +26,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, onClose }) =
       <div className={clsx(
         "z-50 bg-[#2B2D31] border border-[#1E1F22] rounded-lg shadow-xl p-2 animate-scale-in",
         // Desktop
-        "md:absolute md:right-0 md:top-8 md:w-[180px] md:origin-top-right",
+        "md:absolute md:right-0 md:left-auto md:top-[calc(100%+6px)] md:w-[180px] md:origin-top-right md:translate-x-0 md:translate-y-0",
         // Mobile (Centered Modal style or Bottom Sheet)
         "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[280px] origin-center"
       )}>

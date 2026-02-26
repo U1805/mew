@@ -134,7 +134,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
                   alt={message.payload.sticker.name || t('sticker.defaultName')}
                   title={message.payload.sticker.name || undefined}
                   // Discord sticker size + hover effect
-                  className="max-w-[120px] max-h-[120px] w-auto h-auto object-contain select-none cursor-pointer hover:scale-[1.02] transition-transform duration-200"
+                  className="max-w-[160px] max-h-[160px] w-auto h-auto object-contain select-none cursor-pointer hover:scale-[1.02] transition-transform duration-200"
                   draggable={false}
                 />
               </div>
