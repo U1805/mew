@@ -81,9 +81,22 @@ func parseTwitterViewerTRPCResponse(body []byte) (Timeline, error) {
 	}
 
 	data := parsed[0].Result.Data
-	users := data.Users
-	if users == nil {
-		users = map[string]User{}
+	rawUsers := data.Users
+	if rawUsers == nil {
+		rawUsers = map[string]User{}
+	}
+	users := map[string]User{}
+	idToKey := map[string]string{}
+	for rawID, usr := range rawUsers {
+		key := resolveUserKey(users, firstNonEmpty(usr.RestID, rawID), usr.Handle)
+		if key == "" {
+			continue
+		}
+		users[key] = mergeUser(users[key], usr)
+		id := strings.TrimSpace(firstNonEmpty(usr.RestID, rawID))
+		if id != "" {
+			idToKey[id] = key
+		}
 	}
 
 	monitored := User{
@@ -92,15 +105,51 @@ func parseTwitterViewerTRPCResponse(body []byte) (Timeline, error) {
 		Name:            data.User.Name,
 		ProfileImageURL: data.User.ProfileImageURL,
 	}
-	if strings.TrimSpace(monitored.RestID) != "" {
-		users[monitored.RestID] = monitored
+	monitoredKey := resolveUserKey(users, monitored.RestID, monitored.Handle)
+	if monitoredKey != "" {
+		users[monitoredKey] = mergeUser(users[monitoredKey], monitored)
+	}
+	if strings.TrimSpace(monitored.RestID) != "" && monitoredKey != "" {
+		idToKey[strings.TrimSpace(monitored.RestID)] = monitoredKey
+	}
+
+	items := data.Timeline.Items
+	for i := range items {
+		remapTweetUserKeys(&items[i].Tweet, users, idToKey, monitoredKey)
 	}
 
 	return Timeline{
 		MonitoredUser: monitored,
 		Users:         users,
-		Items:         data.Timeline.Items,
+		Items:         items,
 	}, nil
+}
+
+func remapTweetUserKeys(t *Tweet, users map[string]User, idToKey map[string]string, monitoredKey string) {
+	if t == nil {
+		return
+	}
+
+	uid := strings.TrimSpace(t.UserID)
+	switch {
+	case uid == "":
+		if monitoredKey != "" {
+			t.UserID = monitoredKey
+		}
+	default:
+		if key, ok := idToKey[uid]; ok {
+			t.UserID = key
+		} else if _, ok := users[uid]; ok {
+			t.UserID = uid
+		}
+	}
+
+	if t.RetweetedTweet != nil {
+		remapTweetUserKeys(t.RetweetedTweet, users, idToKey, monitoredKey)
+	}
+	if t.QuotedTweet != nil {
+		remapTweetUserKeys(t.QuotedTweet, users, idToKey, monitoredKey)
+	}
 }
 
 func ensureUTIDCookie(ctx context.Context, client *http.Client, userAgent string) error {

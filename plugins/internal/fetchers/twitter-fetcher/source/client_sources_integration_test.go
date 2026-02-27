@@ -57,6 +57,42 @@ func TestTwitterSourcesIntegration(t *testing.T) {
 			if strings.TrimSpace(tl.Items[0].Tweet.RestID) == "" {
 				t.Fatalf("first tweet missing rest id")
 			}
+			if strings.TrimSpace(tl.MonitoredUser.Handle) == "" {
+				t.Fatalf("monitored user handle is empty")
+			}
+			if strings.TrimSpace(tl.MonitoredUser.Name) == "" {
+				t.Fatalf("monitored user name is empty")
+			}
+			if strings.TrimSpace(tl.MonitoredUser.ProfileImageURL) == "" {
+				t.Fatalf("monitored user avatar is empty")
+			}
+
+			foundResolvedAuthor := false
+			for _, it := range tl.Items {
+				uid := strings.TrimSpace(it.Tweet.UserID)
+				if uid == "" {
+					continue
+				}
+				author, ok := tl.Users[uid]
+				if !ok {
+					continue
+				}
+				if strings.TrimSpace(author.Handle) == "" {
+					continue
+				}
+
+				foundResolvedAuthor = true
+				if strings.TrimSpace(author.Name) == "" {
+					t.Fatalf("resolved author name is empty for userId=%s", uid)
+				}
+				if strings.TrimSpace(author.ProfileImageURL) == "" {
+					t.Fatalf("resolved author avatar is empty for userId=%s", uid)
+				}
+				break
+			}
+			if !foundResolvedAuthor {
+				t.Fatalf("no tweet has a resolved author user mapping")
+			}
 		})
 	}
 }

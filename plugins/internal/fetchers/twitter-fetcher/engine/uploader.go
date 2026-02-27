@@ -75,6 +75,10 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 	if strings.TrimSpace(author.Handle) == "" {
 		author = tl.Users[wrapper.UserID]
 	}
+	author = enrichAuthorFromUserKey(author, display.UserID)
+	if strings.TrimSpace(author.Handle) == "" {
+		author = enrichAuthorFromUserKey(author, wrapper.UserID)
+	}
 
 	tweetURL := BuildTweetURL(tl.Users, display.UserID, display.RestID)
 	if tweetURL == "" {
@@ -181,6 +185,7 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 
 func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline, t source.Tweet) map[string]any {
 	author := tl.Users[t.UserID]
+	author = enrichAuthorFromUserKey(author, t.UserID)
 
 	tweetURL := BuildTweetURL(tl.Users, t.UserID, t.RestID)
 	text := BuildTweetText(t)
@@ -274,10 +279,39 @@ func BuildTweetURL(users map[string]source.User, userID, tweetID string) string 
 		handle = usr.Handle
 	}
 	handle = strings.TrimSpace(handle)
-	if handle != "" && handle != userID {
+	if handle != "" {
+		if _, err := strconv.ParseInt(handle, 10, 64); err == nil {
+			return fmt.Sprintf("https://x.com/i/web/status/%s", tweetID)
+		}
 		return fmt.Sprintf("https://x.com/%s/status/%s", handle, tweetID)
 	}
 	return fmt.Sprintf("https://x.com/i/web/status/%s", tweetID)
+}
+
+func enrichAuthorFromUserKey(author source.User, userID string) source.User {
+	if strings.TrimSpace(author.Handle) != "" {
+		if strings.TrimSpace(author.Name) == "" {
+			author.Name = strings.TrimSpace(author.Handle)
+		}
+		return author
+	}
+
+	uid := strings.TrimSpace(userID)
+	if uid == "" {
+		return author
+	}
+	if _, err := strconv.ParseInt(uid, 10, 64); err == nil {
+		return author
+	}
+	handle := uid
+	if handle == "" {
+		return author
+	}
+	author.Handle = handle
+	if strings.TrimSpace(author.Name) == "" {
+		author.Name = handle
+	}
+	return author
 }
 
 func PickBestVideoURL(v *source.Video) (videoURL string, contentType string) {
