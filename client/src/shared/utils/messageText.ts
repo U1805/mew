@@ -86,11 +86,13 @@ function cardPayloadText(type: string, payload: Record<string, any>): string {
     case 'app/x-instagram-card': {
       const username = safeTrim(payload.username);
       const fullName = safeTrim(payload.full_name);
+      const content = pickFirstNonEmpty(payload.content, payload.title);
       const biography = safeTrim(payload.biography);
       const profileUrl = username ? `https://www.instagram.com/${username}/` : '';
 
       pushUnique(lines, fullName);
       pushUnique(lines, username ? `@${username}` : '');
+      pushUnique(lines, content);
       pushUnique(lines, biography);
       pushUnique(lines, profileUrl);
       return joinLines(lines);

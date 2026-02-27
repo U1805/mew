@@ -56,7 +56,7 @@ func (c *Client) FetchStories(ctx context.Context, username string) ([]StoryItem
 
 		stories, profile, err := source.fetch(ctx, httpClient, ua, target)
 		if err == nil {
-			return stories, profile, nil
+			return mergeStoriesByPost(stories), profile, nil
 		}
 		errMsgs = append(errMsgs, fmt.Sprintf("%s: %v", source.name, err))
 	}

@@ -18,11 +18,11 @@ import (
 )
 
 const (
-	picukiBaseURL           = "https://picuki.site"
-	picukiAPIBaseURL        = "https://api-wh.picuki.site/api/v1/instagram"
-	picukiStaticTS    int64 = 1770118266914
-	picukiStaticSV    int64 = 2
-	picukiMaxClockSkewMs    = int64(60 * time.Second / time.Millisecond)
+	picukiBaseURL              = "https://picuki.site"
+	picukiAPIBaseURL           = "https://api-wh.picuki.site/api/v1/instagram"
+	picukiStaticTS       int64 = 1770118266914
+	picukiStaticSV       int64 = 2
+	picukiMaxClockSkewMs       = int64(60 * time.Second / time.Millisecond)
 )
 
 var picukiSigningKey = mustDecodeHex("8ee0fd249e43e00bc59d3f2acd7f02509f5cd0db0d6c54889c7c2d7c5bf8c87f")
@@ -237,6 +237,7 @@ func buildStoryItemsFromPicukiPosts(edges []picukiPostEdge) []StoryItem {
 		if takenAt <= 0 {
 			continue
 		}
+		caption := n.EdgeMediaToCaption.FirstText()
 
 		if len(n.EdgeSidecarToChildren.Edges) > 0 {
 			for idx, childEdge := range n.EdgeSidecarToChildren.Edges {
@@ -244,6 +245,8 @@ func buildStoryItemsFromPicukiPosts(edges []picukiPostEdge) []StoryItem {
 				if !ok {
 					continue
 				}
+				item.Title = caption
+				item.Content = caption
 				items = append(items, item)
 			}
 			continue
@@ -261,7 +264,8 @@ func buildStoryItemsFromPicukiPosts(edges []picukiPostEdge) []StoryItem {
 		}
 		item.LikeCount = n.EdgeMediaPreviewLike.Count
 		item.CommentCount = n.EdgeMediaToComment.Count
-		item.Title = n.EdgeMediaToCaption.FirstText()
+		item.Title = caption
+		item.Content = caption
 		items = append(items, item)
 	}
 
@@ -330,15 +334,15 @@ func absInt64(v int64) int64 {
 type picukiUserInfoResponse struct {
 	Result []struct {
 		User struct {
-			ID                 string `json:"id"`
-			Username           string `json:"username"`
-			FullName           string `json:"full_name"`
-			Biography          string `json:"biography"`
-			ProfilePicURL      string `json:"profile_pic_url"`
-			FollowerCount      int64  `json:"follower_count"`
-			FollowingCount     int64  `json:"following_count"`
-			IsPrivate          bool   `json:"is_private"`
-			IsVerified         bool   `json:"is_verified"`
+			ID                  string `json:"id"`
+			Username            string `json:"username"`
+			FullName            string `json:"full_name"`
+			Biography           string `json:"biography"`
+			ProfilePicURL       string `json:"profile_pic_url"`
+			FollowerCount       int64  `json:"follower_count"`
+			FollowingCount      int64  `json:"following_count"`
+			IsPrivate           bool   `json:"is_private"`
+			IsVerified          bool   `json:"is_verified"`
 			HDProfilePicURLInfo struct {
 				URL string `json:"url"`
 			} `json:"hd_profile_pic_url_info"`
@@ -357,12 +361,12 @@ type picukiPostEdge struct {
 }
 
 type picukiPostNode struct {
-	Typename             string `json:"__typename"`
-	DisplayURL           string `json:"display_url"`
-	ThumbnailSrc         string `json:"thumbnail_src"`
-	IsVideo              bool   `json:"is_video"`
-	VideoURL             string `json:"video_url"`
-	TakenAtTimestamp     int64  `json:"taken_at_timestamp"`
+	Typename              string `json:"__typename"`
+	DisplayURL            string `json:"display_url"`
+	ThumbnailSrc          string `json:"thumbnail_src"`
+	IsVideo               bool   `json:"is_video"`
+	VideoURL              string `json:"video_url"`
+	TakenAtTimestamp      int64  `json:"taken_at_timestamp"`
 	EdgeSidecarToChildren struct {
 		Edges []struct {
 			Node picukiMediaNode `json:"node"`
@@ -399,4 +403,3 @@ func (c picukiCaptionEdges) FirstText() string {
 	}
 	return strings.TrimSpace(c.Edges[0].Node.Text)
 }
-

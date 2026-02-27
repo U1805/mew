@@ -35,6 +35,11 @@ function safeDateLabel(value: unknown, locale: Locale): string | null {
   return null;
 }
 
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string').map((v) => v.trim()).filter(Boolean);
+}
+
 function guessImageContentTypeFromUrl(url: string): string {
   try {
     const pathname = new URL(url).pathname.toLowerCase();
@@ -86,6 +91,7 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
   const id = safeString((payload as any).id);
   const username = safeString((payload as any).username);
   const fullName = safeString((payload as any).full_name);
+  const content = safeString((payload as any).content) || safeString((payload as any).title);
   const biography = safeString((payload as any).biography);
   const s3ProfilePicUrl = safeString((payload as any).s3_profile_pic_url);
   const profilePicUrl = (s3ProfilePicUrl || safeString((payload as any).profile_pic_url)).trim();
@@ -104,16 +110,33 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
   const rawDisplayUrl = safeString((payload as any).display_url);
   const rawThumbnailUrl = safeString((payload as any).thumbnail_src);
   const rawVideoUrl = safeString((payload as any).video_url);
+  const rawImages = toStringArray((payload as any).images);
+  const s3Images = toStringArray((payload as any).s3_images);
 
   const displayUrl = (s3DisplayUrl || rawDisplayUrl || s3ThumbnailUrl || rawThumbnailUrl).trim();
   const thumbnailUrl = (s3ThumbnailUrl || rawThumbnailUrl || displayUrl).trim();
   const videoUrl = (s3VideoUrl || rawVideoUrl).trim();
+  const images = useMemo(() => {
+    const arr = s3Images.length > 0 ? s3Images : rawImages;
+    if (arr.length > 0) return arr;
+    if (!videoUrl && displayUrl) return [displayUrl];
+    return [];
+  }, [displayUrl, rawImages, s3Images, videoUrl]);
 
   const takenAtLabel = useMemo(() => safeDateLabel((payload as any).taken_at, locale), [locale, payload]);
   const profileUrl = useMemo(() => (username ? `https://www.instagram.com/${username}/` : ''), [username]);
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [previewAttachments, setPreviewAttachments] = useState<Attachment[]>([]);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
-  if (!username && !fullName && !displayUrl && !videoUrl) return null;
+  const makeImageAttachment = (imgUrl: string): Attachment => ({
+    url: imgUrl,
+    contentType: guessImageContentTypeFromUrl(imgUrl),
+    filename: filenameFromUrl(imgUrl, 'image'),
+    size: 0,
+  });
+
+  if (!username && !fullName && !displayUrl && !videoUrl && images.length === 0 && !content) return null;
 
   const showStats = Boolean(likeCount || commentCount || followersCount || takenAtLabel || isPrivate);
 
@@ -185,7 +208,15 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
         </div>
       </div>
 
-      {(videoUrl || displayUrl) && (
+      {content && (
+        <div className="border-t border-mew-darkest/50 px-3 py-2">
+          <p className="whitespace-pre-wrap break-words text-sm leading-6 text-mew-text">
+            {content}
+          </p>
+        </div>
+      )}
+
+      {(videoUrl || images.length > 0) && (
         <div className="border-t border-mew-darkest/50 bg-black/10">
           {videoUrl ? (
             <div className="relative w-full bg-black">
@@ -204,23 +235,45 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
             </div>
           ) : (
             <div className="p-2">
-              <img
-                src={displayUrl}
-                alt=""
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                className="w-full max-h-[520px] rounded-lg object-cover bg-black/30 cursor-zoom-in"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setPreviewAttachment({
-                    url: displayUrl,
-                    contentType: guessImageContentTypeFromUrl(displayUrl),
-                    filename: filenameFromUrl(displayUrl, 'image'),
-                    size: 0,
-                  });
-                }}
-              />
+              {images.length === 1 ? (
+                <img
+                  src={images[0]}
+                  alt=""
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  className="w-full max-h-[520px] rounded-lg object-cover bg-black/30 cursor-zoom-in"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const attachment = makeImageAttachment(images[0]);
+                    setPreviewAttachments([attachment]);
+                    setPreviewIndex(0);
+                    setPreviewAttachment(attachment);
+                  }}
+                />
+              ) : (
+                <div className="grid grid-cols-2 gap-1">
+                  {images.slice(0, 4).map((img) => (
+                    <img
+                      key={img}
+                      src={img}
+                      alt=""
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                      className="w-full aspect-square rounded-md object-cover bg-black/20 cursor-zoom-in"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const attachments = images.map(makeImageAttachment);
+                        const idx = attachments.findIndex((a) => a.url === img);
+                        setPreviewAttachments(attachments);
+                        setPreviewIndex(idx >= 0 ? idx : 0);
+                        setPreviewAttachment(attachments[idx >= 0 ? idx : 0] ?? null);
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -242,7 +295,16 @@ export const InstagramCard: React.FC<InstagramCardProps> = ({ payload }) => {
       )}
 
       {previewAttachment && (
-        <AttachmentLightbox attachment={previewAttachment} onClose={() => setPreviewAttachment(null)} />
+        <AttachmentLightbox
+          attachment={previewAttachment}
+          attachments={previewAttachments}
+          initialIndex={previewIndex ?? undefined}
+          onClose={() => {
+            setPreviewAttachment(null);
+            setPreviewAttachments([]);
+            setPreviewIndex(null);
+          }}
+        />
       )}
     </div>
   );

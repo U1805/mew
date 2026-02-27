@@ -37,7 +37,7 @@ func (w *Worker) Run(ctx context.Context) {
 
 		edges := make([]source.StoryItem, 0, len(stories))
 		for _, e := range stories {
-			if strings.TrimSpace(e.ID) == "" {
+			if strings.TrimSpace(e.ID) == "" && e.TakenAt <= 0 {
 				continue
 			}
 			edges = append(edges, e)
@@ -62,43 +62,87 @@ func (w *Worker) Run(ctx context.Context) {
 			}
 			return a.ID < b.ID
 		})
-
 		if w.firstRun && !w.sendHistory && w.freshState {
-			for _, e := range edges {
-				w.tracker.MarkSeen(strings.TrimSpace(e.ID))
+			for _, s := range edges {
+				markStoryPostSeen(w.tracker, s)
 			}
 			_ = w.tracker.Save()
 			w.firstRun = false
-			log.Printf("%s init done, cached %d items", w.logPrefix, len(edges))
+			log.Printf("%s init done, cached %d posts", w.logPrefix, len(edges))
 			return
 		}
 		w.firstRun = false
 
-		var newStories []source.StoryItem
+		var newPosts []source.StoryItem
 		for _, s := range edges {
-			if w.tracker.IsNew(strings.TrimSpace(s.ID)) {
-				newStories = append(newStories, s)
+			if isStoryPostNew(w.tracker, s) {
+				newPosts = append(newPosts, s)
 			}
 		}
-		if len(newStories) == 0 {
+		if len(newPosts) == 0 {
 			_ = w.tracker.Save()
 			return
 		}
 
-		for _, s := range newStories {
-			if err := w.uploader.ProcessAndSendStory(ctx, user, s); err != nil {
+		for _, s := range newPosts {
+			if err := w.uploader.ProcessAndSendPost(ctx, user, strings.TrimSpace(s.ID), storyPostItems(s)); err != nil {
 				log.Printf(
-					"%s process failed: story_key=%s story_id=%s err=%v",
+					"%s process failed: post_id=%s err=%v",
 					w.logPrefix,
-					strings.TrimSpace(s.ID),
 					strings.TrimSpace(s.ID),
 					err,
 				)
 				continue
 			}
-			w.tracker.MarkSeen(strings.TrimSpace(s.ID))
+			markStoryPostSeen(w.tracker, s)
 		}
 
 		_ = w.tracker.Save()
 	})
+}
+
+func isStoryPostNew(m *Manager, story source.StoryItem) bool {
+	if m == nil {
+		return false
+	}
+	postID := strings.TrimSpace(story.ID)
+	if !m.IsNew(postID) {
+		return false
+	}
+	// Backward compatibility: old state may only contain story-level ids.
+	for _, s := range storyPostItems(story) {
+		id := strings.TrimSpace(s.ID)
+		if id == "" {
+			continue
+		}
+		if !m.IsNew(id) {
+			return false
+		}
+	}
+	return true
+}
+
+func markStoryPostSeen(m *Manager, story source.StoryItem) {
+	if m == nil {
+		return
+	}
+	postID := strings.TrimSpace(story.ID)
+	if postID != "" {
+		m.MarkSeen(postID)
+	}
+	// Keep story-level ids for compatibility with previous versions and rollback safety.
+	for _, s := range storyPostItems(story) {
+		id := strings.TrimSpace(s.ID)
+		if id == "" {
+			continue
+		}
+		m.MarkSeen(id)
+	}
+}
+
+func storyPostItems(story source.StoryItem) []source.StoryItem {
+	if len(story.Items) > 0 {
+		return story.Items
+	}
+	return []source.StoryItem{story}
 }
