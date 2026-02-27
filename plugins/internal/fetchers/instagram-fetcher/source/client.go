@@ -75,7 +75,6 @@ func (c *Client) storySources() []storySource {
 	}
 	return []storySource{
 		{name: "picuki-site", fetch: c.fetchPicukiPosts},
-		{name: "insta-stories-viewer-com", fetch: c.fetchInstaStoriesViewerSocketIO},
 	}
 }
 
