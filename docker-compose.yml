@@ -156,6 +156,8 @@ services:
       # Claude Code proxy base url for claudecode-agent plugin
       CLAUDECODE_URL: ${CLAUDECODE_URL:-http://claude-code:3457}
     volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
       - plugins_cache:/root/.cache/mew
     networks:
       - mew_network
