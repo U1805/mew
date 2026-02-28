@@ -376,7 +376,7 @@ const MessageList: React.FC<MessageListProps> = ({
         <button
           type="button"
           aria-label={t('messageList.scrollToBottom')}
-          className="absolute bottom-4 right-4 z-[2] h-11 w-11 rounded-full bg-[#1E1F22]/90 hover:bg-[#1E1F22] text-white/80 hover:text-white flex items-center justify-center shadow-xl border border-white/10 backdrop-blur-sm transition-colors"
+          className="absolute bottom-4 right-4 z-30 h-11 w-11 rounded-full bg-[#1E1F22]/90 hover:bg-[#1E1F22] text-white/80 hover:text-white flex items-center justify-center shadow-xl border border-white/10 backdrop-blur-sm transition-colors"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
