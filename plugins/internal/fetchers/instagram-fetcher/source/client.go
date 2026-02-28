@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -73,9 +74,13 @@ func (c *Client) storySources() []storySource {
 	if c.storySourceProvider != nil {
 		return c.storySourceProvider()
 	}
-	return []storySource{
+	sources := []storySource{
 		{name: "picuki-site", fetch: c.fetchPicukiPosts},
 	}
+	if strings.TrimSpace(os.Getenv("FLARESOLVERR_URL")) != "" {
+		sources = append(sources, storySource{name: "imginn", fetch: c.fetchImginn})
+	}
+	return sources
 }
 
 func (c *Client) getHTTPClient() *http.Client {

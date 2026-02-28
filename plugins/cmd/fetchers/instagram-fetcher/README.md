@@ -51,6 +51,9 @@
 环境变量：
 `.env.local/.env` 加载规则与通用环境变量说明见 `plugins/README.md`（由 `plugins/pkg` 提供）。
 
+可选环境变量：
+- `FLARESOLVERR_URL`。配置后会额外启用 `imginn` 数据源。
+
 运行：
 
 ```bash
