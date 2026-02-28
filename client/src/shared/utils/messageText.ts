@@ -86,13 +86,33 @@ function cardPayloadText(type: string, payload: Record<string, any>): string {
     case 'app/x-instagram-card': {
       const username = safeTrim(payload.username);
       const fullName = safeTrim(payload.full_name);
+      const content = pickFirstNonEmpty(payload.content, payload.title);
       const biography = safeTrim(payload.biography);
       const profileUrl = username ? `https://www.instagram.com/${username}/` : '';
 
       pushUnique(lines, fullName);
       pushUnique(lines, username ? `@${username}` : '');
+      pushUnique(lines, content);
       pushUnique(lines, biography);
       pushUnique(lines, profileUrl);
+      return joinLines(lines);
+    }
+
+    case 'app/x-tiktok-card': {
+      const username = safeTrim(payload.profile_username);
+      const profileName = safeTrim(payload.profile_name);
+      const title = safeTrim(payload.title);
+      const description = safeTrim(payload.description);
+      const audioName = safeTrim(payload.audio_name);
+      const audioAuthor = safeTrim(payload.audio_author);
+      const audio = [audioName, audioAuthor].filter(Boolean).join(' - ');
+
+      pushUnique(lines, profileName);
+      pushUnique(lines, username ? `@${username}` : '');
+      pushUnique(lines, title);
+      pushUnique(lines, description);
+      if (audio) pushUnique(lines, `Audio: ${audio}`);
+      pushUnique(lines, pickFirstNonEmpty(payload.url, payload.profile_url));
       return joinLines(lines);
     }
 

@@ -70,10 +70,15 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 		display = *wrapper.RetweetedTweet
 		isRetweet = true
 	}
+	u.cacheTweetAuthorAvatars(ctx, tl, wrapper, 0, map[string]struct{}{})
 
 	author := tl.Users[display.UserID]
 	if strings.TrimSpace(author.Handle) == "" {
 		author = tl.Users[wrapper.UserID]
+	}
+	author = enrichAuthorFromUserKey(author, display.UserID)
+	if strings.TrimSpace(author.Handle) == "" {
+		author = enrichAuthorFromUserKey(author, wrapper.UserID)
 	}
 
 	tweetURL := BuildTweetURL(tl.Users, display.UserID, display.RestID)
@@ -148,7 +153,10 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 		payload["video_content_type"] = videoCT
 	}
 	if display.QuotedTweet != nil && strings.TrimSpace(display.QuotedTweet.RestID) != "" {
-		payload["quoted_tweet"] = u.buildTweetCardPayload(ctx, tl, *display.QuotedTweet)
+		payload["quoted_tweet"] = u.buildTweetCardPayloadDepth(ctx, tl, *display.QuotedTweet, 1)
+	}
+	if display.RetweetedTweet != nil && strings.TrimSpace(display.RetweetedTweet.RestID) != "" {
+		payload["retweeted_tweet"] = u.buildTweetCardPayloadDepth(ctx, tl, *display.RetweetedTweet, 1)
 	}
 
 	content := text
@@ -180,7 +188,12 @@ func (u *Uploader) SendTweet(ctx context.Context, tl source.Timeline, wrapper so
 }
 
 func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline, t source.Tweet) map[string]any {
+	return u.buildTweetCardPayloadDepth(ctx, tl, t, 0)
+}
+
+func (u *Uploader) buildTweetCardPayloadDepth(ctx context.Context, tl source.Timeline, t source.Tweet, depth int) map[string]any {
 	author := tl.Users[t.UserID]
+	author = enrichAuthorFromUserKey(author, t.UserID)
 
 	tweetURL := BuildTweetURL(tl.Users, t.UserID, t.RestID)
 	text := BuildTweetText(t)
@@ -248,7 +261,48 @@ func (u *Uploader) buildTweetCardPayload(ctx context.Context, tl source.Timeline
 		out["s3_video_url"] = s3Video
 		out["video_content_type"] = videoCT
 	}
+	if depth < 3 && t.QuotedTweet != nil && strings.TrimSpace(t.QuotedTweet.RestID) != "" {
+		out["quoted_tweet"] = u.buildTweetCardPayloadDepth(ctx, tl, *t.QuotedTweet, depth+1)
+	}
+	if depth < 3 && t.RetweetedTweet != nil && strings.TrimSpace(t.RetweetedTweet.RestID) != "" {
+		out["retweeted_tweet"] = u.buildTweetCardPayloadDepth(ctx, tl, *t.RetweetedTweet, depth+1)
+	}
 	return out
+}
+
+func (u *Uploader) cacheTweetAuthorAvatars(
+	ctx context.Context,
+	tl source.Timeline,
+	t source.Tweet,
+	depth int,
+	seen map[string]struct{},
+) {
+	if depth > 6 {
+		return
+	}
+
+	if seen != nil {
+		id := strings.TrimSpace(t.RestID)
+		if id != "" {
+			if _, ok := seen[id]; ok {
+				return
+			}
+			seen[id] = struct{}{}
+		}
+	}
+
+	author := enrichAuthorFromUserKey(tl.Users[t.UserID], t.UserID)
+	avatar := NormalizeMediaURL(author.ProfileImageURL)
+	if avatar != "" {
+		_ = u.uploadWithCache(ctx, avatar, "avatar"+path.Ext(avatar))
+	}
+
+	if t.QuotedTweet != nil {
+		u.cacheTweetAuthorAvatars(ctx, tl, *t.QuotedTweet, depth+1, seen)
+	}
+	if t.RetweetedTweet != nil {
+		u.cacheTweetAuthorAvatars(ctx, tl, *t.RetweetedTweet, depth+1, seen)
+	}
 }
 
 func TweetCreatedAt(twitterCreatedAt string) time.Time {
@@ -274,10 +328,39 @@ func BuildTweetURL(users map[string]source.User, userID, tweetID string) string 
 		handle = usr.Handle
 	}
 	handle = strings.TrimSpace(handle)
-	if handle != "" && handle != userID {
+	if handle != "" {
+		if _, err := strconv.ParseInt(handle, 10, 64); err == nil {
+			return fmt.Sprintf("https://x.com/i/web/status/%s", tweetID)
+		}
 		return fmt.Sprintf("https://x.com/%s/status/%s", handle, tweetID)
 	}
 	return fmt.Sprintf("https://x.com/i/web/status/%s", tweetID)
+}
+
+func enrichAuthorFromUserKey(author source.User, userID string) source.User {
+	if strings.TrimSpace(author.Handle) != "" {
+		if strings.TrimSpace(author.Name) == "" {
+			author.Name = strings.TrimSpace(author.Handle)
+		}
+		return author
+	}
+
+	uid := strings.TrimSpace(userID)
+	if uid == "" {
+		return author
+	}
+	if _, err := strconv.ParseInt(uid, 10, 64); err == nil {
+		return author
+	}
+	handle := uid
+	if handle == "" {
+		return author
+	}
+	author.Handle = handle
+	if strings.TrimSpace(author.Name) == "" {
+		author.Name = handle
+	}
+	return author
 }
 
 func PickBestVideoURL(v *source.Video) (videoURL string, contentType string) {

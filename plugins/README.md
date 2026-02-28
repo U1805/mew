@@ -12,6 +12,7 @@
 - `plugins/internal/fetchers/*`：Fetcher 类 Bot（Go）
   - `plugins/internal/fetchers/test-fetcher`：示例 Fetcher（serviceType=`test-fetcher`）
   - `plugins/internal/fetchers/rss-fetcher`：RSS 抓取（serviceType=`rss-fetcher`）
+  - `plugins/internal/fetchers/tiktok-fetcher`：TikTok 抓取（serviceType=`tiktok-fetcher`）
 - `plugins/internal/agents/*`：Agent 类 Bot（Go）
   - `plugins/internal/agents/test-agent`：示例 Agent（serviceType=`test-agent`）
   - `plugins/internal/agents/jpdict-agent`：词典/翻译 Agent（serviceType=`jpdict-agent`）

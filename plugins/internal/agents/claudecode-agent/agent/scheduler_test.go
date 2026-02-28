@@ -141,6 +141,78 @@ func TestSchedulerReloadJobsPreservesFutureNextRunForUnchangedIntervalJob(t *tes
 	}
 }
 
+func TestSchedulerReloadDiff(t *testing.T) {
+	oldJobs := map[string]*schedulerJob{
+		"keep": {
+			Key:       "keep",
+			Name:      "keep",
+			BotID:     "bot-A",
+			SessionID: "channel-1",
+			Prompt:    "same",
+			Spec: schedulerTimerSpec{
+				Interval: 5 * time.Minute,
+			},
+		},
+		"remove": {
+			Key:       "remove",
+			Name:      "remove",
+			BotID:     "bot-A",
+			SessionID: "channel-1",
+			Prompt:    "old",
+			Spec: schedulerTimerSpec{
+				Interval: 1 * time.Minute,
+			},
+		},
+		"update": {
+			Key:       "update",
+			Name:      "update",
+			BotID:     "bot-A",
+			SessionID: "channel-1",
+			Prompt:    "before",
+			Spec: schedulerTimerSpec{
+				Interval: 2 * time.Minute,
+			},
+		},
+	}
+	newJobs := map[string]*schedulerJob{
+		"keep": {
+			Key:       "keep",
+			Name:      "keep",
+			BotID:     "bot-A",
+			SessionID: "channel-1",
+			Prompt:    "same",
+			Spec: schedulerTimerSpec{
+				Interval: 5 * time.Minute,
+			},
+		},
+		"update": {
+			Key:       "update",
+			Name:      "update",
+			BotID:     "bot-A",
+			SessionID: "channel-1",
+			Prompt:    "after",
+			Spec: schedulerTimerSpec{
+				Interval: 2 * time.Minute,
+			},
+		},
+		"add": {
+			Key:       "add",
+			Name:      "add",
+			BotID:     "bot-A",
+			SessionID: "channel-1",
+			Prompt:    "new",
+			Spec: schedulerTimerSpec{
+				Interval: 10 * time.Minute,
+			},
+		},
+	}
+
+	diff := schedulerReloadDiff(oldJobs, newJobs)
+	if diff.added != 1 || diff.removed != 1 || diff.updated != 1 {
+		t.Fatalf("unexpected diff: %+v", diff)
+	}
+}
+
 func mapKeys(m map[string]*schedulerJob) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {

@@ -41,7 +41,8 @@
 
 ## 去重与缓存
 
-- 优先用 Story `display_url_filename` 去重（更稳定；为空时回退到 `id`）
+- 按 Post 聚合后推送：同一 Post 的多媒体（如 `1771757435_0` / `1771757435_1`）会合并为一次 webhook 发送
+- 去重优先按 Post 维度（`id` 前缀，如 `1771757435`），并兼容历史 Story 级缓存键
 - 媒体文件（包括故事媒体与头像）会通过 webhook `/upload` 本地化到 S3/CDN，并在本地 state 中缓存 `remoteURL -> key`，避免重复上传
 - 支持本地持久化 state（默认写到系统用户缓存目录的 `mew/plugins/instagram-fetcher/<botId>/task-<idx>-<hash>.json`）
 
@@ -49,6 +50,9 @@
 
 环境变量：
 `.env.local/.env` 加载规则与通用环境变量说明见 `plugins/README.md`（由 `plugins/pkg` 提供）。
+
+可选环境变量：
+- `FLARESOLVERR_URL`。配置后会额外启用 `imginn` 数据源。
 
 运行：
 

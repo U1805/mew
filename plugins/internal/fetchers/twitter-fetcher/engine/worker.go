@@ -4,11 +4,12 @@ import (
 	"context"
 	"log"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
-	"mew/plugins/pkg"
 	"mew/plugins/internal/fetchers/twitter-fetcher/source"
+	"mew/plugins/pkg"
 )
 
 type Worker struct {
@@ -36,12 +37,20 @@ func (w *Worker) Run(ctx context.Context) {
 		}
 
 		items := make([]source.TimelineItem, 0, len(tl.Items))
+		monitoredHandle := normalizedHandle(tl.MonitoredUser.Handle)
+		if monitoredHandle == "" {
+			monitoredHandle = normalizedHandle(w.username)
+		}
 		for _, it := range tl.Items {
 			if it.Type != "tweet" {
 				continue
 			}
-			if strings.TrimSpace(it.Tweet.UserID) != "" && strings.TrimSpace(tl.MonitoredUser.RestID) != "" {
-				if it.Tweet.UserID != tl.MonitoredUser.RestID {
+			tweetHandle := normalizedHandle(tweetAuthorHandle(tl, it.Tweet))
+			if monitoredHandle != "" && tweetHandle != "" && tweetHandle != monitoredHandle {
+				continue
+			}
+			if monitoredHandle != "" && tweetHandle == "" {
+				if strings.TrimSpace(it.Tweet.UserID) != "" {
 					continue
 				}
 			}
@@ -108,4 +117,22 @@ func (w *Worker) Run(ctx context.Context) {
 
 		_ = w.tracker.Save()
 	})
+}
+
+func tweetAuthorHandle(tl source.Timeline, tw source.Tweet) string {
+	uid := strings.TrimSpace(tw.UserID)
+	if uid == "" {
+		return ""
+	}
+	if usr, ok := tl.Users[uid]; ok && strings.TrimSpace(usr.Handle) != "" {
+		return usr.Handle
+	}
+	if _, err := strconv.ParseInt(uid, 10, 64); err == nil {
+		return ""
+	}
+	return uid
+}
+
+func normalizedHandle(v string) string {
+	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(v, "@")))
 }

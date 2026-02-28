@@ -119,8 +119,9 @@ func parseViewerCompatResponse(body []byte, expectedHandle string) (Timeline, er
 	}
 
 	users := map[string]User{}
-	if strings.TrimSpace(monitored.RestID) != "" {
-		users[monitored.RestID] = monitored
+	monitoredKey := resolveUserKey(users, monitored.RestID, monitored.Handle)
+	if monitoredKey != "" {
+		users[monitoredKey] = monitored
 	}
 
 	items := make([]TimelineItem, 0, len(tweets))
@@ -129,8 +130,8 @@ func parseViewerCompatResponse(body []byte, expectedHandle string) (Timeline, er
 		if strings.TrimSpace(tw.RestID) == "" {
 			continue
 		}
-		if strings.TrimSpace(tw.UserID) == "" && strings.TrimSpace(monitored.RestID) != "" {
-			tw.UserID = monitored.RestID
+		if strings.TrimSpace(tw.UserID) == "" && monitoredKey != "" {
+			tw.UserID = monitoredKey
 		}
 		items = append(items, TimelineItem{Type: "tweet", Tweet: tw})
 	}
@@ -138,10 +139,11 @@ func parseViewerCompatResponse(body []byte, expectedHandle string) (Timeline, er
 	if len(items) == 0 {
 		return Timeline{}, fmt.Errorf("viewer compat timeline has no valid tweet id")
 	}
-	if strings.TrimSpace(monitored.RestID) == "" {
+	if strings.TrimSpace(monitored.Name) == "" || strings.TrimSpace(monitored.ProfileImageURL) == "" || monitoredKey == "" {
 		monitored = inferMonitoredFromItems(monitored, expectedHandle, items, users)
-		if strings.TrimSpace(monitored.RestID) != "" {
-			users[monitored.RestID] = monitored
+		monitoredKey = resolveUserKey(users, monitored.RestID, monitored.Handle)
+		if monitoredKey != "" {
+			users[monitoredKey] = mergeUser(users[monitoredKey], monitored)
 		}
 	}
 
@@ -201,9 +203,10 @@ func toTimelineTweet(src viewerCompatTweet, users map[string]User, depth int) Tw
 	authorHandle := strings.TrimSpace(strings.TrimPrefix(firstNonEmpty(src.Author.Handle, src.Author.Username, src.Author.UserName), "@"))
 	authorName := strings.TrimSpace(firstNonEmpty(src.Author.Name, src.Author.DisplayName, authorHandle))
 	authorAvatar := strings.TrimSpace(firstNonEmpty(src.Author.AvatarURL, src.Author.ProfilePicture, src.Author.Avatar))
-	if authorID != "" {
-		existing := users[authorID]
-		users[authorID] = mergeUser(existing, User{
+	authorKey := resolveUserKey(users, authorID, authorHandle)
+	if authorKey != "" {
+		existing := users[authorKey]
+		users[authorKey] = mergeUser(existing, User{
 			RestID:          authorID,
 			Handle:          authorHandle,
 			Name:            authorName,
@@ -234,7 +237,7 @@ func toTimelineTweet(src viewerCompatTweet, users map[string]User, depth int) Tw
 
 	t := Tweet{
 		RestID:         restID,
-		UserID:         authorID,
+		UserID:         authorKey,
 		FullText:       strings.TrimSpace(text),
 		DisplayText:    strings.TrimSpace(firstNonEmpty(src.DisplayText, src.Text, src.Content, src.FullText)),
 		CreatedAt:      strings.TrimSpace(src.CreatedAt),
@@ -303,6 +306,9 @@ func inferMonitoredFromItems(monitored User, expectedHandle string, items []Time
 	if target != "" {
 		for _, u := range users {
 			if strings.EqualFold(strings.TrimSpace(u.Handle), target) {
+				if strings.TrimSpace(u.Handle) == "" {
+					u.Handle = target
+				}
 				return u
 			}
 		}
@@ -312,10 +318,10 @@ func inferMonitoredFromItems(monitored User, expectedHandle string, items []Time
 		uid := strings.TrimSpace(items[0].Tweet.UserID)
 		if uid != "" {
 			if u, ok := users[uid]; ok {
+				if strings.TrimSpace(u.Handle) == "" {
+					u.Handle = target
+				}
 				return u
-			}
-			if strings.TrimSpace(monitored.RestID) == "" {
-				monitored.RestID = uid
 			}
 		}
 	}
@@ -329,6 +335,10 @@ func inferMonitoredFromItems(monitored User, expectedHandle string, items []Time
 	if strings.TrimSpace(monitored.RestID) == "" {
 		for _, it := range items {
 			id := strings.TrimSpace(it.Tweet.UserID)
+			if u, ok := users[id]; ok && strings.TrimSpace(u.RestID) != "" {
+				monitored.RestID = strings.TrimSpace(u.RestID)
+				break
+			}
 			if _, err := strconv.ParseInt(id, 10, 64); err == nil {
 				monitored.RestID = id
 				break
@@ -345,13 +355,36 @@ func mergeUser(base User, incoming User) User {
 	if strings.TrimSpace(base.Handle) == "" {
 		base.Handle = strings.TrimSpace(incoming.Handle)
 	}
-	if strings.TrimSpace(base.Name) == "" {
-		base.Name = strings.TrimSpace(incoming.Name)
+	if inName := strings.TrimSpace(incoming.Name); inName != "" {
+		baseName := strings.TrimSpace(base.Name)
+		baseHandle := strings.TrimSpace(base.Handle)
+		if baseName == "" || (baseHandle != "" && strings.EqualFold(baseName, baseHandle)) {
+			base.Name = inName
+		}
 	}
 	if strings.TrimSpace(base.ProfileImageURL) == "" {
 		base.ProfileImageURL = strings.TrimSpace(incoming.ProfileImageURL)
 	}
 	return base
+}
+
+func resolveUserKey(users map[string]User, authorID, authorHandle string) string {
+	handle := normalizeHandle(authorHandle)
+	if handle == "" {
+		return ""
+	}
+
+	for key, u := range users {
+		if normalizeHandle(u.Handle) == handle {
+			return strings.TrimSpace(key)
+		}
+	}
+
+	return handle
+}
+
+func normalizeHandle(handle string) string {
+	return strings.ToLower(strings.TrimSpace(strings.TrimPrefix(handle, "@")))
 }
 
 func firstNonEmpty(values ...string) string {

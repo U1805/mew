@@ -27,16 +27,18 @@ type UserProfile struct {
 }
 
 type StoryItem struct {
-	DisplayURL         string `json:"display_url"`
-	DisplayURLFilename string `json:"display_url_filename"`
-	ID                 string `json:"id"`
-	IsVideo            *bool  `json:"is_video"`
-	ThumbnailSrc       string `json:"thumbnail_src"`
-	LikeCount          int64  `json:"like_count"`
-	CommentCount       int64  `json:"comment_count"`
-	TakenAt            int64  `json:"taken_at"`
-	Title              string `json:"title"`
-	VideoURL           string `json:"video_url"`
+	DisplayURL         string      `json:"display_url"`
+	DisplayURLFilename string      `json:"display_url_filename"`
+	ID                 string      `json:"id"`
+	IsVideo            *bool       `json:"is_video"`
+	ThumbnailSrc       string      `json:"thumbnail_src"`
+	LikeCount          int64       `json:"like_count"`
+	CommentCount       int64       `json:"comment_count"`
+	TakenAt            int64       `json:"taken_at"`
+	Title              string      `json:"title"`
+	Content            string      `json:"content"`
+	VideoURL           string      `json:"video_url"`
+	Items              []StoryItem `json:"-"`
 }
 
 func (u *UserProfile) UnmarshalJSON(b []byte) error {

@@ -21,6 +21,7 @@ const ALLOWED_WEBHOOK_MESSAGE_TYPES = new Set([
   'app/x-twitter-card',
   'app/x-bilibili-card',
   'app/x-instagram-card',
+  'app/x-tiktok-card',
   'app/x-jpdict-card',
 ]);
 

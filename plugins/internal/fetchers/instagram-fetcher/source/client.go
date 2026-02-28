@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -56,7 +57,7 @@ func (c *Client) FetchStories(ctx context.Context, username string) ([]StoryItem
 
 		stories, profile, err := source.fetch(ctx, httpClient, ua, target)
 		if err == nil {
-			return stories, profile, nil
+			return mergeStoriesByPost(stories), profile, nil
 		}
 		errMsgs = append(errMsgs, fmt.Sprintf("%s: %v", source.name, err))
 	}
@@ -73,10 +74,13 @@ func (c *Client) storySources() []storySource {
 	if c.storySourceProvider != nil {
 		return c.storySourceProvider()
 	}
-	return []storySource{
+	sources := []storySource{
 		{name: "picuki-site", fetch: c.fetchPicukiPosts},
-		{name: "insta-stories-viewer-com", fetch: c.fetchInstaStoriesViewerSocketIO},
 	}
+	if strings.TrimSpace(os.Getenv("FLARESOLVERR_URL")) != "" {
+		sources = append(sources, storySource{name: "imginn", fetch: c.fetchImginn})
+	}
+	return sources
 }
 
 func (c *Client) getHTTPClient() *http.Client {

@@ -5,5 +5,6 @@ export { InstagramCard } from './components/InstagramCard';
 export { JpdictCard } from './components/JpdictCard';
 export { PornhubCard } from './components/PornhubCard';
 export { RssCard } from './components/RssCard';
+export { TiktokCard } from './components/TiktokCard';
 export { TwitterCard } from './components/TwitterCard';
 

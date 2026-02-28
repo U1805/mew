@@ -37,9 +37,13 @@ func TestInstagramSourcesIntegration(t *testing.T) {
 		fetch func(context.Context, *http.Client, string, string) ([]StoryItem, *UserProfile, error)
 	}
 
-	sources := []sourceCase{
-		{name: "picuki-posts", fetch: client.fetchPicukiPosts},
-		{name: "insta-stories-viewer-com", fetch: client.fetchInstaStoriesViewerSocketIO},
+	rawSources := client.storySources()
+	sources := make([]sourceCase, 0, len(rawSources))
+	for _, src := range rawSources {
+		sources = append(sources, sourceCase{name: src.name, fetch: src.fetch})
+	}
+	if len(sources) == 0 {
+		t.Fatalf("no story source configured")
 	}
 
 	for _, tc := range sources {

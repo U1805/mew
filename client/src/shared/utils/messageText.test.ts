@@ -89,6 +89,30 @@ describe('getMessageBestEffortText', () => {
     expect(text).toContain('https://t.bilibili.com/123');
   });
 
+  it('extracts TikTok card fields', () => {
+    const message = baseMessage({
+      type: 'app/x-tiktok-card',
+      content: '',
+      payload: {
+        profile_name: 'kokona',
+        profile_username: 'kokona_rec',
+        title: 'A short clip',
+        description: 'Latest TikTok content',
+        audio_name: 'Original Sound',
+        audio_author: 'kokona_rec',
+        url: 'https://www.tiktok.com/@kokona_rec/video/123',
+      },
+    });
+
+    const text = getMessageBestEffortText(message);
+    expect(text).toContain('kokona');
+    expect(text).toContain('@kokona_rec');
+    expect(text).toContain('A short clip');
+    expect(text).toContain('Latest TikTok content');
+    expect(text).toContain('Original Sound - kokona_rec');
+    expect(text).toContain('https://www.tiktok.com/@kokona_rec/video/123');
+  });
+
   it('uses voice transcript when content is empty', () => {
     const message = baseMessage({
       type: 'message/voice',

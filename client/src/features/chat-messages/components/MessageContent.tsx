@@ -5,7 +5,7 @@ import { Message } from '../../../shared/types';
 import { parseMessageContent } from '../../../shared/utils/messageParser';
 import { AttachmentList } from '../../chat-attachments/components/AttachmentList';
 import ForwardCard from './ForwardCard';
-import { BilibiliCard, ClaudeCodeCard, InstagramCard, JpdictCard, PornhubCard, RssCard, TwitterCard, UrlEmbed } from '../../chat-embeds';
+import { BilibiliCard, ClaudeCodeCard, InstagramCard, JpdictCard, PornhubCard, RssCard, TiktokCard, TwitterCard, UrlEmbed } from '../../chat-embeds';
 import { VoiceMessagePlayer } from '../../chat-voice/components/VoiceMessagePlayer';
 import { useI18n } from '../../../shared/i18n';
 
@@ -24,6 +24,7 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
     const isTwitterCard = message.type === 'app/x-twitter-card';
     const isBilibiliCard = message.type === 'app/x-bilibili-card';
     const isInstagramCard = message.type === 'app/x-instagram-card';
+    const isTiktokCard = message.type === 'app/x-tiktok-card';
     const isForwardCard = message.type === 'app/x-forward-card';
     const isJpdictCard = message.type === 'app/x-jpdict-card';
     const isClaudeCodeCard = message.type === 'app/x-claudecode-card';
@@ -59,6 +60,10 @@ const MessageContent: React.FC<MessageContentProps> = ({ message, serverId, chan
 
     if (isInstagramCard && message.payload) {
         return <InstagramCard payload={message.payload} />;
+    }
+
+    if (isTiktokCard && message.payload) {
+        return <TiktokCard payload={message.payload} />;
     }
 
     if (isVoiceMessage) {

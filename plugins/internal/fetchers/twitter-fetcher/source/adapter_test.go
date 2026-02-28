@@ -58,7 +58,7 @@ func TestParseViewerCompatResponse_MapsRestIDForDedup(t *testing.T) {
 	if tl.Items[0].Tweet.RestID != "2020432465932984539" {
 		t.Fatalf("tweet restId = %q", tl.Items[0].Tweet.RestID)
 	}
-	if tl.Items[0].Tweet.UserID != "770531791543279616" {
+	if tl.Items[0].Tweet.UserID != "kurusurindesu" {
 		t.Fatalf("tweet userId = %q", tl.Items[0].Tweet.UserID)
 	}
 }
@@ -146,7 +146,7 @@ func TestParseViewerCompatResponse_TwitterWebViewerShape(t *testing.T) {
 	if tw.RestID != "2020432465932984539" {
 		t.Fatalf("tweet restId = %q", tw.RestID)
 	}
-	if tw.UserID != "770531791543279616" {
+	if tw.UserID != "kurusurindesu" {
 		t.Fatalf("tweet userId = %q", tw.UserID)
 	}
 	if tw.FullText != "hello from twitterwebviewer" {
@@ -157,6 +157,75 @@ func TestParseViewerCompatResponse_TwitterWebViewerShape(t *testing.T) {
 	}
 	if tw.Video == nil || tw.Video.VideoURL != "https://video.twimg.com/a.mp4" {
 		t.Fatalf("tweet video = %#v", tw.Video)
+	}
+}
+
+func TestParseViewerCompatResponse_TwitterWebViewerWithoutAuthorID(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{
+		"success": true,
+		"data": {
+			"user": null,
+			"tweets": [
+				{
+					"id": "2020150357003784355",
+					"content": "hello from twitterwebviewer no author id",
+					"createdAt": "Mon Feb 02 02:05:35 +0000 2026",
+					"author": {
+						"username": "hanamiya_nina",
+						"displayName": "花宮初奈",
+						"avatar": "https://pbs.twimg.com/profile_images/1906908257375137792/nxHod3pr_400x400.jpg"
+					},
+					"stats": {
+						"likes": 1,
+						"retweets": 2,
+						"replies": 3,
+						"quotes": 4,
+						"views": 5,
+						"bookmarks": 6
+					}
+				}
+			]
+		}
+	}`)
+
+	tl, err := parseViewerCompatResponse(body, "hanamiya_nina")
+	if err != nil {
+		t.Fatalf("parseViewerCompatResponse returned error: %v", err)
+	}
+
+	if len(tl.Items) != 1 {
+		t.Fatalf("items len = %d", len(tl.Items))
+	}
+
+	tw := tl.Items[0].Tweet
+	if tw.UserID != "hanamiya_nina" {
+		t.Fatalf("tweet userId = %q", tw.UserID)
+	}
+
+	usr, ok := tl.Users[tw.UserID]
+	if !ok {
+		t.Fatalf("users missing key %q", tw.UserID)
+	}
+	if usr.Handle != "hanamiya_nina" {
+		t.Fatalf("user handle = %q", usr.Handle)
+	}
+	if usr.Name != "花宮初奈" {
+		t.Fatalf("user name = %q", usr.Name)
+	}
+	if usr.ProfileImageURL == "" {
+		t.Fatalf("user avatar empty")
+	}
+
+	if tl.MonitoredUser.Handle != "hanamiya_nina" {
+		t.Fatalf("monitored handle = %q", tl.MonitoredUser.Handle)
+	}
+	if tl.MonitoredUser.Name != "花宮初奈" {
+		t.Fatalf("monitored name = %q", tl.MonitoredUser.Name)
+	}
+	if tl.MonitoredUser.ProfileImageURL == "" {
+		t.Fatalf("monitored avatar empty")
 	}
 }
 
