@@ -257,10 +257,12 @@ func (s *claudeScheduler) reloadJobs(now time.Time) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	prevJobs := s.jobs
+	diff := schedulerReloadDiff(prevJobs, scanned)
 
 	// Keep in-memory runtime fields during reload to avoid schedule drift
 	// between reconciliations when job definitions are unchanged.
-	for key, old := range s.jobs {
+	for key, old := range prevJobs {
 		if cur, ok := scanned[key]; ok {
 			if old.Running {
 				cur.Running = true
@@ -272,7 +274,18 @@ func (s *claudeScheduler) reloadJobs(now time.Time) {
 	}
 
 	s.jobs = scanned
-	log.Printf("%s scheduler reloaded: bot=%s jobs=%d bot_dir=%q", s.runner.logPrefix, s.runner.botID, len(s.jobs), s.botDir)
+	if diff.added == 0 && diff.removed == 0 && diff.updated == 0 {
+		return
+	}
+	log.Printf("%s scheduler reloaded: bot=%s jobs=%d added=%d removed=%d updated=%d bot_dir=%q",
+		s.runner.logPrefix,
+		s.runner.botID,
+		len(s.jobs),
+		diff.added,
+		diff.removed,
+		diff.updated,
+		s.botDir,
+	)
 }
 
 func schedulerJobDefinitionEqual(a, b *schedulerJob) bool {
@@ -300,6 +313,32 @@ func schedulerDailyClockEqual(a, b *schedulerDailyClock) bool {
 		return a == b
 	}
 	return a.Hour == b.Hour && a.Minute == b.Minute && a.Second == b.Second
+}
+
+type schedulerReloadDelta struct {
+	added   int
+	removed int
+	updated int
+}
+
+func schedulerReloadDiff(prev, next map[string]*schedulerJob) schedulerReloadDelta {
+	var out schedulerReloadDelta
+	for key, cur := range next {
+		old, ok := prev[key]
+		if !ok {
+			out.added++
+			continue
+		}
+		if !schedulerJobDefinitionEqual(old, cur) {
+			out.updated++
+		}
+	}
+	for key := range prev {
+		if _, ok := next[key]; !ok {
+			out.removed++
+		}
+	}
+	return out
 }
 
 func (s *claudeScheduler) scanJobs(now time.Time) (map[string]*schedulerJob, error) {
