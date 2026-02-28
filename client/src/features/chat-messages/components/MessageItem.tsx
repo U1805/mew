@@ -104,11 +104,12 @@ const MessageItem = ({ message, isSequential, ownedBotUserIds, className }: Mess
   const isTwitterCard = message.type === 'app/x-twitter-card';
   const isBilibiliCard = message.type === 'app/x-bilibili-card';
   const isInstagramCard = message.type === 'app/x-instagram-card';
+  const isTiktokCard = message.type === 'app/x-tiktok-card';
   const isForwardCard = message.type === 'app/x-forward-card';
   const isJpdictCard = message.type === 'app/x-jpdict-card';
   const isClaudeCodeCard = message.type === 'app/x-claudecode-card';
   const isVoiceMessage = message.type === 'message/voice';
-  const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isForwardCard || isJpdictCard;
+  const isAppCard = isRssCard || isPornhubCard || isTwitterCard || isBilibiliCard || isInstagramCard || isTiktokCard || isForwardCard || isJpdictCard;
   const isAuthor = user?._id?.toString() === author._id?.toString();
   const canDeleteAsBotOwner = !!user && !!author?.isBot && !!ownedBotUserIds?.has(author._id?.toString());
   const isRetracted = !!message.retractedAt;

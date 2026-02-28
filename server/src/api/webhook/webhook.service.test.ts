@@ -196,6 +196,41 @@ describe('webhook.service', () => {
     await expect(executeWebhook('w1', 't1', { type: 'app/x-unknown', content: 'x' } as any)).rejects.toBeInstanceOf(BadRequestError);
   });
 
+  it('executeWebhook accepts tiktok card message type', async () => {
+    vi.mocked((webhookRepository as any).findByIdAndToken).mockResolvedValue({
+      _id: 'w1',
+      name: 'Hook',
+      avatarUrl: 'hook.png',
+      channelId: 'c1',
+      botUserId: 'u-bot',
+      serverId: 's1',
+    });
+    vi.mocked((webhookRepository as any).countOtherWebhooksByBotUserId).mockResolvedValue(0);
+    vi.mocked((UserModel as any).findById).mockResolvedValue({ _id: 'u-bot' });
+    vi.mocked(MessageService.createMessage).mockResolvedValue({ _id: 'm1' } as any);
+
+    const result = await executeWebhook('w1', 't1', {
+      type: 'app/x-tiktok-card',
+      content: '@kokona_rec posted a new TikTok video',
+      payload: {
+        id: '123',
+        url: 'https://www.tiktok.com/@kokona_rec/video/123',
+      },
+    } as any);
+
+    expect(MessageService.createMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'app/x-tiktok-card',
+        payload: expect.objectContaining({
+          id: '123',
+          webhookName: 'Hook',
+        }),
+      }),
+      { bypassPermissions: true }
+    );
+    expect(result).toEqual({ _id: 'm1' });
+  });
+
   it('executeWebhook rejects empty content for message/default', async () => {
     vi.mocked((webhookRepository as any).findByIdAndToken).mockResolvedValue({
       _id: 'w1',

@@ -98,6 +98,24 @@ function cardPayloadText(type: string, payload: Record<string, any>): string {
       return joinLines(lines);
     }
 
+    case 'app/x-tiktok-card': {
+      const username = safeTrim(payload.profile_username);
+      const profileName = safeTrim(payload.profile_name);
+      const title = safeTrim(payload.title);
+      const description = safeTrim(payload.description);
+      const audioName = safeTrim(payload.audio_name);
+      const audioAuthor = safeTrim(payload.audio_author);
+      const audio = [audioName, audioAuthor].filter(Boolean).join(' - ');
+
+      pushUnique(lines, profileName);
+      pushUnique(lines, username ? `@${username}` : '');
+      pushUnique(lines, title);
+      pushUnique(lines, description);
+      if (audio) pushUnique(lines, `Audio: ${audio}`);
+      pushUnique(lines, pickFirstNonEmpty(payload.url, payload.profile_url));
+      return joinLines(lines);
+    }
+
     case 'app/x-pornhub-card': {
       pushUnique(lines, safeTrim(payload.title));
       pushUnique(lines, safeTrim(payload.url));
